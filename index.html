@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weird Stuff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  background:#05070a;
+  color:#e5e7eb;
+  font-family:'Share Tech Mono','VHS',monospace;
+  overflow-x:hidden;
+  cursor:none;
+}
+
+#cursor{
+  width:10px;height:10px;
+  background:#e5e7eb;
+  position:fixed;top:0;left:0;
+  pointer-events:none;z-index:9999;
+  mix-blend-mode:difference;
+  transform:translate(-50%,-50%);
+}
+#cursor-trail{
+  width:30px;height:30px;
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:50%;
+  position:fixed;top:0;left:0;
+  pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);
+  transition:left 0.12s ease,top 0.12s ease;
+}
+
+body::after{
+  content:"";
+  position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px);
+  background-size:100% 4px;
+  pointer-events:none;z-index:50;
+}
+
+header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:24px 40px;
+  border-bottom:1px solid #111827;
+  position:relative;z-index:10;
+}
+.logo{font-size:13px;letter-spacing:5px;color:#cbd5e1;}
+.logo:hover{animation:glitch 0.3s steps(2) infinite;}
+@keyframes glitch{
+  0%  {text-shadow: 2px 0 #f00,-2px 0 #0ff;}
+  25% {text-shadow:-2px 0 #f00, 2px 0 #0ff;}
+  50% {text-shadow: 2px 2px #f00,-2px -2px #0ff;}
+  75% {text-shadow:-2px 0 #0ff, 2px 0 #f00;}
+  100%{text-shadow:0 0 #f00,0 0 #0ff;}
+}
+nav a{
+  margin-left:20px;text-decoration:none;
+  font-size:12px;letter-spacing:2px;
+  color:#4b5563;transition:color 0.2s;
+  cursor:none;font-family:inherit;
+}
+nav a:hover{color:#fff;}
+
+.hero{
+  padding:120px 40px 60px;
+  max-width:900px;
+  position:relative;z-index:1;
+}
+.hero h1{
+  font-size:58px;line-height:1.05;
+  font-weight:400;letter-spacing:-1px;
+  min-height:200px;
+}
+.cursor-blink{
+  display:inline-block;width:3px;height:0.85em;
+  background:#e5e7eb;vertical-align:middle;margin-left:4px;
+  animation:blink 0.8s step-end infinite;
+}
+@keyframes blink{50%{opacity:0;}}
+.quote{
+  margin-top:30px;text-align:right;
+  color:#4b5563;font-size:12px;letter-spacing:2px;
+}
+
+section{padding:80px 40px;position:relative;z-index:1;}
+
+.label{
+  font-size:10px;letter-spacing:4px;
+  color:#374151;margin-bottom:24px;
+}
+
+.who p{
+  font-size:16px;color:#6b7280;
+  line-height:2;max-width:600px;
+  transition:color 0.3s;
+}
+.who p:hover{color:#e5e7eb;}
+
+.project{
+  margin-top:32px;max-width:680px;
+  padding:28px;border:1px solid #111827;
+  position:relative;
+  transition:border-color 0.3s,background 0.3s;
+  overflow:hidden;
+}
+.project::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.02) 0%,transparent 60%);
+  opacity:0;transition:opacity 0.3s;pointer-events:none;
+}
+.project:hover{border-color:#1f2937;background:rgba(255,255,255,0.01);}
+.project:hover::before{opacity:1;}
+.project-num{
+  position:absolute;top:28px;right:28px;
+  font-size:11px;color:#1f2937;letter-spacing:2px;
+}
+.project h2{
+  font-size:40px;font-weight:400;
+  letter-spacing:-1px;margin-bottom:8px;
+  transition:letter-spacing 0.3s;
+}
+.project:hover h2{letter-spacing:0;}
+.project .sub{color:#374151;font-size:12px;letter-spacing:1px;margin-bottom:24px;}
+
+a.btn,button.btn{
+  display:inline-block;padding:8px 16px;
+  border:1px solid #1f2937;color:#6b7280;
+  text-decoration:none;font-size:11px;
+  letter-spacing:2px;margin-right:10px;
+  transition:border-color 0.2s,color 0.2s;
+  background:transparent;cursor:none;
+  font-family:inherit;position:relative;z-index:2;
+}
+a.btn:hover,button.btn:hover{border-color:#4b5563;color:#e5e7eb;}
+
+.status{
+  display:inline-flex;align-items:center;
+  gap:6px;font-size:10px;color:#374151;
+  letter-spacing:2px;margin-top:20px;
+}
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#1d4ed8;
+  animation:pulse 2s ease-in-out infinite;
+}
+.dot.wip{background:#78350f;animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+#poster{max-height:0;overflow:hidden;transition:max-height 0.4s ease,margin-top 0.4s ease;}
+#poster.active{max-height:200px;margin-top:24px;}
+#poster-inner{border-top:1px solid #111827;padding-top:20px;}
+#poster-inner p{color:#4b5563;font-size:13px;line-height:1.8;}
+
+/* TEAM */
+.team-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:1px;
+  background:#111827;
+  border:1px solid #111827;
+  margin-top:8px;
+}
+.member{
+  padding:32px 28px;
+  background:#05070a;
+  transition:background 0.3s;
+  position:relative;
+}
+.member:hover{background:#080b10;}
+.member-role{font-size:10px;letter-spacing:3px;color:#374151;margin-bottom:16px;}
+.member-name{font-size:28px;font-weight:400;color:#cbd5e1;letter-spacing:-0.5px;}
+.member-bio{
+  font-size:12px;color:#4b5563;line-height:1.9;
+  margin-top:16px;padding-top:16px;
+  border-top:1px solid #111827;
+}
+.member-num{
+  position:absolute;top:28px;right:24px;
+  font-size:10px;color:#1f2937;letter-spacing:2px;
+}
+
+/* CONTACT */
+.contact-links{display:flex;flex-direction:column;max-width:500px;}
+.contact-link{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:20px 0;border-bottom:1px solid #111827;
+  text-decoration:none;color:#6b7280;
+  font-size:13px;letter-spacing:2px;
+  transition:color 0.2s,padding-left 0.2s;
+  cursor:none;
+}
+.contact-link:first-child{border-top:1px solid #111827;}
+.contact-link:hover{color:#e5e7eb;padding-left:8px;}
+.contact-link span{font-size:10px;color:#1f2937;letter-spacing:1px;transition:color 0.2s;}
+.contact-link:hover span{color:#4b5563;}
+
+footer{
+  padding:40px;border-top:1px solid #111827;
+  font-size:10px;color:#1f2937;letter-spacing:3px;
+  display:flex;justify-content:space-between;
+  position:relative;z-index:1;
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-trail"></div>
+
+<header>
+  <div class="logo">WEIRD STUFF</div>
+  <nav>
+    <a href="#who">WHO ARE?</a>
+    <a href="#projects">PROJECTS</a>
+    <a href="#team">OUR TEAM</a>
+    <a href="#contact">CONTACT</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <h1 id="hero-text"></h1>
+  <div class="quote">— belfegor442</div>
+</div>
+
+<section id="who">
+  <div class="label">// WHO ARE?</div>
+  <div class="who">
+    <p>We're Weird Stuff.</p>
+    <p>We make software.</p>
+    <p>Sometimes because we need it.</p>
+    <p>Sometimes because we can.</p>
+    <p>That's pretty much it.</p>
+  </div>
+</section>
+
+<section id="projects">
+  <div class="label">// PROJECTS</div>
+
+  <div class="project">
+    <span class="project-num">01</span>
+    <h2>Monix</h2>
+    <p class="sub">ALL IN ONE SYSTEM SUITE</p>
+    <a class="btn" href="Apps/Monix.web/index.html">OPEN</a>
+    <button class="btn" id="posterBtn">POSTER</button>
+    <div class="status">
+      <span class="dot"></span>
+      ACTIVE
+    </div>
+    <div id="poster">
+      <div id="poster-inner">
+        <p>Started as a small utility.</p>
+        <p>Then it became something else.</p>
+        <p>Monix is the system that connects everything.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="project">
+    <span class="project-num">02</span>
+    <h2>Meat</h2>
+    <p class="sub">WORK IN PROGRESS</p>
+    <a class="btn" href="Apps/Meat/index.html">OPEN</a>
+    <div class="status">
+      <span class="dot wip"></span>
+      WIP
+    </div>
+  </div>
+
+</section>
+
+<section id="team">
+  <div class="label">// OUR TEAM</div>
+  <div class="team-grid">
+
+    <div class="member">
+      <span class="member-num">01</span>
+      <div class="member-role">CEO</div>
+      <div class="member-name">belfegor442</div>
+      <div class="member-bio">Owner and creator of Weird Stuff. Can't stop thinking about new ideas and making them real.</div>
+    </div>
+
+    <div class="member">
+      <span class="member-num">02</span>
+      <div class="member-role">CO-FOUNDER</div>
+      <div class="member-name">AcridCosine6168</div>
+      <div class="member-bio"></div>
+    </div>
+
+  </div>
+</section>
+
+<section id="contact">
+  <div class="label">// CONTACT</div>
+  <div class="contact-links">
+    <a class="contact-link" href="https://discord.gg/wjG8pEdBTG" target="_blank">
+      DISCORD <span>Discord Server →</span>
+    </a>
+    <a class="contact-link" href="mailto:orimuri12yt@gmail.com">
+      EMAIL <span>orimuri12yt@gmail.com →</span>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <span>WEIRD STUFF</span>
+  <span id="ts"></span>
+</footer>
+
+<script>
+const cur = document.getElementById('cursor');
+const trail = document.getElementById('cursor-trail');
+let mx = 0, my = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.left = mx + 'px';
+  cur.style.top  = my + 'px';
+});
+setInterval(() => {
+  trail.style.left = mx + 'px';
+  trail.style.top  = my + 'px';
+}, 80);
+
+const lines = ["We got bored","and we decided","to make these things."];
+const el = document.getElementById('hero-text');
+let li = 0, ci = 0, text = '';
+function type() {
+  if (li >= lines.length) {
+    el.innerHTML = text.replace(/\n/g,'<br>') + '<span class="cursor-blink"></span>';
+    return;
+  }
+  if (ci < lines[li].length) {
+    text += lines[li][ci++];
+  } else {
+    text += '\n'; li++; ci = 0;
+  }
+  el.innerHTML = text.replace(/\n/g,'<br>') + '<span class="cursor-blink"></span>';
+  setTimeout(type, ci === 0 ? 300 : 40 + Math.random() * 30);
+}
+setTimeout(type, 500);
+
+document.getElementById('posterBtn').onclick = () => {
+  document.getElementById('poster').classList.toggle('active');
+};
+
+function tick() {
+  document.getElementById('ts').textContent =
+    new Date().toLocaleTimeString('es-ES', {hour12:false});
+}
+tick(); setInterval(tick, 1000);
+</script>
+
+</body>
+</html>
