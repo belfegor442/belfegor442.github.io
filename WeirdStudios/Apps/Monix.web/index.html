@@ -82,6 +82,32 @@ nav a{
   color:#e5e7eb;
   text-decoration:none;
 }
+
+/* SYSTEM BOX */
+
+#system{
+  padding:40px;
+  border-top:1px solid #111827;
+}
+
+#system h2{
+  font-size:13px;
+  letter-spacing:4px;
+  margin-bottom:20px;
+  color:#9ca3af;
+}
+
+.system-info{
+  font-family:'Share Tech Mono',monospace;
+  white-space:pre;
+  line-height:1.6;
+  font-size:15px;
+}
+
+#os-name{
+  color:#fff;
+  text-shadow:0 0 10px rgba(255,255,255,.2);
+}
 </style>
 </head>
 
@@ -113,15 +139,27 @@ nav a{
   <div class="project">
     <h2>Monix</h2>
     <p class="sub">ALL IN ONE SYSTEM SUITE</p>
-
-    <!-- FIX REAL -->
     <a class="btn" href="./Apps/Monix.web/">OPEN</a>
-
   </div>
 
 </section>
 
+<!-- SYSTEM DETECTOR -->
+<section id="system">
+  <h2>YOUR SYSTEM</h2>
+
+  <pre class="system-info">
+--Your system--
+        |
+        ↓
+
+<span id="os-name">Detecting...</span>
+  </pre>
+</section>
+
 <script>
+
+/* TYPEWRITER */
 const lines = ["We got bored","and we decided","to make these things."];
 const el = document.getElementById('hero-text');
 
@@ -145,6 +183,27 @@ function type(){
 }
 
 setTimeout(type, 400);
+
+/* OS DETECTION */
+function detectOS(){
+
+  if(navigator.userAgentData?.platform){
+    return navigator.userAgentData.platform;
+  }
+
+  const ua = navigator.userAgent;
+
+  if(ua.includes("Windows")) return "Windows";
+  if(ua.includes("Mac")) return "macOS";
+  if(ua.includes("Linux")) return "Linux";
+  if(ua.includes("Android")) return "Android";
+  if(/iPhone|iPad|iPod/.test(ua)) return "iOS";
+
+  return "Unknown";
+}
+
+document.getElementById("os-name").textContent = detectOS();
+
 </script>
 
 </body>
