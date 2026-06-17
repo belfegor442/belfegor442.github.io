@@ -83,7 +83,7 @@ nav a{
   text-decoration:none;
 }
 
-/* SYSTEM BOX */
+/* SYSTEM */
 
 #system{
   padding:40px;
@@ -98,14 +98,13 @@ nav a{
 }
 
 .system-info{
-  font-family:'Share Tech Mono',monospace;
   white-space:pre;
   line-height:1.6;
   font-size:15px;
 }
 
 #os-name{
-  color:#fff;
+  color:#ffffff;
   text-shadow:0 0 10px rgba(255,255,255,.2);
 }
 </style>
@@ -135,16 +134,13 @@ nav a{
 </section>
 
 <section id="projects">
-
   <div class="project">
     <h2>Monix</h2>
     <p class="sub">ALL IN ONE SYSTEM SUITE</p>
     <a class="btn" href="./Apps/Monix.web/">OPEN</a>
   </div>
-
 </section>
 
-<!-- SYSTEM DETECTOR -->
 <section id="system">
   <h2>YOUR SYSTEM</h2>
 
@@ -159,7 +155,7 @@ nav a{
 
 <script>
 
-/* TYPEWRITER */
+/* HERO TYPEWRITER */
 const lines = ["We got bored","and we decided","to make these things."];
 const el = document.getElementById('hero-text');
 
@@ -184,25 +180,30 @@ function type(){
 
 setTimeout(type, 400);
 
-/* OS DETECTION */
+
+/* OS DETECTION (FIXED REAL) */
 function detectOS(){
 
-  if(navigator.userAgentData?.platform){
+  const ua = navigator.userAgent.toLowerCase();
+
+  if (navigator.userAgentData?.platform) {
     return navigator.userAgentData.platform;
   }
 
-  const ua = navigator.userAgent;
-
-  if(ua.includes("Windows")) return "Windows";
-  if(ua.includes("Mac")) return "macOS";
-  if(ua.includes("Linux")) return "Linux";
-  if(ua.includes("Android")) return "Android";
-  if(/iPhone|iPad|iPod/.test(ua)) return "iOS";
+  if (ua.includes("windows")) return "Windows";
+  if (ua.includes("mac")) return "macOS";
+  if (ua.includes("linux")) return "Linux";
+  if (ua.includes("android")) return "Android";
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ipod")) return "iOS";
 
   return "Unknown";
 }
 
-document.getElementById("os-name").textContent = detectOS();
+window.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("os-name");
+  if (!el) return;
+  el.textContent = detectOS();
+});
 
 </script>
 
