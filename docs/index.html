@@ -324,6 +324,10 @@ footer{
 <footer>
   <span>WEIRD STUFF</span>
   <span id="ts"></span>
+  
+  <span id="copyright">© 2026 Weird Stuff. All rights reserved.</span>
+  <span id="ts"></span>
+
 </footer>
 
 <script>
@@ -367,6 +371,8 @@ function tick() {
     new Date().toLocaleTimeString('es-ES', {hour12:false});
 }
 tick(); setInterval(tick, 1000);
+  document.getElementById("copyright").textContent =
+  `© ${new Date().getFullYear()} Weird Stuff. All rights reserved.`;
 </script>
 
 </body>
