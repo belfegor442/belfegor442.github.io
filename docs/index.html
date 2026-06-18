@@ -11,6 +11,10 @@
 <link rel="icon" type="image/jpeg" href="/icon.jpg">
 
 <style>
+
+/* =========================
+   THEME FIX (NO BREAK)
+========================= */
 :root{
   --bg:#05070a;
   --text:#e5e7eb;
@@ -32,12 +36,12 @@
 body{
   background:var(--bg);
   color:var(--text);
-  font-family:'Share Tech Mono',monospace;
+  font-family:'Share Tech Mono','VHS',monospace;
   overflow-x:hidden;
   cursor:none;
 }
 
-/* CURSOR */
+/* ================= CURSOR ================= */
 #cursor{
   width:10px;height:10px;
   background:var(--text);
@@ -51,23 +55,25 @@ body{
 
 #cursor-trail{
   width:30px;height:30px;
-  border:1px solid var(--border);
+  border:1px solid rgba(255,255,255,0.2);
   border-radius:50%;
   position:fixed;
   top:0;left:0;
   pointer-events:none;
   z-index:9998;
   transform:translate(-50%,-50%);
-  transition:left .12s ease,top .12s ease;
+  transition:left 0.12s ease,top 0.12s ease;
 }
 
+/* ================= LAYOUT ================= */
 body::after{
   content:"";
   position:fixed;
   inset:0;
-  background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px);
   background-size:100% 4px;
   pointer-events:none;
+  z-index:50;
 }
 
 /* HEADER */
@@ -77,6 +83,8 @@ header{
   align-items:center;
   padding:24px 40px;
   border-bottom:1px solid var(--border);
+  position:relative;
+  z-index:10;
 }
 
 .logo{
@@ -91,6 +99,7 @@ nav a{
   font-size:12px;
   letter-spacing:2px;
   color:var(--muted);
+  transition:0.2s;
 }
 
 nav a:hover{color:var(--text);}
@@ -99,12 +108,15 @@ nav a:hover{color:var(--text);}
 .hero{
   padding:120px 40px 60px;
   max-width:900px;
+  position:relative;
+  z-index:1;
 }
 
 .hero h1{
   font-size:58px;
-  font-weight:400;
   line-height:1.05;
+  font-weight:400;
+  letter-spacing:-1px;
 }
 
 .cursor-blink{
@@ -112,7 +124,7 @@ nav a:hover{color:var(--text);}
   width:3px;
   height:0.85em;
   background:var(--text);
-  animation:blink .8s step-end infinite;
+  animation:blink 0.8s step-end infinite;
 }
 
 @keyframes blink{50%{opacity:0;}}
@@ -125,7 +137,11 @@ nav a:hover{color:var(--text);}
 }
 
 /* SECTIONS */
-section{padding:80px 40px;}
+section{
+  padding:80px 40px;
+  position:relative;
+  z-index:1;
+}
 
 .label{
   font-size:10px;
@@ -160,22 +176,39 @@ section{padding:80px 40px;}
   font-size:12px;
 }
 
-.btn{
+a.btn,button.btn{
   display:inline-block;
   padding:8px 16px;
   border:1px solid var(--border);
   color:var(--muted);
   text-decoration:none;
   font-size:11px;
+  background:transparent;
+  cursor:none;
 }
 
-.btn:hover{color:var(--text);}
+a.btn:hover,button.btn:hover{color:var(--text);}
 
 /* STATUS */
 .status{
-  margin-top:20px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
   font-size:10px;
   color:var(--muted);
+  margin-top:20px;
+}
+
+/* POSTER */
+#poster{
+  max-height:0;
+  overflow:hidden;
+  transition:0.4s;
+}
+
+#poster.active{
+  max-height:200px;
+  margin-top:24px;
 }
 
 /* TEAM */
@@ -223,6 +256,7 @@ footer{
   display:flex;
   justify-content:space-between;
 }
+
 </style>
 </head>
 
@@ -247,10 +281,12 @@ footer{
 </div>
 
 <section id="who">
-  <div class="label">// WHO</div>
+  <div class="label">// WHO ARE?</div>
   <div class="who">
+    <p>We're Weird Stuff.</p>
     <p>We make software.</p>
-    <p>Because we can.</p>
+    <p>Sometimes because we need it.</p>
+    <p>Sometimes because we can.</p>
   </div>
 </section>
 
@@ -259,16 +295,23 @@ footer{
 
   <div class="project">
     <h2>Monix</h2>
-    <p class="sub">ALL IN ONE SYSTEM</p>
+    <p class="sub">ALL IN ONE SYSTEM SUITE</p>
     <a class="btn" href="Apps/Monix.web/index.html">OPEN</a>
+    <button class="btn" id="posterBtn">POSTER</button>
+
     <div class="status">ACTIVE</div>
+
+    <div id="poster">
+      <p>Started as a small utility.</p>
+      <p>Then it became something else.</p>
+    </div>
   </div>
 
   <div class="project">
     <h2>Meat</h2>
-    <p class="sub">WIP</p>
+    <p class="sub">WORK IN PROGRESS</p>
     <a class="btn" href="Apps/Meat/index.html">OPEN</a>
-    <div class="status">WORK IN PROGRESS</div>
+    <div class="status">WIP</div>
   </div>
 </section>
 
@@ -297,6 +340,8 @@ footer{
 </footer>
 
 <script>
+
+/* CURSOR */
 const cur = document.getElementById('cursor');
 const trail = document.getElementById('cursor-trail');
 
@@ -310,12 +355,46 @@ setInterval(()=>{
   trail.style.top = cur.style.top;
 },50);
 
-function tick(){
-  document.getElementById('ts').textContent =
-    new Date().toLocaleTimeString('es-ES',{hour12:false});
+/* TYPING */
+const lines=["We got bored","and we made this"];
+const el=document.getElementById('hero-text');
+let i=0,j=0,t="";
+
+function type(){
+  if(i>=lines.length){
+    el.innerHTML=t;
+    return;
+  }
+
+  if(j<lines[i].length){
+    t+=lines[i][j++];
+  }else{
+    t+="<br>";i++;j=0;
+  }
+
+  el.innerHTML=t+'<span class="cursor-blink"></span>';
+  setTimeout(type,40);
 }
-setInterval(tick,1000);
+
+setTimeout(type,500);
+
+/* POSTER */
+document.getElementById('posterBtn').onclick=()=>{
+  document.getElementById('poster').classList.toggle('active');
+};
+
+/* CLOCK SAFE */
+const ts=document.getElementById('ts');
+
+function tick(){
+  if(ts){
+    ts.textContent=new Date().toLocaleTimeString('es-ES',{hour12:false});
+  }
+}
+
 tick();
+setInterval(tick,1000);
+
 </script>
 
 </body>
