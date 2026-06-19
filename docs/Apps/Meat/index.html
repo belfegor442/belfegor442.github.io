@@ -1,12 +1,3 @@
-
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MEAT - El laberinto que respira</title>
-
-﻿
 <!doctype html>
 <html lang="es">
 <head>
@@ -14,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MEAT - El laberinto que respira</title>
   <meta name="description" content="MEAT es un prototipo de terror en primera persona: un laberinto de carne vivo, enemigos organicos y una salida que no quiere abrirse.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --black: #050204;
@@ -849,9 +843,402 @@
         text-align: center;
       }
     }
+
+    /* =========================================================
+       RETRO CRT TV TRANSFORMATION
+       ========================================================= */
+
+    /* Pixel-art rendering for ALL images & icons */
+    img,
+    .image-panel img,
+    .media-shot img,
+    .weapon img,
+    .heart,
+    svg {
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+
+    /* Pixelate raster art via low-res downscale trick where appropriate */
+    .image-panel img,
+    .media-shot img,
+    .weapon img {
+      filter: contrast(1.18) saturate(1.25) brightness(0.94);
+      transform: translateZ(0);
+    }
+
+    /* Pixelated brand mark via stepped background */
+    .brand-mark {
+      image-rendering: pixelated;
+      filter: contrast(1.2) saturate(1.4);
+    }
+
+    /* Retro pixel font for headings, monospace CRT for body */
+    body {
+      font-family: "VT323", "Courier New", monospace !important;
+      font-size: 19px;
+      letter-spacing: 0.02em;
+      color: #ffd9b0;
+      text-shadow: 0 0 1px rgba(255, 180, 120, 0.55), 0 0 6px rgba(255, 60, 40, 0.18);
+    }
+
+    h1 {
+      font-family: "Press Start 2P", "VT323", monospace !important;
+      font-size: 78px !important;
+      line-height: 1 !important;
+      letter-spacing: 0.04em !important;
+      color: #ffe7b8 !important;
+      text-shadow:
+        2px 0 0 #ff2a2a,
+        -2px 0 0 #00d6ff,
+        0 4px 0 #360508,
+        0 0 14px rgba(255, 60, 40, 0.55),
+        0 0 38px rgba(210, 52, 47, 0.5) !important;
+      animation: meatRgbJitter 3.2s steps(8) infinite;
+    }
+
+    h2, .section-title {
+      font-family: "Press Start 2P", "VT323", monospace !important;
+      letter-spacing: 0.05em;
+      text-shadow:
+        1px 0 0 #ff2a2a,
+        -1px 0 0 #00d6ff,
+        0 0 8px rgba(255, 80, 60, 0.45);
+    }
+
+    h3 {
+      font-family: "Silkscreen", "VT323", monospace !important;
+      letter-spacing: 0.04em;
+    }
+
+    .brand,
+    .nav-links,
+    .button,
+    .signal strong,
+    .signal span,
+    .objective-index,
+    .live-readout,
+    code,
+    .command span {
+      font-family: "Silkscreen", "VT323", monospace !important;
+      letter-spacing: 0.05em;
+    }
+
+    code {
+      font-family: "VT323", monospace !important;
+      font-size: 22px;
+    }
+
+    p, .tagline, .hero-note, .section-copy p, .quote-block {
+      font-family: "VT323", "Courier New", monospace !important;
+    }
+
+    .tagline {
+      font-size: 30px !important;
+      letter-spacing: 0.02em;
+    }
+
+    .hero-note,
+    .section-copy p {
+      font-size: 20px !important;
+      line-height: 1.45 !important;
+    }
+
+    /* Heavier vignette to look like screen edges */
+    body::before {
+      filter: saturate(1.32) contrast(1.18) brightness(0.78) hue-rotate(-4deg) !important;
+    }
+
+    /* Strong scanline overlay everywhere */
+    body::after {
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.42) 0 2px,
+          rgba(255, 255, 255, 0.02) 2px 3px,
+          rgba(0, 0, 0, 0.0) 3px 4px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 0, 30, 0.04) 0 1px,
+          rgba(0, 255, 220, 0.04) 1px 2px,
+          transparent 2px 3px
+        ),
+        radial-gradient(circle at 50% 30%, rgba(255, 110, 70, 0.18), transparent 55%) !important;
+      mix-blend-mode: normal !important;
+      opacity: 1 !important;
+      z-index: 9998 !important;
+      pointer-events: none;
+    }
+
+    /* The big CRT shell: curvature, vignette, glare */
+    .crt-shell {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+    }
+
+    /* Curved vignette + bezel */
+    .crt-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 38px / 28px;
+      box-shadow:
+        inset 0 0 80px 8px rgba(0, 0, 0, 0.95),
+        inset 0 0 220px 30px rgba(60, 0, 0, 0.85),
+        inset 0 0 420px 80px rgba(0, 0, 0, 0.55);
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.07), transparent 35%),
+        radial-gradient(ellipse at 50% 100%, rgba(255, 60, 40, 0.06), transparent 45%);
+    }
+
+    /* Bright glare sweep across screen */
+    .crt-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        120deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.06) 45%,
+        rgba(255, 255, 255, 0.10) 50%,
+        rgba(255, 255, 255, 0.06) 55%,
+        transparent 70%
+      );
+      mix-blend-mode: screen;
+      animation: crtGlare 11s linear infinite;
+    }
+
+    /* Rolling horizontal scanline */
+    .crt-rolling {
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 140px;
+      pointer-events: none;
+      z-index: 9997;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(255, 255, 255, 0.025) 35%,
+        rgba(255, 255, 255, 0.06) 50%,
+        rgba(255, 255, 255, 0.025) 65%,
+        transparent 100%
+      );
+      mix-blend-mode: screen;
+      animation: crtRoll 7.5s linear infinite;
+    }
+
+    /* CRT noise grain */
+    .crt-noise {
+      position: fixed;
+      inset: -50%;
+      pointer-events: none;
+      z-index: 9996;
+      opacity: 0.12;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      animation: crtGrain 0.18s steps(4) infinite;
+    }
+
+    /* RGB shift / chromatic aberration layer at top */
+    .crt-rgb {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9995;
+      mix-blend-mode: screen;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 0, 80, 0.06) 0 1px,
+          transparent 1px 2px,
+          rgba(0, 220, 255, 0.06) 2px 3px,
+          transparent 3px 4px
+        );
+      opacity: 0.85;
+    }
+
+    /* Power-on flicker on first load */
+    main, .site-header, footer {
+      animation: crtPowerOn 1.4s ease-out 1;
+    }
+
+    /* Subtle global flicker */
+    html {
+      animation: crtFlicker 4.2s infinite;
+    }
+
+    /* Boxy retro borders on cards */
+    .button,
+    .objective,
+    .feature,
+    .signal,
+    .media-shot,
+    .image-panel,
+    .download,
+    .command,
+    .live-readout {
+      border-radius: 0 !important;
+      border: 2px solid rgba(255, 200, 150, 0.32) !important;
+      box-shadow:
+        2px 2px 0 rgba(0, 0, 0, 0.7),
+        4px 4px 0 rgba(154, 18, 24, 0.35) !important;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      transform: translate(-1px, -1px);
+      box-shadow:
+        3px 3px 0 rgba(0, 0, 0, 0.85),
+        6px 6px 0 rgba(210, 52, 47, 0.55) !important;
+    }
+
+    .button-primary {
+      background: #9a1218 !important;
+      color: #ffe7b8 !important;
+      text-shadow: 1px 1px 0 #2a0306;
+    }
+
+    /* Dashed retro outline accents */
+    .image-panel {
+      outline: 1px dashed rgba(255, 200, 150, 0.25);
+      outline-offset: 4px;
+    }
+
+    /* Heart looks pulsing/blocky */
+    .heart {
+      filter: contrast(1.4) saturate(1.6) brightness(0.95) drop-shadow(0 0 14px rgba(255, 60, 40, 0.6));
+      image-rendering: pixelated;
+    }
+
+    /* Live readout looks like terminal */
+    .live-readout {
+      background: rgba(0, 0, 0, 0.7) !important;
+      color: #ffb070 !important;
+      font-size: 14px;
+    }
+
+    .live-readout .readout-line span:last-child {
+      color: #5cff8a;
+      text-shadow: 0 0 6px rgba(92, 255, 138, 0.6);
+    }
+
+    /* Maze frame as crisp pixel box */
+    .maze-frame {
+      filter: contrast(1.3) saturate(1.4);
+    }
+
+    /* Section titles get RGB jitter on hover, slight animation */
+    .section-title:hover {
+      animation: meatRgbJitter 0.4s steps(6) 1;
+    }
+
+    /* Animations */
+    @keyframes crtPowerOn {
+      0% { transform: scaleY(0.005) scaleX(1); opacity: 0; filter: brightness(8); }
+      18% { transform: scaleY(0.02) scaleX(1); opacity: 0.6; filter: brightness(4); }
+      40% { transform: scaleY(1) scaleX(0.4); opacity: 0.9; filter: brightness(2.2); }
+      70% { transform: scaleY(1) scaleX(1); opacity: 1; filter: brightness(1.4); }
+      100% { transform: scaleY(1) scaleX(1); opacity: 1; filter: brightness(1); }
+    }
+
+    @keyframes crtFlicker {
+      0%, 100% { opacity: 1; }
+      3% { opacity: 0.92; }
+      6% { opacity: 1; }
+      48% { opacity: 0.97; }
+      50% { opacity: 1; }
+      77% { opacity: 0.94; }
+      78% { opacity: 1; }
+    }
+
+    @keyframes crtRoll {
+      0% { top: -160px; }
+      100% { top: 110vh; }
+    }
+
+    @keyframes crtGrain {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-4%, 3%); }
+      50% { transform: translate(3%, -2%); }
+      75% { transform: translate(-2%, -4%); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes crtGlare {
+      0% { transform: translateX(-30%); opacity: 0.0; }
+      40% { opacity: 0.5; }
+      60% { opacity: 0.5; }
+      100% { transform: translateX(30%); opacity: 0.0; }
+    }
+
+    @keyframes meatRgbJitter {
+      0%, 100% {
+        text-shadow:
+          2px 0 0 #ff2a2a,
+          -2px 0 0 #00d6ff,
+          0 4px 0 #360508,
+          0 0 14px rgba(255, 60, 40, 0.55),
+          0 0 38px rgba(210, 52, 47, 0.5);
+      }
+      25% {
+        text-shadow:
+          -3px 0 0 #ff2a2a,
+          3px 0 0 #00d6ff,
+          0 4px 0 #360508,
+          0 0 18px rgba(255, 60, 40, 0.65),
+          0 0 38px rgba(210, 52, 47, 0.5);
+      }
+      50% {
+        text-shadow:
+          2px 1px 0 #ff2a2a,
+          -2px -1px 0 #00d6ff,
+          0 4px 0 #360508,
+          0 0 14px rgba(255, 60, 40, 0.55),
+          0 0 38px rgba(210, 52, 47, 0.5);
+      }
+      75% {
+        text-shadow:
+          1px 0 0 #ff2a2a,
+          -1px 0 0 #00d6ff,
+          0 4px 0 #360508,
+          0 0 22px rgba(255, 60, 40, 0.75),
+          0 0 38px rgba(210, 52, 47, 0.5);
+      }
+    }
+
+    /* Smaller screens keep effect strong */
+    @media (max-width: 760px) {
+      h1 { font-size: 52px !important; }
+      .tagline { font-size: 22px !important; }
+      body { font-size: 17px; }
+    }
+
+    /* Barrel-curvature SVG filter wrapper */
+    .crt-curve {
+      filter: url(#crt-barrel);
+    }
   </style>
 </head>
 <body>
+  <!-- CRT TV OVERLAY LAYERS -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="crt-barrel">
+        <feGaussianBlur stdDeviation="0.35" />
+      </filter>
+    </defs>
+  </svg>
+  <div class="crt-rgb" aria-hidden="true"></div>
+  <div class="crt-noise" aria-hidden="true"></div>
+  <div class="crt-rolling" aria-hidden="true"></div>
+  <div class="crt-shell" aria-hidden="true"></div>
+
   <header class="site-header">
     <nav class="nav" aria-label="Principal">
       <a class="brand" href="#top" aria-label="MEAT inicio">
@@ -1114,5 +1501,6 @@
       observer.observe(item);
     });
   </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7f7b0fd8732c4326aae4b9d58d5c514a","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
