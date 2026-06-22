@@ -1,3 +1,16 @@
+@font-face {
+    font-family: "EuropeanTeletext";
+    src: url("EuropeanTeletext.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+html,
+body {
+    font-family: "EuropeanTeletext", monospace;
+}
+
 :root {
   --black: #000000;
   --white: #ffffff;
