@@ -1,31 +1,38 @@
+```html
 <!DOCTYPE html>
-/* kaka */
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weird Stuff</title>
+
 <link rel="icon" type="image/jpg" href="/icon.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
 
 body{
   background:#05070a;
   color:#e5e7eb;
-  font-family:'Share Tech Mono','VHS',monospace;
+  font-family:'Share Tech Mono', monospace;
   overflow-x:hidden;
   cursor:none;
 }
 
 #cursor{
-  width:10px;height:10px;
+  width:10px;
+  height:10px;
   background:#e5e7eb;
   position:fixed;
-  top:0;left:0;
+  top:0;
+  left:0;
   pointer-events:none;
   z-index:9999;
   mix-blend-mode:difference;
@@ -33,15 +40,17 @@ body{
 }
 
 #cursor-trail{
-  width:30px;height:30px;
+  width:30px;
+  height:30px;
   border:1px solid rgba(255,255,255,0.2);
   border-radius:50%;
   position:fixed;
-  top:0;left:0;
+  top:0;
+  left:0;
   pointer-events:none;
   z-index:9998;
   transform:translate(-50%,-50%);
-  transition:left 0.12s ease,top 0.12s ease;
+  transition:left .12s ease, top .12s ease;
 }
 
 header{
@@ -67,24 +76,57 @@ nav a{
   cursor:none;
 }
 
+nav a:hover{
+  color:white;
+}
+
 .hero{
-  padding:80px 40px;
+  padding:100px 40px;
+}
+
+.hero h1{
+  font-size:56px;
+  font-weight:400;
+  line-height:1.1;
+}
+
+section{
+  padding:40px;
 }
 
 .project{
-  padding:40px;
+  margin-bottom:40px;
+  padding:30px;
+  border:1px solid #111827;
+}
+
+.project h2{
+  font-size:36px;
+  margin-bottom:10px;
+}
+
+.sub{
+  color:#4b5563;
+  margin-bottom:15px;
 }
 
 .btn{
   display:inline-block;
-  margin-top:10px;
-  padding:10px 14px;
+  padding:10px 16px;
   border:1px solid #333;
   color:#e5e7eb;
   text-decoration:none;
 }
 
-/* resto igual */
+.btn:hover{
+  border-color:#888;
+}
+
+footer{
+  padding:30px 40px;
+  border-top:1px solid #111827;
+  color:#4b5563;
+}
 </style>
 </head>
 
@@ -95,10 +137,10 @@ nav a{
 
 <header>
   <div class="logo">WEIRD STUFF</div>
+
   <nav>
     <a href="#who">WHO ARE?</a>
     <a href="#projects">PROJECTS</a>
-    <a href="#team">OUR TEAM</a>
     <a href="#contact">CONTACT</a>
   </nav>
 </header>
@@ -108,46 +150,103 @@ nav a{
 </div>
 
 <section id="who">
-  <p>Weird Stuff.</p>
+  <h2>WHO ARE?</h2>
+  <br>
+  <p>We're Weird Stuff.</p>
+  <p>We make software.</p>
+  <p>Sometimes because we need it.</p>
+  <p>Sometimes because we can.</p>
 </section>
 
 <section id="projects">
 
+  <h2>PROJECTS</h2>
+  <br>
+
   <div class="project">
     <h2>Monix</h2>
     <p class="sub">ALL IN ONE SYSTEM SUITE</p>
-
-    <!-- FIX REAL PARA GITHUB PAGES -->
     <a class="btn" href="/Apps/Monix.web/">OPEN</a>
+  </div>
 
+  <div class="project">
+    <h2>Meat</h2>
+    <p class="sub">WORK IN PROGRESS</p>
+    <a class="btn" href="/Apps/Meat/">OPEN</a>
+  </div>
+
+  <div class="project">
+    <h2>Telenet</h2>
+    <p class="sub">COMMUNICATION & NETWORK SYSTEMS</p>
+    <a class="btn" href="/docs/Apps/Telenet/Index.html">OPEN</a>
   </div>
 
 </section>
 
+<section id="contact">
+  <h2>CONTACT</h2>
+  <br>
+  <p>Discord Server</p>
+  <p>orimuri12yt@gmail.com</p>
+</section>
+
+<footer>
+  © 2026 Weird Stuff
+</footer>
+
 <script>
-const lines = ["We got bored","and we decided","to make these things."];
+const cur = document.getElementById('cursor');
+const trail = document.getElementById('cursor-trail');
+
+let mx = 0;
+let my = 0;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX;
+  my = e.clientY;
+
+  cur.style.left = mx + 'px';
+  cur.style.top = my + 'px';
+});
+
+setInterval(() => {
+  trail.style.left = mx + 'px';
+  trail.style.top = my + 'px';
+}, 80);
+
+const lines = [
+  "We got bored",
+  "and we decided",
+  "to make these things."
+];
+
 const el = document.getElementById('hero-text');
-let li = 0, ci = 0, text = '';
+
+let li = 0;
+let ci = 0;
+let text = '';
 
 function type(){
   if(li >= lines.length){
-    el.innerHTML = text;
+    el.innerHTML = text.replace(/\n/g,'<br>');
     return;
   }
 
   if(ci < lines[li].length){
     text += lines[li][ci++];
-  } else {
-    text += "\n";
-    li++; ci = 0;
+  }else{
+    text += '\n';
+    li++;
+    ci = 0;
   }
 
   el.innerHTML = text.replace(/\n/g,'<br>');
-  setTimeout(type, 40);
+  setTimeout(type,40);
 }
 
-setTimeout(type, 400);
+setTimeout(type,400);
 </script>
 
 </body>
 </html>
+```
