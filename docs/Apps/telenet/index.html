@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telenet | AI Teletext for Windows and Linux</title>
+    <meta
+      name="description"
+      content="Telenet is a retro teletext-inspired AI desktop application for Windows and Linux."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <canvas id="signalCanvas" class="signal-canvas" aria-hidden="true"></canvas>
+    <div class="crt-overlay" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Telenet home">
+        <span class="brand-page">100</span>
+        <span>TELENET</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#signal">Signal</a>
+        <a href="#ai-pages">AI Pages</a>
+        <a href="#builds">Builds</a>
+      </nav>
+      <div class="header-status">
+        <span>ONLINE</span>
+        <time id="clock" datetime="">00:00:00</time>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="page-kicker">
+            <span class="block block-red"></span>
+            <span class="block block-green"></span>
+            <span class="block block-yellow"></span>
+            PAGE 100 / AI READY
+          </p>
+          <h1 id="hero-title">Telenet</h1>
+          <p class="hero-lede">
+            Teletext speed, AI answers, and a native desktop feel for Windows
+            and Linux.
+          </p>
+          <div class="hero-actions" aria-label="Platform links">
+            <a class="button button-primary" href="#builds">Windows Build</a>
+            <a class="button button-secondary" href="#builds">Linux Build</a>
+          </div>
+        </div>
+
+        <div class="hero-transmission" aria-label="Live transmission preview">
+          <div class="transmission-header">
+            <span>TELENET 100</span>
+            <span>AI INDEX</span>
+            <span id="platformReadout">DESKTOP</span>
+          </div>
+          <div class="transmission-grid">
+            <span class="cyan">101</span><span>Search the archive</span>
+            <span class="yellow">202</span><span>Ask the signal</span>
+            <span class="green">303</span><span>Summarize files</span>
+            <span class="magenta">404</span><span>Recover lost context</span>
+            <span class="red">505</span><span>Focus mode</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="signal" class="signal-band" aria-labelledby="signal-title">
+        <div class="section-heading">
+          <p class="page-number">PAGE 101</p>
+          <h2 id="signal-title">A Terminal With A Signal</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-cell">
+            <span class="feature-code cyan">01</span>
+            <h3>True Teletext Palette</h3>
+            <p>
+              Black, white, red, green, yellow, blue, magenta, and cyan carry
+              the interface with crisp block colour.
+            </p>
+          </article>
+          <article class="feature-cell">
+            <span class="feature-code yellow">02</span>
+            <h3>AI As Numbered Pages</h3>
+            <p>
+              Prompts become compact pages that are easy to scan, save, and
+              return to later.
+            </p>
+          </article>
+          <article class="feature-cell">
+            <span class="feature-code green">03</span>
+            <h3>Desktop First</h3>
+            <p>
+              Telenet is shaped for native Windows and Linux workflows, with a
+              quiet interface that rewards repetition.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="ai-pages" class="console-band" aria-labelledby="console-title">
+        <div class="console-wrap">
+          <div class="section-heading">
+            <p class="page-number">PAGE 202</p>
+            <h2 id="console-title">Ask The Signal</h2>
+          </div>
+          <form id="promptForm" class="prompt-form">
+            <label for="promptInput">AI prompt</label>
+            <div class="prompt-row">
+              <input
+                id="promptInput"
+                name="prompt"
+                type="text"
+                autocomplete="off"
+                maxlength="72"
+                placeholder="TYPE A QUESTION FOR TELENET"
+              />
+              <button class="button button-primary" type="submit">Send</button>
+            </div>
+          </form>
+          <pre id="consoleOutput" class="console-output" aria-live="polite">TELENET PAGE 202
+AI CHANNEL OPEN
+
+TYPE A QUESTION TO RECEIVE A RETRO PAGE RESPONSE.</pre>
+        </div>
+      </section>
+
+      <section id="builds" class="builds-band" aria-labelledby="builds-title">
+        <div class="section-heading">
+          <p class="page-number">PAGE 303</p>
+          <h2 id="builds-title">Windows And Linux Builds</h2>
+        </div>
+        <div class="build-grid">
+          <article class="build-card">
+            <div class="build-topline">
+              <span class="build-os">WIN</span>
+              <span>Windows 10/11</span>
+            </div>
+            <p>Installer-ready build for the native Windows desktop app.</p>
+            <span class="button button-secondary" aria-disabled="true">Coming Soon</span>
+          </article>
+          <article class="build-card">
+            <div class="build-topline">
+              <span class="build-os">LIN</span>
+              <span>Linux</span>
+            </div>
+            <p>AppImage, deb, or tarball build for Linux desktop systems.</p>
+            <span class="button button-secondary" aria-disabled="true">Coming Soon</span>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>TELENET 899</span>
+      <span>END OF TRANSMISSION</span>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
