@@ -36,7 +36,7 @@
 @media(prefers-reduced-motion:reduce){.na-cosmic{display:none}}
 .na-field{position:absolute;inset:-20%;perspective:1200px;transform-style:preserve-3d;pointer-events:none}.na-particle{position:absolute;width:3px;height:3px;background:#111;border-radius:50%;opacity:.18;transform-style:preserve-3d;will-change:transform}.na-beam{position:absolute;left:50%;top:45%;width:1px;height:120vh;background:linear-gradient(transparent,#111,transparent);opacity:.045;transform-origin:top;will-change:transform}.na-beam.b2{transform:rotate(62deg)}.na-beam.b3{transform:rotate(-62deg)}.na-portal{position:absolute;left:50%;top:50%;width:34vw;height:34vw;border:1px solid #111;border-radius:50%;opacity:.035;transform:translate(-50%,-50%) rotateX(70deg);transform-style:preserve-3d;will-change:transform}.na-portal:before,.na-portal:after{content:"";position:absolute;inset:9%;border:1px solid #111;border-radius:50%}.na-portal:after{inset:22%}.section{position:relative;transform-style:preserve-3d}.hubcard,.project,.person,.contact a,.legalcard,.facts{will-change:transform}.hubcard:hover,.project:hover,.person:hover,.contact a:hover,.legalcard:hover{transform:translate3d(0,-7px,35px) rotateX(2deg)}@media(max-width:700px){.na-field{display:none}.na-portal{width:70vw;height:70vw}.na-beam{opacity:.02}}@media(prefers-reduced-motion:reduce){.na-field,.na-portal,.na-beam{display:none}}
 /* NORTH ASSEMBLY — EXTREME INTERACTIVE 3D */
-body{perspective:1800px;overflow-x:hidden}.na-cosmic{transform-style:preserve-3d}.na-portal{filter:drop-shadow(0 0 22px #1112)}
+body{perspective:1800px;overflow-x:hidden}.na-cosmic{contain:layout paint;backface-visibility:hidden;transform:translateZ(0)}.na-cosmic{transform-style:preserve-3d}.na-portal{filter:none}
 .na-shard{position:absolute;width:clamp(40px,5vw,92px);height:clamp(40px,5vw,92px);border:1px solid #111;opacity:.055;transform-style:preserve-3d;will-change:transform;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
 .na-shard.s1{left:12%;top:32%}.na-shard.s2{right:14%;top:58%;width:70px;height:70px}.na-shard.s3{left:42%;top:78%;width:55px;height:55px}.na-shard.s4{right:32%;top:18%;width:45px;height:45px}
 .na-helix{position:absolute;left:50%;top:50%;width:44vw;height:44vw;transform:translate(-50%,-50%);transform-style:preserve-3d;opacity:.035;border:1px dashed #111;border-radius:50%;will-change:transform}.na-helix:before,.na-helix:after{content:"";position:absolute;inset:12%;border:1px dashed #111;border-radius:50%;transform:rotateX(65deg)}.na-helix:after{inset:25%;transform:rotateY(65deg)}
@@ -54,6 +54,16 @@ body{perspective:1800px;overflow-x:hidden}.na-cosmic{transform-style:preserve-3d
 .na-poly{position:absolute;width:90px;height:90px;border:1px solid #111;opacity:.035;transform-style:preserve-3d;will-change:transform;clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%)}.na-poly.p1{left:4%;top:58%}.na-poly.p2{right:4%;top:22%}.na-poly.p3{left:46%;top:8%}.na-poly.p4{right:28%;top:82%}
 .na-circuit{position:absolute;width:30vw;height:16vw;border:1px solid #111;opacity:.022;transform-style:preserve-3d;will-change:transform}.na-circuit.c1{left:-8%;top:74%;transform:rotateX(62deg) rotateZ(18deg)}.na-circuit.c2{right:-8%;top:8%;transform:rotateX(62deg) rotateZ(-22deg)}
 @media(max-width:700px){.na-radar,.na-slab,.na-spoke,.na-poly,.na-circuit{display:none}}
+
+/* NORTH ASSEMBLY — LIGHTWEIGHT 3D SCULPTURES */
+.na-model{position:absolute;width:clamp(90px,11vw,170px);height:clamp(90px,11vw,170px);transform-style:preserve-3d;perspective:900px;opacity:.075;will-change:transform;contain:layout style}
+.na-model .mcore{position:absolute;left:50%;top:50%;width:28%;height:28%;transform:translate(-50%,-50%) translateZ(18px);border:1px solid #111;border-radius:50%;box-shadow:0 0 24px #1111}
+.na-model .mring{position:absolute;inset:8%;border:1px solid #111;border-radius:50%;transform-style:preserve-3d;backface-visibility:hidden}
+.na-model .mring.r1{transform:rotateX(70deg)}.na-model .mring.r2{transform:rotateY(70deg)}.na-model .mring.r3{transform:rotateZ(45deg) rotateX(55deg)}
+.na-model:before,.na-model:after{content:"";position:absolute;left:50%;top:50%;width:46%;height:46%;border:1px solid #111;transform-style:preserve-3d}.na-model:before{transform:translate(-50%,-50%) rotateX(45deg) rotateY(45deg) translateZ(28px)}.na-model:after{transform:translate(-50%,-50%) rotateX(-45deg) rotateY(-45deg) translateZ(-28px)}
+.na-model.m1{left:6%;top:26%}.na-model.m2{right:8%;top:42%;transform:scale(.72)}.na-model.m3{left:18%;top:73%;transform:scale(.62)}.na-model.m4{right:25%;top:16%;transform:scale(.48)}.na-model.m5{left:48%;top:52%;transform:scale(.42);opacity:.045}.na-model.m6{right:4%;top:76%;transform:scale(.55)}
+.na-model .mring{animation:naModelSpin 18s linear infinite}.na-model .mring.r2{animation-duration:24s;animation-direction:reverse}.na-model .mring.r3{animation-duration:30s}@keyframes naModelSpin{to{transform:rotateX(70deg) rotateZ(360deg)}}
+@media(max-width:700px){.na-model{display:none}}@media(max-width:900px){.na-model.m5,.na-model.m6{display:none}}@media(prefers-reduced-motion:reduce){.na-model{display:none}}
 </style>
 </head>
 <body><div class="na-cosmic" aria-hidden="true"><div class="na-field"><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-beam"></div><div class="na-beam b2"></div><div class="na-beam b3"></div><div class="na-portal"></div></div>
@@ -75,6 +85,12 @@ body{perspective:1800px;overflow-x:hidden}.na-cosmic{transform-style:preserve-3d
   <div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div>
   <div class="na-poly p1" aria-hidden="true"></div><div class="na-poly p2" aria-hidden="true"></div><div class="na-poly p3" aria-hidden="true"></div><div class="na-poly p4" aria-hidden="true"></div>
   <div class="na-circuit c1" aria-hidden="true"></div><div class="na-circuit c2" aria-hidden="true"></div>
+  <div class="na-model m1" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
+  <div class="na-model m2" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
+  <div class="na-model m3" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
+  <div class="na-model m4" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
+  <div class="na-model m5" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
+  <div class="na-model m6" aria-hidden="true"><i class="mcore"></i><i class="mring r1"></i><i class="mring r2"></i><i class="mring r3"></i></div>
 </div>
 <header class="nav"><div class="wrap navin"><a class="logo" href="#top"><i></i>NORTH ASSEMBLY</a><nav><a data-i18n="navAbout" href="#about">About</a><a data-i18n="navProjects" href="/projects/">Projects</a><a data-i18n="navDocs" href="/documentation/">Documentation</a><a data-i18n="navReleases" href="/releases/">Releases</a><a data-i18n="navStatus" href="/status/">Status</a><a data-i18n="navTeam" href="#team">Team</a><a data-i18n="navLegal" href="#legal">Legal</a><a data-i18n="navContact" href="#contact">Contact</a></nav><button class="lang" id="langToggle" type="button" aria-label="Switch language"><span class="flag">🇪🇸</span><span id="langLabel">Español</span></button></div></header>
 <main id="top">
@@ -167,7 +183,6 @@ console.info("%cNORTH ASSEMBLY%c %s","color:#ffffff;font-weight:bold","color:inh
         {x:0,y:0,z:0,rotationX:i*25,rotationY:i*35,rotationZ:0},
         {x:x,y:depth,z:i%2?180:-180,rotationX:360+(i*70),rotationY:540-(i*45),rotationZ:180,ease:"none",
           scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:1.1+i*.18}});
-      gsap.to(cube,{y:"+=35",x:"+=18",rotationZ:"+=18",duration:2.8+i*.5,repeat:-1,yoyo:true,ease:"sine.inOut",delay:i*.2});
     });
 
     // Give major sections depth as they enter the viewport.
@@ -178,20 +193,14 @@ console.info("%cNORTH ASSEMBLY%c %s","color:#ffffff;font-weight:bold","color:inh
           scrollTrigger:{trigger:section,start:"top 82%",once:true}});
     });
 
-    // Subtle mouse camera movement on capable desktop devices.
+    // Pointer camera: one lightweight listener instead of dozens of competing tweens.
     if(window.matchMedia("(pointer:fine)").matches){
-      window.addEventListener("pointermove",function(e){
-        const x=(e.clientX/innerWidth-.5), y=(e.clientY/innerHeight-.5);
-        gsap.to(".na-orbit",{x:x*70,y:y*42,rotationY:x*18,duration:.8,overwrite:true});
-        gsap.to(".na-ring.r3",{x:x*100,y:y*55,rotationY:x*28,duration:1,overwrite:true});
-        gsap.to(".na-ring.r4",{x:x*-80,y:y*-42,rotationX:y*22,duration:1.1,overwrite:true});
-        gsap.to(".na-grid",{x:x*-65,y:y*-35,rotationX:68+y*8,duration:1.2,overwrite:true});
-        gsap.to(".na-prism.p1",{x:x*120,y:y*80,rotationY:x*35,duration:1.1,overwrite:true});
-        gsap.to(".na-core",{x:-50+x*-35,y:-50+y*-24,z:x*80,duration:1,overwrite:true});
-        cubes.forEach(function(cube,i){
-          gsap.to(cube,{rotationY:(i*35)+x*18,rotationX:(i*25)-y*12,duration:1,overwrite:true});
-        });
-      });
+      const cameraX=gsap.quickTo(".na-cosmic","x",{duration:.55,ease:"power3.out"});
+      const cameraY=gsap.quickTo(".na-cosmic","y",{duration:.55,ease:"power3.out"});
+      const cameraRX=gsap.quickTo(".na-cosmic","rotationX",{duration:.65,ease:"power3.out"});
+      const cameraRY=gsap.quickTo(".na-cosmic","rotationY",{duration:.65,ease:"power3.out"});
+      let lastX=0,lastY=0,queued=false;
+      window.addEventListener("pointermove",function(e){lastX=e.clientX/innerWidth-.5;lastY=e.clientY/innerHeight-.5;if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;cameraX(lastX*28);cameraY(lastY*18);cameraRX(-lastY*2.2);cameraRY(lastX*3.2);});},{passive:true});
     }
     // Extreme depth: distinct 3D scenes emerge while scrolling through the page.
     gsap.to(".na-helix",{rotationX:720,rotationY:540,rotationZ:-360,scale:1.8,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.7}});
@@ -242,6 +251,11 @@ console.info("%cNORTH ASSEMBLY%c %s","color:#ffffff;font-weight:bold","color:inh
       gsap.to(el,{xPercent:(i%2?8:-8),yPercent:(i%3-1)*10,z:(i%2?160:-120),rotationY:(i%2?3:-3),ease:"none",scrollTrigger:{trigger:el,start:"top bottom",end:"bottom top",scrub:.65}});
     });
 
+
+    // Lightweight 3D sculptures: one scroll tween per model.
+    gsap.utils.toArray(".na-model").forEach(function(model,i){gsap.to(model,{xPercent:(i%2?150:-130),yPercent:(i%3-1)*95,z:(i%2?420:-360),rotationX:360+i*70,rotationY:-300+i*110,rotationZ:180-i*45,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.8}})});
+    const constrained=(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||(navigator.connection&&navigator.connection.saveData);
+    if(constrained){gsap.set(".na-radar,.na-slab,.na-circuit,.na-spoke",{autoAlpha:0});gsap.set(".na-stars",{opacity:.07});}
     ScrollTrigger.refresh();
     const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const mobile=window.matchMedia("(max-width:700px)").matches;
