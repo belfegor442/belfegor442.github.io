@@ -438,7 +438,128 @@ button { font: inherit; }
 .contact-link{will-change:transform}
 @media (max-width:800px){.hero-grid::before{animation:none}.scene{opacity:.45}.layer{right:-18%}.layer.cube-layer{right:8%;top:14%}.portal{right:-30%;opacity:.5}}
 
-</style>
+
+/* ---------- COSMIC MOTION PASS ---------- */
+:root{
+  --cosmic-bg:#05030c;
+  --cosmic-line:rgba(214,201,255,.14);
+  --cosmic-glow:rgba(151,112,255,.28);
+  --cosmic-cyan:rgba(113,224,255,.22);
+}
+html{background:var(--cosmic-bg);overflow-x:hidden}
+body{background:
+  radial-gradient(circle at 50% 8%,rgba(112,72,255,.13),transparent 30rem),
+  radial-gradient(circle at 85% 45%,rgba(41,148,255,.07),transparent 32rem),
+  #05030c;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:72px 72px;
+  mask-image:linear-gradient(to bottom,transparent,#000 12%,#000 82%,transparent);
+  opacity:.32;
+}
+.cosmic-vignette{
+  position:fixed;inset:-10%;z-index:2;pointer-events:none;
+  background:radial-gradient(circle at center,transparent 45%,rgba(0,0,0,.42) 100%);
+  mix-blend-mode:multiply;
+}
+.cosmic-grid{
+  position:absolute;inset:-30%;pointer-events:none;z-index:0;
+  opacity:.16;
+  background-image:
+    linear-gradient(rgba(191,166,255,.12) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(191,166,255,.12) 1px,transparent 1px);
+  background-size:90px 90px;
+  transform:perspective(800px) rotateX(68deg) translateY(20%);
+  transform-origin:center top;
+  mask-image:linear-gradient(to bottom,transparent 0%,#000 25%,#000 75%,transparent 100%);
+}
+.cosmic-orbit{
+  position:absolute;left:50%;top:50%;width:min(70vw,900px);aspect-ratio:1;
+  transform:translate(-50%,-50%) rotateX(67deg) rotateZ(-12deg);
+  transform-style:preserve-3d;border:1px solid rgba(199,177,255,.16);
+  border-radius:50%;box-shadow:0 0 80px rgba(135,90,255,.08),inset 0 0 60px rgba(135,90,255,.04);
+  pointer-events:none;z-index:1;
+}
+.cosmic-orbit::before,.cosmic-orbit::after{
+  content:"";position:absolute;inset:12%;border:1px solid rgba(119,221,255,.13);border-radius:50%;
+}
+.cosmic-orbit::after{inset:28%;border-color:rgba(255,255,255,.11)}
+.cosmic-core{
+  position:absolute;left:50%;top:50%;width:18px;height:18px;border-radius:50%;
+  transform:translate(-50%,-50%);background:#fff;box-shadow:0 0 12px #fff,0 0 55px 12px rgba(142,104,255,.5);
+}
+.cosmic-object{
+  position:absolute;left:50%;top:50%;width:clamp(42px,5vw,74px);height:clamp(42px,5vw,74px);
+  transform-style:preserve-3d;pointer-events:none;z-index:2;
+  opacity:.72;
+}
+.cosmic-object .face{
+  position:absolute;inset:0;border:1px solid rgba(218,207,255,.28);
+  background:linear-gradient(135deg,rgba(160,124,255,.08),rgba(70,220,255,.02));
+  box-shadow:inset 0 0 30px rgba(143,105,255,.08);
+}
+.cosmic-object .f1{transform:translateZ(32px)}
+.cosmic-object .f2{transform:rotateY(180deg) translateZ(32px)}
+.cosmic-object .f3{transform:rotateY(90deg) translateZ(32px)}
+.cosmic-object .f4{transform:rotateY(-90deg) translateZ(32px)}
+.cosmic-object .f5{transform:rotateX(90deg) translateZ(32px)}
+.cosmic-object .f6{transform:rotateX(-90deg) translateZ(32px)}
+.cosmic-label{
+  position:absolute;left:50%;top:50%;z-index:3;pointer-events:none;
+  font:500 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.22em;text-transform:uppercase;color:rgba(231,225,255,.48);
+  white-space:nowrap;
+}
+.cosmic-scan{
+  position:fixed;left:0;right:0;top:0;height:1px;z-index:20;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(197,174,255,.65),transparent);
+  box-shadow:0 0 16px rgba(155,112,255,.45);
+  transform-origin:50% 50%;opacity:.35;
+}
+.section,.contact{position:relative;isolation:isolate}
+.section::after{
+  content:"";position:absolute;left:7%;right:7%;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cosmic-line),transparent);
+  pointer-events:none;
+}
+.project,.contributor,.contact-link{
+  position:relative;transform-style:preserve-3d;will-change:transform;
+  overflow:hidden;
+}
+.project::before,.contributor::before,.contact-link::before{
+  content:"";position:absolute;inset:-1px;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(205,185,255,.16),transparent 32%);
+  transition:opacity .35s ease;
+}
+.project:hover::before,.contributor:hover::before,.contact-link:hover::before{opacity:1}
+.project::after,.contributor::after{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,transparent,rgba(225,215,255,.75),transparent);
+  transition:transform .6s cubic-bezier(.22,1,.36,1);
+}
+.project:hover::after,.contributor:hover::after{transform:scaleX(1)}
+.hero{perspective:1200px;overflow:hidden}
+.hero-content,.scene{transform-style:preserve-3d}
+.scene .layer{will-change:transform}
+.orb{will-change:transform}
+.portal{transform-style:preserve-3d;will-change:transform}
+.marquee{will-change:transform}
+@media (max-width:800px){
+  .cosmic-grid{opacity:.08}
+  .cosmic-orbit{width:130vw}
+  .cosmic-object{opacity:.48}
+}
+@media (prefers-reduced-motion:reduce){
+  .cosmic-grid,.cosmic-orbit,.cosmic-object,.cosmic-scan{display:none}
+}
+
+  </style>
 </head>
 <body>
   <div class="nebula" aria-hidden="true"></div>
@@ -926,5 +1047,126 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
+
+<script>
+/* ---------- COSMIC GSAP LAYER ---------- */
+document.addEventListener("DOMContentLoaded", () => {
+  if (!window.gsap || !window.ScrollTrigger || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  const body = document.body;
+  const make = (tag, cls, parent = body) => {
+    const el = document.createElement(tag);
+    el.className = cls;
+    parent.appendChild(el);
+    return el;
+  };
+
+  const vignette = make("div","cosmic-vignette");
+  const scan = make("div","cosmic-scan");
+  const grid = make("div","cosmic-grid");
+  const orbit = make("div","cosmic-orbit");
+  const core = make("div","cosmic-core", orbit);
+
+  ["f1","f2","f3","f4","f5","f6"].forEach(c => make("i","face "+c, make("div","cosmic-object", body)));
+  const objects = document.querySelectorAll(".cosmic-object");
+  const labels = ["FIELD 01","ORBIT 02","VOID 03"];
+  labels.forEach((txt,i) => {
+    const l = make("span","cosmic-label");
+    l.textContent = txt;
+    l.style.transform = "translate(-50%,-50%) translate3d(" + ((i-1)*min(24, innerWidth*.08)) + "vw," + ((i-1)*16) + "vh,0)";
+    l.style.opacity = String(.28 + i*.08);
+  });
+
+  // Position the 3D cubes around the hero like distant objects in a scene.
+  const placements = [
+    [-25,-8,-120],[20,-14,-20],[29,20,-180],[0,27,-80],[ -34,25,-220],[12,4,90]
+  ];
+  objects.forEach((o,i) => {
+    const p = placements[i] || [0,0,0];
+    gsap.set(o,{xPercent:-50,yPercent:-50,x:p[0]+"vw",y:p[1]+"vh",z:p[2],rotationX:i*17,rotationY:i*31,rotationZ:i*11});
+  });
+
+  // The whole page behaves like a deep camera move rather than a collection of isolated reveals.
+  const universe = gsap.timeline({
+    scrollTrigger:{trigger:body,start:"top top",end:"bottom bottom",scrub:1.15}
+  });
+  universe
+    .to(grid,{yPercent:-42,rotationZ:7,scale:1.18,ease:"none"},0)
+    .to(orbit,{rotationZ:130,rotationX:74,scale:1.42,ease:"none"},0)
+    .to(core,{scale:2.4,opacity:.2,ease:"none"},0)
+    .to(scan,{y:()=>innerHeight*1.7,opacity:.08,ease:"none"},0);
+
+  // Independent depth tracks for the floating geometry.
+  objects.forEach((o,i) => {
+    const depth = 0.18 + (i % 3) * .11;
+    gsap.to(o,{
+      y:()=>-(innerHeight*(.25+i*.055)),
+      x:()=>((i%2?1:-1)*innerWidth*(.06+i*.012)),
+      rotationX:()=>360*(i%2?1:-1),
+      rotationY:()=>520*(i%3===0?1:-1),
+      rotationZ:()=>180*(i%2?1:-1),
+      ease:"none",
+      scrollTrigger:{trigger:body,start:"top top",end:"bottom bottom",scrub:1.2}
+    });
+    gsap.to(o,{z:()=>i%2?220:-260,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:1}});
+    o.style.opacity = String(.32 + depth);
+  });
+
+  // Hero becomes a portal: scale, depth and perspective change continuously with scroll.
+  const hero = document.querySelector(".hero");
+  if (hero) {
+    gsap.to(hero,{
+      "--hero-depth":"1",
+      scrollTrigger:{trigger:hero,start:"top top",end:"bottom top",scrub:true}
+    });
+    gsap.to(".scene",{rotationX:5,rotationY:-4,z:140,scale:1.08,ease:"none",
+      scrollTrigger:{trigger:hero,start:"top top",end:"bottom top",scrub:1}});
+  }
+
+  // Section transitions use depth and blur instead of simple fade-ins.
+  document.querySelectorAll(".section-header").forEach((h,i)=>{
+    gsap.fromTo(h,
+      {filter:"blur(10px)",y:70,opacity:0},
+      {filter:"blur(0px)",y:0,opacity:1,duration:1.15,ease:"power3.out",
+       scrollTrigger:{trigger:h,start:"top 88%",toggleActions:"play none none reverse"}}
+    );
+  });
+
+  document.querySelectorAll(".project").forEach((card,i)=>{
+    gsap.fromTo(card,
+      {z:-220,rotateX:10,rotateY:i%2?7:-7,scale:.9,opacity:0},
+      {z:0,rotateX:0,rotateY:0,scale:1,opacity:1,duration:1.25,delay:(i%3)*.06,ease:"expo.out",
+       scrollTrigger:{trigger:card,start:"top 91%",toggleActions:"play none none reverse"}}
+    );
+  });
+
+  // Depth-driven section backgrounds.
+  document.querySelectorAll(".section").forEach((section,i)=>{
+    const ghost = make("div","cosmic-section-glow",section);
+    gsap.set(ghost,{position:"absolute",width:"45vw",height:"45vw",borderRadius:"50%",
+      background:"radial-gradient(circle,rgba("+(i%2?70:145)+","+(i%2?110:80)+",255,.10),transparent 68%)",
+      filter:"blur(30px)",pointerEvents:"none",zIndex:-1,
+      left:(i%2?"55%":"-12%"),top:"15%"});
+    gsap.to(ghost,{yPercent:-28,xPercent:i%2?-8:8,scale:1.25,ease:"none",
+      scrollTrigger:{trigger:section,start:"top bottom",end:"bottom top",scrub:1}});
+  });
+
+  // Mouse depth camera on desktop.
+  if (matchMedia("(hover:hover) and (pointer:fine)").matches) {
+    const camX=gsap.quickTo(".cosmic-orbit","x",{duration:1.2,ease:"power3"});
+    const camY=gsap.quickTo(".cosmic-orbit","y",{duration:1.2,ease:"power3"});
+    addEventListener("pointermove",e=>{
+      camX((e.clientX-innerWidth/2)*.035);
+      camY((e.clientY-innerHeight/2)*.035);
+    },{passive:true});
+  }
+
+  // Keep ScrollTrigger accurate after fonts/layout settle.
+  addEventListener("load",()=>ScrollTrigger.refresh());
+  if (document.fonts) document.fonts.ready.then(()=>ScrollTrigger.refresh());
+});
+</script>
+
 </body>
 </html>
