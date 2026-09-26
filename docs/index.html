@@ -46,6 +46,14 @@ body{perspective:1800px;overflow-x:hidden}.na-cosmic{transform-style:preserve-3d
 .btn,.hubcard,.project,.person,.contact a,.legalcard,.facts{transform-style:preserve-3d;backface-visibility:hidden}.btn:hover{transform:translate3d(0,-6px,28px) rotateX(4deg) rotateY(-2deg)}
 @media(max-width:700px){.na-shard,.na-helix,.na-tunnel,.na-flare{display:none}.hero h1 span{transform:none;text-shadow:none}}
 @media(prefers-reduced-motion:reduce){.na-shard,.na-helix,.na-tunnel,.na-flare{display:none}}
+
+/* NORTH ASSEMBLY — MAXIMUM PARALLAX FIELD */
+.na-radar{position:absolute;left:50%;top:42%;width:58vw;height:58vw;transform:translate(-50%,-50%);border:1px solid #111;border-radius:50%;opacity:.022;transform-style:preserve-3d;will-change:transform}.na-radar:before,.na-radar:after{content:"";position:absolute;inset:8%;border:1px solid #111;border-radius:50%;transform:rotateX(72deg) rotateY(18deg)}.na-radar:after{inset:20%;transform:rotateY(72deg) rotateZ(25deg)}
+.na-slab{position:absolute;width:24vw;height:14vw;border:1px solid #111;opacity:.025;transform-style:preserve-3d;will-change:transform}.na-slab.s1{left:-5%;top:18%;transform:rotateX(58deg) rotateY(-35deg)}.na-slab.s2{right:-5%;top:52%;transform:rotateX(65deg) rotateY(40deg)}.na-slab.s3{left:26%;bottom:-10%;transform:rotateX(70deg) rotateY(-18deg)}
+.na-spoke{position:absolute;left:50%;top:50%;width:1px;height:65vh;background:linear-gradient(transparent,#111,transparent);opacity:.035;transform-origin:50% 0;will-change:transform}.na-spoke:nth-of-type(1){transform:rotate(15deg)}.na-spoke:nth-of-type(2){transform:rotate(75deg)}.na-spoke:nth-of-type(3){transform:rotate(135deg)}.na-spoke:nth-of-type(4){transform:rotate(195deg)}.na-spoke:nth-of-type(5){transform:rotate(255deg)}.na-spoke:nth-of-type(6){transform:rotate(315deg)}
+.na-poly{position:absolute;width:90px;height:90px;border:1px solid #111;opacity:.035;transform-style:preserve-3d;will-change:transform;clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%)}.na-poly.p1{left:4%;top:58%}.na-poly.p2{right:4%;top:22%}.na-poly.p3{left:46%;top:8%}.na-poly.p4{right:28%;top:82%}
+.na-circuit{position:absolute;width:30vw;height:16vw;border:1px solid #111;opacity:.022;transform-style:preserve-3d;will-change:transform}.na-circuit.c1{left:-8%;top:74%;transform:rotateX(62deg) rotateZ(18deg)}.na-circuit.c2{right:-8%;top:8%;transform:rotateX(62deg) rotateZ(-22deg)}
+@media(max-width:700px){.na-radar,.na-slab,.na-spoke,.na-poly,.na-circuit{display:none}}
 </style>
 </head>
 <body><div class="na-cosmic" aria-hidden="true"><div class="na-field"><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-particle"></div><div class="na-beam"></div><div class="na-beam b2"></div><div class="na-beam b3"></div><div class="na-portal"></div></div>
@@ -63,6 +71,10 @@ body{perspective:1800px;overflow-x:hidden}.na-cosmic{transform-style:preserve-3d
   <div class="na-helix" aria-hidden="true"></div><div class="na-tunnel" aria-hidden="true"></div>
   <div class="na-shard s1" aria-hidden="true"></div><div class="na-shard s2" aria-hidden="true"></div><div class="na-shard s3" aria-hidden="true"></div><div class="na-shard s4" aria-hidden="true"></div>
   <div class="na-flare f1" aria-hidden="true"></div><div class="na-flare f2" aria-hidden="true"></div>
+  <div class="na-radar" aria-hidden="true"></div><div class="na-slab s1" aria-hidden="true"></div><div class="na-slab s2" aria-hidden="true"></div><div class="na-slab s3" aria-hidden="true"></div>
+  <div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div><div class="na-spoke" aria-hidden="true"></div>
+  <div class="na-poly p1" aria-hidden="true"></div><div class="na-poly p2" aria-hidden="true"></div><div class="na-poly p3" aria-hidden="true"></div><div class="na-poly p4" aria-hidden="true"></div>
+  <div class="na-circuit c1" aria-hidden="true"></div><div class="na-circuit c2" aria-hidden="true"></div>
 </div>
 <header class="nav"><div class="wrap navin"><a class="logo" href="#top"><i></i>NORTH ASSEMBLY</a><nav><a data-i18n="navAbout" href="#about">About</a><a data-i18n="navProjects" href="/projects/">Projects</a><a data-i18n="navDocs" href="/documentation/">Documentation</a><a data-i18n="navReleases" href="/releases/">Releases</a><a data-i18n="navStatus" href="/status/">Status</a><a data-i18n="navTeam" href="#team">Team</a><a data-i18n="navLegal" href="#legal">Legal</a><a data-i18n="navContact" href="#contact">Contact</a></nav><button class="lang" id="langToggle" type="button" aria-label="Switch language"><span class="flag">🇪🇸</span><span id="langLabel">Español</span></button></div></header>
 <main id="top">
@@ -201,6 +213,33 @@ console.info("%cNORTH ASSEMBLY%c %s","color:#ffffff;font-weight:bold","color:inh
     document.querySelectorAll(".hubcard,.project,.person,.contact a,.legalcard,.facts,.btn").forEach(function(card){
       card.addEventListener("pointerenter",function(){if(!window.matchMedia("(pointer:fine)").matches)return;gsap.to(card,{z:55,rotationX:-4,rotationY:gsap.utils.random(-4,4),scale:1.025,duration:.45,ease:"power3.out",overwrite:"auto"});});
       card.addEventListener("pointerleave",function(){gsap.to(card,{z:0,rotationX:0,rotationY:0,scale:1,duration:.65,ease:"power3.out",overwrite:"auto"});});
+    });
+
+    // MAXIMUM PARALLAX: deep layers move at radically different speeds.
+    gsap.to(".na-radar",{rotationX:900,rotationY:-620,rotationZ:480,scale:3.4,xPercent:-28,yPercent:24,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.35}});
+    gsap.to(".na-slab.s1",{xPercent:420,yPercent:-260,z:900,rotationX:760,rotationY:-520,rotationZ:360,scale:1.7,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.3}});
+    gsap.to(".na-slab.s2",{xPercent:-380,yPercent:310,z:-760,rotationX:-680,rotationY:640,rotationZ:-420,scale:.65,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.42}});
+    gsap.to(".na-slab.s3",{xPercent:260,yPercent:-420,z:1100,rotationX:980,rotationY:720,rotationZ:520,scale:1.9,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.28}});
+    gsap.utils.toArray(".na-spoke").forEach(function(el,i){gsap.to(el,{rotation:720+i*95,xPercent:(i%2?160:-160),scaleY:1.8,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.35+i*.035}})});
+    gsap.utils.toArray(".na-poly").forEach(function(el,i){gsap.to(el,{xPercent:(i%2?360:-330),yPercent:(i%2?-280:320),z:(i%2?900:-850),rotationX:720+i*130,rotationY:-540+i*180,rotationZ:900-i*120,scale:i%2?1.8:.55,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.32+i*.04}})});
+    gsap.to(".na-circuit.c1",{xPercent:480,yPercent:-300,z:700,rotationX:840,rotationY:-420,rotationZ:300,scale:1.8,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.38}});
+    gsap.to(".na-circuit.c2",{xPercent:-440,yPercent:360,z:-900,rotationX:-720,rotationY:560,rotationZ:-340,scale:.7,ease:"none",scrollTrigger:{trigger:document.body,start:"top top",end:"bottom bottom",scrub:.46}});
+
+    // Layered camera: foreground, midground and background react differently to pointer position.
+    if(window.matchMedia("(pointer:fine)").matches){
+      const mx=gsap.quickTo(document.documentElement, "--mx",{duration:.7,ease:"power3.out"});
+      const my=gsap.quickTo(document.documentElement, "--my",{duration:.7,ease:"power3.out"});
+      const cameraLayers=[[".na-cube",34,24],[".na-poly",75,55],[".na-shard",105,75],[".na-slab",145,95],[".na-prism",120,85],[".na-ring",90,60],[".na-radar",180,120]];
+      window.addEventListener("pointermove",function(e){
+        const x=e.clientX/innerWidth-.5,y=e.clientY/innerHeight-.5;mx(x);my(y);
+        cameraLayers.forEach(function(item){document.querySelectorAll(item[0]).forEach(function(el){gsap.to(el,{x:x*item[1],y:y*item[2],rotationY:x*item[1]*.18,rotationX:-y*item[2]*.16,duration:.65,overwrite:"auto"});});});
+        gsap.to(".hero .wrap",{x:x*48,y:y*30,rotationY:x*3.5,rotationX:-y*2.5,z:x*80,duration:.8,overwrite:"auto"});
+      },{passive:true});
+    }
+
+    // Individual content elements drift in opposite directions, amplifying depth while scrolling.
+    document.querySelectorAll(".hero h1,.hero p,.hero .actions,.hero .meta,.heading,.statement,.fact,.thanks").forEach(function(el,i){
+      gsap.to(el,{xPercent:(i%2?8:-8),yPercent:(i%3-1)*10,z:(i%2?160:-120),rotationY:(i%2?3:-3),ease:"none",scrollTrigger:{trigger:el,start:"top bottom",end:"bottom top",scrub:.65}});
     });
 
     ScrollTrigger.refresh();
