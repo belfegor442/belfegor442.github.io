@@ -12,6 +12,15 @@
 .beta-app-feature h3{font-size:clamp(34px,4vw,55px)}
 .beta-app-feature .app-desc{max-width:390px}
 .beta-app-feature .app-top{border-bottom-color:#b9bbbd}
+#apps .apps{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#apps .app,#apps .app-feature{grid-column:auto;grid-row:auto;min-height:0;aspect-ratio:1/1;background:#fff;color:var(--ink)}
+#apps .app-feature:hover{background:#fff}
+#apps .app-feature .app-id,#apps .app-feature .app-type,#apps .app-feature .app-desc{color:var(--muted)}
+#apps .app-feature .app-arrow{border-color:var(--line)}
+.monix-crown,.monix-crown-label{display:none}
+.beta-app-feature .beta-badge{display:none}
+.beta-app-feature:after{content:"Flagship project";position:absolute;right:22px;top:19px;font:8px ui-monospace,monospace;letter-spacing:.16em;color:#101216;text-transform:uppercase;pointer-events:none}
+@media(max-width:620px){#apps .apps{grid-template-columns:1fr 1fr}#apps .app,#apps .app-feature{min-height:0;aspect-ratio:1/1}.beta-app-feature:after{right:18px;top:17px}}
 @media(max-width:900px){.beta-apps{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.beta-apps{grid-template-columns:1fr}.beta-app,.beta-app-feature{min-height:300px!important}.monix-crown{right:18px;top:17px;width:62px;height:44px}.monix-crown-label{right:19px;top:65px}}
 </style>
@@ -43,7 +52,7 @@ body{overflow-x:hidden;perspective:2000px}
 <a class="app" href="/Apps/Vault/index.html"><div class="app-top"><span class="app-id">006</span><span class="app-type">Utilities</span></div><div><h3>Vault</h3><p class="app-desc">Storage and utility tooling for the application ecosystem.</p></div><div class="app-bottom"><span class="app-type">Application</span><span class="app-arrow">↗</span></div></a>
 </div></div></section>
 <section class="section" id="beta"><div class="wrap"><div class="section-head"><span class="index">04</span><h2>Beta / In Development.</h2><p class="section-note">Applications actively being developed or not yet considered finished. Their interfaces and capabilities may continue to change.</p></div><div class="apps beta-apps">
-<a class="app beta-app beta-app-feature" href="/Apps/Monix.web/index.html"><span class="monix-crown" aria-hidden="true"><svg viewBox="0 0 92 64" role="presentation"><path d="M7 10 25 29 46 7 67 29 85 10 79 53H13Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M12 43H80M16 53H76" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span><span class="monix-crown-label">Flagship project</span><div class="app-top"><span class="app-id">NA / BETA / 001</span><span class="beta-badge">★ North Assembly flagship</span></div><div><h3>Monix</h3><p class="app-desc">Windows system observability and diagnostics environment focused on hardware telemetry, monitoring and operational visibility.</p></div><div class="app-bottom"><span class="app-type">C++ / Win32 · In Development</span><span class="app-arrow">↗</span></div></a>
+<a class="app beta-app beta-app-feature" href="/Apps/Monix.web/index.html"><div class="app-top"><span class="app-id">NA / BETA / 001</span></div><div><h3>Monix</h3><p class="app-desc">Windows system observability and diagnostics environment focused on hardware telemetry, monitoring and operational visibility.</p></div><div class="app-bottom"><span class="app-type">C++ / Win32 · In Development</span><span class="app-arrow">↗</span></div></a>
 <a class="app beta-app" href="/Apps/DraftPad/index.html"><div class="app-top"><span class="app-id">002</span><span class="app-type">Workspace</span></div><div><h3>DraftPad</h3><p class="app-desc">Focused drafting and structured notes workspace.</p></div><div class="app-bottom"><span class="app-type">In Development</span><span class="app-arrow">↗</span></div></a>
 <a class="app beta-app" href="/Apps/Meat/index.html"><div class="app-top"><span class="app-id">003</span><span class="app-type">Experimental</span></div><div><h3>Meat</h3><p class="app-desc">Experimental application environment within the ecosystem.</p></div><div class="app-bottom"><span class="app-type">In Development</span><span class="app-arrow">↗</span></div></a>
 <a class="app beta-app" href="/Apps/DataLog/index.html"><div class="app-top"><span class="app-id">004</span><span class="app-type">Data</span></div><div><h3>DataLog</h3><p class="app-desc">Structured data, calculations and report workflows.</p></div><div class="app-bottom"><span class="app-type">In Development</span><span class="app-arrow">↗</span></div></a>
