@@ -1,43 +1,26 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f5f2"><meta name="color-scheme" content="light"><meta name="description" content="North Assembly — software, systems and digital infrastructure."><title>North Assembly — Software / Systems / Infrastructure</title><link rel="icon" type="image/jpeg" href="/icon.jpg"><style>
 :root{--bg:#f5f5f2;--paper:#fff;--ink:#101216;--muted:#69717b;--soft:#969da5;--line:#d9dbd8;--strong:#b5b9b5;--accent:#315cff;--max:1280px}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.32;background-image:radial-gradient(rgba(16,18,22,.08) .55px,transparent .55px);background-size:5px 5px;mask-image:linear-gradient(to bottom,#000,transparent 75%)}a{color:inherit}.wrap{width:min(calc(100% - 44px),var(--max));margin:auto}.header{position:sticky;top:0;z-index:30;background:rgba(245,245,242,.9);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}.header-inner{height:76px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:13px;text-decoration:none}.brand-logo{width:38px;height:38px;object-fit:cover;border-radius:9px;border:1px solid var(--line);display:block}.brand-name{font-size:12px;font-weight:760;letter-spacing:.14em;text-transform:uppercase}.nav{display:flex;gap:24px}.nav a{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.11em;text-transform:uppercase;text-decoration:none;color:var(--muted)}.nav a:hover{color:var(--ink)}.hero{border-bottom:1px solid var(--line)}.hero-grid{min-height:calc(100vh - 76px);display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,.7fr);grid-template-rows:1fr auto;gap:45px;padding:72px 0 28px}.hero-main{align-self:center}.hero-brand{display:flex;align-items:center;gap:16px;margin-bottom:30px}.hero-brand img{width:72px;height:72px;object-fit:cover;border-radius:16px;border:1px solid var(--line);box-shadow:0 14px 35px rgba(16,18,22,.08)}.hero-brand span{font:10px ui-monospace,monospace;color:var(--muted);letter-spacing:.16em;text-transform:uppercase}.kicker{display:flex;align-items:center;gap:9px;color:var(--muted);font:10px ui-monospace,monospace;letter-spacing:.15em;text-transform:uppercase}.kicker i{width:7px;height:7px;border-radius:50%;background:#28a568;box-shadow:0 0 0 5px rgba(40,165,104,.1)}h1{font-size:clamp(68px,10.8vw,150px);line-height:.8;letter-spacing:-.09em;margin:23px 0 32px}h1 span{display:block;color:#777e86}.hero-lead{max-width:680px;margin:0;color:var(--muted);font-size:17px;line-height:1.7}.hero-panel{align-self:center;border:1px solid var(--line);background:var(--paper);padding:22px}.hero-panel img{display:block;width:100%;height:150px;object-fit:cover;margin-bottom:22px;filter:saturate(.75)}.panel-label,.label{display:block;color:var(--soft);font:9px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase}.hero-panel h2{font-size:27px;letter-spacing:-.05em;margin:12px 0}.hero-panel p{color:var(--muted);font:11px/1.75 ui-monospace,monospace;margin:0}.hero-meta{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:17px}.meta-list{display:flex;gap:28px;flex-wrap:wrap}.meta-item{font:9px ui-monospace,monospace;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}.meta-item b{color:var(--ink);font-weight:500}.scroll{font:9px ui-monospace,monospace;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}.section{padding:105px 0;border-bottom:1px solid var(--line)}.section-head{display:grid;grid-template-columns:75px 1fr 320px;gap:22px;align-items:start;margin-bottom:45px}.index{font:10px ui-monospace,monospace;color:var(--soft);letter-spacing:.12em}.section h2{font-size:clamp(40px,5.5vw,72px);line-height:.9;letter-spacing:-.07em;margin:0}.section-note{color:var(--muted);font:11px/1.7 ui-monospace,monospace;margin:0}.about-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:80px}.statement{font-size:clamp(27px,3.7vw,48px);line-height:1.13;letter-spacing:-.045em;max-width:780px}.statement span{color:var(--muted)}.info-list{border-top:1px solid var(--strong)}.info-row{display:grid;grid-template-columns:1fr 1.5fr;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}.info-row span:first-child{color:var(--soft);font:9px ui-monospace,monospace;letter-spacing:.11em;text-transform:uppercase}.info-row span:last-child{font-size:12px}.apps{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}.app{grid-column:span 4;min-height:285px;padding:21px;border:1px solid var(--line);background:rgba(255,255,255,.55);display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;transition:.2s}.app:hover{background:#fff;border-color:var(--strong);transform:translateY(-4px)}.app-feature{grid-column:span 6;grid-row:span 2;min-height:580px;background:var(--ink);color:#fff}.app-feature:hover{background:#171a20}.app-top,.app-bottom{display:flex;justify-content:space-between;gap:15px}.app-id,.app-type{font:9px ui-monospace,monospace;color:var(--soft);letter-spacing:.11em;text-transform:uppercase}.app-feature .app-id,.app-feature .app-type,.app-feature .app-desc{color:#aeb4bc}.app h3{font-size:clamp(34px,4vw,55px);letter-spacing:-.065em;margin:0 0 10px}.app-feature h3{font-size:clamp(52px,6vw,82px)}.app-desc{font:11px/1.7 ui-monospace,monospace;color:var(--muted);max-width:390px;margin:0}.app-arrow{width:34px;height:34px;border:1px solid var(--line);display:grid;place-items:center;transition:.2s}.app-feature .app-arrow{border-color:#454a52}.app:hover .app-arrow{background:var(--ink);color:#fff;border-color:var(--ink);transform:rotate(-45deg)}.systems{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--strong)}.system{padding:20px 18px 28px;border-right:1px solid var(--line);min-height:190px;text-decoration:none}.system:last-child{border-right:0}.system-num{font:9px ui-monospace,monospace;color:var(--soft)}.system h3{font-size:22px;letter-spacing:-.035em;margin:40px 0 9px}.system p{font:10px/1.65 ui-monospace,monospace;color:var(--muted);margin:0}.team-grid{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--strong);border-left:1px solid var(--line)}.person{padding:19px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-height:175px}.person-role{font:8px ui-monospace,monospace;color:var(--soft);letter-spacing:.12em;text-transform:uppercase}.person h3{font-size:17px;letter-spacing:-.025em;margin:45px 0 8px}.person p{font:10px ui-monospace,monospace;color:var(--muted);margin:0}.contact{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.contact a{min-height:145px;border:1px solid var(--line);background:var(--paper);padding:20px;text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;transition:.2s}.contact a:hover{border-color:var(--ink);transform:translateY(-3px)}.contact strong{font-size:23px;letter-spacing:-.045em}.footer{padding:25px 0;color:var(--muted);font:9px ui-monospace,monospace;letter-spacing:.08em}.footer-inner{display:flex;justify-content:space-between;gap:20px}.footer a{text-decoration:none}@media(max-width:900px){.hero-grid{grid-template-columns:1fr}.hero-panel{display:none}.apps{grid-template-columns:1fr 1fr}.app{grid-column:span 1}.app-feature{grid-column:span 2;grid-row:auto;min-height:420px}.systems{grid-template-columns:1fr 1fr}.system:nth-child(2){border-right:0}.team-grid{grid-template-columns:repeat(3,1fr)}.section-head{grid-template-columns:55px 1fr}.section-note{grid-column:2}.about-grid{grid-template-columns:1fr}}@media(max-width:620px){.wrap{width:min(calc(100% - 28px),var(--max))}.header-inner{height:64px}.brand-logo{width:32px;height:32px}.nav{display:none}.hero-grid{min-height:auto;padding:58px 0 28px}.hero-brand img{width:58px;height:58px}.hero-brand{margin-bottom:25px}.hero h1{font-size:clamp(58px,18vw,100px)}.hero-meta{align-items:flex-start;flex-direction:column;gap:18px}.meta-list{gap:12px}.section{padding:75px 0}.section-head{display:block;margin-bottom:35px}.index{display:block;margin-bottom:12px}.section-note{margin-top:18px}.apps,.systems,.team-grid,.contact{grid-template-columns:1fr}.app,.app-feature{grid-column:auto;grid-row:auto;min-height:280px}.app-feature{min-height:350px}.system{border-right:0!important}.footer-inner{flex-direction:column}}
 <style id="na-3d-layer">
-/* North Assembly — spatial motion layer */
-body{overflow-x:hidden;perspective:1600px}
-.na3d{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden;perspective:1400px;transform-style:preserve-3d;will-change:transform}
-.na3d *{box-sizing:border-box}
-.na3d-grid{position:absolute;width:150vw;height:130vh;left:-25vw;top:28vh;opacity:.32;background:linear-gradient(rgba(16,18,22,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(16,18,22,.12) 1px,transparent 1px);background-size:70px 70px;transform:perspective(650px) rotateX(67deg) translateZ(-500px);will-change:transform}
-.na3d-ring{position:absolute;border:1px solid rgba(16,18,22,.16);border-radius:50%;transform-style:preserve-3d;will-change:transform}
-.na3d-ring:before,.na3d-ring:after{content:"";position:absolute;inset:10%;border:1px solid rgba(49,92,255,.16);border-radius:50%}
-.na3d-ring:after{inset:27%;border-color:rgba(16,18,22,.13);transform:rotateY(70deg) translateZ(90px)}
-.na3d-r1{width:44vw;height:44vw;left:67%;top:5%;transform:rotateX(68deg) rotateZ(18deg)}
-.na3d-r2{width:27vw;height:27vw;left:-7%;top:51%;transform:rotateY(66deg) rotateZ(-25deg)}
-.na3d-r3{width:18vw;height:18vw;left:48%;top:68%;transform:rotateX(62deg)}
-.na3d-core{position:absolute;left:78%;top:27%;width:90px;height:90px;border:1px solid rgba(16,18,22,.3);background:rgba(255,255,255,.35);transform-style:preserve-3d;box-shadow:0 0 60px rgba(49,92,255,.12);will-change:transform}
-.na3d-core:before,.na3d-core:after{content:"";position:absolute;inset:18px;border:1px solid rgba(49,92,255,.35);transform:translateZ(45px) rotate(45deg)}
-.na3d-core:after{inset:30px;transform:translateZ(-55px) rotateX(70deg)}
-.na3d-cube{position:absolute;width:54px;height:54px;transform-style:preserve-3d;will-change:transform}
-.na3d-cube i{position:absolute;inset:0;border:1px solid rgba(16,18,22,.25);background:rgba(255,255,255,.28);backface-visibility:visible}
-.na3d-cube i:nth-child(1){transform:translateZ(27px)}.na3d-cube i:nth-child(2){transform:rotateY(180deg) translateZ(27px)}
-.na3d-cube i:nth-child(3){transform:rotateY(90deg) translateZ(27px)}.na3d-cube i:nth-child(4){transform:rotateY(-90deg) translateZ(27px)}
-.na3d-cube i:nth-child(5){transform:rotateX(90deg) translateZ(27px)}.na3d-cube i:nth-child(6){transform:rotateX(-90deg) translateZ(27px)}
-.na3d-c1{left:13%;top:20%;width:42px;height:42px}.na3d-c2{left:87%;top:67%;width:72px;height:72px}.na3d-c3{left:57%;top:11%;width:30px;height:30px}.na3d-c4{left:37%;top:78%;width:46px;height:46px}
-.na3d-shard{position:absolute;width:110px;height:18px;border:1px solid rgba(16,18,22,.18);background:rgba(255,255,255,.2);transform-style:preserve-3d;will-change:transform}
-.na3d-shard:after{content:"";position:absolute;inset:4px;border:1px solid rgba(49,92,255,.18);transform:translateZ(22px)}
-.na3d-s1{left:9%;top:43%;transform:rotateZ(28deg) rotateY(55deg)}.na3d-s2{right:5%;top:42%;transform:rotateZ(-22deg) rotateY(-62deg)}.na3d-s3{left:44%;top:88%;transform:rotateZ(12deg) rotateX(68deg)}
-.na3d-dot{position:absolute;width:7px;height:7px;border:1px solid #101216;background:#fff;box-shadow:0 0 24px rgba(49,92,255,.3);will-change:transform}.na3d-d1{left:22%;top:16%}.na3d-d2{left:73%;top:57%}.na3d-d3{left:48%;top:31%}.na3d-d4{left:30%;top:72%}
-.na3d-beam{position:absolute;width:1px;height:70vh;background:linear-gradient(transparent,rgba(49,92,255,.25),transparent);transform-origin:center;will-change:transform}.na3d-b1{left:18%;top:15%;transform:rotate(24deg)}.na3d-b2{right:20%;top:7%;transform:rotate(-31deg)}
-.na3d-portal{position:absolute;left:50%;top:50%;width:170px;height:170px;border:1px solid rgba(16,18,22,.13);border-radius:50%;transform-style:preserve-3d;will-change:transform}.na3d-portal:before,.na3d-portal:after{content:"";position:absolute;inset:18px;border:1px solid rgba(49,92,255,.16);border-radius:50%;transform:rotateX(70deg)}.na3d-portal:after{inset:43px;transform:rotateY(70deg) translateZ(60px)}
+body{overflow-x:hidden;perspective:1800px}
+.na3d{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden;perspective:1500px;transform-style:preserve-3d;will-change:transform;opacity:.9}
+.na3d-grid{position:absolute;width:145vw;height:125vh;left:-22vw;top:35vh;opacity:.24;background:linear-gradient(rgba(16,18,22,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(16,18,22,.13) 1px,transparent 1px);background-size:82px 82px;transform:perspective(720px) rotateX(68deg) translateZ(-650px);will-change:transform}
+.na3d-ring{position:absolute;width:min(52vw,760px);height:min(52vw,760px);left:58%;top:8%;border:1px solid rgba(16,18,22,.18);border-radius:50%;transform-style:preserve-3d;will-change:transform;box-shadow:0 0 90px rgba(49,92,255,.07)}
+.na3d-ring:before,.na3d-ring:after{content:"";position:absolute;border-radius:50%;inset:10%;border:1px solid rgba(49,92,255,.13);transform:rotateX(72deg) translateZ(90px)}
+.na3d-ring:after{inset:28%;border-color:rgba(16,18,22,.15);transform:rotateY(72deg) translateZ(-110px)}
+.na3d-core{position:absolute;left:76%;top:31%;width:92px;height:92px;border:1px solid rgba(16,18,22,.28);transform-style:preserve-3d;will-change:transform;box-shadow:0 0 70px rgba(49,92,255,.1)}
+.na3d-core:before,.na3d-core:after{content:"";position:absolute;inset:17px;border:1px solid rgba(49,92,255,.25);transform:translateZ(48px) rotate(45deg)}
+.na3d-core:after{inset:29px;transform:translateZ(-52px) rotateX(68deg)}
+.na3d-cube{position:absolute;width:64px;height:64px;left:11%;top:23%;transform-style:preserve-3d;will-change:transform;opacity:.7}
+.na3d-cube i{position:absolute;inset:0;border:1px solid rgba(16,18,22,.18);background:rgba(255,255,255,.18)}
+.na3d-cube i:nth-child(1){transform:translateZ(32px)}.na3d-cube i:nth-child(2){transform:rotateY(180deg) translateZ(32px)}.na3d-cube i:nth-child(3){transform:rotateY(90deg) translateZ(32px)}.na3d-cube i:nth-child(4){transform:rotateY(-90deg) translateZ(32px)}.na3d-cube i:nth-child(5){transform:rotateX(90deg) translateZ(32px)}.na3d-cube i:nth-child(6){transform:rotateX(-90deg) translateZ(32px)}
+.na3d-dot{position:absolute;width:6px;height:6px;border:1px solid #101216;background:#fff;box-shadow:0 0 22px rgba(49,92,255,.28);will-change:transform}.na3d-d1{left:20%;top:18%}.na3d-d2{left:82%;top:72%}
 .hero,.section,.footer{position:relative;z-index:2;transform-style:preserve-3d}
 .hero-main,.hero-panel,.hero-meta,.section-head,.about-grid,.apps,.systems,.team-grid,.contact{transform-style:preserve-3d}
-.hero-main{will-change:transform}
-.app,.system,.person,.contact a,.hero-panel{will-change:transform;transform-style:preserve-3d;transition:background .2s,border-color .2s}
-.app:after,.system:after,.person:after,.contact a:after,.hero-panel:after{content:"";position:absolute;inset:7px;border:1px solid rgba(16,18,22,.06);transform:translateZ(-18px);pointer-events:none}
-.app,.system,.person,.contact a{position:relative}
-.app h3,.system h3,.person h3,.contact strong,.hero-panel h2{transform:translateZ(22px);will-change:transform}
-.section{perspective:1300px}
-@media(max-width:900px){.na3d-core{left:72%;top:24%}.na3d-r1{width:70vw;height:70vw}.na3d-r2{width:48vw;height:48vw}.na3d-shard{opacity:.65}}
-@media(max-width:620px){.na3d{opacity:.65}.na3d-grid{opacity:.18}.na3d-cube{transform:scale(.7)}.na3d-portal{width:110px;height:110px}.na3d-core{width:60px;height:60px}}
-@media(prefers-reduced-motion:reduce){.na3d{display:none}.app,.system,.person,.contact a,.hero-panel{will-change:auto}}
+.hero-main,.hero-panel,.hero-meta,.app,.system,.person,.contact a{will-change:transform}
+.app,.system,.person,.contact a{transform-style:preserve-3d}
+@media(max-width:900px){.na3d-ring{width:72vw;height:72vw;left:44%}.na3d-core{left:70%;top:25%}}
+@media(max-width:620px){.na3d{opacity:.55}.na3d-grid{opacity:.14}.na3d-ring{width:100vw;height:100vw;left:18%;top:12%}.na3d-cube{transform:scale(.65)}}
+@media(prefers-reduced-motion:reduce){.na3d{display:none}.hero-main,.hero-panel,.hero-meta,.app,.system,.person,.contact a{will-change:auto}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script></head><body>
@@ -59,31 +42,41 @@ body{overflow-x:hidden;perspective:1600px}
 </main><footer class="footer"><div class="wrap footer-inner"><span>© 2026 North Assembly</span><span><a href="/legal/">Legal</a> · <a href="/security/">Security</a> · <a href="/changelog/">Changelog</a></span></div></footer><script id="na-3d-motion">
 (()=>{if(!window.gsap||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;gsap.registerPlugin(ScrollTrigger);
 const q=s=>document.querySelector(s),qa=s=>[...document.querySelectorAll(s)];
-document.body.insertAdjacentHTML('afterbegin',"<div class=\"na3d\" aria-hidden=\"true\">\n<div class=\"na3d-grid\"></div><div class=\"na3d-ring na3d-r1\"></div><div class=\"na3d-ring na3d-r2\"></div><div class=\"na3d-ring na3d-r3\"></div>\n<div class=\"na3d-core\"></div>\n<div class=\"na3d-cube na3d-c1\"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class=\"na3d-cube na3d-c2\"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class=\"na3d-cube na3d-c3\"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class=\"na3d-cube na3d-c4\"><i></i><i></i><i></i><i></i><i></i><i></i></div>\n<div class=\"na3d-shard na3d-s1\"></div><div class=\"na3d-shard na3d-s2\"></div><div class=\"na3d-shard na3d-s3\"></div>\n<div class=\"na3d-beam na3d-b1\"></div><div class=\"na3d-beam na3d-b2\"></div><div class=\"na3d-portal\"></div>\n<div class=\"na3d-dot na3d-d1\"></div><div class=\"na3d-dot na3d-d2\"></div><div class=\"na3d-dot na3d-d3\"></div><div class=\"na3d-dot na3d-d4\"></div>\n</div>");
-const scene=q('.na3d'), hero=q('.hero'), grid=q('.na3d-grid'), core=q('.na3d-core');
-const rings=qa('.na3d-ring'), cubes=qa('.na3d-cube'), shards=qa('.na3d-shard'), dots=qa('.na3d-dot');
-gsap.to(rings[0],{rotationZ:720,rotationY:360,scale:1.35,duration:42,repeat:-1,ease:'none'});
-gsap.to(rings[1],{rotationZ:-620,rotationX:360,scale:.82,duration:34,repeat:-1,ease:'none'});
-gsap.to(rings[2],{rotationY:540,rotationZ:-300,scale:1.2,duration:27,repeat:-1,ease:'none'});
-gsap.to(core,{rotationX:360,rotationY:720,rotationZ:180,duration:24,repeat:-1,ease:'none'});
-cubes.forEach((el,i)=>gsap.to(el,{rotationX:360+(i*90),rotationY:540+(i*80),rotationZ:360,duration:20+i*5,repeat:-1,ease:'none'}));
-gsap.to('.na3d-portal',{rotationY:720,rotationX:45,scale:1.7,duration:30,repeat:-1,ease:'none'});
-gsap.to(grid,{yPercent:180,z:850,rotationZ:15,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1}});
-gsap.to('.na3d-r1',{xPercent:-45,yPercent:75,z:1000,rotationX:540,rotationY:720,scale:2.15,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.25}});
-gsap.to('.na3d-r2',{xPercent:85,yPercent:-100,z:-650,rotationX:-420,rotationY:620,scale:.45,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.4}});
-gsap.to('.na3d-r3',{xPercent:-120,yPercent:-70,z:500,rotationZ:900,scale:2.4,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.1}});
-gsap.to(core,{xPercent:-80,yPercent:115,z:950,rotationX:540,rotationY:900,scale:1.8,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.1}});
-cubes.forEach((el,i)=>gsap.to(el,{x:(i%2?1:-1)*(180+i*110),y:(i%2?-1:1)*(300+i*95),z:(i%2?700:-500),rotationX:720+i*180,rotationY:900-i*80,rotationZ:540,scale:1.2+i*.15,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.2+i*.12}}));
-shards.forEach((el,i)=>gsap.to(el,{xPercent:(i%2?170:-190),yPercent:(i%2?-260:230),z:i%2?850:-700,rotationX:500,rotationY:i%2?720:-720,rotationZ:i%2?-540:620,scale:1.4,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.3}}));
-gsap.to('.na3d-b1',{yPercent:220,z:500,rotationZ:360,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1}});
-gsap.to('.na3d-b2',{yPercent:-180,z:700,rotationZ:-420,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.1}});
-dots.forEach((el,i)=>gsap.to(el,{x:(i%2?500:-430),y:(i%2?-600:520),z:i%2?900:-500,scale:2,scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:.9}}));
-qa('.hero-main,.hero-panel,.hero-meta').forEach((el,i)=>gsap.fromTo(el,{y:90,z:-220,rotationX:i?5:2},{y:0,z:0,rotationX:0,scrollTrigger:{trigger:hero,start:'top top',end:'bottom top',scrub:.8}}));
-qa('.section').forEach((el,i)=>{gsap.fromTo(el,{y:100,z:-260,rotationX:4},{y:0,z:0,rotationX:0,scrollTrigger:{trigger:el,start:'top 95%',end:'top 45%',scrub:.8}})});
-qa('.app,.system,.person,.contact a,.info-row').forEach((el,i)=>gsap.fromTo(el,{y:80,z:-180,rotationX:7,rotationY:i%2?3:-3},{y:0,z:0,rotationX:0,rotationY:0,scrollTrigger:{trigger:el,start:'top 96%',end:'top 60%',scrub:.7}}));
-let px=0,py=0,tx=0,ty=0;
-addEventListener('pointermove',e=>{tx=(e.clientX/innerWidth-.5)*44;ty=(e.clientY/innerHeight-.5)*34},{passive:true});
-gsap.ticker.add(()=>{px+=(tx-px)*.07;py+=(ty-py)*.07;gsap.set(scene,{x:px,y:py,rotationY:px*.16,rotationX:-py*.13});gsap.set('.hero-main',{x:px*.18,y:py*.12,rotationY:px*.035,rotationX:-py*.025});gsap.set('.hero-panel',{x:-px*.12,y:-py*.09,rotationY:-px*.06,rotationX:py*.04});});
-qa('.app,.system,.person,.contact a').forEach(el=>{el.addEventListener('pointerenter',()=>gsap.to(el,{z:45,rotationX:-3,rotationY:3,duration:.35,ease:'power2.out'}));el.addEventListener('pointerleave',()=>gsap.to(el,{z:0,rotationX:0,rotationY:0,duration:.45,ease:'power2.out'}));});
+document.body.insertAdjacentHTML('afterbegin','<div class="na3d" aria-hidden="true"><div class="na3d-grid"></div><div class="na3d-ring"></div><div class="na3d-core"></div><div class="na3d-cube"><i></i><i></i><i></i><i></i><i></i><i></i></div><i class="na3d-dot na3d-d1"></i><i class="na3d-dot na3d-d2"></i></div>');
+const scene=q('.na3d'),ring=q('.na3d-ring'),core=q('.na3d-core'),cube=q('.na3d-cube'),grid=q('.na3d-grid');
+/* Slow ambient motion: only three hero objects, keeping the scene light. */
+gsap.to(ring,{rotationZ:360,rotationY:180,duration:48,repeat:-1,ease:'none'});
+gsap.to(core,{rotationX:360,rotationY:540,rotationZ:180,duration:30,repeat:-1,ease:'none'});
+gsap.to(cube,{rotationX:360,rotationY:-540,rotationZ:180,duration:26,repeat:-1,ease:'none'});
+/* The page becomes the camera: deep Z travel, large scale changes and long rotations. */
+const page=gsap.timeline({scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.05}});
+page.to(grid,{yPercent:240,z:1100,rotationZ:18},0)
+.to(ring,{xPercent:-72,yPercent:105,z:1250,rotationX:520,rotationY:760,rotationZ:480,scale:2.35},0)
+.to(core,{xPercent:-88,yPercent:135,z:1150,rotationX:620,rotationY:980,rotationZ:360,scale:1.85},0)
+.to(cube,{xPercent:360,yPercent:260,z:-720,rotationX:-520,rotationY:860,rotationZ:420,scale:.55},0);
+const sections=qa('.section');
+sections.forEach((el,i)=>{
+  gsap.fromTo(el,{y:140,z:-500,rotationX:7,scale:.88,opacity:.72},
+    {y:0,z:0,rotationX:0,scale:1,opacity:1,ease:'none',
+     scrollTrigger:{trigger:el,start:'top 105%',end:'top 38%',scrub:1.15}});
+  const items=qa('.app,.system,.person,.contact a',el);
+  items.forEach((item,j)=>gsap.fromTo(item,
+    {y:100+(j%3)*35,z:-280-(j%2)*160,rotationY:j%2?6:-6,rotationX:5,scale:.92},
+    {y:0,z:0,rotationY:0,rotationX:0,scale:1,ease:'none',
+     scrollTrigger:{trigger:item,start:'top 98%',end:'top 58%',scrub:.8}}));
+});
+/* Hero behaves like a camera lens opening into the page. */
+const hero=q('.hero');
+if(hero) gsap.to('.hero-main',{y:-180,z:360,scale:1.08,rotationX:-4,scrollTrigger:{trigger:hero,start:'top top',end:'bottom top',scrub:1}});
+if(q('.hero-panel')) gsap.to('.hero-panel',{y:150,z:-260,rotationY:-8,scale:.94,scrollTrigger:{trigger:hero,start:'top top',end:'bottom top',scrub:1}});
+/* Scroll velocity briefly widens the camera, creating a controlled hyperspace sensation. */
+let velocity=0;
+ScrollTrigger.create({trigger:document.body,start:'top top',end:'bottom bottom',onUpdate:self=>{velocity=Math.min(1,Math.abs(self.getVelocity())/2200);}});
+gsap.ticker.add(()=>{const target=1+velocity*.045;gsap.to(scene,{scale:target,rotationZ:velocity*.65,duration:.18,overwrite:true,ease:'power2.out'});velocity*=.88});
+/* Strong but smooth pointer camera. */
+let mx=0,my=0,tx=0,ty=0;
+addEventListener('pointermove',e=>{tx=(e.clientX/innerWidth-.5)*58;ty=(e.clientY/innerHeight-.5)*44},{passive:true});
+gsap.ticker.add(()=>{mx+=(tx-mx)*.055;my+=(ty-my)*.055;gsap.set(scene,{x:mx,y:my,rotationY:mx*.2,rotationX:-my*.16});gsap.set('.hero-main',{x:mx*.22,y:my*.13,rotationY:mx*.045,rotationX:-my*.03});gsap.set('.hero-panel',{x:-mx*.15,y:-my*.1,rotationY:-mx*.065,rotationX:my*.04})});
+qa('.app,.system,.person,.contact a').forEach(el=>{el.addEventListener('pointerenter',()=>gsap.to(el,{z:55,rotationX:-2.5,rotationY:2.5,duration:.4,ease:'power3.out'}));el.addEventListener('pointerleave',()=>gsap.to(el,{z:0,rotationX:0,rotationY:0,duration:.55,ease:'power3.out'}))});
 })();
 </script></body></html>
