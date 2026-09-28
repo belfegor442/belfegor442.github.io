@@ -10,7 +10,7 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(82px,13.5vw,205px);l
 
 .about-grid{display:grid;grid-template-columns:1.4fr .6fr;gap:120px}.statement{font-family:var(--serif);font-size:clamp(40px,5.3vw,76px);line-height:1;letter-spacing:-.055em;max-width:900px}.statement span{color:#858078;font-style:italic}.info-list{border-top:1px solid #aaa59b}.info-row{display:grid;grid-template-columns:1fr 1.5fr;gap:18px;padding:20px 0;border-bottom:1px solid var(--line);font-size:11px}.info-row span:first-child{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#918d84}.info-row span:last-child{color:#4f4c46}
 
-.apps{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}.app{position:relative;grid-column:span 4;min-height:410px;padding:25px;background:transparent;border:1px solid #bbb5aa;text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;transition:transform .7s cubic-bezier(.16,1,.3,1),background .4s,color .4s,border-color .4s}.app:before{content:"";position:absolute;width:0;height:0;border-radius:50%;background:#171717;left:50%;top:50%;transform:translate(-50%,-50%);transition:width .65s cubic-bezier(.16,1,.3,1),height .65s cubic-bezier(.16,1,.3,1);z-index:0}.app>*{position:relative;z-index:1}.app:hover{transform:translateY(-12px);border-color:#171717;color:#f3f0e9}.app:hover:before{width:170%;height:170%}.app-feature{grid-column:span 6;grid-row:span 2;min-height:838px;background:#171717;color:#f3f0e9;border-color:#171717;overflow:hidden}.app-feature:before{background:#37342f}.app-feature:hover{background:#171717}.app-top,.app-bottom{display:flex;justify-content:space-between;gap:15px}.app-id,.app-type{font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:#918d84}.app-feature .app-id,.app-feature .app-type,.app-feature .app-desc{color:#aaa69d}.app h3{font-family:var(--serif);font-size:clamp(39px,4.5vw,67px);font-weight:400;letter-spacing:-.06em;margin:0 0 13px}.app-feature h3{font-size:clamp(65px,8vw,116px);font-style:italic}.app-desc{font-size:10px;line-height:1.8;color:#706d66;max-width:390px;margin:0}.app-arrow{width:38px;height:38px;border:1px solid #bdb7ad;display:grid;place-items:center;font-size:15px;transition:transform .5s,background .3s}.app-feature .app-arrow{border-color:#555}.app:hover .app-arrow{transform:rotate(-45deg);background:#f3f0e9;color:#171717;border-color:#f3f0e9}
+.apps{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}.app{position:relative;grid-column:span 4;min-height:410px;padding:25px;background:transparent;border:1px solid #bbb5aa;text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;transition:transform .7s cubic-bezier(.16,1,.3,1),background .4s,color .4s,border-color .4s}.app:before{content:"";position:absolute;inset:0;background:#171717;transform:scaleY(0);transform-origin:bottom;transition:transform .55s cubic-bezier(.16,1,.3,1);z-index:0}.app>*{position:relative;z-index:1}.app:hover{transform:translateY(-7px);border-color:#171717;color:#f3f0e9}.app:hover:before{transform:scaleY(1)}.app-feature{grid-column:span 6;grid-row:span 2;min-height:838px;background:#171717;color:#f3f0e9;border-color:#171717;overflow:hidden}.app-feature:before{display:none}.app-feature:hover{background:#171717}.app-top,.app-bottom{display:flex;justify-content:space-between;gap:15px}.app-id,.app-type{font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:#918d84}.app-feature .app-id,.app-feature .app-type,.app-feature .app-desc{color:#aaa69d}.app h3{font-family:var(--serif);font-size:clamp(39px,4.5vw,67px);font-weight:400;letter-spacing:-.06em;margin:0 0 13px}.app-feature h3{font-size:clamp(65px,8vw,116px);font-style:italic}.app-desc{font-size:10px;line-height:1.8;color:#706d66;max-width:390px;margin:0}.app-arrow{width:38px;height:38px;border:1px solid #bdb7ad;display:grid;place-items:center;font-size:15px;transition:transform .5s,background .3s}.app-feature .app-arrow{border-color:#555}.app:hover .app-arrow{transform:rotate(-45deg);background:#f3f0e9;color:#171717;border-color:#f3f0e9}
 
 .beta-apps{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.beta-app,.beta-app-feature{grid-column:auto!important;grid-row:auto!important;min-height:390px!important;background:#e7e2d9;border-color:#c7c1b6}.beta-app-feature{background:#d8d1c6}.beta-app-feature h3{font-family:var(--serif);font-size:clamp(50px,5.5vw,80px);font-weight:400}.beta-app-feature:after{content:"Flagship project";position:absolute;right:25px;top:25px;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:#5f5b54}.beta-badge,.monix-crown,.monix-crown-label{display:none}
 
@@ -28,17 +28,17 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(82px,13.5vw,205px);l
 html{scroll-behavior:auto}
 body{--scroll:0;--velocity:0}
 .motion-field{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
-.motion-orbit{position:absolute;border:1px solid #aaa49a;border-radius:50%;opacity:.72;will-change:transform}
-.motion-orbit.o1{width:32vw;height:32vw;right:-9vw;top:14%}
-.motion-orbit.o2{width:13vw;height:13vw;left:-4vw;bottom:11%;border-color:#c1bbb1}
-.motion-orbit.o3{width:5vw;height:5vw;right:27%;top:7%;background:#171717;border:0}
-.motion-line{position:absolute;width:1px;height:170px;background:linear-gradient(to bottom,transparent,#171717,transparent);opacity:.22;will-change:transform}
+.motion-orbit{position:absolute;border:1px solid #aaa49a;border-radius:50%;opacity:.32;will-change:transform}
+.motion-orbit.o1{width:28vw;height:28vw;right:-10vw;top:18%}
+.motion-orbit.o2{width:9vw;height:9vw;left:-3vw;bottom:12%;border-color:#c1bbb1}
+.motion-orbit.o3{width:18px;height:18px;right:27%;top:9%;background:#171717;border:0;opacity:.28}
+.motion-line{position:absolute;width:1px;height:120px;background:linear-gradient(to bottom,transparent,#171717,transparent);opacity:.12;will-change:transform}
 .motion-line.l1{left:18%;top:-30px}.motion-line.l2{right:18%;bottom:-30px;height:230px}
-.motion-square{position:absolute;width:42px;height:42px;border:1px solid #99938a;transform:rotate(45deg);opacity:.5;will-change:transform}
-.motion-square.s1{right:12%;top:45%}.motion-square.s2{left:8%;bottom:19%;width:24px;height:24px}
-.motion-cross{position:absolute;width:30px;height:30px;opacity:.35}
+.motion-square{position:absolute;width:28px;height:28px;border:1px solid #99938a;transform:rotate(45deg);opacity:.24;will-change:transform}
+.motion-square.s1{right:12%;top:45%}.motion-square.s2{left:8%;bottom:19%;width:16px;height:16px}
+.motion-cross{position:absolute;width:22px;height:22px;opacity:.18}
 .motion-cross:before,.motion-cross:after{content:"";position:absolute;background:#171717}
-.motion-cross:before{width:30px;height:1px;top:14px}.motion-cross:after{width:1px;height:30px;left:14px}
+.motion-cross:before{width:22px;height:1px;top:10px}.motion-cross:after{width:1px;height:22px;left:10px}
 .motion-cross.c1{left:35%;top:13%}.motion-cross.c2{right:7%;bottom:14%}
 
 .motion-heading{overflow:hidden}
@@ -48,21 +48,18 @@ body{--scroll:0;--velocity:0}
 .motion-copy.is-visible{opacity:1;transform:none;filter:none}
 .motion-card{opacity:0;transform:translateY(65px) scale(.965);transition:opacity .9s ease,transform 1.15s cubic-bezier(.16,1,.3,1)}
 .motion-card.is-visible{opacity:1;transform:none}
-.hero h1 .motion-word:nth-child(2){font-style:italic}
+.hero h1 .motion-word:nth-of-type(2){font-style:italic;color:#77736b}
 .hero-main{will-change:transform}
 .hero-panel{will-change:transform}
 .parallax{will-change:transform}
-.smooth-cursor{position:fixed;left:0;top:0;width:8px;height:8px;border-radius:50%;background:#171717;pointer-events:none;z-index:120;transform:translate(-50%,-50%);opacity:0;mix-blend-mode:multiply;transition:width .25s,height .25s,opacity .25s}
-body.cursor-ready .smooth-cursor{opacity:.65}
-body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
 .scroll-progress{position:fixed;right:18px;top:50%;width:1px;height:90px;background:#c8c2b8;z-index:80;transform:translateY(-50%)}
 .scroll-progress i{display:block;width:3px;background:#171717;transform-origin:top;transform:scaleY(0);height:100%;margin-left:-1px}
 .scroll-number{position:fixed;right:13px;bottom:18px;font:8px Arial,sans-serif;letter-spacing:.15em;color:#77736b;z-index:80;writing-mode:vertical-rl}
-@media(max-width:620px){.smooth-cursor,.scroll-progress,.scroll-number{display:none}.motion-orbit.o1{width:65vw;height:65vw}.motion-line{display:none}}
+@media(max-width:620px){}.motion-orbit.o1{width:52vw;height:52vw}.motion-line{display:none}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}.motion-word,.motion-copy,.motion-card{transform:none!important;opacity:1!important;filter:none!important}}
 </style></head><body class="editorial-site">
 <header class="header"><div class="header-banner"><a href="/" aria-label="North Assembly home"><img src="/banner.jpg" alt="North Assembly banner"></a></div><div class="wrap header-inner"><nav class="nav" aria-label="Primary navigation"><a href="#about">About</a><a href="#apps">Applications</a><a href="#beta">Beta</a><a href="#systems">Systems</a><a href="#team">Team</a><a href="/hub/">Hub</a></nav></div></header>
-<main>
+<div class="scroll-progress" aria-hidden="true"><i></i></div><div class="scroll-number" aria-hidden="true">00</div><main>
 <section class="hero"><div class="wrap hero-grid"><div class="hero-main"><div class="hero-brand"><img src="/icon.jpg" alt="North Assembly logo"><span>North Assembly / Independent software studio</span></div><div class="kicker"><i></i>Software · Systems · Infrastructure</div><h1>NORTH <span>ASSEMBLY</span></h1><p class="hero-lead">A connected software organization building applications, infrastructure and operational tools with a common technical language.</p></div><aside class="hero-panel"><img src="/banner.jpg" alt="North Assembly visual banner"><span class="panel-label">North Assembly</span><h2>One organization.<br>Multiple systems.</h2><p>Applications live under the same ecosystem and are presented from the actual /Apps/ application tree.</p></aside><div class="hero-meta"><div class="meta-list"><span class="meta-item"><b>Software</b> / Applications</span><span class="meta-item"><b>Systems</b> / Infrastructure</span><span class="meta-item"><b>2026</b> / Active</span></div><span class="scroll">Scroll ↓</span></div></div></section>
 <section class="section" id="about"><div class="wrap"><div class="section-head"><span class="index">02</span><h2>Built to connect.</h2><p class="section-note">North Assembly treats applications, services, documentation and infrastructure as parts of one technical environment.</p></div><div class="about-grid"><div class="statement">Software should not feel like a collection of isolated pages. <span>Each project has a place, a purpose and a relationship to the systems around it.</span></div><div class="info-list"><div class="info-row"><span>Organization</span><span>North Assembly</span></div><div class="info-row"><span>Focus</span><span>Software / Systems / Infrastructure</span></div><div class="info-row"><span>Model</span><span>Independent development</span></div><div class="info-row"><span>Access</span><span>Public applications + internal tooling</span></div></div></div></div></section>
 <section class="section" id="apps"><div class="wrap"><div class="section-head"><span class="index">03</span><h2>Applications.</h2><p class="section-note">Direct entry points into the applications currently exposed under /Apps/.</p></div><div class="apps">
@@ -81,35 +78,7 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
 </div></div></section><section class="section" id="systems"><div class="wrap"><div class="section-head"><span class="index">05</span><h2>Systems.</h2><p class="section-note">The supporting layer around the applications.</p></div><div class="systems"><a class="system" href="/hub/"><span class="system-num">01</span><h3>Hub</h3><p>Central access to projects, releases and operational resources.</p></a><a class="system" href="/documentation/"><span class="system-num">02</span><h3>Documentation</h3><p>Technical reference, architecture and project information.</p></a><a class="system" href="/status/"><span class="system-num">03</span><h3>Status</h3><p>Operational state and service visibility.</p></a><a class="system" href="/releases/"><span class="system-num">04</span><h3>Releases</h3><p>Published software and release information.</p></a></div></div></section>
 <section class="section" id="team"><div class="wrap"><div class="section-head"><span class="index">06</span><h2>People.</h2><p class="section-note">The people currently forming the organization.</p></div><div class="team-grid"><div class="person"><span class="person-role">Executive / Direction</span><h3>belfegor442</h3><p>CEO / Director</p></div><div class="person"><span class="person-role">Management</span><h3>Acrid</h3><p>Manager</p></div><div class="person"><span class="person-role">Direction</span><h3>Anti</h3><p>Director</p></div><div class="person"><span class="person-role">Design</span><h3>xtccy / Terrorendi</h3><p>Graphic Designer</p></div><div class="person"><span class="person-role">Quality</span><h3>Aneley_567</h3><p>Tester</p></div></div></div></section>
 <section class="section"><div class="wrap"><div class="section-head"><span class="index">07</span><h2>Connect.</h2><p class="section-note">Public entry points for North Assembly.</p></div><div class="contact"><a href="https://github.com/belfegor442" rel="noopener"><span class="label">Source</span><strong>GitHub ↗</strong></a><a href="/hub/"><span class="label">Organization</span><strong>North Assembly Hub ↗</strong></a><a href="/work-with-us/"><span class="label">Contact</span><strong>Work with us ↗</strong></a></div></div></section>
-</main><footer class="footer"><div class="wrap footer-inner"><span>© 2026 North Assembly</span><span><a href="/legal/">Legal</a> · <a href="/security/">Security</a> · <a href="/changelog/">Changelog</a></span></div></footer><script>
-(() => {
-  const targets = document.querySelectorAll('.section, .hero-main, .hero-panel, .app, .system, .person, .contact a');
-  targets.forEach((el, i) => {
-    if (el.querySelector('h2,h3') && !el.querySelector('.reveal')) {
-      const heading = el.querySelector('h2,h3');
-      const span = document.createElement('span');
-      span.className='reveal';
-      span.innerHTML=heading.innerHTML;
-      heading.innerHTML='';
-      heading.appendChild(span);
-    }
-    el.style.transitionDelay = (Math.min(i % 6, 5) * 70) + 'ms';
-  });
-  const io = new IntersectionObserver(entries => entries.forEach(entry => {
-    if(entry.isIntersecting) entry.target.classList.add('visible');
-  }), {threshold:.14});
-  targets.forEach(el => io.observe(el));
-  let last=0;
-  addEventListener('scroll', () => {
-    const y=scrollY;
-    document.querySelectorAll('.section:before').forEach((el,i)=> {
-      const p=Math.max(-18,Math.min(18,(y-last)*.02));
-      el.style.transform='translateY('+p+'px)';
-    });
-    last=y;
-  }, {passive:true});
-})();
-</script><script id="na-motion">
+</main><footer class="footer"><div class="wrap footer-inner"><span>© 2026 North Assembly</span><span><a href="/legal/">Legal</a> · <a href="/security/">Security</a> · <a href="/changelog/">Changelog</a></span></div></footer><script id="na-motion">
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root=document.documentElement;
@@ -168,13 +137,16 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
   let target=scrollY,current=scrollY,velocity=0,last=scrollY,raf=0;
   const setTarget=()=>{target=scrollY};
   addEventListener('scroll',setTarget,{passive:true});
+  // A restrained inertia model: visual layers lag behind the native scroll,
+  // while the document itself remains native and responsive.
+  const smoothFactor=.055;
 
   const progress=()=>Math.min(1,Math.max(0,scrollY/(document.documentElement.scrollHeight-innerHeight||1)));
   const tick=()=>{
-    current += (target-current)*.075;
+    current += (target-current)*smoothFactor;
     const raw=target-last;
-    velocity += (raw-velocity)*.09;
-    last += (target-last)*.18;
+    velocity += (raw-velocity)*.055;
+    last += (target-last)*.12;
     root.style.setProperty('--scroll',current);
     root.style.setProperty('--velocity',velocity);
 
@@ -184,8 +156,8 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
       const p=Math.max(-1,Math.min(1,(innerHeight/2-(h.top+h.height/2))/innerHeight));
       const main=hero.querySelector('.hero-main');
       const panel=hero.querySelector('.hero-panel');
-      if(main) main.style.transform='translate3d(0,'+(p*-38)+'px,0)';
-      if(panel) panel.style.transform='translate3d(0,'+(p*-72)+'px,0) rotate('+(3+p*1.8)+'deg)';
+      if(main) main.style.transform='translate3d(0,'+(p*-24)+'px,0)';
+      if(panel) panel.style.transform='translate3d(0,'+(p*-42)+'px,0) rotate('+(3+p*.8)+'deg)';
     }
 
     document.querySelectorAll('.motion-field').forEach((field,si)=>{
@@ -195,10 +167,10 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
       field.querySelectorAll('[data-speed]').forEach(el=>{
         const speed=parseFloat(el.dataset.speed),phase=parseFloat(el.dataset.phase);
         const axis=el.dataset.axis;
-        const amount=p*180*speed + velocity*phase*.025;
+        const amount=p*95*speed + velocity*phase*.012;
         const x=axis==='x'?amount:Math.sin(current*.001+phase)*amount*.35;
         const y=axis==='y'?amount:Math.cos(current*.001+phase)*amount*.35;
-        el.style.transform='translate3d('+x+'px,'+y+'px,0) rotate('+(phase+current*.018)+'deg)';
+        el.style.transform='translate3d('+x+'px,'+y+'px,0) rotate('+(phase*.35+current*.006)+'deg)';
       });
     });
 
@@ -210,12 +182,12 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
   if(!raf) raf=requestAnimationFrame(tick);
 
   // Lightweight magnetic cursor: it follows the pointer without hijacking clicks.
-  const cursor=document.createElement('div');cursor.className='smooth-cursor';document.body.appendChild(cursor);
+  const cursor=document.createElement('div');cursor.className='';document.body.appendChild(cursor);
   let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
-  addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;document.body.classList.add('cursor-ready')},{passive:true});
+  addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;document.body.classList.add('')},{passive:true});
   document.querySelectorAll('a,.app,.system,.person').forEach(el=>{
-    el.addEventListener('mouseenter',()=>document.body.classList.add('cursor-hover'));
-    el.addEventListener('mouseleave',()=>document.body.classList.remove('cursor-hover'));
+    el.addEventListener('mouseenter',()=>document.body.classList.add(''));
+    el.addEventListener('mouseleave',()=>document.body.classList.remove(''));
   });
   const cursorTick=()=>{
     cx+=(mx-cx)*.14;cy+=(my-cy)*.14;
@@ -223,19 +195,6 @@ body.cursor-hover .smooth-cursor{width:32px;height:32px;opacity:.28}
     requestAnimationFrame(cursorTick);
   };cursorTick();
 
-  // Soft inertia on internal anchor navigation.
-  document.querySelectorAll('a[href^="#"]').forEach(a=>{
-    a.addEventListener('click',e=>{
-      const el=document.querySelector(a.getAttribute('href'));if(!el)return;
-      e.preventDefault();
-      const y=el.getBoundingClientRect().top+scrollY-40;
-      const start=scrollY,d=y-start,t0=performance.now(),dur=Math.min(1300,Math.max(650,Math.abs(d)*.75));
-      const ease=t=>1-Math.pow(1-t,4);
-      const go=now=>{
-        const t=Math.min(1,(now-t0)/dur);scrollTo(0,start+d*ease(t));
-        if(t<1)requestAnimationFrame(go);
-      };requestAnimationFrame(go);
-    });
-  });
+  // Smooth anchor navigation is handled by the native scroll timeline below.
 })();
 </script></body></html>
