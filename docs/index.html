@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<div class="header-banner"><a href="/" aria-label="North Assembly home"><img src="/banner.jpg" alt="North Assembly"></a></div>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>North Assembly — Software / Systems / Infrastructure</title>
 <meta name="description" content="North Assembly — software, systems and digital infrastructure.">
-<link rel="icon" type="image/jpeg" href="/icon.jpg"><link rel="shortcut icon" type="image/jpeg" href="/icon.jpg">
+<link rel="icon" type="image/jpeg" href="./icon.jpg"><link rel="shortcut icon" type="image/jpeg" href="./icon.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300..700&family=STIX+Two+Text:ital@1&display=swap" rel="stylesheet">
 <style>
@@ -20,7 +19,7 @@ a{color:inherit;text-decoration:none}
 a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:3px}
 .gl{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .gl span{position:absolute;top:0;font:italic 400 1em/1 var(--fm);color:var(--ink);will-change:transform}
-nav{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:calc(env(safe-area-inset-top,0px) + 18px) 6vw 16px;background:linear-gradient(#fff 30%,#fff0)}
+nav{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:calc(env(safe-area-inset-top,0px) + 18px) 6vw 16px;background:linear-gradient(#fff 30%,#fff0)}
 nav b{font-weight:600;letter-spacing:-.02em}
 nav div{display:flex;gap:clamp(14px,2.6vw,34px);align-items:center;flex-wrap:wrap;justify-content:flex-end;font-size:.92rem}
 nav a{color:var(--mute);transition:color .3s var(--ex)}nav a:hover,nav a.on{color:var(--ink)}
@@ -113,12 +112,12 @@ footer a:hover{color:var(--ink)}
 }
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
-<style>.header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}</style></head>
+<style>.header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}.brand-banner{position:absolute;left:0;top:0;width:245px;height:82px;display:block;overflow:hidden;border-radius:0}.brand-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:left center}.nav-name{position:absolute;left:calc(6vw + 265px);top:calc(env(safe-area-inset-top,0px) + 18px)}@media(max-width:900px){.brand-banner{width:185px;height:70px}.nav-name{left:calc(6vw + 205px)}}@media(max-width:620px){.brand-banner{left:0;width:135px;height:58px}.nav-name{display:none}nav{padding-left:0}}</style></head>
 </head>
 <body>
 <div class="gl" aria-hidden="true"></div>
 <div class="pg"></div>
-<nav aria-label="Main"><b>North Assembly</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="https://northassembly.work.gd/hub/">Hub</a></div></nav>
+<nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><img src="./banner.jpg" alt="North Assembly"></a><b class="nav-name">North Assembly</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="https://northassembly.work.gd/hub/">Hub</a></div></nav>
 
 <main>
 <section class="sec hero" id="top">
