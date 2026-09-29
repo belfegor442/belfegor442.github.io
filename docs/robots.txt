@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://belfegor442.github.io./sitemap.xml
+Sitemap: https://northassembly.work.gd/sitemap.xml
