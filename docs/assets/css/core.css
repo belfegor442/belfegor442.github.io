@@ -1,6 +1,6 @@
-/* Shared Weird Stuff frontend enhancements */
+/* North Assembly — shared frontend enhancements */
 [data-reveal]{opacity:0;transform:translateY(14px);transition:opacity .45s ease,transform .45s ease}
 [data-reveal][data-revealed="true"]{opacity:1;transform:none}
-a[aria-current="page"],a.is-active{color:#fff!important}
+a[aria-current="page"],a.is-active{color:#11110f!important}
 html[data-motion="reduced"] [data-reveal]{opacity:1;transform:none;transition:none}
 @media(prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none}}
