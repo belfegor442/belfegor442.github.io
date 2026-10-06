@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brew — North Assembly</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../../">NORTH ASSEMBLY</a>
+  <span class="slash">/</span>
+  <span class="section">BREW</span>
+</header>
+<main>
+  <section id="home" class="screen">
+    <p class="eyebrow">NORTH ASSEMBLY · WEB GAME</p>
+    <h1>BREW</h1>
+    <p class="lead">A small multiplayer game built for the web.</p>
+    <div class="panel menu">
+      <button id="createBtn" class="primary">CREATE ROOM</button>
+      <div class="join">
+        <input id="roomInput" maxlength="6" placeholder="ROOM CODE" autocomplete="off">
+        <button id="joinBtn">JOIN</button>
+      </div>
+      <p id="status" class="status">Ready.</p>
+    </div>
+  </section>
+
+  <section id="lobby" class="screen hidden">
+    <p class="eyebrow">ROOM</p>
+    <div class="room-line"><h2 id="roomCode">------</h2><button id="copyBtn">COPY</button></div>
+    <div class="players">
+      <div class="player"><span class="dot"></span><strong id="p1">YOU</strong><small>HOST</small></div>
+      <div class="player"><span class="dot waiting"></span><strong id="p2">WAITING</strong><small>PLAYER 2</small></div>
+    </div>
+    <button id="startBtn" class="primary wide" disabled>WAITING FOR PLAYER</button>
+    <button id="leaveBtn" class="textbtn">LEAVE ROOM</button>
+    <p id="lobbyStatus" class="status">Share the room code with another player.</p>
+  </section>
+
+  <section id="game" class="screen hidden">
+    <div class="game-head">
+      <div><span class="label">YOU</span><strong id="youScore">1000</strong></div>
+      <div class="vs">VS</div>
+      <div class="right"><span class="label" id="opponentName">OPPONENT</span><strong id="opScore">1000</strong></div>
+    </div>
+    <div class="arena panel">
+      <p class="eyebrow">COINFLIP DUEL</p>
+      <div id="coin" class="coin">?</div>
+      <p id="turnText">Choose heads or tails.</p>
+      <div class="choices">
+        <button data-choice="heads">HEADS</button>
+        <button data-choice="tails">TAILS</button>
+      </div>
+      <div class="stake"><label>STAKE</label><input id="stake" type="number" min="1" max="1000" value="25"></div>
+      <p id="gameStatus" class="status"></p>
+    </div>
+    <button id="gameLeave" class="textbtn">LEAVE</button>
+  </section>
+</main>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
