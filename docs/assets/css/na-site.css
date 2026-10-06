@@ -1,0 +1,28 @@
+/* North Assembly — shared corporate site layer */
+:root{--na-paper:#f4f3ef;--na-ink:#11110f;--na-muted:#6e6d68;--na-line:#d7d5ce;--na-panel:#eeece6}
+html{background:var(--na-paper)!important;color-scheme:light!important}
+body{background:var(--na-paper)!important;color:var(--na-ink)!important;font-family:Arial,Helvetica,sans-serif!important}
+body::before,body::after{background:none!important;box-shadow:none!important}
+a{color:var(--na-ink);text-decoration-thickness:1px;text-underline-offset:3px}
+nav,.nav,.site-header,.header,.topbar{background:rgba(244,243,239,.95)!important;border-color:var(--na-line)!important;box-shadow:none!important;backdrop-filter:blur(12px)}
+nav a,.nav a,.header a,.topbar a{color:var(--na-muted)!important}
+nav a:hover,.nav a:hover,.header a:hover,.topbar a:hover,nav a.is-active,.nav a.is-active{color:var(--na-ink)!important}
+h1,h2,h3,h4{font-family:Georgia,"Times New Roman",serif!important;color:var(--na-ink)!important}
+h1{font-weight:400!important;letter-spacing:-.045em!important}
+h2,h3{font-weight:400!important;letter-spacing:-.025em!important}
+p,li,dd,dt{color:var(--na-muted)}
+button,.button,.btn{border-radius:0!important;box-shadow:none!important}
+button,.button,.btn-primary,.btn-filled{background:var(--na-ink)!important;color:var(--na-paper)!important;border:1px solid var(--na-ink)!important}
+.btn-outline,.button-outline{background:transparent!important;color:var(--na-ink)!important;border:1px solid var(--na-line)!important}
+.card,.person,.panel,.box,.tile,.item,.feature,.project,.release,.notice{background:var(--na-paper)!important;color:var(--na-ink)!important;border:1px solid var(--na-line)!important;border-radius:0!important;box-shadow:none!important}
+.card:hover,.person:hover,.panel:hover,.box:hover,.tile:hover{transform:none!important;box-shadow:none!important}
+table{border-collapse:collapse!important;border-color:var(--na-line)!important}th,td{border-color:var(--na-line)!important}th{background:var(--na-panel)!important;color:var(--na-ink)!important}
+code,pre{background:#e9e7e0!important;color:var(--na-ink)!important;border-color:var(--na-line)!important}
+input,textarea,select{background:#fff!important;color:var(--na-ink)!important;border:1px solid var(--na-line)!important;border-radius:0!important}
+hr{border:0!important;border-top:1px solid var(--na-line)!important}
+.badge,.pill,.tag{border-radius:0!important;background:transparent!important;border:1px solid var(--na-line)!important;color:var(--na-muted)!important}
+.status,.ey,.eyebrow,.label,small{color:var(--na-muted)!important}
+footer,.footer{border-color:var(--na-line)!important;background:var(--na-paper)!important}
+footer a,.footer a{color:var(--na-muted)!important}
+::selection{background:var(--na-ink)!important;color:var(--na-paper)!important}
+@media(max-width:700px){nav,.nav,.site-header,.header,.topbar{position:relative!important}.container,.wrap,.w{width:calc(100% - 32px)!important}.grid{grid-template-columns:1fr!important}}
