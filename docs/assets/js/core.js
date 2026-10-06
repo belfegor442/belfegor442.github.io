@@ -1,4 +1,4 @@
-/* Weird Stuff — shared frontend runtime */
+/* North Assembly — shared frontend runtime */
 (() => {
   'use strict';
 
