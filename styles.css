@@ -1,20 +1,5 @@
 ```css
-:root {
-  --bg: #070809;
-  --panel: #0c0e10;
-
-  --text: #e8e8e6;
-  --muted: #85898d;
-  --dim: #555a5e;
-
-  --border: #202327;
-  --border-light: #30353a;
-
-  --max: 1180px;
-
-  --mono: "Share Tech Mono", "Courier New", monospace;
-  --sans: Inter, Arial, sans-serif;
-}
+:root{--bg:#fff;--panel:#fff;--text:#080808;--muted:#666;--dim:#888;--border:#ddd;--border-light:#111;--max:1180px;--mono:"Courier New",monospace;--sans:Arial,Helvetica,sans-serif}
 
 * {
   box-sizing: border-box;
@@ -26,15 +11,7 @@ html {
   scroll-behavior: smooth;
 }
 
-body {
-  min-height: 100vh;
-
-  background: var(--bg);
-  color: var(--text);
-
-  font-family: var(--sans);
-  line-height: 1.6;
-}
+body{min-height:100vh;background:#fff;color:#080808;font-family:var(--sans);line-height:1.6}
 
 a {
   color: inherit;
