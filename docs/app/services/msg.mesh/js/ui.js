@@ -1,0 +1,223 @@
+import { state, conversationOrder, unreadCount, peerLabel, peerUser, maxRowid } from "./store.js";
+
+export const $ = (s) => document.querySelector(s);
+
+export function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+export function initials(name) {
+  return String(name || "?").trim().split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase() || "?";
+}
+
+const fmtTime = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+function dayKey(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yest = new Date(Date.now() - 86400000);
+  const k = dayKey(ts);
+  if (k === dayKey(today.getTime())) return "TODAY";
+  if (k === dayKey(yest.getTime())) return "YESTERDAY";
+  return d.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+}
+
+function fileSize(n) {
+  if (n == null) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
+
+export function toast(text, isError) {
+  const box = $("#toasts");
+  const el = document.createElement("div");
+  el.className = "toast" + (isError ? " error" : "");
+  el.textContent = text;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+export function showAuth(tab) {
+  $("#authView").classList.remove("hidden");
+  $("#appView").classList.add("hidden");
+  if (tab) setAuthTab(tab);
+}
+
+export function showApp() {
+  $("#authView").classList.add("hidden");
+  $("#appView").classList.remove("hidden");
+}
+
+export function setAuthTab(tab) {
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  const isReg = tab === "register";
+  document.querySelector(".reg-only").classList.toggle("hidden", !isReg);
+  $("#authSubmit").textContent = isReg ? "CREATE ACCOUNT" : "SIGN IN";
+  $("#authError").textContent = "";
+}
+
+export function renderProfile() {
+  const u = state.user;
+  if (!u) return;
+  const name = u.display_name || u.username || "?";
+  $("#selfName").textContent = name;
+  $("#selfHandle").textContent = "@" + (u.username || "?");
+  $("#selfAvatar").textContent = initials(name);
+}
+
+export function renderConnection() {
+  const mode = state.connection;
+  const el = $("#connection");
+  const label = { connecting: "CONNECTING", online: "CONNECTED", reconnecting: "RECONNECTING", offline: "OFFLINE" }[mode] || "OFFLINE";
+  el.className = "connection " + mode;
+  el.innerHTML = "<i></i> " + label;
+}
+
+export function renderSidebar() {
+  const rows = conversationOrder().filter((r) => state.filter === "all" || r.unread > 0);
+  $("#allCount").textContent = state.conversations.size;
+  let total = 0;
+  for (const r of conversationOrder()) total += r.unread;
+  $("#unreadCount").textContent = total;
+
+  const list = $("#conversationList");
+  if (!rows.length) {
+    list.innerHTML = '<div class="hint" style="padding:28px 16px;text-align:center">No conversations yet.<br>Use NEW MESSAGE to find a user.</div>';
+    return;
+  }
+  list.innerHTML = rows.map((r) => {
+    const label = peerLabel(r.peer);
+    const last = r.last;
+    const preview = last
+      ? (last.mine ? "You: " : "") + (last.text || (last.attachment ? "Attachment" : (last.type || "message")))
+      : "No messages yet";
+    const time = last ? fmtTime(new Date(last.ts)) : "";
+    return `<article class="conversation ${state.activePeer === r.peer ? "active " : ""}${r.unread ? "unread" : ""}" data-peer="${esc(r.peer)}">
+      <div class="avatar">${esc(initials(label))}</div>
+      <div class="conversation-main">
+        <div class="conversation-row"><strong>${esc(label)}</strong><span class="time">${esc(time)}</span></div>
+        <span class="preview">${esc(preview)}</span>
+      </div>
+      ${r.unread ? `<span class="badge">${r.unread}</span>` : ""}
+    </article>`;
+  }).join("");
+}
+
+function metaFor(m, peer) {
+  if (m.sync === "sending") return "sending…";
+  if (m.sync === "failed") return "failed · tap to retry";
+  if (m.mine) {
+    const pp = state.peerPointers.get(peer) || 0;
+    if (m.rowid != null && pp >= m.rowid) return fmtTime(new Date(m.ts)) + " · read";
+    return fmtTime(new Date(m.ts)) + " · sent";
+  }
+  return fmtTime(new Date(m.ts));
+}
+
+function messageHtml(m, peer) {
+  const att = m.attachment
+    ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><span class="ico">📎</span><span>${esc(m.attachment.filename || "file")}<small>${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
+    : "";
+  const body = m.text ? esc(m.text) : (att ? "" : `<span style="color:#7c8794">(${esc(m.type)})</span>`);
+  return `<div class="message ${m.mine ? "mine " : ""}${m.sync === "sending" ? "pending " : ""}${m.sync === "failed" ? "failed " : ""}" data-id="${esc(m.id)}" data-rowid="${m.rowid != null ? m.rowid : ""}">
+    <div class="bubble">${body}${att}</div>
+    <span class="message-meta">${esc(metaFor(m, peer))}</span>
+  </div>`;
+}
+
+export function renderMessages(opts = {}) {
+  const peer = state.activePeer;
+  if (!peer) return;
+  const c = state.conversations.get(peer);
+  const box = $("#messageList");
+  const wrap = $("#messages");
+
+  if (!c || !c.messages.length) {
+    box.innerHTML = '<div class="hint" style="text-align:center;padding:40px 10px;color:#596572">No messages yet. Say hello — messages sync to your other clients.</div>';
+    $("#loadOlder").classList.add("hidden");
+    return;
+  }
+
+  let html = "";
+  let lastDay = "";
+  for (const m of c.messages) {
+    const k = dayKey(m.ts);
+    if (k !== lastDay) {
+      html += `<div class="day-divider">${dayLabel(m.ts)}</div>`;
+      lastDay = k;
+    }
+    html += messageHtml(m, peer);
+  }
+  box.innerHTML = html;
+  $("#loadOlder").classList.toggle("hidden", !c.hasMore);
+
+  if (opts.scroll !== false) wrap.scrollTop = wrap.scrollHeight;
+}
+
+export function renderChatHead() {
+  const peer = state.activePeer;
+  if (!peer) return;
+  const label = peerLabel(peer);
+  const u = peerUser(peer);
+  $("#chatName").textContent = label;
+  $("#chatAvatar").textContent = initials(label);
+
+  let head = "";
+  if (u) {
+    head += `<span class="dot ${u.status === "online" ? "on" : ""}"></span>${u.status === "online" ? "online" : "offline"}`;
+    head += " · " + esc("@" + u.username);
+  } else {
+    head += esc("device " + peer);
+  }
+  const myLastMine = [...((state.conversations.get(peer) || {}).messages || [])]
+    .filter((m) => m.mine && m.rowid != null)
+    .reduce((a, m) => Math.max(a, m.rowid), 0);
+  const pp = state.peerPointers.get(peer) || 0;
+  if (myLastMine > 0) head += " · " + (pp >= myLastMine ? "read ✓" : "delivered");
+  $("#chatMeta").innerHTML = head;
+  renderDetails();
+}
+
+export function renderDetails() {
+  const peer = state.activePeer;
+  if (!peer) return;
+  const label = peerLabel(peer);
+  const u = peerUser(peer);
+  const c = state.conversations.get(peer);
+  $("#detailsName").textContent = label;
+  $("#detailsHandle").textContent = u ? "@" + u.username : peer;
+  $("#detailsAvatar").textContent = initials(label);
+  $("#detailsStatus").textContent = u ? (u.status === "online" ? "Online" : "Offline") : "Device node";
+  $("#detailsMessages").textContent = c ? c.messages.length : 0;
+  const pp = state.peerPointers.get(peer) || 0;
+  $("#detailsRead").textContent = pp > 0 ? `Row ${pp}` : "—";
+}
+
+export function setActive(peer) {
+  state.activePeer = peer;
+  const open = !!peer;
+  $("#emptyState").classList.toggle("hidden", open);
+  $("#chatView").classList.toggle("hidden", !open);
+  $("#chatPanel").classList.toggle("mobile-open", open);
+  renderSidebar();
+  if (open) {
+    renderChatHead();
+    renderMessages();
+  }
+}
+
+export function renderAll() {
+  renderProfile();
+  renderConnection();
+  renderSidebar();
+  if (state.activePeer) {
+    renderChatHead();
+    renderMessages({ scroll: false });
+  }
+}
