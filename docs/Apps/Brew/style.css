@@ -33,6 +33,10 @@ body>*{position:relative;z-index:1}
   background:linear-gradient(180deg, rgba(4,26,17,.9), rgba(4,26,17,.5));
 }
 .brand{color:var(--gold);text-decoration:none;font-weight:800}
+.snd{
+  margin-left:auto;font-size:10px;letter-spacing:.18em;padding:8px 12px;
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+}
 .slash{color:rgba(233,200,119,.45)}
 .section{color:var(--muted)}
 .screen{max-width:720px;margin:0 auto;padding:90px 24px 110px}

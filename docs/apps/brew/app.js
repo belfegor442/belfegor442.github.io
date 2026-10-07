@@ -10,20 +10,41 @@ const BROKERS=(()=>{try{
 const MAXJOIN=9;
 let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
 let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
-let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null,pingTimer=null,guestSeen=0;
+let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null,pingTimer=null,retryTimer=null,guestSeen=0,hostQueue=[];
 let gList=[],gIdx=0,gSwitch=0,nextTimer=null;
 const myUid=uid();
 const myPid=(()=>{try{let p=localStorage.getItem("brew.pid");if(!p){p=uid().slice(0,4).toUpperCase();localStorage.setItem("brew.pid",p)}return p}catch(e){return uid().slice(0,4).toUpperCase()}})();
 let myName="",peerName="",peerPid="";
+const SND={coin:"./Assets/sound/coin.mp3",join:"./Assets/sound/join.mp3",win:"./Assets/sound/win.mp3",lose:"./Assets/sound/lose.mp3"};
+let sndOn=true;
+try{sndOn=localStorage.getItem("brew.sound")!=="0"}catch(e){}
+const sndCache={};
+function sfx(k){
+ if(!sndOn)return;
+ try{
+  let a=sndCache[k];
+  if(!a){a=new Audio(SND[k]);a.preload="auto";a.volume=.55;sndCache[k]=a}
+  a.currentTime=0;
+  const p=a.play();
+  if(p&&p.catch)p.catch(()=>{});
+ }catch(e){}
+}
+function setSnd(on){
+ sndOn=on;
+ try{localStorage.setItem("brew.sound",on?"1":"0")}catch(e){}
+ const b=$("#sndBtn");if(b)b.textContent=on?"SOUND ON":"SOUND OFF";
+ if(!on)for(const k in sndCache){try{sndCache[k].pause()}catch(e){}}
+}
+function preloadSnd(){if(!sndOn)return;for(const k in SND){if(sndCache[k])continue;try{const a=new Audio(SND[k]);a.preload="auto";a.volume=.55;sndCache[k]=a}catch(e){}}}
 
 function uid(){const a="abcdefghijklmnopqrstuvwxyz0123456789",b=new Uint8Array(8);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
 function code(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",b=new Uint8Array(6);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
 function T(k){return NS+room+"/"+k}
 function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
 function inGame(){return !game.classList.contains("hidden")}
-function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}if(pingTimer){clearInterval(pingTimer);pingTimer=null}}
+function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}if(pingTimer){clearInterval(pingTimer);pingTimer=null}if(retryTimer){clearInterval(retryTimer);retryTimer=null}}
 function anyUp(){return conns.some(c=>c.connected)}
-function closeMq(){const l=conns;conns=[];for(const c of l){try{c.removeAllListeners();c.end(true)}catch(e){}}}
+function closeMq(){const l=conns;conns=[];for(const c of l){try{c.removeAllListeners();c.on("error",()=>{});c.end(true)}catch(e){}}}
 function send(o){
  if(!conns.length)return;
  const m=isHost?Object.assign({},o,{to:guestUid}):Object.assign({},o,{from:myUid});
@@ -58,11 +79,11 @@ function connectOne(url,will,onReady,onFail){
   c=mqtt.connect(url,{connectTimeout:6000,reconnectPeriod:2500,keepalive:15,resubscribe:true,queueQoSZero:true,will:will||undefined});
  }catch(e){onFail();return}
  let settled=false;
- const bad=()=>{
-  if(settled)return;settled=true;clearTimeout(t);
-  try{c.removeAllListeners();c.end(true)}catch(e){}
-  onFail();
- };
+  const bad=()=>{
+   if(settled)return;settled=true;clearTimeout(t);
+   try{c.removeAllListeners();c.on("error",()=>{});c.end(true)}catch(e){}
+   onFail();
+  };
  const ok=()=>{
   if(settled)return;settled=true;clearTimeout(t);
   c.removeListener("error",bad);c.removeListener("offline",bad);
@@ -82,25 +103,28 @@ function connectList(list,will,onReady,onFail){
 function create(){
  if(!hosting)return;
  hosting=true;isHost=true;room=code();guestUid=null;linked=false;peerName="";peerPid="";guestSeen=0;readName();
- closeMq();stopTimers();
+ hostQueue=[];closeMq();stopTimers();
  show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
  const will={topic:T("host"),payload:'{"on":0}',retain:true,qos:0};
  const list=order();
- let left=list.length,up=0;
- list.forEach(url=>{
-  connectOne(url,will,c=>{
-   up++;conns.push(c);
-   c.on("message",onHostMsg);
-   c.on("reconnect",()=>{if(!anyUp())lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
-   c.on("close",()=>{if(isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
-   c.subscribe([T("g2h")],()=>{});
-   c.publish(T("host"),'{"on":1}',{retain:true});
-   if(up===1){lobbyStatus.textContent="Share the code: "+room;setLobby()}
-  },()=>{
-   left--;
-   if(up===0&&left===0)lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again.";
-  });
- });
+ let left=list.length,up=0,first=true;
+ const attach=c=>{
+  up++;conns.push(c);
+  c.on("message",onHostMsg);
+  c.on("reconnect",()=>{if(!anyUp())lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
+  c.on("close",()=>{if(isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
+  c.subscribe([T("g2h")],()=>{});
+  c.publish(T("host"),'{"on":1}',{retain:true});
+  if(first){first=false;lobbyStatus.textContent="Share the code: "+room;setLobby()}
+ };
+ const failed=()=>{left--;if(up===0&&left===0)lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again."};
+ list.forEach(url=>connectOne(url,will,attach,()=>{if(hostQueue.indexOf(url)<0)hostQueue.push(url);failed()}));
+ retryTimer=setInterval(()=>{
+  if(!isHost)return;
+  if(!hostQueue.length)return;
+  const url=hostQueue.shift();
+  connectOne(url,will,attach,()=>{if(hostQueue.indexOf(url)<0)hostQueue.push(url)});
+ },25000);
  beatTimer=setInterval(()=>{
   for(const c of conns){if(c.connected){try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}}}
  },20000);
@@ -114,6 +138,7 @@ function onHostMsg(t,p){
    guestSeen=Date.now();setLobby();
    lobbyStatus.textContent="Player connected. You can start the duel.";
    send({type:"hello",name:meName(),pid:myPid});
+   sfx("join");
   };
   if(!guestUid){take();return}
   if(m.from===guestUid){guestSeen=Date.now();peerName=(m.name||"").trim().slice(0,12)||peerName;peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;setLobby();send({type:"hello",name:meName(),pid:myPid});return}
@@ -191,6 +216,7 @@ function begin(){
  myChoice=null;remoteChoice=null;roundLocked=false;$("#coin").textContent="?";
  $("#turnText").textContent="Choose heads or tails.";gameStatus.textContent="";
  $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;enableChoices();
+ sfx("coin");
 }
 function enableChoices(){document.querySelectorAll(".choices button").forEach(b=>b.disabled=false)}
 function disableChoices(){document.querySelectorAll(".choices button").forEach(b=>b.disabled=true)}
@@ -213,15 +239,18 @@ function applyResult(result,hostWon,s){
  const won=isHost?hostWon:!hostWon;$("#coin").textContent=result==="heads"?"H":"T";
  $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;
  gameStatus.textContent=won?"YOU WIN +"+s:"YOU LOSE -"+s;
+ sfx(won?"win":"lose");
  if(isHost)setTimeout(()=>{begin();send({type:"begin"})},1100);
  else nextTimer=setTimeout(()=>{if(inGame())begin()},4500);
 }
 function onData(m){
  if(m.type==="hello"){
+  const was=linked;
   linked=true;stopTimers();
   peerName=(m.name||"").trim().slice(0,12)||peerName;
   peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;
   setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";
+  if(!was)sfx("join");
   pingTimer=setInterval(()=>{if(linked&&anyUp())send({type:"ping"})},5000);
   return;
  }
@@ -246,5 +275,7 @@ document.querySelectorAll(".choices button").forEach(b=>b.onclick=()=>play(b.dat
 try{const n=localStorage.getItem("brew.name");if(n&&$("#nameInput"))$("#nameInput").value=n}catch(e){}
 if($("#myPid"))$("#myPid").textContent=myPid;
 if($("#nameInput")){$("#nameInput").addEventListener("change",readName);$("#nameInput").addEventListener("blur",readName)}
+setSnd(sndOn);preloadSnd();
+if($("#sndBtn"))$("#sndBtn").onclick=()=>setSnd(!sndOn);
 setLobby();
 setInterval(setLobby,700);
