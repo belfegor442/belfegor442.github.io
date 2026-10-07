@@ -1,11 +1,16 @@
 const $=s=>document.querySelector(s);
 const home=$("#home"),lobby=$("#lobby"),game=$("#game"),status=$("#status"),lobbyStatus=$("#lobbyStatus"),gameStatus=$("#gameStatus");
 const NS="na-brew/v2/";
-const BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://test.mosquitto.org:8081/mqtt"];
-const MAXJOIN=6;
+const BROKERS=(()=>{try{
+ const q=new URLSearchParams(location.search).get("brokers");
+ if(q){const l=q.split(",").map(s=>s.trim()).filter(s=>/^wss?:\/\//.test(s));if(l.length)return l}
+ }catch(e){}
+ return["wss://broker.emqx.io:8084/mqtt","wss://test.mosquitto.org:8081/mqtt","wss://broker.hivemq.com:8884/mqtt"];
+})();
+const MAXJOIN=9;
 let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
 let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
-let mq=null,guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null;
+let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null;
 let gList=[],gIdx=0,gSwitch=0,nextTimer=null;
 const myUid=uid();
 
@@ -15,11 +20,14 @@ function T(k){return NS+room+"/"+k}
 function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
 function inGame(){return !game.classList.contains("hidden")}
 function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}}
-function closeMq(){if(mq){try{mq.removeAllListeners();mq.end(true)}catch(e){}mq=null}}
+function anyUp(){return conns.some(c=>c.connected)}
+function closeMq(){const l=conns;conns=[];for(const c of l){try{c.removeAllListeners();c.end(true)}catch(e){}}}
 function send(o){
- if(!mq||!mq.connected)return;
+ if(!conns.length)return;
  const m=isHost?Object.assign({},o,{to:guestUid}):Object.assign({},o,{from:myUid});
- mq.publish(isHost?T("h2g"):T("g2h"),JSON.stringify(m),{qos:0});
+ const topic=isHost?T("h2g"):T("g2h");
+ const payload=JSON.stringify(m);
+ for(const c of conns){if(c.connected){try{c.publish(topic,payload,{qos:0})}catch(e){}}}
 }
 function setLobby(){
  $("#roomCode").textContent=room||"------";
@@ -34,33 +42,32 @@ function order(){
  const s=h%BROKERS.length;
  return BROKERS.slice(s).concat(BROKERS.slice(0,s));
 }
-function connectBroker(list,will,onReady,onFail){
+function connectOne(url,will,onReady,onFail){
  if(typeof mqtt==="undefined"){onFail();return}
- let i=0;
- const next=()=>{
-  if(i>=list.length){onFail();return}
-  const url=list[i++];
-  let c;
-  try{
-   c=mqtt.connect(url,{connectTimeout:6000,reconnectPeriod:2500,keepalive:15,resubscribe:true,queueQoSZero:true,will:will||undefined});
-  }catch(e){next();return}
-  let settled=false;
-  const bad=()=>{
-   if(settled)return;settled=true;clearTimeout(t);
-   try{c.removeAllListeners();c.end(true)}catch(e){}
-   next();
-  };
-  const ok=()=>{
-   if(settled)return;settled=true;clearTimeout(t);
-   c.removeListener("error",bad);c.removeListener("offline",bad);
-   c.on("error",()=>{});
-   onReady(c,url);
-  };
-  const t=setTimeout(bad,7000);
-  c.once("connect",ok);
-  c.on("error",bad);
-  c.on("offline",bad);
+ let c;
+ try{
+  c=mqtt.connect(url,{connectTimeout:6000,reconnectPeriod:2500,keepalive:15,resubscribe:true,queueQoSZero:true,will:will||undefined});
+ }catch(e){onFail();return}
+ let settled=false;
+ const bad=()=>{
+  if(settled)return;settled=true;clearTimeout(t);
+  try{c.removeAllListeners();c.end(true)}catch(e){}
+  onFail();
  };
+ const ok=()=>{
+  if(settled)return;settled=true;clearTimeout(t);
+  c.removeListener("error",bad);c.removeListener("offline",bad);
+  c.on("error",()=>{});
+  onReady(c,url);
+ };
+ const t=setTimeout(bad,7000);
+ c.once("connect",ok);
+ c.on("error",bad);
+ c.on("offline",bad);
+}
+function connectList(list,will,onReady,onFail){
+ let i=0;
+ const next=()=>{if(i>=list.length){onFail();return}connectOne(list[i++],will,onReady,next)};
  next();
 }
 function create(){
@@ -69,17 +76,25 @@ function create(){
  closeMq();stopTimers();
  show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
  const will={topic:T("host"),payload:'{"on":0}',retain:true,qos:0};
- connectBroker(order(),will,c=>{
-  mq=c;
-  c.on("message",onHostMsg);
-  c.on("reconnect",()=>{lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
-  c.on("close",()=>{if(isHost)lobbyStatus.textContent="Connection lost — reconnecting…"});
-  c.subscribe([T("g2h")],()=>{});
-  c.publish(T("host"),'{"on":1}',{retain:true});
-  beatTimer=setInterval(()=>{if(mq&&mq.connected)mq.publish(T("host"),'{"on":1}',{retain:true})},20000);
-  lobbyStatus.textContent="Share the code: "+room;
-  setLobby();
- },()=>{lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again."});
+ const list=order();
+ let left=list.length,up=0;
+ list.forEach(url=>{
+  connectOne(url,will,c=>{
+   up++;conns.push(c);
+   c.on("message",onHostMsg);
+   c.on("reconnect",()=>{if(!anyUp())lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
+   c.on("close",()=>{if(isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
+   c.subscribe([T("g2h")],()=>{});
+   c.publish(T("host"),'{"on":1}',{retain:true});
+   if(up===1){lobbyStatus.textContent="Share the code: "+room;setLobby()}
+  },()=>{
+   left--;
+   if(up===0&&left===0)lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again.";
+  });
+ });
+ beatTimer=setInterval(()=>{
+  for(const c of conns){if(c.connected){try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}}}
+ },20000);
 }
 function onHostMsg(t,p){
  let m;try{m=JSON.parse(p.toString())}catch(e){return}
@@ -107,11 +122,11 @@ function join(){
 function guestConnect(){
  closeMq();
  const list=gList.slice(gIdx).concat(gList.slice(0,gIdx));
- connectBroker(list,null,c=>{
-  mq=c;
+ connectList(list,null,c=>{
+  conns=[c];
   c.on("message",onGuestMsg);
   c.on("reconnect",()=>{if(!linked)lobbyStatus.textContent="Reconnecting…"});
-  c.on("close",()=>{if(!linked&&!isHost)lobbyStatus.textContent="Connection lost — reconnecting…"});
+  c.on("close",()=>{if(!linked&&!isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
   c.subscribe([T("host"),T("h2g")],()=>{});
   sendJoin();
  },()=>{
@@ -122,11 +137,11 @@ function guestConnect(){
 function sendJoin(){
  if(linked)return;
  joinTries++;
- if(mq&&mq.connected)send({type:"join",from:myUid});
+ if(anyUp())send({type:"join",from:myUid});
  lobbyStatus.textContent=hostOn?"Joining room "+room+"…":"Looking for room "+room+"… ("+joinTries+"/"+MAXJOIN+")";
  if(linked)return;
  if(joinTries<MAXJOIN){
-  if(joinTries===3&&!hostOn&&gSwitch<gList.length-1){
+  if(joinTries%3===0&&!hostOn&&gSwitch<gList.length-1){
    gSwitch++;gIdx=(gIdx+1)%gList.length;
    lobbyStatus.textContent="Looking in another network…";
    joinTimer=setTimeout(guestConnect,400);
@@ -139,7 +154,7 @@ function onGuestMsg(t,p){
  let m;try{m=JSON.parse(p.toString())}catch(e){return}
  if(t===T("host")){
   const on=m.on===1;
-  if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(mq&&mq.connected)send({type:"join",from:myUid})}}
+  if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(anyUp())send({type:"join",from:myUid})}}
   if(!on&&hostOn){
    hostOn=false;linked=false;
    if(inGame()){gameStatus.textContent="Host left the room.";disableChoices()}
