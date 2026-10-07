@@ -10,16 +10,18 @@ const BROKERS=(()=>{try{
 const MAXJOIN=9;
 let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
 let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
-let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null;
+let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null,pingTimer=null,guestSeen=0;
 let gList=[],gIdx=0,gSwitch=0,nextTimer=null;
 const myUid=uid();
+const myPid=(()=>{try{let p=localStorage.getItem("brew.pid");if(!p){p=uid().slice(0,4).toUpperCase();localStorage.setItem("brew.pid",p)}return p}catch(e){return uid().slice(0,4).toUpperCase()}})();
+let myName="",peerName="",peerPid="";
 
 function uid(){const a="abcdefghijklmnopqrstuvwxyz0123456789",b=new Uint8Array(8);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
 function code(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",b=new Uint8Array(6);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
 function T(k){return NS+room+"/"+k}
 function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
 function inGame(){return !game.classList.contains("hidden")}
-function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}}
+function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}if(pingTimer){clearInterval(pingTimer);pingTimer=null}}
 function anyUp(){return conns.some(c=>c.connected)}
 function closeMq(){const l=conns;conns=[];for(const c of l){try{c.removeAllListeners();c.end(true)}catch(e){}}}
 function send(o){
@@ -29,13 +31,20 @@ function send(o){
  const payload=JSON.stringify(m);
  for(const c of conns){if(c.connected){try{c.publish(topic,payload,{qos:0})}catch(e){}}}
 }
+function readName(){const el=$("#nameInput");if(el)myName=(el.value||"").trim().replace(/\s+/g," ").slice(0,12)||"PLAYER";try{localStorage.setItem("brew.name",myName)}catch(e){}}
+function meName(){return myName||"PLAYER"}
 function setLobby(){
  $("#roomCode").textContent=room||"------";
- const on=isHost?!!guestUid:false;
- $("#startBtn").disabled=!on;
- $("#startBtn").textContent=isHost?(on?"START DUEL":"WAITING FOR PLAYER"):"WAITING FOR HOST";
- $("#p2").textContent=on?"PLAYER 2":"WAITING";
+ const on=isHost?!!guestUid:linked;
+ $("#startBtn").disabled=!(isHost&&!!guestUid);
+ $("#startBtn").textContent=isHost?(guestUid?"START DUEL":"WAITING FOR PLAYER"):"WAITING FOR HOST";
+ $("#p1").textContent=meName();
+ $("#p1meta").textContent="#"+myPid+" · "+(isHost?"HOST":"YOU");
+ $("#p2").textContent=on?(peerName||(isHost?"PLAYER 2":"HOST")):"WAITING";
+ $("#p2meta").textContent=(on&&peerPid?"#"+peerPid+" · ":"")+(isHost?"PLAYER 2":"HOST");
  $(".dot.waiting").style.background=on?"#111":"#ccc";
+ $("#myName").textContent=meName().toUpperCase();
+ $("#opponentName").textContent=(peerName||(isHost&&guestUid?"PLAYER 2":(!isHost&&linked?"HOST":"OPPONENT"))).toUpperCase();
 }
 function order(){
  let h=0;for(const ch of room)h=(h*131+ch.charCodeAt(0))>>>0;
@@ -72,7 +81,7 @@ function connectList(list,will,onReady,onFail){
 }
 function create(){
  if(!hosting)return;
- hosting=true;isHost=true;room=code();guestUid=null;linked=false;
+ hosting=true;isHost=true;room=code();guestUid=null;linked=false;peerName="";peerPid="";guestSeen=0;readName();
  closeMq();stopTimers();
  show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
  const will={topic:T("host"),payload:'{"on":0}',retain:true,qos:0};
@@ -100,20 +109,29 @@ function onHostMsg(t,p){
  let m;try{m=JSON.parse(p.toString())}catch(e){return}
  if(m.type==="join"){
   if(!m.from)return;
-  if(!guestUid){guestUid=m.from;setLobby();lobbyStatus.textContent="Player connected. You can start the duel.";send({type:"hello",name:"PLAYER 2"})}
-  else if(m.from!==guestUid)send({type:"full",to:m.from});
+  const take=()=>{
+   guestUid=m.from;peerName=(m.name||"").trim().slice(0,12);peerPid=(m.pid||"").trim().slice(0,6).toUpperCase();
+   guestSeen=Date.now();setLobby();
+   lobbyStatus.textContent="Player connected. You can start the duel.";
+   send({type:"hello",name:meName(),pid:myPid});
+  };
+  if(!guestUid){take();return}
+  if(m.from===guestUid){guestSeen=Date.now();peerName=(m.name||"").trim().slice(0,12)||peerName;peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;setLobby();send({type:"hello",name:meName(),pid:myPid});return}
+  if(Date.now()-guestSeen>7000){take();return}
+  send({type:"full",to:m.from});
   return;
  }
  if(t===T("host"))return;
  if(t!==T("g2h"))return;
  if(!guestUid)guestUid=m.from||"unknown";
  if(m.from&&m.from!==guestUid)return;
+ guestSeen=Date.now();
  onData(m);
 }
 function join(){
  const v=$("#roomInput").value.trim().toUpperCase();
  if(v.length!==6){status.textContent="Enter a 6-character room code.";return}
- hosting=false;isHost=false;room=v;joinTries=0;hostOn=false;linked=false;
+ hosting=false;isHost=false;room=v;joinTries=0;hostOn=false;linked=false;peerName="";peerPid="";readName();
  gList=order();gIdx=0;gSwitch=0;
  closeMq();stopTimers();
  show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
@@ -137,7 +155,7 @@ function guestConnect(){
 function sendJoin(){
  if(linked)return;
  joinTries++;
- if(anyUp())send({type:"join",from:myUid});
+  if(anyUp())send({type:"join",from:myUid,name:meName(),pid:myPid});
  lobbyStatus.textContent=hostOn?"Joining room "+room+"…":"Looking for room "+room+"… ("+joinTries+"/"+MAXJOIN+")";
  if(linked)return;
  if(joinTries<MAXJOIN){
@@ -154,7 +172,7 @@ function onGuestMsg(t,p){
  let m;try{m=JSON.parse(p.toString())}catch(e){return}
  if(t===T("host")){
   const on=m.on===1;
-  if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(anyUp())send({type:"join",from:myUid})}}
+   if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(anyUp())send({type:"join",from:myUid,name:meName(),pid:myPid})}}
   if(!on&&hostOn){
    hostOn=false;linked=false;
    if(inGame()){gameStatus.textContent="Host left the room.";disableChoices()}
@@ -199,7 +217,14 @@ function applyResult(result,hostWon,s){
  else nextTimer=setTimeout(()=>{if(inGame())begin()},4500);
 }
 function onData(m){
- if(m.type==="hello"){linked=true;stopTimers();setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";return}
+ if(m.type==="hello"){
+  linked=true;stopTimers();
+  peerName=(m.name||"").trim().slice(0,12)||peerName;
+  peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;
+  setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";
+  pingTimer=setInterval(()=>{if(linked&&anyUp())send({type:"ping"})},5000);
+  return;
+ }
  if(m.type==="start"){linked=true;stopTimers();show(game);begin();return}
  if(m.type==="begin"){if(inGame())begin();return}
  if(m.type==="full"){lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
@@ -218,4 +243,8 @@ $("#startBtn").onclick=start;
 $("#leaveBtn").onclick=()=>location.reload();$("#gameLeave").onclick=()=>location.reload();
 $("#copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText(room);lobbyStatus.textContent="Room code copied."}catch{lobbyStatus.textContent="Room code: "+room}};
 document.querySelectorAll(".choices button").forEach(b=>b.onclick=()=>play(b.dataset.choice));
+try{const n=localStorage.getItem("brew.name");if(n&&$("#nameInput"))$("#nameInput").value=n}catch(e){}
+if($("#myPid"))$("#myPid").textContent=myPid;
+if($("#nameInput")){$("#nameInput").addEventListener("change",readName);$("#nameInput").addEventListener("blur",readName)}
+setLobby();
 setInterval(setLobby,700);

@@ -18,6 +18,11 @@
     <h1>BREW</h1>
     <p class="lead">A small multiplayer game built for the web.</p>
     <div class="panel menu">
+      <label class="field">
+        <span>YOUR NAME</span>
+        <input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname">
+      </label>
+      <p class="pid">PLAYER ID <strong id="myPid">----</strong></p>
       <button id="createBtn" class="primary">CREATE ROOM</button>
       <div class="join">
         <input id="roomInput" maxlength="6" placeholder="ROOM CODE" autocomplete="off">
@@ -31,8 +36,8 @@
     <p class="eyebrow">ROOM</p>
     <div class="room-line"><h2 id="roomCode">------</h2><button id="copyBtn">COPY</button></div>
     <div class="players">
-      <div class="player"><span class="dot"></span><strong id="p1">YOU</strong><small>HOST</small></div>
-      <div class="player"><span class="dot waiting"></span><strong id="p2">WAITING</strong><small>PLAYER 2</small></div>
+      <div class="player"><span class="dot"></span><strong id="p1">YOU</strong><small id="p1meta">HOST</small></div>
+      <div class="player"><span class="dot waiting"></span><strong id="p2">WAITING</strong><small id="p2meta">PLAYER 2</small></div>
     </div>
     <button id="startBtn" class="primary wide" disabled>WAITING FOR PLAYER</button>
     <button id="leaveBtn" class="textbtn">LEAVE ROOM</button>
@@ -41,7 +46,7 @@
 
   <section id="game" class="screen hidden">
     <div class="game-head">
-      <div><span class="label">YOU</span><strong id="youScore">1000</strong></div>
+      <div><span class="label" id="myName">YOU</span><strong id="youScore">1000</strong></div>
       <div class="vs">VS</div>
       <div class="right"><span class="label" id="opponentName">OPPONENT</span><strong id="opScore">1000</strong></div>
     </div>
