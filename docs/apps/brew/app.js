@@ -1,96 +1,158 @@
 const $=s=>document.querySelector(s);
 const home=$("#home"),lobby=$("#lobby"),game=$("#game"),status=$("#status"),lobbyStatus=$("#lobbyStatus"),gameStatus=$("#gameStatus");
-let peer=null,conn=null,isHost=false,room="",balance=1000,opBalance=1000;
-const MAXJOIN=5;
-let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false,hosting=false,joinTries=0,connTimer=null;
+const NS="na-brew/v2/";
+const BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://test.mosquitto.org:8081/mqtt"];
+const MAXJOIN=6;
+let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
+let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
+let mq=null,guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null;
+let gList=[],gIdx=0,gSwitch=0;
+const myUid=uid();
 
-const ICE={iceServers:[
- {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302","stun:stun.cloudflare.com:3478"]},
- {urls:["turn:openrelay.metered.ca:80","turn:openrelay.metered.ca:443","turn:openrelay.metered.ca:443?transport=tcp"],username:"openrelayproject",credential:"openrelayproject"}
-]};
-
-function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
+function uid(){const a="abcdefghijklmnopqrstuvwxyz0123456789",b=new Uint8Array(8);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
 function code(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",b=new Uint8Array(6);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
-function send(o){if(conn&&conn.open)conn.send(o)}
-function dropPeer(){if(connTimer){clearTimeout(connTimer);connTimer=null}if(conn){try{conn.close()}catch(e){}conn=null}if(peer){try{peer.destroy()}catch(e){}peer=null}}
-function errText(e){
- const t=e&&e.type;
- if(t==="peer-unavailable")return "No room with that code. Check it with the host.";
- if(t==="unavailable-id")return "Room code already in use.";
- if(t==="network"||t==="server-error"||t==="socket-error"||t==="socket-closed")return "Cannot reach the game network. Check your internet connection.";
- if(t==="browser-incompatible")return "This browser does not support WebRTC.";
- if(t==="disconnected"||t==="webrtc")return "Peer-to-peer connection failed ("+t+").";
- return "Connection problem ("+(t||"unknown")+").";
+function T(k){return NS+room+"/"+k}
+function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
+function inGame(){return !game.classList.contains("hidden")}
+function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}}
+function closeMq(){if(mq){try{mq.removeAllListeners();mq.end(true)}catch(e){}mq=null}}
+function send(o){
+ if(!mq||!mq.connected)return;
+ const m=isHost?Object.assign({},o,{to:guestUid}):Object.assign({},o,{from:myUid});
+ mq.publish(isHost?T("h2g"):T("g2h"),JSON.stringify(m),{qos:0});
 }
 function setLobby(){
  $("#roomCode").textContent=room||"------";
- const ready=!!(peer&&peer.open);
- $("#startBtn").disabled=!conn||!isHost||!ready;
- $("#startBtn").textContent=conn?(isHost?"START DUEL":"WAITING FOR HOST"):(isHost?"CREATING ROOM…":"WAITING FOR PLAYER");
- $("#p2").textContent=conn?"PLAYER 2":"WAITING";$(".dot.waiting").style.background=conn?"#111":"#ccc";
+ const on=isHost?!!guestUid:false;
+ $("#startBtn").disabled=!on;
+ $("#startBtn").textContent=isHost?(on?"START DUEL":"WAITING FOR PLAYER"):"WAITING FOR HOST";
+ $("#p2").textContent=on?"PLAYER 2":"WAITING";
+ $(".dot.waiting").style.background=on?"#111":"#ccc";
 }
-function wire(c){
- c.on("data",onData);
- c.on("error",e=>{if(conn===c)lobbyStatus.textContent="Link error: "+((e&&e.type)||e)});
- c.on("close",()=>{if(conn!==c)return;conn=null;if(!game.classList.contains("hidden")){gameStatus.textContent="Connection closed.";disableChoices()}else setLobby()});
+function order(){
+ let h=0;for(const ch of room)h=(h*131+ch.charCodeAt(0))>>>0;
+ const s=h%BROKERS.length;
+ return BROKERS.slice(s).concat(BROKERS.slice(0,s));
+}
+function connectBroker(list,will,onReady,onFail){
+ if(typeof mqtt==="undefined"){onFail();return}
+ let i=0;
+ const next=()=>{
+  if(i>=list.length){onFail();return}
+  const url=list[i++];
+  let c;
+  try{
+   c=mqtt.connect(url,{connectTimeout:6000,reconnectPeriod:2500,keepalive:15,resubscribe:true,queueQoSZero:true,will:will||undefined});
+  }catch(e){next();return}
+  let settled=false;
+  const bad=()=>{
+   if(settled)return;settled=true;clearTimeout(t);
+   try{c.removeAllListeners();c.end(true)}catch(e){}
+   next();
+  };
+  const ok=()=>{
+   if(settled)return;settled=true;clearTimeout(t);
+   c.removeListener("error",bad);c.removeListener("offline",bad);
+   c.on("error",()=>{});
+   onReady(c,url);
+  };
+  const t=setTimeout(bad,7000);
+  c.once("connect",ok);
+  c.on("error",bad);
+  c.on("offline",bad);
+ };
+ next();
 }
 function create(){
  if(!hosting)return;
- if(peer){try{peer.destroy()}catch(e){}peer=null}conn=null;
- room=code();isHost=true;show(lobby);setLobby();lobbyStatus.textContent="Creating room…";
- peer=new Peer("brew-"+room,{debug:0,config:ICE});
- peer.on("open",()=>{lobbyStatus.textContent="Share the code: "+room;setLobby()});
- peer.on("connection",c=>{
-  if(conn){c.close();return} conn=c;wire(c);
-  c.on("open",()=>{setLobby();send({type:"hello",name:"PLAYER 2"});lobbyStatus.textContent="Player connected. You can start the duel."});
- });
- peer.on("error",e=>{
-  if(e.type==="unavailable-id"){lobbyStatus.textContent="Code in use, generating a new one…";setTimeout(create,350);return}
-  lobbyStatus.textContent=errText(e);
- });
- peer.on("disconnected",()=>{if(peer&&!peer.destroyed)try{peer.reconnect()}catch(e){}});
+ hosting=true;isHost=true;room=code();guestUid=null;linked=false;
+ closeMq();stopTimers();
+ show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
+ const will={topic:T("host"),payload:'{"on":0}',retain:true,qos:0};
+ connectBroker(order(),will,c=>{
+  mq=c;
+  c.on("message",onHostMsg);
+  c.on("reconnect",()=>{lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
+  c.on("close",()=>{if(isHost)lobbyStatus.textContent="Connection lost — reconnecting…"});
+  c.subscribe([T("g2h")],()=>{});
+  c.publish(T("host"),'{"on":1}',{retain:true});
+  beatTimer=setInterval(()=>{if(mq&&mq.connected)mq.publish(T("host"),'{"on":1}',{retain:true})},20000);
+  lobbyStatus.textContent="Share the code: "+room;
+  setLobby();
+ },()=>{lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again."});
+}
+function onHostMsg(t,p){
+ let m;try{m=JSON.parse(p.toString())}catch(e){return}
+ if(m.type==="join"){
+  if(!m.from)return;
+  if(!guestUid){guestUid=m.from;setLobby();lobbyStatus.textContent="Player connected. You can start the duel.";send({type:"hello",name:"PLAYER 2"})}
+  else if(m.from!==guestUid)send({type:"full",to:m.from});
+  return;
+ }
+ if(t===T("host"))return;
+ if(t!==T("g2h"))return;
+ if(!guestUid)guestUid=m.from||"unknown";
+ if(m.from&&m.from!==guestUid)return;
+ onData(m);
 }
 function join(){
  const v=$("#roomInput").value.trim().toUpperCase();
  if(v.length!==6){status.textContent="Enter a 6-character room code.";return}
- hosting=false;room=v;isHost=false;joinTries=0;dropPeer();
- show(lobby);setLobby();lobbyStatus.textContent="Connecting…";
- attempt();
+ hosting=false;isHost=false;room=v;joinTries=0;hostOn=false;linked=false;
+ gList=order();gIdx=0;gSwitch=0;
+ closeMq();stopTimers();
+ show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
+ guestConnect();
 }
-function attempt(){
+function guestConnect(){
+ closeMq();
+ const list=gList.slice(gIdx).concat(gList.slice(0,gIdx));
+ connectBroker(list,null,c=>{
+  mq=c;
+  c.on("message",onGuestMsg);
+  c.on("reconnect",()=>{if(!linked)lobbyStatus.textContent="Reconnecting…"});
+  c.on("close",()=>{if(!linked&&!isHost)lobbyStatus.textContent="Connection lost — reconnecting…"});
+  c.subscribe([T("host"),T("h2g")],()=>{});
+  sendJoin();
+ },()=>{
+  if(gSwitch<gList.length-1){gSwitch++;gIdx=(gIdx+1)%gList.length;lobbyStatus.textContent="Connecting to the network…";setTimeout(guestConnect,400)}
+  else lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again.";
+ });
+}
+function sendJoin(){
+ if(linked)return;
  joinTries++;
- const my=joinTries;
- dropPeer();
- peer=new Peer({debug:0,config:ICE});
- const retry=delay=>{
-  if(joinTries!==my)return;
-  if(joinTries<MAXJOIN){
-   lobbyStatus.textContent="Looking for room "+room+"… ("+joinTries+"/"+MAXJOIN+")";
-   connTimer=setTimeout(()=>{if(joinTries===my)attempt()},delay);
-  }else lobbyStatus.textContent="Room "+room+" not found. Ask the host for a new code.";
- };
- peer.on("open",()=>{
-  if(joinTries!==my)return;
-  const c=peer.connect("brew-"+room,{reliable:true});
-  conn=c;wire(c);setLobby();
-  let opened=false;
-  c.on("open",()=>{
-   if(joinTries!==my)return;
-   opened=true;setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";send({type:"hello",name:"PLAYER 2"});
-  });
-  connTimer=setTimeout(()=>{
-   if(opened||joinTries!==my)return;
-   conn=null;retry(350);
-  },2200);
- });
- peer.on("error",e=>{
-  if(joinTries!==my)return;
-  if(e.type==="peer-unavailable"||e.type==="network")retry(400);
-  else lobbyStatus.textContent=errText(e);
- });
- peer.on("disconnected",()=>{if(peer&&!peer.destroyed)try{peer.reconnect()}catch(e){}});
+ if(mq&&mq.connected)send({type:"join",from:myUid});
+ lobbyStatus.textContent=hostOn?"Joining room "+room+"…":"Looking for room "+room+"… ("+joinTries+"/"+MAXJOIN+")";
+ if(linked)return;
+ if(joinTries<MAXJOIN){
+  if(joinTries===3&&!hostOn&&gSwitch<gList.length-1){
+   gSwitch++;gIdx=(gIdx+1)%gList.length;
+   lobbyStatus.textContent="Looking in another network…";
+   joinTimer=setTimeout(guestConnect,400);
+   return;
+  }
+  joinTimer=setTimeout(sendJoin,1300);
+ }else if(!linked)lobbyStatus.textContent=hostOn?"The host is not responding. Ask them to create a new room.":"Room "+room+" not found. Ask the host for a new code.";
 }
-function start(){if(!conn||!isHost||!conn.open)return;show(game);begin();send({type:"start"})}
+function onGuestMsg(t,p){
+ let m;try{m=JSON.parse(p.toString())}catch(e){return}
+ if(t===T("host")){
+  const on=m.on===1;
+  if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(mq&&mq.connected)send({type:"join",from:myUid})}}
+  if(!on&&hostOn){
+   hostOn=false;linked=false;
+   if(inGame()){gameStatus.textContent="Host left the room.";disableChoices()}
+   else lobbyStatus.textContent="The host closed the room.";
+  }
+  return;
+ }
+ if(t!==T("h2g"))return;
+ if(m.to&&m.to!==myUid)return;
+ if(m.type==="full"){linked=false;lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
+ onData(m);
+}
+function start(){if(!isHost||!guestUid)return;show(game);begin();send({type:"start"})}
 function begin(){
  myChoice=null;remoteChoice=null;roundLocked=false;$("#coin").textContent="?";
  $("#turnText").textContent="Choose heads or tails.";gameStatus.textContent="";
@@ -119,8 +181,9 @@ function applyResult(result,hostWon,s){
  gameStatus.textContent=won?"YOU WIN +"+s:"YOU LOSE -"+s;setTimeout(begin,1100);
 }
 function onData(m){
- if(m.type==="hello"){return}
- if(m.type==="start"){show(game);begin();return}
+ if(m.type==="hello"){linked=true;stopTimers();setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";return}
+ if(m.type==="start"){linked=true;stopTimers();show(game);begin();return}
+ if(m.type==="full"){lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
  if(m.type==="choice"){
   remoteChoice=m.choice;remoteStake=Math.max(1,Number(m.stake)||1);
   if(isHost)resolveIfReady();return;
