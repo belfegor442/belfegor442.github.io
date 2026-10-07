@@ -88,7 +88,7 @@ export function renderSidebar() {
 
   const list = $("#conversationList");
   if (!rows.length) {
-    list.innerHTML = '<div class="hint" style="padding:28px 16px;text-align:center">No conversations yet.<br>Use NEW MESSAGE to find a user.</div>';
+    list.innerHTML = '<div class="list-empty">No conversations yet.<br>Use NEW MESSAGE to find a user.</div>';
     return;
   }
   list.innerHTML = rows.map((r) => {
@@ -124,7 +124,7 @@ function messageHtml(m, peer) {
   const att = m.attachment
     ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><span class="ico">📎</span><span>${esc(m.attachment.filename || "file")}<small>${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
     : "";
-  const body = m.text ? esc(m.text) : (att ? "" : `<span style="color:#7c8794">(${esc(m.type)})</span>`);
+  const body = m.text ? esc(m.text) : (att ? "" : `<span class="type-tag">(${esc(m.type)})</span>`);
   return `<div class="message ${m.mine ? "mine " : ""}${m.sync === "sending" ? "pending " : ""}${m.sync === "failed" ? "failed " : ""}" data-id="${esc(m.id)}" data-rowid="${m.rowid != null ? m.rowid : ""}">
     <div class="bubble">${body}${att}</div>
     <span class="message-meta">${esc(metaFor(m, peer))}</span>
@@ -139,7 +139,7 @@ export function renderMessages(opts = {}) {
   const wrap = $("#messages");
 
   if (!c || !c.messages.length) {
-    box.innerHTML = '<div class="hint" style="text-align:center;padding:40px 10px;color:#596572">No messages yet. Say hello — messages sync to your other clients.</div>';
+    box.innerHTML = '<div class="list-empty">No messages yet. Say hello — messages sync to your other clients.</div>';
     $("#loadOlder").classList.add("hidden");
     return;
   }

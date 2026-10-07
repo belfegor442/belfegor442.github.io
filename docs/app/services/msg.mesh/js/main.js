@@ -82,7 +82,7 @@ async function startSession() {
   await initialLoad();
   wsConnect();
   booted = true;
-  if (location.hash !== "#/") location.hash = "#/";
+  if (!location.hash || location.hash === "#") location.hash = "#/";
   route();
   ui.toast("Signed in as " + (state.user.display_name || state.user.username));
 }
