@@ -6,7 +6,7 @@ const MAXJOIN=6;
 let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
 let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
 let mq=null,guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null;
-let gList=[],gIdx=0,gSwitch=0;
+let gList=[],gIdx=0,gSwitch=0,nextTimer=null;
 const myUid=uid();
 
 function uid(){const a="abcdefghijklmnopqrstuvwxyz0123456789",b=new Uint8Array(8);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
@@ -154,6 +154,7 @@ function onGuestMsg(t,p){
 }
 function start(){if(!isHost||!guestUid)return;show(game);begin();send({type:"start"})}
 function begin(){
+ if(nextTimer){clearTimeout(nextTimer);nextTimer=null}
  myChoice=null;remoteChoice=null;roundLocked=false;$("#coin").textContent="?";
  $("#turnText").textContent="Choose heads or tails.";gameStatus.textContent="";
  $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;enableChoices();
@@ -178,11 +179,14 @@ function resolveIfReady(){
 function applyResult(result,hostWon,s){
  const won=isHost?hostWon:!hostWon;$("#coin").textContent=result==="heads"?"H":"T";
  $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;
- gameStatus.textContent=won?"YOU WIN +"+s:"YOU LOSE -"+s;setTimeout(begin,1100);
+ gameStatus.textContent=won?"YOU WIN +"+s:"YOU LOSE -"+s;
+ if(isHost)setTimeout(()=>{begin();send({type:"begin"})},1100);
+ else nextTimer=setTimeout(()=>{if(inGame())begin()},4500);
 }
 function onData(m){
  if(m.type==="hello"){linked=true;stopTimers();setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";return}
  if(m.type==="start"){linked=true;stopTimers();show(game);begin();return}
+ if(m.type==="begin"){if(inGame())begin();return}
  if(m.type==="full"){lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
  if(m.type==="choice"){
   remoteChoice=m.choice;remoteStake=Math.max(1,Number(m.stake)||1);
