@@ -52,38 +52,48 @@ export class Net {
   }
 
   connectOne(url, will, onOk, onFail) {
-    if (typeof mqtt === 'undefined') { onFail(); return; }
+    if (typeof mqtt === 'undefined') { onFail(new Error('mqtt-unavailable')); return; }
     let c;
     try {
       c = mqtt.connect(url, {
-        connectTimeout: 8000, reconnectPeriod: 2500, keepalive: 20,
-        protocolVersion: 4, clean: true, resubscribe: true,
-        queueQoSZero: true, reconnectOnConnackError: true,
-        clientId: 'brew-' + Math.random().toString(36).slice(2, 12),
+        connectTimeout: 9000,
+        reconnectPeriod: 3000,
+        keepalive: 30,
+        protocolVersion: 4,
+        clean: true,
+        resubscribe: false,
+        queueQoSZero: true,
+        reconnectOnConnackError: true,
+        clientId: 'brew-' + Math.random().toString(36).slice(2, 14),
         will: will || undefined
       });
-    } catch (e) { onFail(); return; }
-    let settled = false;
-    const fail = () => {
-      if (settled) return;
-      settled = true;
+    } catch (e) { onFail(e); return; }
+
+    let done = false;
+    const timer = setTimeout(() => fail(new Error('timeout')), 10000);
+    const cleanup = () => {
       clearTimeout(timer);
-      try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
-      onFail();
+      c.removeListener('connect', connected);
+      c.removeListener('error', failed);
+      c.removeListener('offline', failed);
     };
-    const ok = () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      c.removeListener('error', fail);
-      c.removeListener('offline', fail);
+    const fail = err => {
+      if (done) return;
+      done = true;
+      cleanup();
+      try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
+      onFail(err);
+    };
+    const connected = () => {
+      if (done) return;
+      done = true;
+      cleanup();
       c.on('error', () => {});
       onOk(c, url);
     };
-    const timer = setTimeout(fail, 7000);
-    c.once('connect', ok);
-    c.on('error', fail);
-    c.on('offline', fail);
+    c.once('connect', connected);
+    c.once('error', failed);
+    c.once('offline', failed);
   }
 
   host(room, will) {
@@ -104,13 +114,11 @@ export class Net {
         try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }); } catch (e) {}
       });
       c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-      c.subscribe([
-        { topic: this.topics.c, qos: 1 },
-        { topic: this.topics.pAll, qos: 1 }
-      ], err => {
+      c.subscribe([this.topics.c, this.topics.pAll], { qos: 1 }, err => {
         if (err) { try { c.end(true); } catch (e) {} return; }
-        c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true });
-        if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
+        c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }, () => {
+          if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
+        });
       });
     };
     for (const url of list) {
@@ -172,10 +180,7 @@ export class Net {
         c.on('message', (t, p) => this.handle(t, p));
         c.on('reconnect', () => { this.onStatus('Reconnecting…'); this.onReconnect(); });
         c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-        c.subscribe([
-          { topic: this.topics.s, qos: 1 },
-          { topic: this.topics.host, qos: 1 }
-        ], err => {
+        c.subscribe([this.topics.s, this.topics.host], { qos: 1 }, err => {
           if (err) { try { c.end(true); } catch (e) {} return; }
           this.onStatus('connected');
           this.onFirstUp();
