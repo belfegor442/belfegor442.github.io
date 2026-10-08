@@ -1,11 +1,11 @@
-import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=8';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=8';
-import { Host } from './src/state.js?v=8';
-import { Net } from './src/net.js?v=8';
-import { Renderer } from './src/render.js?v=8';
-import { Input } from './src/input.js?v=8';
-import { UI } from './src/ui.js?v=8';
-import { Registry, kinds as activityKinds } from './src/activities.js?v=8';
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=9';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=9';
+import { Host } from './src/state.js?v=9';
+import { Net } from './src/net.js?v=9';
+import { Renderer } from './src/render.js?v=9';
+import { Input } from './src/input.js?v=9';
+import { UI } from './src/ui.js?v=9';
+import { Registry, kinds as activityKinds } from './src/activities.js?v=9';
 
 const BROKERS = (() => {
   try {
