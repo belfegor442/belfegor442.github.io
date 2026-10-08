@@ -14,12 +14,22 @@ function transfer(host, act, winners, losers) {
   const stake = Math.max(0, Math.min(act.stake, ...ids.map(id => (host.players.get(id) || { balance: 0 }).balance)));
   const balances = {};
   for (const id of ids) balances[id] = 0;
-  if (losers.length) {
-    const each = winners.length ? Math.floor(stake / winners.length) : 0;
-    for (const id of losers) balances[id] = -stake;
-    for (const id of winners) balances[id] = each;
-    applyBalances(host, ids, balances);
+  if (!losers.length) return balances;
+
+  // Each loser contributes one stake to a shared pot. Split the full pot
+  // between winners so multiplayer rounds remain zero-sum (apart from
+  // deliberate house outcomes such as roulette green).
+  for (const id of losers) balances[id] = -stake;
+  if (winners.length) {
+    const pot = stake * losers.length;
+    const each = Math.floor(pot / winners.length);
+    let remainder = pot - each * winners.length;
+    for (const id of winners) {
+      balances[id] = each + (remainder > 0 ? 1 : 0);
+      remainder -= 1;
+    }
   }
+  applyBalances(host, ids, balances);
   return balances;
 }
 
