@@ -1,281 +1,684 @@
-const $=s=>document.querySelector(s);
-const home=$("#home"),lobby=$("#lobby"),game=$("#game"),status=$("#status"),lobbyStatus=$("#lobbyStatus"),gameStatus=$("#gameStatus");
-const NS="na-brew/v2/";
-const BROKERS=(()=>{try{
- const q=new URLSearchParams(location.search).get("brokers");
- if(q){const l=q.split(",").map(s=>s.trim()).filter(s=>/^wss?:\/\//.test(s));if(l.length)return l}
- }catch(e){}
- return["wss://broker.emqx.io:8084/mqtt","wss://test.mosquitto.org:8081/mqtt","wss://broker.hivemq.com:8884/mqtt"];
-})();
-const MAXJOIN=9;
-let isHost=false,hosting=false,room="",balance=1000,opBalance=1000;
-let myChoice=null,remoteChoice=null,myStake=25,remoteStake=25,roundLocked=false;
-let conns=[],guestUid=null,hostOn=false,linked=false,joinTries=0,joinTimer=null,beatTimer=null,pingTimer=null,retryTimer=null,guestSeen=0,hostQueue=[];
-let gList=[],gIdx=0,gSwitch=0,nextTimer=null;
-const myUid=uid();
-const myPid=(()=>{try{let p=localStorage.getItem("brew.pid");if(!p){p=uid().slice(0,4).toUpperCase();localStorage.setItem("brew.pid",p)}return p}catch(e){return uid().slice(0,4).toUpperCase()}})();
-let myName="",peerName="",peerPid="";
-const SND={coin:"./Assets/sound/coin.mp3",join:"./Assets/sound/join.mp3",win:"./Assets/sound/win.mp3",lose:"./Assets/sound/lose.mp3"};
-let sndOn=true;
-try{sndOn=localStorage.getItem("brew.sound")!=="0"}catch(e){}
-const sndCache={};
-function sfx(k){
- if(!sndOn)return;
- try{
-  let a=sndCache[k];
-  if(!a){a=new Audio(SND[k]);a.preload="auto";a.volume=.55;sndCache[k]=a}
-  a.currentTime=0;
-  const p=a.play();
-  if(p&&p.catch)p.catch(()=>{});
- }catch(e){}
-}
-function setSnd(on){
- sndOn=on;
- try{localStorage.setItem("brew.sound",on?"1":"0")}catch(e){}
- const b=$("#sndBtn");if(b)b.textContent=on?"SOUND ON":"SOUND OFF";
- if(!on)for(const k in sndCache){try{sndCache[k].pause()}catch(e){}}
-}
-function preloadSnd(){if(!sndOn)return;for(const k in SND){if(sndCache[k])continue;try{const a=new Audio(SND[k]);a.preload="auto";a.volume=.55;sndCache[k]=a}catch(e){}}}
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js';
+import { Host } from './src/state.js';
+import { Net } from './src/net.js';
+import { Renderer } from './src/render.js';
+import { Input } from './src/input.js';
+import { UI } from './src/ui.js';
+import { Registry } from './src/activities.js';
 
-function uid(){const a="abcdefghijklmnopqrstuvwxyz0123456789",b=new Uint8Array(8);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
-function code(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",b=new Uint8Array(6);crypto.getRandomValues(b);return [...b].map(n=>a[n%a.length]).join("")}
-function T(k){return NS+room+"/"+k}
-function show(x){[home,lobby,game].forEach(e=>e.classList.add("hidden"));x.classList.remove("hidden")}
-function inGame(){return !game.classList.contains("hidden")}
-function stopTimers(){if(joinTimer){clearTimeout(joinTimer);joinTimer=null}if(beatTimer){clearInterval(beatTimer);beatTimer=null}if(pingTimer){clearInterval(pingTimer);pingTimer=null}if(retryTimer){clearInterval(retryTimer);retryTimer=null}}
-function anyUp(){return conns.some(c=>c.connected)}
-function closeMq(){const l=conns;conns=[];for(const c of l){try{c.removeAllListeners();c.on("error",()=>{});c.end(true)}catch(e){}}}
-function send(o){
- if(!conns.length)return;
- const m=isHost?Object.assign({},o,{to:guestUid}):Object.assign({},o,{from:myUid});
- const topic=isHost?T("h2g"):T("g2h");
- const payload=JSON.stringify(m);
- for(const c of conns){if(c.connected){try{c.publish(topic,payload,{qos:0})}catch(e){}}}
+const BROKERS = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('brokers');
+    if (q) {
+      const l = q.split(',').map(s => s.trim()).filter(s => /^wss?:\/\//.test(s));
+      if (l.length) return l;
+    }
+  } catch (e) {}
+  return ['wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+})();
+
+const MAX_HELLO = 7;
+const SND = {
+  coin: './Assets/sound/coin.mp3',
+  join: './Assets/sound/join.mp3',
+  win: './Assets/sound/win.mp3',
+  lose: './Assets/sound/lose.mp3'
+};
+
+const ui = new UI();
+const input = new Input();
+const canvas = document.getElementById('world');
+const renderer = new Renderer(canvas);
+
+const players = new Map();
+const pending = new Map();
+let me = null;
+let myUid = token(8);
+let myName = 'PLAYER';
+let myPid = '----';
+let mySeed = 0;
+let balance = 1000;
+let isHost = false;
+let hosting = false;
+let room = '';
+let net = null;
+let authority = null;
+let activity = null;
+let objects = { lights: true };
+let hostSeen = false;
+let welcomed = false;
+let gTries = 0;
+let gRots = 0;
+let gTimer = null;
+let nextStake = 25;
+let sndOn = true;
+let savedName = '';
+const sndCache = {};
+
+try {
+  const n = localStorage.getItem('brew.name');
+  if (n) { myName = n; savedName = n; }
+  const p = localStorage.getItem('brew.pid');
+  if (!p) { myPid = token(4).toUpperCase(); localStorage.setItem('brew.pid', myPid); }
+  else myPid = p.toUpperCase();
+  const s = localStorage.getItem('brew.seed');
+  if (s != null) mySeed = Number(s) % 6;
+  else { mySeed = Math.floor(Math.random() * 6); localStorage.setItem('brew.seed', String(mySeed)); }
+  const b = localStorage.getItem('brew.balance');
+  if (b != null) balance = Math.max(0, Number(b));
+  sndOn = localStorage.getItem('brew.sound') !== '0';
+} catch (e) {}
+
+function sfx(k) {
+  if (!sndOn) return;
+  try {
+    let a = sndCache[k];
+    if (!a) { a = new Audio(SND[k]); a.preload = 'auto'; a.volume = 0.55; sndCache[k] = a; }
+    a.currentTime = 0;
+    const pr = a.play();
+    if (pr && pr.catch) pr.catch(() => {});
+  } catch (e) {}
 }
-function readName(){const el=$("#nameInput");if(el)myName=(el.value||"").trim().replace(/\s+/g," ").slice(0,12)||"PLAYER";try{localStorage.setItem("brew.name",myName)}catch(e){}}
-function meName(){return myName||"PLAYER"}
-function setLobby(){
- $("#roomCode").textContent=room||"------";
- const on=isHost?!!guestUid:linked;
- $("#startBtn").disabled=!(isHost&&!!guestUid);
- $("#startBtn").textContent=isHost?(guestUid?"START DUEL":"WAITING FOR PLAYER"):"WAITING FOR HOST";
- $("#p1").textContent=meName();
- $("#p1meta").textContent="#"+myPid+" · "+(isHost?"HOST":"YOU");
- $("#p2").textContent=on?(peerName||(isHost?"PLAYER 2":"HOST")):"WAITING";
- $("#p2meta").textContent=(on&&peerPid?"#"+peerPid+" · ":"")+(isHost?"PLAYER 2":"HOST");
- $(".dot.waiting").style.background=on?"#111":"#ccc";
- $("#myName").textContent=meName().toUpperCase();
- $("#opponentName").textContent=(peerName||(isHost&&guestUid?"PLAYER 2":(!isHost&&linked?"HOST":"OPPONENT"))).toUpperCase();
+function preloadSnd() {
+  if (!sndOn) return;
+  for (const k in SND) if (!sndCache[k]) { try { const a = new Audio(SND[k]); a.preload = 'auto'; a.volume = 0.55; sndCache[k] = a; } catch (e) {} }
 }
-function order(){
- let h=0;for(const ch of room)h=(h*131+ch.charCodeAt(0))>>>0;
- const s=h%BROKERS.length;
- return BROKERS.slice(s).concat(BROKERS.slice(0,s));
+function setSound(on) {
+  sndOn = on;
+  try { localStorage.setItem('brew.sound', on ? '1' : '0'); } catch (e) {}
+  ui.setSound(on);
+  if (!on) for (const k in sndCache) { try { sndCache[k].pause(); } catch (e) {} }
 }
-function connectOne(url,will,onReady,onFail){
- if(typeof mqtt==="undefined"){onFail();return}
- let c;
- try{
-  c=mqtt.connect(url,{connectTimeout:6000,reconnectPeriod:2500,keepalive:15,resubscribe:true,queueQoSZero:true,will:will||undefined});
- }catch(e){onFail();return}
- let settled=false;
-  const bad=()=>{
-   if(settled)return;settled=true;clearTimeout(t);
-   try{c.removeAllListeners();c.on("error",()=>{});c.end(true)}catch(e){}
-   onFail();
+
+function T() { return topics(room); }
+
+function serialize(p) {
+  return {
+    id: p.id, name: p.name, pid: p.pid, seed: p.seed, x: p.x, y: p.y, dir: p.dir,
+    anim: p.anim, status: p.status, seat: p.seat, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
   };
- const ok=()=>{
-  if(settled)return;settled=true;clearTimeout(t);
-  c.removeListener("error",bad);c.removeListener("offline",bad);
-  c.on("error",()=>{});
-  onReady(c,url);
- };
- const t=setTimeout(bad,7000);
- c.once("connect",ok);
- c.on("error",bad);
- c.on("offline",bad);
 }
-function connectList(list,will,onReady,onFail){
- let i=0;
- const next=()=>{if(i>=list.length){onFail();return}connectOne(list[i++],will,onReady,next)};
- next();
+function entity(data) {
+  const existing = players.get(data.id);
+  const p = existing || { rx: data.x, ry: data.y, chat: null };
+  Object.assign(p, data);
+  players.set(data.id, p);
+  return p;
 }
-function create(){
- if(!hosting)return;
- hosting=true;isHost=true;room=code();guestUid=null;linked=false;peerName="";peerPid="";guestSeen=0;readName();
- hostQueue=[];closeMq();stopTimers();
- show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
- const will={topic:T("host"),payload:'{"on":0}',retain:true,qos:0};
- const list=order();
- let left=list.length,up=0,first=true;
- const attach=c=>{
-  up++;conns.push(c);
-  c.on("message",onHostMsg);
-  c.on("reconnect",()=>{if(!anyUp())lobbyStatus.textContent="Reconnecting…";try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}});
-  c.on("close",()=>{if(isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
-  c.subscribe([T("g2h")],()=>{});
-  c.publish(T("host"),'{"on":1}',{retain:true});
-  if(first){first=false;lobbyStatus.textContent="Share the code: "+room;setLobby()}
- };
- const failed=()=>{left--;if(up===0&&left===0)lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again."};
- list.forEach(url=>connectOne(url,will,attach,()=>{if(hostQueue.indexOf(url)<0)hostQueue.push(url);failed()}));
- retryTimer=setInterval(()=>{
-  if(!isHost)return;
-  if(!hostQueue.length)return;
-  const url=hostQueue.shift();
-  connectOne(url,will,attach,()=>{if(hostQueue.indexOf(url)<0)hostQueue.push(url)});
- },25000);
- beatTimer=setInterval(()=>{
-  for(const c of conns){if(c.connected){try{c.publish(T("host"),'{"on":1}',{retain:true})}catch(e){}}}
- },20000);
+function sendHost(msg, critical) {
+  if (!net || !T()) return;
+  if (isHost) { handleHost(Object.assign({ from: myUid }, msg)); return; }
+  if (critical !== false) {
+    const mid = token(6);
+    msg.mid = mid;
+    pending.set(mid, { msg, at: Date.now(), tries: 1 });
+  }
+  net.publish(T().c, Object.assign({ from: myUid }, msg));
 }
-function onHostMsg(t,p){
- let m;try{m=JSON.parse(p.toString())}catch(e){return}
- if(m.type==="join"){
-  if(!m.from)return;
-  const take=()=>{
-   guestUid=m.from;peerName=(m.name||"").trim().slice(0,12);peerPid=(m.pid||"").trim().slice(0,6).toUpperCase();
-   guestSeen=Date.now();setLobby();
-   lobbyStatus.textContent="Player connected. You can start the duel.";
-   send({type:"hello",name:meName(),pid:myPid});
-   sfx("join");
+function sendTo(uid, msg) {
+  if (isHost && uid === myUid) { handleClient(Object.assign({}, msg, { to: null })); return; }
+  net.publish(T().s, Object.assign({ to: uid }, msg));
+}
+function broadcast(msg) { net.publish(T().s, msg); }
+
+function publishPresence(on) {
+  if (!net || !T()) return;
+  net.publish(T().p(myUid), { t: 'presence', on: on ? 1 : 0, name: myName, pid: myPid, seed: mySeed }, { retain: true, qos: 0 });
+}
+function presenceWill() {
+  return { topic: T().p(myUid), payload: '{"t":"presence","on":0}', retain: true, qos: 0 };
+}
+
+function enter({ name, code }) {
+  if (net) return;
+  myName = (name || '').trim().replace(/\s+/g, ' ').slice(0, LIMITS.name) || 'PLAYER';
+  try { localStorage.setItem('brew.name', myName); } catch (e) {}
+  const wanted = (code || '').trim().toUpperCase();
+  if (wanted.length === 6) startGuest(wanted);
+  else startHost();
+}
+
+function startHost() {
+  isHost = true;
+  hosting = true;
+  room = roomCode();
+  authority = new Host(room);
+  ui.entryStatus('Opening a new world…');
+  net = new Net(BROKERS);
+  wireNet();
+  const will = { topic: T().host, payload: '{"t":"presence","on":0}', retain: true, qos: 0 };
+  net.onStatus = t => { if (t === 'ready') onHostReady(); else if (t) ui.entryStatus(t); };
+  net.host(room, will);
+}
+
+function onHostReady() {
+  const spawn = SPAWNS[0];
+  me = entity({
+    id: myUid, name: myName, pid: myPid, seed: mySeed, x: spawn.x, y: spawn.y,
+    dir: -Math.PI / 2, anim: 'idle', status: 'standing', seat: null,
+    emote: null, emoteAt: 0, balance
+  });
+  me.rx = me.x; me.ry = me.y;
+  authority.addPlayer(me);
+  publishPresence(true);
+  ui.world(room, players.size, MAX_PLAYERS);
+  ui.hideEntry();
+  ui.system('World #' + room + ' is open. Share the code to invite people.');
+  input.enabled = true;
+}
+
+function startGuest(code) {
+  isHost = false;
+  hosting = false;
+  room = code;
+  ui.entryStatus('Looking for world ' + room + '…');
+  net = new Net(BROKERS);
+  wireNet();
+  net.onStatus = t => {
+    if (t === 'connected') { gTries = 0; guestHelloLoop(); }
+    else if (t) ui.entryStatus(t);
   };
-  if(!guestUid){take();return}
-  if(m.from===guestUid){guestSeen=Date.now();peerName=(m.name||"").trim().slice(0,12)||peerName;peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;setLobby();send({type:"hello",name:meName(),pid:myPid});return}
-  if(Date.now()-guestSeen>7000){take();return}
-  send({type:"full",to:m.from});
-  return;
- }
- if(t===T("host"))return;
- if(t!==T("g2h"))return;
- if(!guestUid)guestUid=m.from||"unknown";
- if(m.from&&m.from!==guestUid)return;
- guestSeen=Date.now();
- onData(m);
+  net.guest(room, presenceWill());
 }
-function join(){
- const v=$("#roomInput").value.trim().toUpperCase();
- if(v.length!==6){status.textContent="Enter a 6-character room code.";return}
- hosting=false;isHost=false;room=v;joinTries=0;hostOn=false;linked=false;peerName="";peerPid="";readName();
- gList=order();gIdx=0;gSwitch=0;
- closeMq();stopTimers();
- show(lobby);setLobby();lobbyStatus.textContent="Connecting to the network…";
- guestConnect();
-}
-function guestConnect(){
- closeMq();
- const list=gList.slice(gIdx).concat(gList.slice(0,gIdx));
- connectList(list,null,c=>{
-  conns=[c];
-  c.on("message",onGuestMsg);
-  c.on("reconnect",()=>{if(!linked)lobbyStatus.textContent="Reconnecting…"});
-  c.on("close",()=>{if(!linked&&!isHost&&!anyUp())lobbyStatus.textContent="Connection lost — reconnecting…"});
-  c.subscribe([T("host"),T("h2g")],()=>{});
-  sendJoin();
- },()=>{
-  if(gSwitch<gList.length-1){gSwitch++;gIdx=(gIdx+1)%gList.length;lobbyStatus.textContent="Connecting to the network…";setTimeout(guestConnect,400)}
-  else lobbyStatus.textContent="Cannot reach the game network. Check your connection and try again.";
- });
-}
-function sendJoin(){
- if(linked)return;
- joinTries++;
-  if(anyUp())send({type:"join",from:myUid,name:meName(),pid:myPid});
- lobbyStatus.textContent=hostOn?"Joining room "+room+"…":"Looking for room "+room+"… ("+joinTries+"/"+MAXJOIN+")";
- if(linked)return;
- if(joinTries<MAXJOIN){
-  if(joinTries%3===0&&!hostOn&&gSwitch<gList.length-1){
-   gSwitch++;gIdx=(gIdx+1)%gList.length;
-   lobbyStatus.textContent="Looking in another network…";
-   joinTimer=setTimeout(guestConnect,400);
-   return;
+
+function guestHelloLoop() {
+  clearTimeout(gTimer);
+  if (welcomed || isHost) return;
+  if (hostSeen && net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  gTries++;
+  if (welcomed) return;
+  if (gTries > MAX_HELLO) {
+    if (gRots < BROKERS.length * 2 && net.rotate) {
+      gRots++;
+      gTries = 0;
+      ui.entryStatus('Looking in another network…');
+      net.rotate();
+      return;
+    }
+    ui.entryStatus('World ' + room + ' not found. Ask the host for the code.');
+    return;
   }
-  joinTimer=setTimeout(sendJoin,1300);
- }else if(!linked)lobbyStatus.textContent=hostOn?"The host is not responding. Ask them to create a new room.":"Room "+room+" not found. Ask the host for a new code.";
+  ui.entryStatus(hostSeen
+    ? 'Joining world ' + room + '…'
+    : 'Looking for world ' + room + '… (' + gTries + '/' + MAX_HELLO + ')');
+  gTimer = setTimeout(guestHelloLoop, 1300);
 }
-function onGuestMsg(t,p){
- let m;try{m=JSON.parse(p.toString())}catch(e){return}
- if(t===T("host")){
-  const on=m.on===1;
-   if(on&&!hostOn){hostOn=true;if(!linked){lobbyStatus.textContent="Room found. Joining…";if(anyUp())send({type:"join",from:myUid,name:meName(),pid:myPid})}}
-  if(!on&&hostOn){
-   hostOn=false;linked=false;
-   if(inGame()){gameStatus.textContent="Host left the room.";disableChoices()}
-   else lobbyStatus.textContent="The host closed the room.";
+
+function wireNet() {
+  net.onMessage = onMessage;
+  net.onFirstUp = () => { if (!isHost) publishPresence(true); };
+}
+
+function onMessage(topic, msg) {
+  if (msg.to && msg.to !== myUid) return;
+  if (isHost) {
+    if (topic === T().host) return;
+    if (topic.startsWith(T().pAll.replace('+', ''))) {
+      const uid = topic.slice(topic.lastIndexOf('/') + 1);
+      if (uid === myUid) return;
+      if (msg.on === 0) removePlayer(uid, 'left the world');
+      return;
+    }
+    if (topic !== T().c) return;
+    handleHost(msg);
+  } else {
+    if (topic === T().host) {
+      hostSeen = msg.on === 1;
+      if (!hostSeen && welcomed) {
+        welcomed = false;
+        ui.showEntry('The host closed this world.');
+        ui.system('The world was closed by its host.');
+      }
+      return;
+    }
+    handleClient(msg);
   }
-  return;
- }
- if(t!==T("h2g"))return;
- if(m.to&&m.to!==myUid)return;
- if(m.type==="full"){linked=false;lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
- onData(m);
 }
-function start(){if(!isHost||!guestUid)return;show(game);begin();send({type:"start"})}
-function begin(){
- if(nextTimer){clearTimeout(nextTimer);nextTimer=null}
- myChoice=null;remoteChoice=null;roundLocked=false;$("#coin").textContent="?";
- $("#turnText").textContent="Choose heads or tails.";gameStatus.textContent="";
- $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;enableChoices();
- sfx("coin");
+
+function handleHost(msg) {
+  const uid = msg.from;
+  if (!uid) return;
+  const now = Date.now();
+  if (msg.mid) sendTo(uid, { t: 'ack', mid: msg.mid });
+  switch (msg.t) {
+    case 'hello': joinPlayer(msg, uid); break;
+    case 'mv': authority.applyMove(uid, msg, now); break;
+    case 'sit': reply(uid, authority.sit(uid, msg.seat)); break;
+    case 'stand': reply(uid, authority.stand(uid)); break;
+    case 'emote': reply(uid, authority.emote(uid, msg.key)); break;
+    case 'chat': reply(uid, authority.chat(uid, msg.text)); break;
+    case 'obj': reply(uid, authority.objectState(uid, msg.id, msg.val)); break;
+    case 'activity.start': reply(uid, authority.startActivity(msg.kind, uid, { stake: msg.stake })); break;
+    case 'activity.input': reply(uid, authority.inputActivity(uid, { side: msg.side, id: msg.id })); break;
+    case 'bye': removePlayer(uid, 'left the world'); break;
+  }
 }
-function enableChoices(){document.querySelectorAll(".choices button").forEach(b=>b.disabled=false)}
-function disableChoices(){document.querySelectorAll(".choices button").forEach(b=>b.disabled=true)}
-function play(c){
- if(roundLocked||myChoice)return;
- myChoice=c;myStake=Math.max(1,Math.min(1000,Number($("#stake").value)||1));disableChoices();
- $("#turnText").textContent="Waiting for opponent…";send({type:"choice",choice:c,stake:myStake});
- if(isHost)resolveIfReady();
+function reply(uid, res) {
+  if (!res) return;
+  if (res.error) { sendTo(uid, { t: 'err', code: res.error }); return; }
+  if (res.ok) { broadcast(res.ok); handleClient(res.ok); }
 }
-function resolveIfReady(){
- if(!isHost||!myChoice||!remoteChoice||roundLocked)return;
- roundLocked=true;
- const s=Math.min(myStake,remoteStake,balance,opBalance),result=Math.random()<.5?"heads":"tails";
- const hostWon=myChoice===result;
- if(hostWon){balance+=s;opBalance-=s}else{balance-=s;opBalance+=s}
- send({type:"result",result,hostWon,hostBalance:balance,guestBalance:opBalance,stake:s});
- applyResult(result,hostWon,s);
+
+function joinPlayer(msg, uid) {
+  if (authority.players.has(uid)) {
+    sendTo(uid, welcomeFor(uid));
+    return;
+  }
+  if (authority.count() >= MAX_PLAYERS) { sendTo(uid, { t: 'err', code: 'world-full' }); return; }
+  const spawn = SPAWNS[authority.count() % SPAWNS.length];
+  const p = authority.addPlayer({
+    id: uid, name: msg.name, pid: msg.pid, seed: msg.seed,
+    x: spawn.x, y: spawn.y, dir: -Math.PI / 2, balance: msg.balance
+  });
+  if (!p) { sendTo(uid, { t: 'err', code: 'name-taken' }); return; }
+  entity(serialize(p));
+  sendTo(uid, welcomeFor(uid));
+  broadcast({ t: 'join', player: serialize(p) });
+  ui.system(p.name + ' walked in.');
+  sfx('join');
 }
-function applyResult(result,hostWon,s){
- const won=isHost?hostWon:!hostWon;$("#coin").textContent=result==="heads"?"H":"T";
- $("#youScore").textContent=balance;$("#opScore").textContent=opBalance;
- gameStatus.textContent=won?"YOU WIN +"+s:"YOU LOSE -"+s;
- sfx(won?"win":"lose");
- if(isHost)setTimeout(()=>{begin();send({type:"begin"})},1100);
- else nextTimer=setTimeout(()=>{if(inGame())begin()},4500);
+
+function welcomeFor(uid) {
+  const p = authority.players.get(uid);
+  return {
+    t: 'welcome', uid, x: p.x, y: p.y, dir: p.dir, balance: p.balance,
+    room, max: MAX_PLAYERS, obj: Object.assign({}, authority.objects),
+    activity: authority.serialize(authority.activity),
+    snapshot: authority.snapshot()
+  };
 }
-function onData(m){
- if(m.type==="hello"){
-  const was=linked;
-  linked=true;stopTimers();
-  peerName=(m.name||"").trim().slice(0,12)||peerName;
-  peerPid=(m.pid||"").trim().slice(0,6).toUpperCase()||peerPid;
-  setLobby();lobbyStatus.textContent="Connected. Waiting for the host.";
-  if(!was)sfx("join");
-  pingTimer=setInterval(()=>{if(linked&&anyUp())send({type:"ping"})},5000);
-  return;
- }
- if(m.type==="start"){linked=true;stopTimers();show(game);begin();return}
- if(m.type==="begin"){if(inGame())begin();return}
- if(m.type==="full"){lobbyStatus.textContent="Room "+room+" already has 2 players.";return}
- if(m.type==="choice"){
-  remoteChoice=m.choice;remoteStake=Math.max(1,Number(m.stake)||1);
-  if(isHost)resolveIfReady();return;
- }
- if(m.type==="result"){
-  balance=isHost?m.hostBalance:m.guestBalance;opBalance=isHost?m.guestBalance:m.hostBalance;
-  roundLocked=true;applyResult(m.result,m.hostWon,m.stake);
- }
+
+function removePlayer(uid, reason) {
+  const p = players.get(uid);
+  if (!p) return;
+  players.delete(uid);
+  const seat = p.seat ? SEAT_BY_ID.get(p.seat) : null;
+  if (seat && seat.occupiedBy === uid) seat.occupiedBy = null;
+  if (isHost && authority) {
+    for (const m of authority.removePlayer(uid)) {
+      broadcast(m);
+      if (m.t !== 'leave') handleClient(m);
+    }
+  }
+  if (uid !== myUid) ui.system(p.name + ' ' + (reason || 'left') + '.');
 }
-$("#createBtn").onclick=()=>{hosting=true;create()};
-$("#joinBtn").onclick=join;
-$("#startBtn").onclick=start;
-$("#leaveBtn").onclick=()=>location.reload();$("#gameLeave").onclick=()=>location.reload();
-$("#copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText(room);lobbyStatus.textContent="Room code copied."}catch{lobbyStatus.textContent="Room code: "+room}};
-document.querySelectorAll(".choices button").forEach(b=>b.onclick=()=>play(b.dataset.choice));
-try{const n=localStorage.getItem("brew.name");if(n&&$("#nameInput"))$("#nameInput").value=n}catch(e){}
-if($("#myPid"))$("#myPid").textContent=myPid;
-if($("#nameInput")){$("#nameInput").addEventListener("change",readName);$("#nameInput").addEventListener("blur",readName)}
-setSnd(sndOn);preloadSnd();
-if($("#sndBtn"))$("#sndBtn").onclick=()=>setSnd(!sndOn);
-setLobby();
-setInterval(setLobby,700);
+
+function handleClient(msg) {
+  switch (msg.t) {
+    case 'welcome': applyWelcome(msg); break;
+    case 'err': ui.toast(errText(msg.code)); if (msg.code === 'name-taken') { gTries = MAX_HELLO; } break;
+    case 'ack': pending.delete(msg.mid); break;
+    case 'join':
+      if (msg.player && msg.player.id !== myUid) { entity(msg.player); refreshHud(); }
+      break;
+    case 'leave': removePlayer(msg.uid, 'left the world'); break;
+    case 'snapshot': applySnapshot(msg); break;
+    case 'snap': applySnap(msg); break;
+    case 'sit': applySit(msg); break;
+    case 'stand': applyStand(msg); break;
+    case 'emote': applyEmote(msg); break;
+    case 'chat': applyChat(msg); break;
+    case 'obj': objects[msg.id] = msg.val; renderer.lights = objects.lights; break;
+    case 'activity.start': applyActivityStart(msg); break;
+    case 'activity.update': applyActivityUpdate(msg); break;
+    case 'activity.end': applyActivityEnd(msg); break;
+  }
+}
+
+function applyWelcome(msg) {
+  welcomed = true;
+  clearTimeout(gTimer);
+  room = msg.room || room;
+  myUid = msg.uid;
+  objects = msg.obj || { lights: true };
+  renderer.lights = objects.lights;
+  balance = msg.balance;
+  players.clear();
+  for (const sp of (msg.snapshot && msg.snapshot.players) || []) entity(sp);
+  applySeats((msg.snapshot && msg.snapshot.seats) || []);
+  const mine = players.get(myUid);
+  if (mine) { mine.rx = mine.x; mine.ry = mine.y; me = mine; }
+  activity = msg.activity || null;
+  ui.world(room, players.size, msg.max || MAX_PLAYERS);
+  ui.hideEntry();
+  ui.system('You walked into world #' + room + '.');
+  input.enabled = true;
+  refreshHud();
+  renderActivityPanel();
+}
+
+function applySnapshot(msg) {
+  const snap = msg.snapshot || msg;
+  if (!snap.players) return;
+  const seen = new Set();
+  for (const sp of snap.players) {
+    if (sp.id === myUid) continue;
+    seen.add(sp.id);
+    const p = entity(sp);
+    if (p.rx == null) { p.rx = p.x; p.ry = p.y; }
+  }
+  for (const id of [...players.keys()]) if (id !== myUid && !seen.has(id)) players.delete(id);
+  applySeats(snap.seats || []);
+  if (snap.obj) { objects = snap.obj; renderer.lights = objects.lights; }
+  if (snap.activity !== undefined && (!activity || (snap.activity && activity && snap.activity.id !== activity.id))) {
+    activity = snap.activity;
+    renderActivityPanel();
+  }
+  refreshHud();
+}
+
+function applySnap(msg) {
+  if (msg.full) { applySnapshot(msg.full); return; }
+  for (const s of msg.p || []) {
+    if (s.id === myUid) {
+      if (me && Math.hypot(s.x - me.x, s.y - me.y) > 90) { me.x = s.x; me.y = s.y; }
+      continue;
+    }
+    const p = players.get(s.id);
+    if (!p) continue;
+    p.x = s.x; p.y = s.y; p.dir = s.dir; p.anim = s.anim;
+    if (s.status) p.status = s.status;
+    if (s.seat !== undefined) p.seat = s.seat;
+    if (s.name) p.name = s.name;
+    if (s.balance != null) p.balance = s.balance;
+    if (s.emote) { p.emote = s.emote; p.emoteAt = s.emoteAt; }
+  }
+}
+
+function applySeats(list) {
+  for (const s of SEATS) s.occupiedBy = null;
+  for (const entry of list) {
+    const seat = SEAT_BY_ID.get(entry[0]);
+    if (seat) seat.occupiedBy = entry[1];
+  }
+}
+
+function applySit(msg) {
+  const p = players.get(msg.uid);
+  if (!p) return;
+  const seat = SEAT_BY_ID.get(msg.seat);
+  if (seat) seat.occupiedBy = msg.uid;
+  p.x = msg.x; p.y = msg.y; p.dir = msg.dir;
+  p.status = 'seated'; p.seat = msg.seat; p.anim = 'sit';
+  if (msg.uid === myUid) { p.rx = p.x; p.ry = p.y; me = p; }
+  refreshHud();
+  renderPrompt();
+}
+
+function applyStand(msg) {
+  const p = players.get(msg.uid);
+  if (!p) return;
+  const seat = p.seat ? SEAT_BY_ID.get(p.seat) : null;
+  if (seat && seat.occupiedBy === msg.uid) seat.occupiedBy = null;
+  p.status = 'standing'; p.seat = null; p.anim = 'idle';
+  refreshHud();
+  renderPrompt();
+}
+
+function applyEmote(msg) {
+  const p = players.get(msg.uid);
+  if (!p) return;
+  p.emote = msg.key;
+  p.emoteAt = msg.at || Date.now();
+}
+
+function applyChat(msg) {
+  if (msg.to && !msg.to.includes(myUid)) return;
+  const p = players.get(msg.uid);
+  if (!p) return;
+  p.chat = { text: msg.text, at: Date.now() };
+  ui.line(p.id === myUid ? 'me' : 'other', msg.text, p.name);
+}
+
+function applyActivityStart(msg) {
+  activity = msg.activity;
+  if (activity && activity.players && activity.players.includes(myUid)) sfx('coin');
+  renderActivityPanel();
+  if (activity) ui.system(Registry[activity.kind] ? Registry[activity.kind].label + ' started at ' + activity.table : 'Activity started.');
+}
+
+function applyActivityUpdate(msg) {
+  if (!activity || activity.id !== msg.id) activity = msg.activity || activity;
+  else if (msg.activity) Object.assign(activity, msg.activity);
+  else { activity.phase = msg.phase || activity.phase; if (msg.waiting) activity.waiting = msg.waiting; }
+  if (activity && msg.activity && msg.activity.balances) activity.balances = msg.activity.balances;
+  if (activity && msg.activity && msg.activity.result) activity.result = msg.activity.result;
+  renderActivityPanel();
+  if (activity && activity.phase === 'result' && activity.balances && me) {
+    const d = activity.balances[myUid] || 0;
+    if (d !== 0) {
+      me.balance = Math.max(0, (me.balance || 0) + d);
+      balance = me.balance;
+      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
+      sfx(d > 0 ? 'win' : 'lose');
+      ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
+    }
+  }
+}
+
+function applyActivityEnd(msg) {
+  if (activity && msg.activity && msg.activity.balances && activity.id === msg.id) {
+    const d = (msg.activity.balances[myUid] || 0);
+    if (d !== 0 && (!activity.balances)) {
+      me.balance = Math.max(0, (me.balance || 0) + d);
+      balance = me.balance;
+      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
+      sfx(d > 0 ? 'win' : 'lose');
+    }
+  }
+  activity = null;
+  renderActivityPanel();
+  renderPrompt();
+}
+
+function errText(code) {
+  const map = {
+    'world-full': 'That world is full (20 players).',
+    'name-taken': 'That name is already in this world.',
+    'taken': 'That seat is taken.',
+    'too-far': 'Too far away.',
+    'busy': 'You are busy right now.',
+    'must-sit': 'Sit at a table first.',
+    'need-two-players': 'Two players need to be seated at the table.',
+    'activity-running': 'A game is already running at that table.',
+    'no-table': 'Sit at a table to play.',
+    'no-balance': 'You are out of chips.',
+    'unknown-activity': 'That activity does not exist.',
+    'already-picked': 'You already picked a side.'
+  };
+  return map[code] || 'That action is not available.';
+}
+
+function renderActivityPanel() {
+  ui.renderActivity(activity, myUid, {
+    activityInput: payload => {
+      if (!activity) return;
+      sendHost({ t: 'activity.input', id: activity.id, side: payload.side });
+    },
+    stake: v => { nextStake = v; ui.toast('Stake set to ' + v); }
+  });
+}
+
+function computePrompt() {
+  if (!me) return null;
+  if (activity && activity.players && activity.players.includes(myUid) && activity.phase === 'picking') {
+    return 'PICK HEADS OR TAILS BELOW';
+  }
+  if (me.status === 'seated') {
+    const seat = SEAT_BY_ID.get(me.seat);
+    const table = seat && seat.table;
+    const others = table ? seatsAt(table).filter(s => s.occupiedBy && s.occupiedBy !== myUid).length : 0;
+    if (others && !activity && Registry.coinflip) return 'E  STAND UP · F  START COINFLIP';
+    return 'E  STAND UP';
+  }
+  const sw = insideInteract(me.x, me.y, PROX.interact);
+  if (sw) return objects.lights ? 'E  LIGHTS OFF' : 'E  LIGHTS ON';
+  const seat = nearestSeat(me.x, me.y, PROX.interact);
+  if (seat && !seat.occupiedBy) return 'E  SIT DOWN';
+  for (const t of OBJECTS) {
+    if (t.type !== 'table') continue;
+    const seated = seatsAt(t.id).filter(s => s.occupiedBy).length;
+    if (seated >= 2) return 'A GAME IS RUNNING AT ' + t.id.toUpperCase();
+  }
+  return null;
+}
+
+function renderPrompt() {
+  ui.setPrompt(computePrompt());
+  ui.stakeBar(!!me && me.status === 'seated' && !activity);
+}
+
+function interact() {
+  if (!me) return;
+  if (me.status === 'seated') { sendHost({ t: 'stand' }); return; }
+  const sw = insideInteract(me.x, me.y, PROX.interact);
+  if (sw) { sendHost({ t: 'obj', id: sw.id, val: !objects.lights }); return; }
+  const seat = nearestSeat(me.x, me.y, PROX.interact);
+  if (seat && !seat.occupiedBy) { sendHost({ t: 'sit', seat: seat.id }); return; }
+  ui.toast('Nothing to interact with here.');
+}
+
+function startActivity() {
+  if (!me || me.status !== 'seated') { ui.toast('Sit at a table first.'); return; }
+  sendHost({ t: 'activity.start', kind: 'coinflip', stake: nextStake });
+}
+
+function say(text) {
+  if (!me) return;
+  sendHost({ t: 'chat', text });
+}
+
+function refreshHud() {
+  ui.world(room, players.size, MAX_PLAYERS);
+  ui.roster(players.values(), myUid);
+}
+
+function leaveWorld() {
+  try {
+    if (net && T()) {
+      publishPresence(false);
+      if (!isHost) sendHost({ t: 'bye' }, false);
+      net.close();
+    }
+  } catch (e) {}
+  location.reload();
+}
+
+input.on('chat', () => ui.focusChat());
+input.on('interact', interact);
+input.on('activity', startActivity);
+input.on('emote', key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); });
+
+ui.bind({
+  enter,
+  leave: leaveWorld,
+  sound: setSound,
+  share: async () => {
+    try { await navigator.clipboard.writeText(room); ui.toast('World code ' + room + ' copied'); }
+    catch (e) { ui.toast('World code: ' + room); }
+  },
+  emote: key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); },
+  stake: v => { nextStake = v; ui.stake(v); },
+  say
+});
+
+let last = performance.now();
+let moveAcc = 0, hudAcc = 0, lastFull = 0;
+
+function hostPulse() {
+  if (!isHost || !authority || !net || !net.up) return;
+  const dirty = authority.dirtyPlayers();
+  if (dirty.length) broadcast({ t: 'snap', p: dirty });
+  for (const m of authority.tick(Date.now())) { broadcast(m); handleClient(m); }
+  const now = Date.now();
+  if (now - lastFull >= TICK.full) {
+    lastFull = now;
+    broadcast({ t: 'snapshot', snapshot: authority.snapshot() });
+  }
+}
+setInterval(hostPulse, TICK.snap);
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  renderer.time = now / 1000;
+
+  if (me && input.enabled && me.status === 'standing' && !input.typing()) {
+    const a = input.axis();
+    if (a.x || a.y) {
+      const spd = SPEED * (a.sprint ? 1.45 : 1) * dt;
+      const r = collide(me.x, me.y, me.x + a.x * spd, me.y + a.y * spd, RADIUS);
+      me.x = r.x; me.y = r.y;
+      me.dir = Math.atan2(a.y, a.x);
+      me.anim = 'walk';
+      if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: 'walk' }, Date.now());
+    } else if (me.anim !== 'idle') me.anim = 'idle';
+  }
+
+  for (const p of players.values()) {
+    if (p === me) { p.rx = p.x; p.ry = p.y; continue; }
+    const k = Math.min(1, dt * 12);
+    p.rx = p.rx == null ? p.x : p.rx + (p.x - p.rx) * k;
+    p.ry = p.ry == null ? p.y : p.ry + (p.y - p.ry) * k;
+  }
+
+  moveAcc += dt * 1000;
+  if (!isHost && me && net && net.up && moveAcc >= TICK.move) {
+    moveAcc = 0;
+    if (me.status === 'standing') sendHost({ t: 'mv', x: me.x, y: me.y, dir: me.dir, anim: me.anim }, false);
+  }
+
+  const nowMs = Date.now();
+  for (const [mid, e] of [...pending]) {
+    if (nowMs - e.at > TICK.retry) {
+      if (e.tries >= TICK.retries) pending.delete(mid);
+      else {
+        e.tries++;
+        e.at = nowMs;
+        net.publish(T().c, Object.assign({ from: myUid }, e.msg));
+      }
+    }
+  }
+
+  hudAcc += dt * 1000;
+  if (hudAcc >= 700) {
+    hudAcc = 0;
+    if (me) {
+      refreshHud();
+      renderPrompt();
+      const el = document.getElementById('youBalance');
+      if (el) el.textContent = me.balance;
+    }
+  }
+
+  renderer.draw(me, players.values(), activity, dt);
+}
+
+window.addEventListener('resize', () => renderer.resize());
+
+ui.setSound(sndOn);
+ui.setName(savedName);
+ui.setPid(myPid);
+ui.stake(nextStake);
+preloadSnd();
+if (!sndOn) ui.setSound(false);
+ui.showEntry('Ready.');
+
+window.Brew = {
+  version: 3,
+  get me() { return me; },
+  get room() { return room; },
+  get isHost() { return isHost; },
+  get activity() { return activity; },
+  get players() { return players; },
+  get net() { return net; },
+  get objects() { return objects; },
+  get welcomed() { return welcomed; },
+  enter, interact, startActivity, say,
+  seatAt: id => SEAT_BY_ID.get(id),
+  MAP, OBJECTS, SEATS
+};
+
+requestAnimationFrame(frame);

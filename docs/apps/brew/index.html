@@ -2,71 +2,77 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Brew — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body>
-<header class="topbar">
-  <a class="brand" href="../../">NORTH ASSEMBLY</a>
-  <span class="slash">/</span>
-  <span class="section">BREW</span>
-  <button id="sndBtn" class="snd" type="button">SOUND ON</button>
-</header>
-<main>
-  <section id="home" class="screen">
-    <p class="eyebrow">NORTH ASSEMBLY · WEB GAME</p>
+<body class="world">
+<canvas id="world"></canvas>
+
+<div id="hud" class="hud hidden">
+  <div class="hud-top">
+    <div class="world-card">
+      <span class="k">BREW WORLD</span>
+      <strong id="worldCode">#------</strong>
+      <span class="count"><b id="playerCount">1</b><i>/</i><span id="worldMax">20</span> PLAYERS</span>
+      <span class="chips">CHIPS <b id="youBalance">1000</b></span>
+      <button id="shareBtn" class="mini">SHARE</button>
+    </div>
+    <div class="hud-actions">
+      <button id="sndBtn" class="mini">SOUND ON</button>
+      <button id="leaveBtn" class="mini">LEAVE</button>
+    </div>
+  </div>
+
+  <aside class="roster" id="roster"></aside>
+
+  <div class="hud-bottom">
+    <div id="prompt" class="prompt hidden"></div>
+    <div class="dock">
+      <div class="dock-left">
+        <div id="stakeBar" class="stakebar hidden">
+          <span class="k">STAKE</span>
+          <button data-stake="25" class="chip mini on">25</button>
+          <button data-stake="50" class="chip mini">50</button>
+          <button data-stake="100" class="chip mini">100</button>
+        </div>
+        <div id="emotes" class="emotes">
+          <button data-emote="wave">1 WAVE</button>
+          <button data-emote="laugh">2 LAUGH</button>
+          <button data-emote="clap">3 CLAP</button>
+          <button data-emote="dance">4 DANCE</button>
+          <button data-emote="think">5 THINK</button>
+        </div>
+      </div>
+      <div class="chatbox">
+        <div id="chatLog" class="chatlog"></div>
+        <div class="chatrow">
+          <input id="chatInput" maxlength="140" placeholder="Enter to chat · proximity chat">
+          <button id="chatSend">SEND</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="activityPanel" class="activity hidden"></div>
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<div id="entry" class="entry">
+  <div class="entry-card">
+    <p class="eyebrow">NORTH ASSEMBLY · 2.5D MULTIPLAYER WORLD</p>
     <h1>BREW</h1>
-    <p class="lead">A small multiplayer game built for the web.</p>
-    <div class="panel menu">
-      <label class="field">
-        <span>YOUR NAME</span>
-        <input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname">
-      </label>
-      <p class="pid">PLAYER ID <strong id="myPid">----</strong></p>
-      <button id="createBtn" class="primary">CREATE ROOM</button>
-      <div class="join">
-        <input id="roomInput" maxlength="6" placeholder="ROOM CODE" autocomplete="off">
-        <button id="joinBtn">JOIN</button>
-      </div>
-      <p id="status" class="status">Ready.</p>
-    </div>
-  </section>
+    <p class="lead">Walk in, meet people, sit at a table and play. Coinflip is only one activity inside the world.</p>
+    <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
+    <label class="field"><span>WORLD CODE <em>optional — leave empty to open a new world</em></span><input id="codeInput" maxlength="6" placeholder="A7F29" autocomplete="off"></label>
+    <button id="enterBtn" class="primary">ENTER THE WORLD</button>
+    <p id="entryStatus" class="status">Ready.</p>
+    <p class="pid">PLAYER ID <strong id="myPid">----</strong></p>
+  </div>
+</div>
 
-  <section id="lobby" class="screen hidden">
-    <p class="eyebrow">ROOM</p>
-    <div class="room-line"><h2 id="roomCode">------</h2><button id="copyBtn">COPY</button></div>
-    <div class="players">
-      <div class="player"><span class="dot"></span><strong id="p1">YOU</strong><small id="p1meta">HOST</small></div>
-      <div class="player"><span class="dot waiting"></span><strong id="p2">WAITING</strong><small id="p2meta">PLAYER 2</small></div>
-    </div>
-    <button id="startBtn" class="primary wide" disabled>WAITING FOR PLAYER</button>
-    <button id="leaveBtn" class="textbtn">LEAVE ROOM</button>
-    <p id="lobbyStatus" class="status">Share the room code with another player.</p>
-  </section>
-
-  <section id="game" class="screen hidden">
-    <div class="game-head">
-      <div><span class="label" id="myName">YOU</span><strong id="youScore">1000</strong></div>
-      <div class="vs">VS</div>
-      <div class="right"><span class="label" id="opponentName">OPPONENT</span><strong id="opScore">1000</strong></div>
-    </div>
-    <div class="arena panel">
-      <p class="eyebrow">COINFLIP DUEL</p>
-      <div id="coin" class="coin">?</div>
-      <p id="turnText">Choose heads or tails.</p>
-      <div class="choices">
-        <button data-choice="heads">HEADS</button>
-        <button data-choice="tails">TAILS</button>
-      </div>
-      <div class="stake"><label>STAKE</label><input id="stake" type="number" min="1" max="1000" value="25"></div>
-      <p id="gameStatus" class="status"></p>
-    </div>
-    <button id="gameLeave" class="textbtn">LEAVE</button>
-  </section>
-</main>
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
-<script src="./app.js"></script>
+<script type="module" src="./app.js"></script>
 </body>
 </html>
