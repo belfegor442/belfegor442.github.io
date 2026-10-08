@@ -134,7 +134,9 @@ export class Renderer {
     this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
     this.glbWorld = null;
     this.glbPlayer = null;
-    // lobby.glb is the authoritative Brew world. The procedural scene is fallback-only.\n    this.useImportedWorld = true;\n    this.glbReady = false;
+    // lobby.glb is the authoritative Brew world. The procedural scene is fallback-only.
+    this.useImportedWorld = true;
+    this.glbReady = false;
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
@@ -197,7 +199,8 @@ export class Renderer {
       console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
         this.glbWorld.blend.length + ' blend, size=' + world.bounds.max.map(v => Math.round(v)).join('x'));
     } catch (e) {
-      this.glbReady = false;\n      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
+      this.glbReady = false;
+      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
     }
     try {
       const player = await loadGLB('./Assets/gbl/Player/steve.skin.glb');

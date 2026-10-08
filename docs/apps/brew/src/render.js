@@ -90,6 +90,7 @@ export class Renderer {
 
   toggleFreeCam() {
     this.freeCam = !this.freeCam;
+    if (!this.freeCam) { this.cam.x = MAP.w / 2; this.cam.z = MAP.h / 2; }
     return this.freeCam;
   }
 
@@ -133,6 +134,9 @@ export class Renderer {
     this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
     this.glbWorld = null;
     this.glbPlayer = null;
+    // lobby.glb is the authoritative Brew world. The procedural scene is fallback-only.
+    this.useImportedWorld = true;
+    this.glbReady = false;
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
@@ -178,7 +182,7 @@ export class Renderer {
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.016, 0.024, 0.055], fogRange: [850, 2900]
     };
-    this.loadGLBAssets();
+    if (this.useImportedWorld) this.loadGLBAssets();
   }
 
   async loadGLBAssets() {
@@ -195,6 +199,7 @@ export class Renderer {
       console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
         this.glbWorld.blend.length + ' blend, size=' + world.bounds.max.map(v => Math.round(v)).join('x'));
     } catch (e) {
+      this.glbReady = false;
       console.warn('[glb] world load failed, procedural fallback:', e && e.message);
     }
     try {
@@ -353,6 +358,9 @@ export class Renderer {
       const cx = o.x + o.w / 2, cz = o.y + o.h / 2;
       switch (o.type) {
         case 'rug':
+          // The central social area must exist visually as well as in the world data.
+          pushBox(M, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
+          pushBox(M, cx, 0.85, cz, o.w - 18, 0.18, o.h - 18, C('#245b47'));
           break;
         case 'wall':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, wallC);
@@ -436,7 +444,7 @@ export class Renderer {
       q = at(-4.5, -sw);
       pushBox(M, q[0], 0, q[1], 5, 9, 5, dark, c, s);
     } else if (seated) {
-      const q = at(0, 3);
+      const q = at(0, -5);
       pushBox(M, q[0], 17, q[1], 12, 5, 16, dark, c, s);
     } else {
       let q = at(4.5, 0);
@@ -445,7 +453,7 @@ export class Renderer {
       pushBox(M, q[0], 0, q[1], 5, 9, 5, dark, c, s);
     }
 
-    const mid = at(0, 0);
+    const mid = at(0, seated ? -7 : 0);
     const by = seated ? 21 : 9;
     const bh = seated ? 13 : 17;
     pushBox(M, mid[0], by, mid[1], 16, bh, 10, body, c, s);
@@ -501,6 +509,10 @@ export class Renderer {
     if (!this.freeCam) {
       this.cam.x += (tx - this.cam.x) * k;
       this.cam.z += (tz - this.cam.z) * k;
+      // Keep the camera target inside the playable room; never expose the void beyond the walls.
+      const margin = 180;
+      this.cam.x = Math.max(margin, Math.min(MAP.w - margin, this.cam.x));
+      this.cam.z = Math.max(margin, Math.min(MAP.h - margin, this.cam.z));
     }
 
     if (!this.gl) { this.drawFallback(); return; }
@@ -533,36 +545,36 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
-    this.useTex();
-    this.setTexM(this.mIdent);
-    this.setTexTint(1, 1, 1, 1);
-    this.bindTex(this.gpuFloor, this.texFloor);
-    gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-    this.glErr('floor');
-
-    this.useLit();
-    this.setLitM(this.mIdent);
-    this.setLitTint(1, 1, 1);
-    this.setLitLighting(def);
-    this.bindLit(this.gpuWorld);
-    gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-
-    if (this.lights) this.setLitTint(1.0, 0.86, 0.42);
-    else this.setLitTint(0.34, 0.34, 0.38);
-    this.bindLit(this.gpuLever);
-    gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-    this.glErr('procWorld');
-
-    if (this.glbWorld && this.glbWorld.opaque.length) {
+    // The imported lobby is the actual map. Never render the procedural map beneath it.
+    if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useGLB(def);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
       this.glErr('lobbyOpaque');
+    } else {
+      // Emergency fallback only while lobby.glb cannot be loaded.
+      this.useTex();
+      this.setTexM(this.mIdent);
+      this.setTexTint(1, 1, 1, 1);
+      this.bindTex(this.gpuFloor, this.texFloor);
+      gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+
+      this.useLit();
+      this.setLitM(this.mIdent);
+      this.setLitTint(1, 1, 1);
+      this.setLitLighting(def);
+      this.bindLit(this.gpuWorld);
+      gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+
+      this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
+      this.bindLit(this.gpuLever);
+      gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.glErr('procWorld');
     }
 
-    if (this.glbPlayer && this.glbPlayer.opaque.length) {
+    if (this.glbReady && this.glbPlayer && this.glbPlayer.opaque.length) {
       this.useGLB(def);
       for (const p of list) {
         const px = p.rx != null ? p.rx : p.x;
@@ -638,7 +650,7 @@ export class Renderer {
 
     gl.enable(gl.BLEND);
     gl.depthMask(false);
-    if (this.glbWorld && this.glbWorld.blend.length) {
+    if (this.glbReady && this.glbWorld && this.glbWorld.blend.length) {
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       this.useGLB(def);
       for (const g of this.glbWorld.blend) this.drawGLBD(g);
