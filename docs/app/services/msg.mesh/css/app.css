@@ -160,11 +160,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
 }
 .icon-btn:hover{border-color:var(--xp-border);background:rgba(255,255,255,.5)}
 .back-btn{
-  display:none;flex:none;width:36px;height:100%;
-  border:0;border-right:1px solid var(--xp-border);
-  background:linear-gradient(180deg,var(--xp-toolbar-a),var(--xp-toolbar-b));
-  font-size:16px;color:#222;
+  display:none;flex:none;
+  width:32px;height:32px;margin-right:2px;
+  border:1px solid var(--xp-border);border-radius:2px;
+  background:linear-gradient(180deg,#fff,#e4e4e4);
+  font-size:14px;color:#222;line-height:1;
 }
+.back-btn:active{background:#d0d0d0}
 
 /* ---------- sunken / raised boxes ---------- */
 .sunken{
@@ -304,7 +306,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
 }
 .chat-col.mobile-open{display:flex;animation:xpSlide .16s ease}
 @keyframes xpSlide{from{transform:translateX(8%);opacity:.6}to{transform:none;opacity:1}}
-.chat-col:not(.hidden){/* desktop/tablet grid handled below */}
 
 .conv-header{
   height:48px;flex:none;
@@ -534,7 +535,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
   .win-toolbar{padding:3px 4px}
   .tb-btn{height:32px;padding:0 8px;font-size:11px}
   .statusbar{height:calc(24px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
-  .win-titlebar{height:30px;padding-top:env(safe-area-inset-top);height:calc(30px + env(safe-area-inset-top))}
+  .win-titlebar{padding-top:env(safe-area-inset-top);height:calc(30px + env(safe-area-inset-top))}
   .composer-sunken textarea{height:32px}
   .send-btn{min-height:32px}
   .xp-btn{min-height:32px}
