@@ -167,7 +167,7 @@ function contactRowHtml(r, active) {
   const m = rowMeta(r);
   return `<button type="button" class="contact-row ${active ? "active" : ""} ${r.unread ? "has-unread" : ""}" data-peer="${esc(r.peer)}">
     <span class="dot ${m.online ? "on" : ""}"></span>
-    <span class="contact-name-wrap" style="flex:1;min-width:0">
+    <span class="contact-name-wrap contact-name-flex">
       <span class="contact-name">${esc(m.label)}</span>
       ${m.preview ? `<span class="contact-preview">${esc(m.preview)}</span>` : ""}
     </span>
@@ -238,7 +238,7 @@ function messageLineHtml(m, peer) {
     ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><span>📎</span><span>${esc(m.attachment.filename || "file")}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
     : "";
   const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
-  const body = m.text ? esc(m.text) : (att ? "" : `<span style="color:#969696">(${esc(m.type)})</span>`);
+  const body = m.text ? esc(m.text) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
   const st = statusGlyph(m, peer);
   const cls = ["msg-line", m.mine ? "mine" : "other"];
   if (m.sync === "sending") cls.push("pending");
