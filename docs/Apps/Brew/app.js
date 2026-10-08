@@ -589,12 +589,14 @@ let moveAcc = 0, hudAcc = 0, lastFull = 0;
 function hostPulse() {
   if (!isHost || !authority || !net || !net.up) return;
   const dirty = authority.dirtyPlayers();
-  if (dirty.length) broadcast({ t: 'snap', p: dirty });
+  if (dirty.length) { broadcast({ t: 'snap', p: dirty }); handleClient({ t: 'snap', p: dirty }); }
   for (const m of authority.tick(Date.now())) { broadcast(m); handleClient(m); }
   const now = Date.now();
   if (now - lastFull >= TICK.full) {
     lastFull = now;
-    broadcast({ t: 'snapshot', snapshot: authority.snapshot() });
+    const snapshot = authority.snapshot();
+    broadcast({ t: 'snapshot', snapshot });
+    applySnapshot(snapshot);
   }
 }
 setInterval(hostPulse, TICK.snap);

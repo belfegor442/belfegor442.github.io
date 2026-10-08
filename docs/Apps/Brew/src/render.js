@@ -12,7 +12,11 @@ const PALETTE = [
   { body: '#2f8f5b', trim: '#e8ffe8', hair: '#12100e' },
   { body: '#8b5bd6', trim: '#f3e9ff', hair: '#2a1830' },
   { body: '#d98a1f', trim: '#fff2d0', hair: '#4a2c12' },
-  { body: '#3ec6c6', trim: '#eaffff', hair: '#101a1a' }
+  { body: '#3ec6c6', trim: '#eaffff', hair: '#101a1a' },
+  { body: '#e05a8a', trim: '#ffe4ef', hair: '#5a1030' },
+  { body: '#7ad1c3', trim: '#f0fffc', hair: '#0f3a34' },
+  { body: '#b8b8c8', trim: '#ffffff', hair: '#3a3a48' },
+  { body: '#f0e6d2', trim: '#fffaf0', hair: '#8a6a3a' }
 ];
 
 const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
@@ -42,8 +46,16 @@ export class Renderer {
     this.enabledAttrs = new Set();
     this.buildOverlay();
     if (this.gl) this.initGL();
+    this.loadPixelFont();
     this.resize();
     try { window.__renderer = this; } catch (e) { /* noop */ }
+  }
+
+  loadPixelFont() {
+    try {
+      const ff = new FontFace('BrewPixel', "url('./Assets/vhs-gothic.ttf')");
+      ff.load().then(f => document.fonts.add(f)).catch(() => {});
+    } catch (e) { /* noop */ }
   }
 
   buildOverlay() {
@@ -587,20 +599,19 @@ export class Renderer {
       const anchor = this.sp(p.rx != null ? p.rx : p.x, seated ? 72 : 64, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;
-      const tag = p.name + (p.pid ? '  ' + p.pid : '');
-      o.font = '700 11px Arial';
-      const tw = o.measureText(tag).width + 14;
-      o.fillStyle = 'rgba(4,16,12,.82)';
-      this.rr(o, x - tw / 2, ty - 8.5, tw, 17, 8);
-      o.fill();
-      o.fillStyle = isMe ? '#e9c877' : '#e7e0cf';
+      o.font = '13px BrewPixel, Arial, sans-serif';
       o.textAlign = 'center';
       o.textBaseline = 'middle';
-      o.fillText(tag, x, ty + 0.5);
+      o.fillStyle = 'rgba(0,0,0,.85)';
+      o.fillText(p.name, x + 1, ty + 1);
+      o.fillStyle = isMe ? '#ffe98a' : '#f4f4f4';
+      o.fillText(p.name, x, ty);
 
       if (p.status === 'activity') {
+        o.font = '10px BrewPixel, Arial, sans-serif';
+        o.fillStyle = 'rgba(0,0,0,.85)';
+        o.fillText('PLAYING', x + 1, ty - 16);
         o.fillStyle = '#e9c877';
-        o.font = '800 9px Arial';
         o.fillText('PLAYING', x, ty - 17);
       }
 

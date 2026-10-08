@@ -11,7 +11,8 @@ This folder currently contains **two builds**:
 
 The MQTT build renders in real 3D: perspective camera, vertex-lit geometry, fog,
 shadows and additive light pools — all hand-written WebGL (no three.js), with an
-overlay 2D canvas for nametags, chat bubbles and seat rings.
+overlay 2D canvas for Minecraft-style nametags (bundled `Assets/vhs-gothic.ttf`
+pixel font, hard drop shadow, no pill), chat bubbles and seat rings.
 
 The rest of this README describes the **server-authoritative build** (`server/`, `client/`, `shared/`).
 
