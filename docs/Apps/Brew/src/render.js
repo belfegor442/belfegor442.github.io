@@ -355,6 +355,9 @@ export class Renderer {
       const cx = o.x + o.w / 2, cz = o.y + o.h / 2;
       switch (o.type) {
         case 'rug':
+          // The central social area must exist visually as well as in the world data.
+          pushBox(M, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
+          pushBox(M, cx, 0.85, cz, o.w - 18, 0.18, o.h - 18, C('#245b47'));
           break;
         case 'wall':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, wallC);
