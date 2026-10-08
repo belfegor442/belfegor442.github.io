@@ -1,0 +1,22 @@
+{
+  "name": "brew",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "BREW - server-authoritative 2.5D social arcade game",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "typecheck": "node --check server/index.js && node --check shared/protocol.js && node --check client/main.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "test:watch": "node --test --watch \"tests/**/*.test.js\"",
+    "test:unit": "node --test \"tests/unit/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"tests/integration/*.test.js\"",
+    "test:acceptance": "node --test --test-concurrency=1 \"tests/acceptance/*.test.js\""
+  },
+  "dependencies": {}
+}
