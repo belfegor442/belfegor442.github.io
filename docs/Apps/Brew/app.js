@@ -745,7 +745,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 4,
+  version: 5,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
