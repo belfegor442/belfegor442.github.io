@@ -55,6 +55,7 @@ let gRots = 0;
 let gTimer = null;
 let nextStake = 25;
 let sndOn = true;
+const motion = { x: 0, y: 0 };
 let savedName = '';
 const settledActivityResults = new Set();
 const sndCache = {};
@@ -424,7 +425,7 @@ function applySit(msg) {
   if (!p) return;
   const seat = SEAT_BY_ID.get(msg.seat);
   if (seat) seat.occupiedBy = msg.uid;
-  p.x = msg.x; p.y = msg.y; p.dir = msg.dir;
+  p.x = msg.x; p.y = msg.y; p.rx = msg.x; p.ry = msg.y; p.dir = msg.dir;
   p.status = 'seated'; p.seat = msg.seat; p.anim = 'sit';
   if (msg.uid === myUid) { p.rx = p.x; p.ry = p.y; me = p; }
   refreshHud();
@@ -664,14 +665,34 @@ function frame(now) {
   }
   if (me && input.enabled && me.status === 'standing' && !input.typing()) {
     const a = input.axis(renderer.freeCam);
-    if (a.x || a.y) {
-      const spd = SPEED * (a.sprint ? 1.45 : 1) * dt;
-      const r = collide(me.x, me.y, me.x + a.x * spd, me.y + a.y * spd, RADIUS);
-      me.x = r.x; me.y = r.y;
-      me.dir = Math.atan2(a.y, a.x);
+    // Movement is camera-relative: W/joystick-up always means "towards the camera target".
+    const yaw = renderer.orbit.yaw;
+    const sy = Math.sin(yaw), cy = Math.cos(yaw);
+    const wx = cy * a.x + sy * a.y;
+    const wy = -sy * a.x + cy * a.y;
+    const moving = Math.hypot(wx, wy) > 0.02;
+    const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
+    const accel = moving ? 1250 : 1650;
+    const targetX = moving ? wx * targetSpeed : 0;
+    const targetY = moving ? wy * targetSpeed : 0;
+    const blend = Math.min(1, accel * dt / Math.max(targetSpeed, 1));
+    motion.x += (targetX - motion.x) * blend;
+    motion.y += (targetY - motion.y) * blend;
+    if (Math.abs(motion.x) < 2) motion.x = 0;
+    if (Math.abs(motion.y) < 2) motion.y = 0;
+    const r = collide(me.x, me.y, me.x + motion.x * dt, me.y + motion.y * dt, RADIUS);
+    if (r.x === me.x) motion.x = 0;
+    if (r.y === me.y) motion.y = 0;
+    me.x = r.x; me.y = r.y;
+    if (moving && (motion.x || motion.y)) {
+      me.dir = Math.atan2(motion.y, motion.x);
       me.anim = 'walk';
-      if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: 'walk' }, Date.now());
-    } else if (me.anim !== 'idle') me.anim = 'idle';
+    } else {
+      me.anim = 'idle';
+    }
+    if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: me.anim }, Date.now());
+  } else {
+    motion.x = motion.y = 0;
   }
 
   for (const p of players.values()) {
@@ -746,7 +767,7 @@ window.Brew = {
       return true;
     }
     if (!me) return false;
-    me.x = x; me.y = y; me.rx = x; me.ry = y;
+    me.x = x; me.y = y; me.rx = x; me.ry = y; motion.x = motion.y = 0;
     if (isHost && authority) {
       const p = authority.players.get(myUid);
       if (p) { p.x = x; p.y = y; p.lastT = Date.now(); p.dirty = true; }
