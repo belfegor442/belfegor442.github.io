@@ -1,6 +1,7 @@
-import { api, getToken, setToken, ApiError } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, resetState } from "./store.js";
+import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, lastUsername, rememberUsername } from "./api.js";
+import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
+import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
 
 const $ = ui.$;
@@ -41,6 +42,7 @@ $("#authForm").addEventListener("submit", async (e) => {
   const password = $("#authPassword").value;
   const errBox = $("#authError");
   errBox.textContent = "";
+  authNotice = "";
   if (!username || !password) { errBox.textContent = "Username and password are required."; return; }
   const btn = $("#authSubmit");
   btn.disabled = true;
@@ -54,9 +56,10 @@ $("#authForm").addEventListener("submit", async (e) => {
       const r = await api.login(username, password);
       setToken(r.session_token);
     }
+    rememberUsername(username);
     await startSession();
   } catch (err) {
-    errBox.textContent = err instanceof ApiError ? err.message : "Sign-in failed.";
+    errBox.textContent = err instanceof ApiError ? friendlyError(err) : "Sign-in failed.";
   } finally {
     btn.disabled = false;
   }
@@ -66,9 +69,26 @@ $("#authForm").addEventListener("submit", async (e) => {
 
 let booted = false;
 
+// Global 401 handler (idempotent): any authenticated call that comes back
+// 401 means the 24h session died. Drop to the login screen cleanly.
+function handleSessionLost() {
+  if (!getToken()) return;
+  setToken("");
+  wsDisconnect();
+  resetState();
+  booted = false;
+  authNotice = "Session expired — please sign in again.";
+  ui.showAuth("login");
+  setMode("login");
+  $("#authUsername").value = lastUsername();
+  if (location.hash === "#/login" || location.hash === "#" || !location.hash) route();
+  else location.hash = "#/login";
+}
+setOnUnauthorized(handleSessionLost);
+
 async function startSession() {
   try {
-    const w = await api.whoami();
+    const w = await api.whoami({ allow401: true });
     state.user = normalizeUser(w);
   } catch (e) {
     setToken("");
@@ -78,6 +98,7 @@ async function startSession() {
   booted = false;
   ui.showApp();
   ui.renderProfile();
+  applyServerSettings();
   ui.setActive(null);
   await initialLoad();
   wsConnect();
@@ -96,7 +117,7 @@ async function initialLoad() {
     const hasMore = items.length >= 200;
     for (const c of state.conversations.values()) c.hasMore = hasMore;
   } catch (e) {
-    ui.toast("Could not load history: " + e.message, true);
+    ui.toast("Could not load history: " + friendlyError(e), true);
   }
   try {
     const map = await api.read(null);
@@ -104,9 +125,16 @@ async function initialLoad() {
       for (const [peer, rowid] of Object.entries(map.reads)) state.pointers.set(peer, Number(rowid) || 0);
     }
   } catch { /* pointers refresh later */ }
+  await loadFriends().catch(() => null);
   await primeUsers();
   ui.renderAll();
+  emitFriends();
   $("#syncState").textContent = "SYNCED";
+}
+
+function emitFriends() {
+  ui.renderSidebar();
+  ui.renderContacts();
 }
 
 async function logout() {
@@ -116,11 +144,16 @@ async function logout() {
   resetState();
   booted = false;
   ui.showAuth("login");
+  $("#authUsername").value = lastUsername();
   location.hash = "#/login";
   ui.toast("Signed out");
 }
 
 /* ---------------- router ---------------- */
+
+// Message to show once the auth view is (re)rendered — setAuthTab clears
+// #authError, so direct writes get wiped by any subsequent route().
+let authNotice = "";
 
 function route() {
   const h = location.hash.replace(/^#\/?/, "");
@@ -129,6 +162,7 @@ function route() {
     if (seg === "register") setMode("register");
     else setMode("login");
     ui.showAuth(seg === "register" ? "register" : "login");
+    if (authNotice) $("#authError").textContent = authNotice;
     return;
   }
   ui.showApp();
@@ -158,6 +192,8 @@ function openChat(peer, opts = {}) {
   if (opts.push !== false && location.hash !== "#/chat/" + encodeURIComponent(peer)) {
     location.hash = "#/chat/" + encodeURIComponent(peer);
   }
+  const mu = /^u(\d+)$/.exec(peer);
+  if (mu) refreshUser(Number(mu[1])).then(() => ui.renderChatHead()).catch(() => null);
   markRead(peer);
   if (opts.jumpRowid) jumpTo(opts.jumpRowid);
 }
@@ -208,6 +244,7 @@ async function sendMessage() {
   const text = input.value.trim();
   const peer = state.activePeer;
   if (!peer || (!text && !pendingAttachment)) return;
+  requestNotificationPermission();
   const att = pendingAttachment;
   const env = {
     v: 1,
@@ -237,7 +274,7 @@ async function sendMessage() {
     const m = findMessage(peer, tmp);
     if (m) m.sync = "failed";
     ui.renderMessages({ scroll: false });
-    ui.toast("Send failed: " + e.message, true);
+    ui.toast("Send failed: " + friendlyError(e), true);
   }
   ui.renderSidebar();
 }
@@ -256,7 +293,7 @@ async function retryMessage(peer, m) {
   } catch (e) {
     m.sync = "failed";
     ui.renderMessages({ scroll: false });
-    ui.toast("Retry failed: " + e.message, true);
+    ui.toast("Retry failed: " + friendlyError(e), true);
   }
 }
 
@@ -281,7 +318,7 @@ $("#fileInput").addEventListener("change", async () => {
     setPendingAttachment({ id: r.attachment_id, filename: r.filename || file.name, content_type: r.content_type || file.type, size_bytes: r.size_bytes ?? file.size });
     ui.toast("Attached " + (r.filename || file.name));
   } catch (e) {
-    ui.toast("Upload failed: " + e.message, true);
+    ui.toast("Upload failed: " + friendlyError(e), true);
   }
 });
 
@@ -311,7 +348,7 @@ async function openAttachment(attachmentId, filename) {
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
-    ui.toast("Download failed: " + e.message, true);
+    ui.toast("Download failed: " + friendlyError(e), true);
   }
 }
 
@@ -328,6 +365,7 @@ function openNewChat() {
   $("#newChatStatus").textContent = "";
   $("#newChatResults").innerHTML = "";
   $("#newChatInput").value = "";
+  ui.renderContacts();
   $("#newChatDialog").showModal();
   $("#newChatInput").focus();
 }
@@ -345,22 +383,60 @@ $("#newChatForm").addEventListener("submit", async (e) => {
     $("#newChatStatus").textContent = users.length ? "" : "No users found.";
     for (const u of users) {
       state.users.set(String(u.user_id), { ...u, user_id: String(u.user_id) });
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "user-item";
-      btn.innerHTML = `<div class="avatar">${esc(ui.initials(u.display_name || u.username))}</div>
+      const row = document.createElement("div");
+      row.className = "user-item-row";
+      const friend = isFriend(u.user_id);
+      const pending = outgoingTo(u.user_id);
+      const incoming = incomingFrom(u.user_id);
+      row.innerHTML = `<button type="button" class="user-item">
+        <div class="avatar">${esc(ui.initials(u.display_name || u.username))}</div>
         <div><strong>${esc(u.display_name || u.username)}</strong><small>@${esc(u.username)}</small></div>
-        <span class="status ${u.status === "online" ? "on" : ""}">${esc(u.status || "")}</span>`;
-      btn.addEventListener("click", () => {
+        <span class="status ${u.status === "online" ? "on" : ""}">${esc(u.status || "")}</span>
+      </button>
+      ${friend ? '<span class="tag-ok">CONTACT</span>'
+        : incoming ? '<button type="button" class="mini-btn accept" data-act="accept">ACCEPT</button>'
+        : pending ? '<span class="tag-ok">REQUESTED</span>'
+        : '<button type="button" class="mini-btn" data-act="add">ADD CONTACT</button>'}`;
+      row.querySelector(".user-item").addEventListener("click", () => {
         $("#newChatDialog").close();
         openChat("u" + u.user_id);
       });
-      box.appendChild(btn);
+      const act = row.querySelector("[data-act]");
+      if (act) {
+        act.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          act.disabled = true;
+          try {
+            if (act.dataset.act === "accept") {
+              await api.friendAccept(incoming.request_id);
+            } else {
+              await api.friendRequest(u.user_id);
+            }
+            await loadFriends().catch(() => null);
+            await primeUsers();
+            emitFriends();
+            ui.toast(act.dataset.act === "accept" ? "Contact added" : "Contact request sent");
+            openNewChatRefresh();
+          } catch (err) {
+            ui.toast(friendlyError(err), true);
+            act.disabled = false;
+          }
+        });
+      }
+      box.appendChild(row);
     }
   } catch (e2) {
-    $("#newChatStatus").textContent = e2.message;
+    $("#newChatStatus").textContent = friendlyError(e2);
   }
 });
+
+function openNewChatRefresh() {
+  const d = $("#newChatDialog");
+  if (!d.open) return;
+  ui.renderContacts();
+  const q = $("#newChatInput").value.trim();
+  if (q) $("#newChatForm").requestSubmit();
+}
 
 function openSearch() {
   $("#searchInput").value = "";
@@ -407,7 +483,7 @@ $("#searchForm").addEventListener("submit", async (e) => {
       box.appendChild(btn);
     }
   } catch (e2) {
-    box.innerHTML = `<p class="hint">${esc(e2.message)}</p>`;
+    box.innerHTML = `<p class="hint">${esc(friendlyError(e2))}</p>`;
   }
 });
 
@@ -519,7 +595,7 @@ async function loadOlder() {
     wrap.scrollTop = wrap.scrollHeight - keepBottom;
     ui.renderSidebar();
   } catch (e) {
-    ui.toast("Could not load older messages: " + e.message, true);
+    ui.toast("Could not load older messages: " + friendlyError(e), true);
   }
 }
 
@@ -545,6 +621,14 @@ on("conversations", () => {
 
 on("messages", (detail) => {
   ui.renderSidebar();
+  if (detail && detail.peer && detail.peer !== state.activePeer) {
+    const u = state.users.get(String(Number(String(detail.peer).slice(1))));
+    notifyIncoming({
+      tag: "peer-" + detail.peer,
+      title: (u && (u.display_name || u.username)) || "msg.mesh",
+      body: "New message",
+    });
+  }
   if (!detail || detail.peer === state.activePeer) {
     ui.renderMessages();
     if (detail && detail.peer) markRead(detail.peer);
@@ -553,17 +637,185 @@ on("messages", (detail) => {
 });
 
 on("connection", () => ui.renderConnection());
-on("sync", (text) => { $("#syncState").textContent = text; });
+on("sync", (text) => {
+  $("#syncState").textContent = text;
+  if (text === "SYNCED") loadFriends().catch(() => null);
+});
+on("friends", async () => {
+  await primeUsers().catch(() => null);
+  emitFriends();
+});
 on("readstate", () => {
   ui.renderSidebar();
   if (state.activePeer) ui.renderChatHead();
+});
+
+/* ---------------- friend requests & contacts ---------------- */
+
+$("#requestStrip").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const row = e.target.closest(".request-row");
+  if (!row) return;
+  const requestId = row.dataset.req;
+  btn.disabled = true;
+  try {
+    if (btn.dataset.act === "accept") {
+      const r = incomingRequests().find((x) => String(x.request_id) === requestId);
+      await api.friendAccept(requestId);
+      if (r) upsertFriend(r.sender_user_id);
+      ui.toast("Contact added");
+    } else {
+      await api.friendReject(requestId);
+      ui.toast("Request declined");
+    }
+    await loadFriends().catch(() => null);
+    await primeUsers();
+  } catch (err) {
+    ui.toast(friendlyError(err), true);
+    btn.disabled = false;
+  }
+});
+
+$("#contactResults").addEventListener("click", (e) => {
+  const item = e.target.closest("[data-peer]");
+  if (!item) return;
+  $("#newChatDialog").close();
+  openChat(item.dataset.peer);
+});
+
+$("#addContactBtn").addEventListener("click", async () => {
+  const peer = state.activePeer;
+  const m = /^u(\d+)$/.exec(peer || "");
+  if (!m) return;
+  const btn = $("#addContactBtn");
+  btn.disabled = true;
+  try {
+    const incoming = incomingFrom(m[1]);
+    if (incoming) await api.friendAccept(incoming.request_id);
+    else await api.friendRequest(m[1]);
+    await loadFriends().catch(() => null);
+    await primeUsers();
+    ui.toast(outgoingTo(m[1]) || isFriend(m[1]) ? "Contact request sent" : "Contact added");
+    ui.renderDetails();
+  } catch (err) {
+    ui.toast(friendlyError(err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#removeContactBtn").addEventListener("click", async () => {
+  const peer = state.activePeer;
+  const m = /^u(\d+)$/.exec(peer || "");
+  if (!m) return;
+  const entry = state.friends.get(m[1]);
+  if (!entry || !entry.friendship_id) { ui.toast("No friendship record", true); return; }
+  if (!confirm("Remove this contact?")) return;
+  const btn = $("#removeContactBtn");
+  btn.disabled = true;
+  try {
+    await api.friendRemove(entry.friendship_id);
+    state.friends.delete(m[1]);
+    ui.renderDetails();
+    ui.toast("Contact removed");
+  } catch (err) {
+    ui.toast(friendlyError(err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#sharedFiles").addEventListener("click", async (e) => {
+  const item = e.target.closest("[data-att]");
+  if (!item) return;
+  const id = item.dataset.att;
+  const name = item.dataset.attname || "file";
+  try {
+    const r = await api.download(id);
+    const b64 = r.content_base64 || "";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (err) {
+    ui.toast("Download failed: " + friendlyError(err), true);
+  }
+});
+
+/* ---------------- server settings ---------------- */
+
+function applyServerSettings() {
+  const input = $("#profileServer");
+  if (input) input.value = apiBase() || "";
+}
+
+$("#serverApply").addEventListener("click", async () => {
+  const input = $("#profileServer");
+  const hint = $("#serverHint");
+  let value = (input.value || "").trim().replace(/\/+$/, "");
+  if (!value) { hint.textContent = "Enter a server URL, e.g. https://host"; return; }
+  if (!/^https?:\/\//.test(value)) value = "https://" + value;
+  hint.textContent = "Checking server…";
+  const btn = $("#serverApply");
+  btn.disabled = true;
+  try {
+    const next = await resolveApiBase(value);
+    if (!next) throw new Error("unreachable");
+    setApiBase(next);
+    hint.textContent = "Server saved. Reconnecting…";
+    setToken("");
+    wsDisconnect();
+    resetState();
+    booted = false;
+    setTimeout(() => location.reload(), 400);
+  } catch {
+    hint.textContent = "Cannot reach that server. It was not saved.";
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- presence / focus ---------------- */
+
+// Friend state has no realtime push: refresh it frequently and on focus.
+setInterval(() => {
+  if (booted && getToken()) loadFriends().catch(() => null);
+}, 20000);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (booted && getToken()) loadFriends().catch(() => null);
+  if (!state.user) return;
+  if (state.activePeer) {
+    markRead(state.activePeer);
+    const u = peerUser(state.activePeer);
+    if (u && /^u\d+$/.test(state.activePeer)) {
+      refreshUser(Number(state.activePeer.slice(1))).then(() => ui.renderChatHead()).catch(() => null);
+    }
+  }
+});
+window.addEventListener("focus", () => {
+  if (!state.user || document.visibilityState !== "visible") return;
+  if (state.activePeer && /^u\d+$/.test(state.activePeer)) {
+    refreshUser(Number(state.activePeer.slice(1))).then(() => ui.renderChatHead()).catch(() => null);
+  }
 });
 
 /* ---------------- boot ---------------- */
 
 async function boot() {
   ui.renderConnection();
+  await resolveApiBase();
   if (!getToken()) {
+    $("#authUsername").value = lastUsername();
     ui.showAuth("login");
     route();
     return;
@@ -572,11 +824,12 @@ async function boot() {
     await startSession();
   } catch (e) {
     setToken("");
-    ui.showAuth("login");
-    $("#authError").textContent =
+    authNotice =
       e instanceof ApiError && e.status === 401
         ? "Session expired — please sign in again."
         : "Cannot reach the msg.mesh server. Check your connection and retry.";
+    ui.showAuth("login");
+    $("#authUsername").value = lastUsername();
     route();
   }
 }

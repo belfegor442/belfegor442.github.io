@@ -1,4 +1,4 @@
-import { state, conversationOrder, unreadCount, peerLabel, peerUser, maxRowid } from "./store.js";
+import { state, conversationOrder, unreadCount, peerLabel, peerUser, maxRowid, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 
 export const $ = (s) => document.querySelector(s);
 
@@ -76,12 +76,68 @@ export function renderConnection() {
   const el = $("#connection");
   const label = { connecting: "CONNECTING", online: "CONNECTED", reconnecting: "RECONNECTING", offline: "OFFLINE" }[mode] || "OFFLINE";
   el.className = "connection " + mode;
+  el.title = "msg.mesh server";
   el.innerHTML = "<i></i> " + label;
 }
 
+export function renderRequests() {
+  const strip = $("#requestStrip");
+  if (!strip) return;
+  const incoming = incomingRequests();
+  const outgoing = outgoingRequests();
+  if (!incoming.length && !outgoing.length) {
+    strip.classList.add("hidden");
+    strip.innerHTML = "";
+    return;
+  }
+  strip.classList.remove("hidden");
+  const rows = [];
+  for (const r of incoming) {
+    const u = state.users.get(String(r.sender_user_id));
+    const name = u ? (u.display_name || u.username) : "u" + r.sender_user_id;
+    rows.push(`<div class="request-row" data-req="${esc(r.request_id)}" data-kind="in">
+      <div class="avatar small">${esc(initials(name))}</div>
+      <div class="request-main"><strong>${esc(name)}</strong><small>wants to connect</small></div>
+      <button class="req-btn accept" data-act="accept" title="Accept">✓</button>
+      <button class="req-btn decline" data-act="decline" title="Decline">×</button>
+    </div>`);
+  }
+  for (const r of outgoing) {
+    const u = state.users.get(String(r.receiver_user_id));
+    const name = u ? (u.display_name || u.username) : "u" + r.receiver_user_id;
+    rows.push(`<div class="request-row pending" data-req="${esc(r.request_id)}" data-kind="out">
+      <div class="avatar small">${esc(initials(name))}</div>
+      <div class="request-main"><strong>${esc(name)}</strong><small>request pending</small></div>
+    </div>`);
+  }
+  strip.innerHTML = rows.join("");
+}
+
+export function renderContacts() {
+  const box = $("#contactResults");
+  if (!box) return;
+  const ids = [...state.friends.keys()];
+  if (!ids.length) {
+    box.innerHTML = '<div class="list-empty">No contacts yet. Search above to find users.</div>';
+    return;
+  }
+  box.innerHTML = ids.map((id) => {
+    const u = state.users.get(String(id));
+    const name = u ? (u.display_name || u.username) : "u" + id;
+    const handle = u ? "@" + u.username : "";
+    const online = u && u.status === "online";
+    return `<button type="button" class="user-item" data-peer="u${esc(id)}">
+      <div class="avatar">${esc(initials(name))}</div>
+      <div><strong>${esc(name)}</strong><small>${esc(handle)}</small></div>
+      <span class="status ${online ? "on" : ""}">${online ? "online" : ""}</span>
+    </button>`;
+  }).join("");
+}
+
 export function renderSidebar() {
+  renderRequests();
   const rows = conversationOrder().filter((r) => state.filter === "all" || r.unread > 0);
-  $("#allCount").textContent = state.conversations.size;
+  $("#allCount").textContent = state.conversations.size || state.friends.size;
   let total = 0;
   for (const r of conversationOrder()) total += r.unread;
   $("#unreadCount").textContent = total;
@@ -180,7 +236,7 @@ export function renderChatHead() {
     .filter((m) => m.mine && m.rowid != null)
     .reduce((a, m) => Math.max(a, m.rowid), 0);
   const pp = state.peerPointers.get(peer) || 0;
-  if (myLastMine > 0) head += " · " + (pp >= myLastMine ? "read ✓" : "delivered");
+  if (myLastMine > 0) head += " · " + (pp >= myLastMine ? "read ✓" : "sent");
   $("#chatMeta").innerHTML = head;
   renderDetails();
 }
@@ -198,6 +254,45 @@ export function renderDetails() {
   $("#detailsMessages").textContent = c ? c.messages.length : 0;
   const pp = state.peerPointers.get(peer) || 0;
   $("#detailsRead").textContent = pp > 0 ? `Row ${pp}` : "—";
+
+  const m = /^u(\d+)$/.exec(peer);
+  const addBtn = $("#addContactBtn");
+  const removeBtn = $("#removeContactBtn");
+  if (addBtn && removeBtn) {
+    if (m) {
+      const friend = isFriend(m[1]);
+      addBtn.classList.toggle("hidden", friend);
+      removeBtn.classList.toggle("hidden", !friend);
+    } else {
+      addBtn.classList.add("hidden");
+      removeBtn.classList.add("hidden");
+    }
+  }
+
+  const filesBlock = $("#sharedFilesBlock");
+  const filesBox = $("#sharedFiles");
+  if (filesBlock && filesBox) {
+    const seen = new Set();
+    const files = [];
+    for (const msg of (c ? c.messages : [])) {
+      const a = msg.attachment;
+      if (a && a.id && !seen.has(a.id)) {
+        seen.add(a.id);
+        files.push(a);
+      }
+    }
+    if (!files.length) {
+      filesBlock.classList.add("hidden");
+      filesBox.innerHTML = "";
+    } else {
+      filesBlock.classList.remove("hidden");
+      filesBox.innerHTML = files.map((a) =>
+        `<button type="button" class="file-row" data-att="${esc(a.id)}" data-attname="${esc(a.filename || "file")}">
+          <span class="ico">📎</span><span>${esc(a.filename || "file")}<small>${esc(a.type || "")}${a.size ? " · " + fileSize(a.size) : ""}</small></span>
+        </button>`
+      ).join("");
+    }
+  }
 }
 
 export function setActive(peer) {

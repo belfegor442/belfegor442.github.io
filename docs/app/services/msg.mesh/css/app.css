@@ -129,3 +129,47 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
   .back-btn{display:block}.messages{padding-left:14px;padding-right:14px}
   .composer-wrap{padding-left:14px;padding-right:14px}.message{max-width:88%}
 }
+
+/* friend requests strip */
+.requests{border-bottom:1px solid var(--line);padding:8px;display:grid;gap:6px}
+.request-row{display:flex;gap:8px;align-items:center;background:#10161f;border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.request-row .request-main{min-width:0;flex:1}
+.request-row .request-main strong{display:block;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.request-row .request-main small{font-size:9.5px;color:#697482}
+.request-row.pending{opacity:.72}
+.request-row.pending .request-main small{color:#8a7f5e}
+.req-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:#141b24;color:#cdd6e1;cursor:pointer;font-size:12px;flex:none}
+.req-btn.accept{border-color:#2e5b3f;color:var(--green)}
+.req-btn.accept:hover{background:#17301f}
+.req-btn.decline:hover{background:#2a1418;color:var(--danger)}
+.req-btn:disabled{opacity:.5;cursor:default}
+
+/* contacts in new conversation dialog */
+.contacts-block{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.block-label{display:block;font-size:9px;letter-spacing:.12em;color:#5e6a78;margin-bottom:8px}
+.user-item-row{display:flex;gap:6px;align-items:center;margin-bottom:7px}
+.user-item-row .user-item{margin-bottom:0;min-width:0}
+.tag-ok{font-size:8.5px;letter-spacing:.1em;color:var(--green);border:1px solid #2e5b3f;border-radius:999px;padding:4px 8px;flex:none}
+.mini-btn{font-size:8.5px;letter-spacing:.08em;border:1px solid #3a4b60;background:#16202c;color:#cdd6e1;border-radius:999px;padding:5px 9px;cursor:pointer;flex:none}
+.mini-btn:hover{background:#1d2836}
+.mini-btn.accept{border-color:#2e5b3f;color:var(--green)}
+.mini-btn:disabled{opacity:.5;cursor:default}
+
+/* details: contact actions + shared files */
+.contact-actions .ghost{margin-top:8px;padding:7px;font-size:10px}
+#sharedFiles{display:grid;gap:6px;margin-top:6px}
+.file-row{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:#0d1219;border:1px solid var(--line);border-radius:7px;padding:8px 9px;color:#cdd6e1;cursor:pointer}
+.file-row:hover{background:#141b24;border-color:#33404f}
+.file-row .ico{font-size:13px;flex:none}
+.file-row span{min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-row small{display:block;color:#697482;font-size:9.5px}
+
+/* profile server settings */
+.server-block{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;text-align:left}
+.server-block label{font-size:9px;letter-spacing:.12em;color:#5e6a78}
+.server-row{display:flex;gap:6px;margin-top:7px}
+.server-row input{flex:1;min-width:0;margin-top:0!important;background:#0b0f14;border:1px solid #2b3541;border-radius:6px;color:#e8edf3;padding:9px 10px;font-size:11px;font-family:inherit;outline:0}
+.server-apply{border:1px solid #3a4b60;background:#16202c;color:#cdd6e1;border-radius:6px;padding:9px 11px;font-size:9.5px;letter-spacing:.08em;cursor:pointer;flex:none}
+.server-apply:hover{background:#1d2836}
+.server-apply:disabled{opacity:.5;cursor:default}
+.server-block .hint{padding:7px 0 0;font-size:10px;line-height:1.5}

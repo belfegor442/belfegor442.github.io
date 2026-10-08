@@ -5,6 +5,8 @@ export const state = {
   selfNode: "",          // "u73"
   conversations: new Map(), // peerId -> {peer, messages:[], hasMore}
   users: new Map(),      // userId -> {user_id, username, display_name, status}
+  friends: new Map(),    // userId -> {user_id, friendship_id, created_at}
+  requests: new Map(),   // request_id -> {request_id, sender_user_id, receiver_user_id, status}
   pointers: new Map(),   // peerId -> my last-read rowid
   peerPointers: new Map(),// peerId -> peer's last-read rowid (towards me)
   activePeer: null,
@@ -33,6 +35,8 @@ export function resetState() {
   state.selfNode = "";
   state.conversations = new Map();
   state.users = new Map();
+  state.friends = new Map();
+  state.requests = new Map();
   state.pointers = new Map();
   state.peerPointers = new Map();
   state.activePeer = null;
@@ -179,9 +183,17 @@ export function totalUnread() {
 
 export function conversationOrder() {
   const rows = [];
+  const seen = new Set();
   for (const c of state.conversations.values()) {
+    seen.add(c.peer);
     const last = c.messages[c.messages.length - 1];
     rows.push({ peer: c.peer, last, unread: unreadCount(c.peer), count: c.messages.length });
+  }
+  // Friends with no traffic yet still belong in the sidebar.
+  for (const f of state.friends.keys()) {
+    const peer = "u" + f;
+    if (seen.has(peer)) continue;
+    rows.push({ peer, last: null, unread: 0, count: 0 });
   }
   rows.sort((a, b) => {
     const ar = a.last && a.last.rowid != null ? a.last.rowid : (a.last ? a.last.ts : 0);
@@ -215,6 +227,15 @@ export async function primeUsers() {
     const m = /^u(\d+)$/.exec(peer || "");
     if (m && !state.users.has(m[1])) ids.add(m[1]);
   }
+  for (const id of state.friends.keys()) {
+    if (!state.users.has(String(id))) ids.add(String(id));
+  }
+  for (const r of state.requests.values()) {
+    for (const raw of [r.sender_user_id, r.receiver_user_id]) {
+      const id = String(raw);
+      if (/^\d+$/.test(id) && !state.users.has(id)) ids.add(id);
+    }
+  }
   await Promise.all([...ids].map(async (id) => {
     try {
       const r = await api.usersGet(id);
@@ -238,4 +259,85 @@ export async function rememberUser(userId) {
     }
   } catch { /* ignore */ }
   return null;
+}
+
+// Re-fetch a user record (status goes stale otherwise: users.status only
+// changes on login, so we re-read it when looking at someone).
+export async function refreshUser(userId) {
+  const id = String(userId);
+  try {
+    const r = await api.usersGet(id);
+    if (r && r.found !== false && r.user) {
+      const u = { ...r.user, user_id: String(r.user.user_id) };
+      state.users.set(id, u);
+      return u;
+    }
+  } catch { /* ignore */ }
+  return state.users.get(id) || null;
+}
+
+/* ---------------- friends ---------------- */
+
+function selfId() {
+  return state.user ? String(state.user.user_id) : "";
+}
+
+export function isFriend(userId) {
+  return state.friends.has(String(userId));
+}
+
+export function incomingRequests() {
+  const me = selfId();
+  return [...state.requests.values()].filter((r) => String(r.receiver_user_id) === me);
+}
+
+export function outgoingRequests() {
+  const me = selfId();
+  return [...state.requests.values()].filter((r) => String(r.sender_user_id) === me);
+}
+
+export function incomingFrom(userId) {
+  return incomingRequests().find((r) => String(r.sender_user_id) === String(userId)) || null;
+}
+
+export function outgoingTo(userId) {
+  return outgoingRequests().find((r) => String(r.receiver_user_id) === String(userId)) || null;
+}
+
+// Pull the authoritative friendship state from the server.
+export async function loadFriends() {
+  const [fl, fr] = await Promise.all([
+    api.friendsList().catch(() => null),
+    api.friendRequests().catch(() => null),
+  ]);
+  if (fl && Array.isArray(fl.friends)) {
+    state.friends = new Map();
+    const me = selfId();
+    for (const f of fl.friends) {
+      const a = String(f.user_a);
+      const b = String(f.user_b);
+      const other = a === me ? b : a;
+      if (other && other !== me && f.status === "active") {
+        state.friends.set(other, { user_id: other, friendship_id: f.friendship_id, created_at: f.created_at });
+      }
+    }
+  }
+  if (fr && Array.isArray(fr.requests)) {
+    state.requests = new Map();
+    for (const r of fr.requests) {
+      if (r.status === "pending") state.requests.set(String(r.request_id), r);
+    }
+  }
+  emit("friends");
+  return true;
+}
+
+export function upsertFriend(userId) {
+  const id = String(userId);
+  state.friends.set(id, { user_id: id, friendship_id: "", created_at: "" });
+  for (const [rid, r] of state.requests) {
+    if (String(r.sender_user_id) === id || String(r.receiver_user_id) === id) {
+      state.requests.delete(rid);
+    }
+  }
 }

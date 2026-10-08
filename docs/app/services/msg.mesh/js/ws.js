@@ -3,11 +3,14 @@ import { state, emit, ingest, primeUsers } from "./store.js";
 
 const HEARTBEAT_MS = 30000;   // text frame keeps proxies alive (server discards it)
 const POLL_MS = 20000;        // history fallback while the socket is down
+const WATCHDOG_MS = 30000;    // API liveness probe while "online" (half-open sockets)
 const MAX_BACKOFF_MS = 30000;
 
 let socket = null;
 let heartbeat = null;
 let poller = null;
+let watchdog = null;
+let watchdogFails = 0;
 let attempts = 0;
 let closedByUs = false;
 let started = false;
@@ -30,6 +33,30 @@ function stopHeartbeat() {
   if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
 }
 
+// Browsers can keep a dead WebSocket "OPEN" for minutes after the network
+// drops. Probe the HTTP side; two straight failures force a reconnect.
+function startWatchdog() {
+  stopWatchdog();
+  watchdogFails = 0;
+  watchdog = setInterval(async () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    const h = await api.health();
+    if (h.ok) {
+      watchdogFails = 0;
+      return;
+    }
+    watchdogFails += 1;
+    if (watchdogFails >= 2) {
+      try { socket.close(); } catch { /* onclose follows */ }
+    }
+  }, WATCHDOG_MS);
+}
+
+function stopWatchdog() {
+  if (watchdog) { clearInterval(watchdog); watchdog = null; }
+  watchdogFails = 0;
+}
+
 async function resync() {
   try {
     const r = await api.history({ limit: 200 });
@@ -44,7 +71,7 @@ async function resync() {
     }
     emit("sync", "SYNCED");
   } catch (e) {
-    emit("sync", "SYNC ERROR");
+    emit("sync", e && e.status === 401 ? "SESSION EXPIRED" : "SYNC ERROR");
   }
 }
 
@@ -97,6 +124,7 @@ export function connect() {
     attempts = 0;
     setConnection("online");
     startHeartbeat();
+    startWatchdog();
     stopPolling();
     emit("sync", "SYNCED");
     resync();
@@ -129,6 +157,7 @@ export function connect() {
 
   ws.onclose = () => {
     stopHeartbeat();
+    stopWatchdog();
     if (socket === ws) socket = null;
     if (closedByUs) { setConnection("offline"); return; }
     setConnection("offline");
@@ -136,6 +165,21 @@ export function connect() {
   };
 
   ws.onerror = () => { /* onclose follows */ };
+}
+
+// The OS says connectivity is back: skip the remaining backoff delay.
+if (typeof window !== "undefined") {
+  window.addEventListener("offline", () => {
+    if (!started || !socket) return;
+    // Proactively drop the socket: half-open sockets look CONNECTED forever.
+    try { socket.close(); } catch { /* onclose follows */ }
+  });
+  window.addEventListener("online", () => {
+    if (started && getToken() && (!socket || socket.readyState === WebSocket.CLOSED)) {
+      attempts = 0;
+      connect();
+    }
+  });
 }
 
 function setPointerLocal(peer, rowid) {
@@ -148,12 +192,26 @@ export function disconnect() {
   started = false;
   attempts = 0;
   stopHeartbeat();
+  stopWatchdog();
   stopPolling();
   if (socket) {
     try { socket.close(); } catch { /* ignore */ }
     socket = null;
   }
   setConnection("offline");
+}
+
+// Used after a server switch: drop the socket immediately, then reconnect.
+export function forceReconnect() {
+  if (!started || !getToken()) return;
+  attempts = 0;
+  if (socket) {
+    closedByUs = true;
+    try { socket.close(); } catch { /* ignore */ }
+    socket = null;
+    closedByUs = false;
+  }
+  connect();
 }
 
 export function isOpen() {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080a0d">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://*.ts.net wss://*.ts.net; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https: wss: ws: http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'none'; form-action 'self'">
 <title>msg.mesh — North Assembly</title>
 <link rel="icon" href="../../../icon.jpg">
 <link rel="stylesheet" href="./css/app.css">
@@ -48,6 +48,7 @@
         <button class="active" data-filter="all">ALL <span id="allCount">0</span></button>
         <button data-filter="unread">UNREAD <span id="unreadCount">0</span></button>
       </nav>
+      <section class="requests hidden" id="requestStrip" aria-label="Friend requests"></section>
       <section class="conversation-list" id="conversationList"></section>
       <div class="sidebar-footer"><span>msg.mesh web</span><span id="syncState">SYNCING</span></div>
     </aside>
@@ -89,6 +90,15 @@
       <div class="detail-block"><span>STATUS</span><strong id="detailsStatus">—</strong></div>
       <div class="detail-block"><span>MESSAGES</span><strong id="detailsMessages">0</strong></div>
       <div class="detail-block"><span>LAST READ BY PEER</span><strong id="detailsRead">—</strong></div>
+      <div class="detail-block contact-actions">
+        <span>CONTACT</span>
+        <button class="ghost small" id="addContactBtn">ADD CONTACT</button>
+        <button class="ghost small hidden" id="removeContactBtn">REMOVE CONTACT</button>
+      </div>
+      <div class="detail-block hidden" id="sharedFilesBlock">
+        <span>SHARED FILES</span>
+        <div id="sharedFiles"></div>
+      </div>
     </aside>
   </main>
 </div>
@@ -99,6 +109,10 @@
     <label>SEARCH BY USERNAME OR NAME<input id="newChatInput" required maxlength="64" placeholder="@username" autocomplete="off"></label>
     <div class="user-results" id="newChatResults"></div>
     <button class="primary" value="default" id="newChatOpen">FIND USER</button>
+    <div class="contacts-block">
+      <span class="block-label">CONTACTS</span>
+      <div class="user-results" id="contactResults"></div>
+    </div>
     <p class="error" id="newChatStatus"></p>
   </form>
 </dialog>
@@ -118,6 +132,15 @@
     <div class="profile-id"><div class="avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small></div></div>
     <label>DISPLAY NAME<input id="profileDisplayName" maxlength="64"></label>
     <button class="primary" value="default" id="profileSave">SAVE CHANGES</button>
+    <div class="server-block">
+      <label>SERVER
+        <div class="server-row">
+          <input id="profileServer" spellcheck="false" autocomplete="off" placeholder="https://server">
+          <button type="button" class="server-apply" id="serverApply">SWITCH</button>
+        </div>
+      </label>
+      <p class="hint" id="serverHint">Messages stay on this server. Switching signs you out locally.</p>
+    </div>
     <button type="button" class="ghost" id="logoutBtn">SIGN OUT</button>
     <p class="error" id="profileStatus"></p>
   </form>
