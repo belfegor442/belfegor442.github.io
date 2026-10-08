@@ -92,8 +92,8 @@ export class Net {
       onOk(c, url);
     };
     c.once('connect', connected);
-    c.once('error', failed);
-    c.once('offline', failed);
+    c.once('error', fail);
+    c.once('offline', fail);
   }
 
   host(room, will) {
