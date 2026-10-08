@@ -1,0 +1,16 @@
+{
+  "name": "brew",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "BREW - server-authoritative 2.5D social arcade game",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "check": "node --check app.js && node --check src/world.js && node --check src/render.js && node --check src/input.js && node --check src/state.js && node --check src/activities.js",
+    "test": "npm run check"
+  },
+  "dependencies": {}
+}

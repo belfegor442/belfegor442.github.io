@@ -75,7 +75,7 @@ export class Host {
     if (p.status !== 'standing') return { error: 'busy' };
     if (!s) return { error: 'no-seat' };
     if (s.occupiedBy && s.occupiedBy !== uid) return { error: 'taken' };
-    if (Math.hypot(s.x - p.x, s.y - p.y) > PROX.interact + 70) return { error: 'too-far' };
+    if (Math.hypot(s.x - p.x, s.y - p.y) > PROX.interact + 10) return { error: 'too-far' };
     if (s.table && this.activity && this.activity.table === s.table && !this.activity.players.includes(uid)) {
       return { error: 'activity-running' };
     }

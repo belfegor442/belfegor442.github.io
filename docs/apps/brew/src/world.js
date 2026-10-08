@@ -6,9 +6,8 @@ export const OBJECTS = [
   { id: 'w-w', type: 'wall', x: 0, y: 0, w: MAP.wall, h: MAP.h, solid: true, hgt: 54 },
   { id: 'w-e', type: 'wall', x: MAP.w - MAP.wall, y: 0, w: MAP.wall, h: MAP.h, solid: true, hgt: 54 },
 
-  { id: 'monument', type: 'monument', x: 625, y: 90, w: 470, h: 1000, solid: true, hgt: 203 },
-
-  { id: 'rug', type: 'rug', x: 420, y: 400, w: 780, h: 470, solid: false, hgt: 0 },
+  // Central floor stays open. The previous invisible 470x1000 'monument' was a solid collider with no renderer geometry.
+  { id: 'rug', type: 'rug', x: 360, y: 330, w: 1000, h: 520, solid: false, hgt: 0 },
   { id: 'neon', type: 'sign', x: 640, y: 6, w: 430, h: 34, solid: false, hgt: 64, label: 'BREW' },
 
   { id: 'bar', type: 'bar', x: 1190, y: 74, w: 460, h: 112, solid: true, hgt: 48 },
@@ -59,7 +58,7 @@ export const SEATS = (() => {
 
 export const SPAWNS = [
   { x: 480, y: 1100 }, { x: 300, y: 1100 }, { x: 480, y: 940 },
-  { x: 300, y: 940 }, { x: 500, y: 500 }, { x: 500, y: 240 },
+  { x: 300, y: 940 }, { x: 430, y: 560 }, { x: 430, y: 260 },
   { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
   { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
 ];
@@ -91,6 +90,13 @@ export function blocked(x, y, r = 14) {
   return false;
 }
 export function move(x, y, nx, ny, r = 14) {
+  const minX = MAP.wall + r, maxX = MAP.w - MAP.wall - r;
+  const minY = MAP.wall + r, maxY = MAP.h - MAP.wall - r;
+  nx = Math.max(minX, Math.min(maxX, Number(nx) || x));
+  ny = Math.max(minY, Math.min(maxY, Number(ny) || y));
+
+  // Resolve each axis independently. This prevents diagonal movement from
+  // tunnelling through corners and guarantees the player never leaves the map.
   let px = x;
   if (!blocked(nx, y, r)) px = nx;
   let py = y;
@@ -104,7 +110,7 @@ export function nearestSeat(x, y, maxDist) {
   let best = null, bd = maxDist;
   for (const s of SEATS) {
     const d = Math.hypot(s.x - x, s.y - y);
-    if (d < bd) { bd = d; best = s; }
+    if (d <= bd) { bd = d; best = s; }
   }
   return best;
 }

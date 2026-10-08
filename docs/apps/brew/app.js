@@ -1,11 +1,11 @@
-import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js';
-import { Host } from './src/state.js';
-import { Net } from './src/net.js';
-import { Renderer } from './src/render.js';
-import { Input } from './src/input.js';
-import { UI } from './src/ui.js';
-import { Registry, kinds as activityKinds } from './src/activities.js';
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=11';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=11';
+import { Host } from './src/state.js?v=11';
+import { Net } from './src/net.js?v=11';
+import { Renderer } from './src/render.js?v=11';
+import { Input } from './src/input.js?v=11';
+import { UI } from './src/ui.js?v=11';
+import { Registry, kinds as activityKinds } from './src/activities.js?v=11';
 
 const BROKERS = (() => {
   try {
@@ -55,7 +55,9 @@ let gRots = 0;
 let gTimer = null;
 let nextStake = 25;
 let sndOn = true;
+const motion = { x: 0, y: 0 };
 let savedName = '';
+const settledActivityResults = new Set();
 const sndCache = {};
 
 try {
@@ -116,11 +118,11 @@ function sendHost(msg, critical) {
     msg.mid = mid;
     pending.set(mid, { msg, at: Date.now(), tries: 1 });
   }
-  net.publish(T().c, Object.assign({ from: myUid }, msg));
+  net.publish(T().c, Object.assign({ from: myUid }, msg), { qos: critical !== false ? 1 : 0 });
 }
 function sendTo(uid, msg) {
   if (isHost && uid === myUid) { handleClient(Object.assign({}, msg, { to: null })); return; }
-  net.publish(T().s, Object.assign({ to: uid }, msg));
+  net.publish(T().s, Object.assign({ to: uid }, msg), { qos: 1 });
 }
 function broadcast(msg) { net.publish(T().s, msg); }
 
@@ -161,6 +163,8 @@ function startHost() {
   net.host(room, will);
 }
 
+function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
+
 function onHostReady() {
   const spawn = SPAWNS[0];
   me = entity({
@@ -175,6 +179,7 @@ function onHostReady() {
   ui.hideEntry();
   ui.system('World #' + room + ' is open. Share the code to invite people.');
   input.enabled = true;
+  setTouchControls(true);
 }
 
 function startGuest(code) {
@@ -194,7 +199,7 @@ function startGuest(code) {
 function guestHelloLoop() {
   clearTimeout(gTimer);
   if (welcomed || isHost) return;
-  if (hostSeen && net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  if (net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
   gTries++;
   if (welcomed) return;
   if (gTries > MAX_HELLO) {
@@ -205,7 +210,9 @@ function guestHelloLoop() {
       net.rotate();
       return;
     }
-    ui.entryStatus('World ' + room + ' not found. Ask the host for the code.');
+    if (net) { try { net.close(); } catch (e) {} net = null; }
+    hostSeen = false;
+    ui.entryStatus('World ' + room + ' not found. Ask the host for the code, then try again.');
     return;
   }
   ui.entryStatus(hostSeen
@@ -362,6 +369,7 @@ function applyWelcome(msg) {
   ui.hideEntry();
   ui.system('You walked into world #' + room + '.');
   input.enabled = true;
+  setTouchControls(true);
   refreshHud();
   renderActivityPanel();
 }
@@ -417,7 +425,7 @@ function applySit(msg) {
   if (!p) return;
   const seat = SEAT_BY_ID.get(msg.seat);
   if (seat) seat.occupiedBy = msg.uid;
-  p.x = msg.x; p.y = msg.y; p.dir = msg.dir;
+  p.x = msg.x; p.y = msg.y; p.rx = msg.x; p.ry = msg.y; p.dir = msg.dir;
   p.status = 'seated'; p.seat = msg.seat; p.anim = 'sit';
   if (msg.uid === myUid) { p.rx = p.x; p.ry = p.y; me = p; }
   refreshHud();
@@ -458,38 +466,36 @@ function applyActivityStart(msg) {
   if (activity) ui.system(Registry[activity.kind] ? Registry[activity.kind].label + ' started at ' + activity.table : 'Activity started.');
 }
 
+function settleActivityResult(act) {
+  if (!act || !act.id || !act.balances || !me) return;
+  if (settledActivityResults.has(act.id)) return;
+  settledActivityResults.add(act.id);
+  const d = Number(act.balances[myUid] || 0);
+  if (!Number.isFinite(d) || d === 0) return;
+  me.balance = Math.max(0, (me.balance || 0) + d);
+  balance = me.balance;
+  try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
+  sfx(d > 0 ? 'win' : 'lose');
+  ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
+}
+
 function applyActivityUpdate(msg) {
   if (!activity || activity.id !== msg.id) activity = msg.activity || activity;
   else if (msg.activity) Object.assign(activity, msg.activity);
   else { activity.phase = msg.phase || activity.phase; if (msg.waiting) activity.waiting = msg.waiting; }
   if (activity && msg.activity && msg.activity.balances) activity.balances = msg.activity.balances;
   if (activity && msg.activity && msg.activity.result) activity.result = msg.activity.result;
+  if (activity && activity.phase === 'result') settleActivityResult(activity);
   renderActivityPanel();
   renderPrompt();
-  if (activity && activity.phase === 'result' && activity.balances && me) {
-    const d = activity.balances[myUid] || 0;
-    if (d !== 0) {
-      me.balance = Math.max(0, (me.balance || 0) + d);
-      balance = me.balance;
-      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
-      sfx(d > 0 ? 'win' : 'lose');
-      ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
-    }
-  }
 }
 
 function applyActivityEnd(msg) {
-  if (activity && msg.activity && msg.activity.balances && activity.id === msg.id) {
-    const d = (msg.activity.balances[myUid] || 0);
-    if (d !== 0 && (!activity.balances)) {
-      me.balance = Math.max(0, (me.balance || 0) + d);
-      balance = me.balance;
-      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
-      sfx(d > 0 ? 'win' : 'lose');
-    }
+  if (msg.activity && msg.activity.id === msg.id) settleActivityResult(msg.activity);
+  if (activity && activity.id === msg.id) {
+    activity = null;
+    myHand = null;
   }
-  activity = null;
-  myHand = null;
   renderActivityPanel();
   renderPrompt();
 }
@@ -602,6 +608,8 @@ function leaveWorld() {
       net.close();
     }
   } catch (e) {}
+  net = null;
+  setTouchControls(false);
   location.reload();
 }
 
@@ -657,14 +665,34 @@ function frame(now) {
   }
   if (me && input.enabled && me.status === 'standing' && !input.typing()) {
     const a = input.axis(renderer.freeCam);
-    if (a.x || a.y) {
-      const spd = SPEED * (a.sprint ? 1.45 : 1) * dt;
-      const r = collide(me.x, me.y, me.x + a.x * spd, me.y + a.y * spd, RADIUS);
-      me.x = r.x; me.y = r.y;
-      me.dir = Math.atan2(a.y, a.x);
+    // Movement is camera-relative: W/joystick-up always means "towards the camera target".
+    const yaw = renderer.orbit.yaw;
+    const sy = Math.sin(yaw), cy = Math.cos(yaw);
+    const wx = cy * a.x + sy * a.y;
+    const wy = -sy * a.x + cy * a.y;
+    const moving = Math.hypot(wx, wy) > 0.02;
+    const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
+    const accel = moving ? 1250 : 1650;
+    const targetX = moving ? wx * targetSpeed : 0;
+    const targetY = moving ? wy * targetSpeed : 0;
+    const blend = Math.min(1, accel * dt / Math.max(targetSpeed, 1));
+    motion.x += (targetX - motion.x) * blend;
+    motion.y += (targetY - motion.y) * blend;
+    if (Math.abs(motion.x) < 2) motion.x = 0;
+    if (Math.abs(motion.y) < 2) motion.y = 0;
+    const r = collide(me.x, me.y, me.x + motion.x * dt, me.y + motion.y * dt, RADIUS);
+    if (r.x === me.x) motion.x = 0;
+    if (r.y === me.y) motion.y = 0;
+    me.x = r.x; me.y = r.y;
+    if (moving && (motion.x || motion.y)) {
+      me.dir = Math.atan2(motion.y, motion.x);
       me.anim = 'walk';
-      if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: 'walk' }, Date.now());
-    } else if (me.anim !== 'idle') me.anim = 'idle';
+    } else {
+      me.anim = 'idle';
+    }
+    if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: me.anim }, Date.now());
+  } else {
+    motion.x = motion.y = 0;
   }
 
   for (const p of players.values()) {
@@ -717,7 +745,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 3,
+  version: 10,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
@@ -739,7 +767,7 @@ window.Brew = {
       return true;
     }
     if (!me) return false;
-    me.x = x; me.y = y; me.rx = x; me.ry = y;
+    me.x = x; me.y = y; me.rx = x; me.ry = y; motion.x = motion.y = 0;
     if (isHost && authority) {
       const p = authority.players.get(myUid);
       if (p) { p.x = x; p.y = y; p.lastT = Date.now(); p.dirty = true; }
