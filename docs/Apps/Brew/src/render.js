@@ -1,11 +1,11 @@
-import { MAP, OBJECTS, SEATS, OBJ_BY_ID } from './world.js';
+import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav } from './world.js';
 import {
   C, mul, perspective, lookAt, trs,
   VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB,
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
-import { loadGLB } from './glb.js';
+import { loadGLB, buildNav } from './glb.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -189,15 +189,44 @@ export class Renderer {
     try {
       const world = await loadGLB('./Assets/gbl/world/lobby.glb');
       const b = world.bounds;
-      const ox = MAP.w / 2 - (b.max[0] - b.min[0]) / 2 - b.min[0];
-      const oy = -b.min[1];
-      const oz = MAP.h / 2 - (b.max[2] - b.min[2]) / 2 - b.min[2];
-      const place = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ox, oy, oz, 1]);
+      // The lobby IS the map: rotate so its long axis follows MAP.w, scale it
+      // to fill the play field (heights stay native so furniture keeps its
+      // size relative to the 32-unit player) and rest the floor on y = 0.
+      const dx = b.max[0] - b.min[0], dz = b.max[2] - b.min[2];
+      const sx = MAP.w / dz, sz = MAP.h / dx;
+      const place = new Float32Array(16);
+      place[0] = 0; place[1] = 0; place[2] = -sz;   // raw +X -> world -Z
+      place[4] = 0; place[5] = 1; place[6] = 0;
+      place[8] = sx; place[9] = 0; place[10] = 0;   // raw +Z -> world +X
+      place[15] = 1;
+      let mnx = 1e9, mny = 1e9, mnz = 1e9, mxx = -1e9, mxy = -1e9, mxz = -1e9;
+      for (const px of [b.min[0], b.max[0]]) {
+        for (const py of [b.min[1], b.max[1]]) {
+          for (const pz of [b.min[2], b.max[2]]) {
+            const X = sx * pz, Y = py, Z = -sz * px;
+            if (X < mnx) mnx = X; if (X > mxx) mxx = X;
+            if (Y < mny) mny = Y; if (Y > mxy) mxy = Y;
+            if (Z < mnz) mnz = Z; if (Z > mxz) mxz = Z;
+          }
+        }
+      }
+      place[12] = MAP.w / 2 - (mnx + mxx) / 2;
+      place[13] = -mny;
+      place[14] = MAP.h / 2 - (mnz + mxz) / 2;
       for (const d of world.draws) d.matrix = mul(new Float32Array(16), place, d.matrix);
-      world.bounds = { min: [0, 0, 0], max: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]] };
+      world.bounds = {
+        min: [mnx + place[12], mny + place[13], mnz + place[14]],
+        max: [mxx + place[12], mxy + place[13], mxz + place[14]]
+      };
       this.glbWorld = this.uploadGLB(world);
+      const nav = buildNav(world.draws, MAP.w, MAP.h);
+      setNav(nav);
+      this.nav = nav;
       console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
-        this.glbWorld.blend.length + ' blend, size=' + world.bounds.max.map(v => Math.round(v)).join('x'));
+        this.glbWorld.blend.length + ' blend, box=' +
+        world.bounds.min.map(v => Math.round(v)).join(',') + '..' +
+        world.bounds.max.map(v => Math.round(v)).join(',') +
+        ', nav ' + nav.open + '/' + nav.total + ' open cells');
     } catch (e) {
       this.glbReady = false;
       console.warn('[glb] world load failed, procedural fallback:', e && e.message);

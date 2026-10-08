@@ -1,11 +1,14 @@
-import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=11';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=11';
-import { Host } from './src/state.js?v=11';
-import { Net } from './src/net.js?v=11';
-import { Renderer } from './src/render.js?v=11';
-import { Input } from './src/input.js?v=11';
-import { UI } from './src/ui.js?v=11';
-import { Registry, kinds as activityKinds } from './src/activities.js?v=11';
+// Do NOT add ?v= queries to these imports: a src module loaded under two
+// different URLs becomes two module instances (nav state in one, seats in the
+// other). Cache busting lives on ./app.js?v=NN in index.html only.
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js';
+import { Host } from './src/state.js';
+import { Net } from './src/net.js';
+import { Renderer } from './src/render.js';
+import { Input } from './src/input.js';
+import { UI } from './src/ui.js';
+import { Registry, kinds as activityKinds } from './src/activities.js';
 
 const BROKERS = (() => {
   try {

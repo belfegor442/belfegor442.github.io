@@ -182,3 +182,95 @@ export async function loadGLB(url, opts = {}) {
     bounds: { min, max }
   };
 }
+
+// Rasterise the world triangles into a coarse height grid. The lobby IS the
+// map: cells with no floor, or with furniture/walls standing on the floor,
+// become colliders instead of the old hand-placed rectangles.
+export function buildNav(draws, width, height, cell = 16) {
+  const cols = Math.max(1, Math.ceil(width / cell));
+  const rows = Math.max(1, Math.ceil(height / cell));
+  const floor = new Float32Array(cols * rows).fill(-1);
+  const obs = new Float32Array(cols * rows).fill(-1);
+  const FLOOR_MAX = 40;    // only low up-facing surfaces count as ground
+  const STEP = 24;         // anything this much above the floor blocks
+  const TALL = 110;        // skip the ceiling (~124+) and anything hung high
+
+  const a = new Float32Array(3), b = new Float32Array(3), c = new Float32Array(3);
+  const put = (arr, cellX, cellZ, v, mode) => {
+    const i = cellZ * cols + cellX;
+    if (mode === 0) { if (arr[i] < 0 || v < arr[i]) arr[i] = v; }
+    else if (v > arr[i]) arr[i] = v;
+  };
+  const inTri = (px, pz) => {
+    const d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+    if (Math.abs(d) < 1e-9) return false;
+    const l1 = ((b[2] - c[2]) * (px - c[0]) + (c[0] - b[0]) * (pz - c[2])) / d;
+    const l2 = ((c[2] - a[2]) * (px - c[0]) + (a[0] - c[0]) * (pz - c[2])) / d;
+    const l3 = 1 - l1 - l2;
+    return l1 >= -0.001 && l2 >= -0.001 && l3 >= -0.001;
+  };
+
+  for (let pass = 0; pass < 2; pass++) {
+    for (const d of draws) {
+      const m = d.matrix, pos = d.pos, idx = d.idx;
+      const n = idx ? idx.length : pos.length / 3;
+      for (let t = 0; t + 2 < n; t += 3) {
+        const i0 = idx ? idx[t] : t, i1 = idx ? idx[t + 1] : t + 1, i2 = idx ? idx[t + 2] : t + 2;
+        for (let k = 0; k < 3; k++) {
+          const src = k === 0 ? i0 : k === 1 ? i1 : i2;
+          const o = k === 0 ? a : k === 1 ? b : c;
+          const x = pos[src * 3], y = pos[src * 3 + 1], z = pos[src * 3 + 2];
+          o[0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+          o[1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+          o[2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+        }
+        const yAvg = (a[1] + b[1] + c[1]) / 3;
+        const ux = b[0] - a[0], uz = b[2] - a[2];
+        const vx = c[0] - a[0], vz = c[2] - a[2];
+        const ny = uz * vx - ux * vz;            // (u x v).y, sign = facing up
+        const flat = ny > 0;
+        if (pass === 0) {
+          if (!flat || yAvg > FLOOR_MAX) continue;
+        } else {
+          if (yAvg <= FLOOR_MAX || yAvg > TALL) continue;
+        }
+        let x0 = Math.floor(Math.min(a[0], b[0], c[0]) / cell);
+        let x1 = Math.floor(Math.max(a[0], b[0], c[0]) / cell);
+        let z0 = Math.floor(Math.min(a[2], b[2], c[2]) / cell);
+        let z1 = Math.floor(Math.max(a[2], b[2], c[2]) / cell);
+        if (x0 < 0) x0 = 0; if (z0 < 0) z0 = 0;
+        if (x1 > cols - 1) x1 = cols - 1;
+        if (z1 > rows - 1) z1 = rows - 1;
+        const vertical = Math.abs(ny) < 1e-6;    // walls: keep only their footprint
+        for (let cz = z0; cz <= z1; cz++) {
+          for (let cx = x0; cx <= x1; cx++) {
+            if (!vertical && !inTri((cx + 0.5) * cell, (cz + 0.5) * cell)) continue;
+            put(pass === 0 ? floor : obs, cx, cz, yAvg, pass);
+          }
+        }
+      }
+    }
+  }
+
+  let open = 0;
+  const block = new Uint8Array(cols * rows);
+  for (let i = 0; i < block.length; i++) {
+    const f = floor[i];
+    if (f < 0 || (obs[i] >= 0 && obs[i] - f > STEP)) { block[i] = 1; } else { open++; }
+  }
+  return { cell, cols, rows, floor, obs, block, open, total: block.length };
+}
+
+export function navBlocked(nav, x, y, r = 0) {
+  if (!nav) return false;
+  const c = nav.cell;
+  const x0 = Math.max(0, Math.floor((x - r) / c));
+  const x1 = Math.min(nav.cols - 1, Math.floor((x + r) / c));
+  const z0 = Math.max(0, Math.floor((y - r) / c));
+  const z1 = Math.min(nav.rows - 1, Math.floor((y + r) / c));
+  if (x1 < x0 || z1 < z0) return true;
+  for (let cz = z0; cz <= z1; cz++) {
+    for (let cx = x0; cx <= x1; cx++) if (nav.block[cz * nav.cols + cx]) return true;
+  }
+  return false;
+}

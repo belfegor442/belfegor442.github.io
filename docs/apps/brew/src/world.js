@@ -10,27 +10,27 @@ export const OBJECTS = [
   { id: 'rug', type: 'rug', x: 360, y: 330, w: 1000, h: 520, solid: false, hgt: 0 },
   { id: 'neon', type: 'sign', x: 640, y: 6, w: 430, h: 34, solid: false, hgt: 64, label: 'BREW' },
 
-  { id: 'bar', type: 'bar', x: 1190, y: 74, w: 460, h: 112, solid: true, hgt: 48 },
-  { id: 'shelf', type: 'shelf', x: 1210, y: 40, w: 420, h: 30, solid: false, hgt: 74 },
+  { id: 'bar', type: 'bar', x: 1190, y: 74, w: 240, h: 80, solid: true, hgt: 48 },
+  { id: 'shelf', type: 'shelf', x: 1210, y: 54, w: 240, h: 30, solid: false, hgt: 74 },
 
-  { id: 't1', type: 'table', kind: 'poker', x: 80, y: 180, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't2', type: 'table', kind: 'poker', x: 1150, y: 340, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't3', type: 'table', kind: 'poker', x: 80, y: 690, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't4', type: 'table', kind: 'poker', x: 1150, y: 700, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't5', type: 'table', kind: 'poker', x: 80, y: 420, w: 250, h: 170, solid: true, hgt: 42 },
+  { id: 't1', type: 'table', kind: 'poker', x: 80, y: 180, w: 160, h: 142, solid: true, hgt: 40 },
+  { id: 't2', type: 'table', kind: 'poker', x: 1150, y: 516, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't3', type: 'table', kind: 'poker', x: 80, y: 690, w: 160, h: 142, solid: true, hgt: 40 },
+  { id: 't4', type: 'table', kind: 'poker', x: 965, y: 750, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't5', type: 'table', kind: 'poker', x: 80, y: 420, w: 160, h: 170, solid: true, hgt: 42 },
 
   { id: 'plant-1', type: 'plant', x: 74, y: 96, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'plant-2', type: 'plant', x: 1560, y: 1010, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'plant-3', type: 'plant', x: 78, y: 1016, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'column', type: 'column', x: 1450, y: 300, w: 54, h: 54, solid: true, hgt: 150 },
-  { id: 'column-2', type: 'column', x: 1450, y: 920, w: 54, h: 54, solid: true, hgt: 150 },
+  { id: 'column-2', type: 'column', x: 1514, y: 920, w: 54, h: 54, solid: true, hgt: 150 },
 
   { id: 'lights', type: 'switch', x: 46, y: 548, w: 22, h: 56, solid: false, hgt: 44 },
   { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' }
 ];
 
 const TABLES = OBJECTS.filter(o => o.type === 'table');
-const BAR_STOOLS = 5;
+const BAR_STOOLS = 4;
 
 function facing(from, to) { return Math.atan2(to.y - from.y, to.x - from.x); }
 
@@ -49,7 +49,7 @@ export const SEATS = (() => {
   }
   const bar = OBJECTS.find(o => o.id === 'bar');
   for (let i = 0; i < BAR_STOOLS; i++) {
-    const x = bar.x + 62 + i * 84;
+    const x = bar.x + 40 + i * 56;
     const y = bar.y + bar.h + 34;
     list.push(seat('bar-' + i, null, x, y, facing({ x, y }, { x, y: bar.y + bar.h })));
   }
@@ -57,7 +57,7 @@ export const SEATS = (() => {
 })();
 
 export const SPAWNS = [
-  { x: 480, y: 1100 }, { x: 300, y: 1100 }, { x: 480, y: 940 },
+  { x: 480, y: 1100 }, { x: 300, y: 1100 }, { x: 512, y: 940 },
   { x: 300, y: 940 }, { x: 430, y: 560 }, { x: 430, y: 260 },
   { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
   { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
@@ -85,7 +85,30 @@ function circleHitsRect(x, y, r, rect) {
   const dx = x - nx, dy = y - ny;
   return dx * dx + dy * dy < r * r;
 }
+
+// Collision grid rasterised from lobby.glb: the model is the map. While the
+// GLB is still loading (or failed) nav stays null and only the rectangle
+// solids above are used, exactly like before.
+let nav = null;
+export function setNav(n) { nav = n; }
+export function getNav() { return nav; }
+
+function navBlockedAt(x, y, r) {
+  if (!nav) return false;
+  const c = nav.cell;
+  const x0 = Math.max(0, Math.floor((x - r) / c));
+  const x1 = Math.min(nav.cols - 1, Math.floor((x + r) / c));
+  const z0 = Math.max(0, Math.floor((y - r) / c));
+  const z1 = Math.min(nav.rows - 1, Math.floor((y + r) / c));
+  if (x1 < x0 || z1 < z0) return true;
+  for (let cz = z0; cz <= z1; cz++) {
+    for (let cx = x0; cx <= x1; cx++) if (nav.block[cz * nav.cols + cx]) return true;
+  }
+  return false;
+}
+
 export function blocked(x, y, r = 14) {
+  if (navBlockedAt(x, y, r)) return true;
   for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
   return false;
 }
@@ -97,10 +120,12 @@ export function move(x, y, nx, ny, r = 14) {
 
   // Resolve each axis independently. This prevents diagonal movement from
   // tunnelling through corners and guarantees the player never leaves the map.
+  const stuck = blocked(x, y, r); // the nav grid may load under a player
   let px = x;
   if (!blocked(nx, y, r)) px = nx;
   let py = y;
   if (!blocked(px, ny, r)) py = ny;
+  if (stuck && px === x && py === y && !blocked(nx, ny, r)) { px = nx; py = ny; }
   return { x: px, y: py };
 }
 export function dist(a, b) {
