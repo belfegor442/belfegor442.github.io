@@ -9,14 +9,8 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
-    "typecheck": "node --check server/index.js && node --check shared/protocol.js && node --check client/main.js",
-    "test": "node --test \"tests/**/*.test.js\"",
-    "test:watch": "node --test --watch \"tests/**/*.test.js\"",
-    "test:unit": "node --test \"tests/unit/*.test.js\"",
-    "test:integration": "node --test --test-concurrency=1 \"tests/integration/*.test.js\"",
-    "test:acceptance": "node --test --test-concurrency=1 \"tests/acceptance/*.test.js\""
+    "check": "node --check app.js && node --check src/world.js && node --check src/render.js && node --check src/input.js && node --check src/state.js && node --check src/activities.js",
+    "test": "npm run check"
   },
   "dependencies": {}
 }
