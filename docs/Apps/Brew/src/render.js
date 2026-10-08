@@ -90,6 +90,7 @@ export class Renderer {
 
   toggleFreeCam() {
     this.freeCam = !this.freeCam;
+    if (!this.freeCam) { this.cam.x = MAP.w / 2; this.cam.z = MAP.h / 2; }
     return this.freeCam;
   }
 
@@ -133,6 +134,7 @@ export class Renderer {
     this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
     this.glbWorld = null;
     this.glbPlayer = null;
+    this.useImportedWorld = /[?&]glb=1(?:&|$)/.test(location.search);
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
@@ -178,7 +180,7 @@ export class Renderer {
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.016, 0.024, 0.055], fogRange: [850, 2900]
     };
-    this.loadGLBAssets();
+    if (this.useImportedWorld) this.loadGLBAssets();
   }
 
   async loadGLBAssets() {
@@ -556,13 +558,13 @@ export class Renderer {
     this.stats.draws++;
     this.glErr('procWorld');
 
-    if (this.glbWorld && this.glbWorld.opaque.length) {
+    if (this.useImportedWorld && this.glbWorld && this.glbWorld.opaque.length) {
       this.useGLB(def);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
       this.glErr('lobbyOpaque');
     }
 
-    if (this.glbPlayer && this.glbPlayer.opaque.length) {
+    if (this.useImportedWorld && this.glbPlayer && this.glbPlayer.opaque.length) {
       this.useGLB(def);
       for (const p of list) {
         const px = p.rx != null ? p.rx : p.x;
