@@ -56,8 +56,11 @@ export class Net {
     let c;
     try {
       c = mqtt.connect(url, {
-        connectTimeout: 6000, reconnectPeriod: 2500, keepalive: 15,
-        resubscribe: true, queueQoSZero: true, will: will || undefined
+        connectTimeout: 8000, reconnectPeriod: 2500, keepalive: 20,
+        protocolVersion: 4, clean: true, resubscribe: true,
+        queueQoSZero: true, reconnectOnConnackError: true,
+        clientId: 'brew-' + Math.random().toString(36).slice(2, 12),
+        will: will || undefined
       });
     } catch (e) { onFail(); return; }
     let settled = false;
@@ -98,10 +101,13 @@ export class Net {
       c.on('message', (t, p) => this.handle(t, p));
       c.on('reconnect', () => {
         if (!this.up) this.onStatus('Reconnecting…');
-        try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true }); } catch (e) {}
+        try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }); } catch (e) {}
       });
       c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-      c.subscribe([this.topics.c, this.topics.pAll], err => {
+      c.subscribe([
+        { topic: this.topics.c, qos: 1 },
+        { topic: this.topics.pAll, qos: 1 }
+      ], err => {
         if (err) { try { c.end(true); } catch (e) {} return; }
         c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true });
         if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
@@ -166,7 +172,10 @@ export class Net {
         c.on('message', (t, p) => this.handle(t, p));
         c.on('reconnect', () => { this.onStatus('Reconnecting…'); this.onReconnect(); });
         c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-        c.subscribe([this.topics.s, this.topics.host], err => {
+        c.subscribe([
+          { topic: this.topics.s, qos: 1 },
+          { topic: this.topics.host, qos: 1 }
+        ], err => {
           if (err) { try { c.end(true); } catch (e) {} return; }
           this.onStatus('connected');
           this.onFirstUp();
