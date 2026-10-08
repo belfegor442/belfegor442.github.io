@@ -134,7 +134,8 @@ export class Host {
     const table = seat && seat.table;
     if (!table) return { error: 'no-table' };
     const seated = seatsAt(table).map(s => s.occupiedBy).filter(Boolean);
-    if (seated.length < 2) return { error: 'need-two-players' };
+    const need = Math.max(1, Number(reg.minPlayers) || 2);
+    if (seated.length < need) return { error: need <= 1 ? 'need-one-player' : 'need-two-players' };
     if (seated.some(id => { const pl = this.players.get(id); return !pl || pl.status === 'activity'; })) return { error: 'need-two-players' };
     const act = {
       id: kind + '-' + (++this.seq) + '-' + Date.now().toString(36),
@@ -145,7 +146,12 @@ export class Host {
     if (reg.validate) { const e = reg.validate(this, act); if (e) return { error: e }; }
     this.activity = act;
     for (const id of act.players) { const pl = this.players.get(id); if (pl) { pl.status = 'activity'; pl.dirty = true; } }
-    return { ok: this.emit('activity.start', { activity: this.serialize(act) }) };
+    const res = { ok: this.emit('activity.start', { activity: this.serialize(act) }) };
+    if (reg.deal) {
+      const dealt = reg.deal(this, act) || [];
+      res.dms = dealt.map(d => ({ uid: d.uid, msg: { t: 'activity.hand', id: act.id, cards: d.cards } }));
+    }
+    return res;
   }
 
   inputActivity(uid, payload) {
@@ -193,11 +199,14 @@ export class Host {
 
   serialize(act) {
     if (!act) return null;
-    return {
+    const out = {
       id: act.id, kind: act.kind, table: act.table, players: act.players,
       phase: act.phase, stake: act.stake, inputs: Object.assign({}, act.inputs),
       data: Object.assign({}, act.data), balances: act.balances || null, result: act.result || null
     };
+    const reg = Registry[act.kind];
+    if (reg && reg.redact) return reg.redact(out);
+    return out;
   }
 
   snapshot() {

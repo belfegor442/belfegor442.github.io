@@ -5,7 +5,7 @@ import { Net } from './src/net.js';
 import { Renderer } from './src/render.js';
 import { Input } from './src/input.js';
 import { UI } from './src/ui.js';
-import { Registry } from './src/activities.js';
+import { Registry, kinds as activityKinds } from './src/activities.js';
 
 const BROKERS = (() => {
   try {
@@ -45,9 +45,11 @@ let room = '';
 let net = null;
 let authority = null;
 let activity = null;
+let myHand = null;
 let objects = { lights: true };
 let hostSeen = false;
 let welcomed = false;
+let welcomeN = 0;
 let gTries = 0;
 let gRots = 0;
 let gTimer = null;
@@ -130,6 +132,13 @@ function presenceWill() {
   return { topic: T().p(myUid), payload: '{"t":"presence","on":0}', retain: true, qos: 0 };
 }
 
+function rejoin() {
+  if (isHost || !welcomed) return false;
+  publishPresence(true);
+  sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  return true;
+}
+
 function enter({ name, code }) {
   if (net) return;
   myName = (name || '').trim().replace(/\s+/g, ' ').slice(0, LIMITS.name) || 'PLAYER';
@@ -208,6 +217,7 @@ function guestHelloLoop() {
 function wireNet() {
   net.onMessage = onMessage;
   net.onFirstUp = () => { if (!isHost) publishPresence(true); };
+  net.onReconnect = () => { rejoin(); };
 }
 
 function onMessage(topic, msg) {
@@ -250,14 +260,17 @@ function handleHost(msg) {
     case 'chat': reply(uid, authority.chat(uid, msg.text)); break;
     case 'obj': reply(uid, authority.objectState(uid, msg.id, msg.val)); break;
     case 'activity.start': reply(uid, authority.startActivity(msg.kind, uid, { stake: msg.stake })); break;
-    case 'activity.input': reply(uid, authority.inputActivity(uid, { side: msg.side, id: msg.id })); break;
+    case 'activity.input': reply(uid, authority.inputActivity(uid, { side: msg.side, pick: msg.pick, id: msg.id })); break;
     case 'bye': removePlayer(uid, 'left the world'); break;
   }
 }
 function reply(uid, res) {
   if (!res) return;
   if (res.error) { sendTo(uid, { t: 'err', code: res.error }); return; }
-  if (res.ok) { broadcast(res.ok); handleClient(res.ok); }
+  if (res.ok) {
+    broadcast(res.ok); handleClient(res.ok);
+    if (res.dms) for (const d of res.dms) sendTo(d.uid, d.msg);
+  }
 }
 
 function joinPlayer(msg, uid) {
@@ -302,6 +315,7 @@ function removePlayer(uid, reason) {
     }
   }
   if (uid !== myUid) ui.system(p.name + ' ' + (reason || 'left') + '.');
+  else rejoin();
 }
 
 function handleClient(msg) {
@@ -323,11 +337,15 @@ function handleClient(msg) {
     case 'activity.start': applyActivityStart(msg); break;
     case 'activity.update': applyActivityUpdate(msg); break;
     case 'activity.end': applyActivityEnd(msg); break;
+    case 'activity.hand':
+      if (activity && activity.id === msg.id) { myHand = msg.cards || null; renderActivityPanel(); }
+      break;
   }
 }
 
 function applyWelcome(msg) {
   welcomed = true;
+  welcomeN++;
   clearTimeout(gTimer);
   room = msg.room || room;
   myUid = msg.uid;
@@ -433,8 +451,10 @@ function applyChat(msg) {
 
 function applyActivityStart(msg) {
   activity = msg.activity;
+  myHand = null;
   if (activity && activity.players && activity.players.includes(myUid)) sfx('coin');
   renderActivityPanel();
+  renderPrompt();
   if (activity) ui.system(Registry[activity.kind] ? Registry[activity.kind].label + ' started at ' + activity.table : 'Activity started.');
 }
 
@@ -445,6 +465,7 @@ function applyActivityUpdate(msg) {
   if (activity && msg.activity && msg.activity.balances) activity.balances = msg.activity.balances;
   if (activity && msg.activity && msg.activity.result) activity.result = msg.activity.result;
   renderActivityPanel();
+  renderPrompt();
   if (activity && activity.phase === 'result' && activity.balances && me) {
     const d = activity.balances[myUid] || 0;
     if (d !== 0) {
@@ -468,6 +489,7 @@ function applyActivityEnd(msg) {
     }
   }
   activity = null;
+  myHand = null;
   renderActivityPanel();
   renderPrompt();
 }
@@ -485,16 +507,20 @@ function errText(code) {
     'no-table': 'Sit at a table to play.',
     'no-balance': 'You are out of chips.',
     'unknown-activity': 'That activity does not exist.',
-    'already-picked': 'You already picked a side.'
+    'already-picked': 'You already made your pick.',
+    'bad-pick': 'Pick one of the offered options.',
+    'need-one-player': 'This game is played solo — the others must stand up.',
+    'in-activity': 'You are in a game right now.'
   };
   return map[code] || 'That action is not available.';
 }
 
 function renderActivityPanel() {
   ui.renderActivity(activity, myUid, {
+    hand: myHand,
     activityInput: payload => {
       if (!activity) return;
-      sendHost({ t: 'activity.input', id: activity.id, side: payload.side });
+      sendHost({ t: 'activity.input', id: activity.id, pick: payload.pick, side: payload.pick });
     },
     stake: v => { nextStake = v; ui.toast('Stake set to ' + v); }
   });
@@ -503,13 +529,11 @@ function renderActivityPanel() {
 function computePrompt() {
   if (!me) return null;
   if (activity && activity.players && activity.players.includes(myUid) && activity.phase === 'picking') {
-    return 'PICK HEADS OR TAILS BELOW';
+    const def = Registry[activity.kind];
+    return (def && def.prompt) || 'MAKE YOUR PICK BELOW';
   }
   if (me.status === 'seated') {
-    const seat = SEAT_BY_ID.get(me.seat);
-    const table = seat && seat.table;
-    const others = table ? seatsAt(table).filter(s => s.occupiedBy && s.occupiedBy !== myUid).length : 0;
-    if (others && !activity && Registry.coinflip) return 'E  STAND UP · F  START COINFLIP';
+    if (!activity) return 'E  STAND UP · F  START GAME';
     return 'E  STAND UP';
   }
   const sw = insideInteract(me.x, me.y, PROX.interact);
@@ -539,9 +563,25 @@ function interact() {
   ui.toast('Nothing to interact with here.');
 }
 
-function startActivity() {
+function startActivity(kind) {
   if (!me || me.status !== 'seated') { ui.toast('Sit at a table first.'); return; }
-  sendHost({ t: 'activity.start', kind: 'coinflip', stake: nextStake });
+  if (activity) { ui.toast('A game is already running at this table.'); return; }
+  if (!kind || !Registry[kind]) { openGamePicker(); return; }
+  sendHost({ t: 'activity.start', kind, stake: nextStake });
+}
+
+function openGamePicker() {
+  const seat = SEAT_BY_ID.get(me.seat);
+  const table = seat && seat.table;
+  const seatedN = table ? seatsAt(table).filter(s => s.occupiedBy).length : 1;
+  const opts = activityKinds()
+    .filter(k => {
+      const d = Registry[k];
+      return seatedN >= (d.minPlayers || 2) && seatedN <= (d.maxPlayers || 99);
+    })
+    .map(k => ({ kind: k, label: Registry[k].label }));
+  if (!opts.length) { ui.toast('No game fits this table.'); return; }
+  ui.renderPicker(opts, k => startActivity(k));
 }
 
 function say(text) {
@@ -679,6 +719,9 @@ ui.showEntry('Ready.');
 window.Brew = {
   version: 3,
   get me() { return me; },
+  get authority() { return isHost ? authority : null; },
+  get welcomes() { return welcomeN; },
+  rejoin,
   get room() { return room; },
   get isHost() { return isHost; },
   get activity() { return activity; },
@@ -687,6 +730,22 @@ window.Brew = {
   get objects() { return objects; },
   get welcomed() { return welcomed; },
   enter, interact, startActivity, say,
+  warp(x, y, uid) {
+    if (uid && uid !== myUid) {
+      if (!isHost || !authority) return false;
+      const p = authority.players.get(uid);
+      if (!p) return false;
+      p.x = x; p.y = y; p.lastT = Date.now(); p.dirty = true;
+      return true;
+    }
+    if (!me) return false;
+    me.x = x; me.y = y; me.rx = x; me.ry = y;
+    if (isHost && authority) {
+      const p = authority.players.get(myUid);
+      if (p) { p.x = x; p.y = y; p.lastT = Date.now(); p.dirty = true; }
+    }
+    return true;
+  },
   seatAt: id => SEAT_BY_ID.get(id),
   MAP, OBJECTS, SEATS
 };

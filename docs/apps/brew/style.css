@@ -108,8 +108,12 @@ button{font:inherit;cursor:pointer}
 }
 .chip.red{background:linear-gradient(180deg,#d24a51,#98262d)}
 .chip.dark{background:linear-gradient(180deg,#2f3438,#14171a)}
+.chip.green{background:linear-gradient(180deg,#2f8f5b,#14532d)}
 .chip:hover{filter:brightness(1.14)}
 .chip:disabled{opacity:.4;cursor:default;filter:saturate(.3)}
+.act-choices.wrap{flex-wrap:wrap}
+.act-cards{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;letter-spacing:.1em;color:var(--gold);text-align:center;margin:8px 0}
+.act-cards.board{color:var(--ink)}
 
 .toast{
   position:absolute;top:74px;left:50%;transform:translateX(-50%);

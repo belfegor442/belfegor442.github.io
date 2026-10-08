@@ -1,4 +1,8 @@
+import { Registry } from './activities.js';
+
 const $ = s => document.querySelector(s);
+const SUITS = ['♠', '♥', '♦', '♣'];
+const cardStr = i => (i == null ? '?' : '23456789TJQKA'[i % 13] + SUITS[Math.floor(i / 13)]);
 
 export class UI {
   constructor() {
@@ -170,9 +174,22 @@ export class UI {
     this._toastT = setTimeout(() => this.toastEl.classList.add('hidden'), 2600);
   }
 
+  renderPicker(list, cb) {
+    this.activityPanel.classList.remove('hidden');
+    const html = ['<div class="act-head"><span class="act-k">TABLE</span><b>CHOOSE A GAME</b></div>'];
+    html.push('<div class="act-choices wrap">' +
+      list.map(o => '<button data-game="' + o.kind + '" class="chip dark">' + o.label + '</button>').join('') + '</div>');
+    html.push('<div class="act-sub">The stake you picked applies to every game.</div>');
+    this.activityPanel.innerHTML = html.join('');
+    this.activityPanel.querySelectorAll('[data-game]').forEach(b => {
+      b.onclick = () => cb(b.dataset.game);
+    });
+  }
+
   renderActivity(act, meId, handlers) {
     if (!act) { this.activityPanel.classList.add('hidden'); this.activityPanel.innerHTML = ''; return; }
     this.activityPanel.classList.remove('hidden');
+    const def = Registry[act.kind] || {};
     const mine = act.players.includes(meId);
     const picked = act.inputs && act.inputs[meId];
     const waiting = (act.players || []).filter(id => !act.inputs || !act.inputs[id]);
@@ -181,7 +198,19 @@ export class UI {
     html.push('<div class="act-head"><span class="act-k">ACTIVITY</span><b>' + (act.kind || '').toUpperCase() + '</b><span class="act-table">' + act.table + '</span><span class="act-stake">STAKE ' + (act.stake || 0) + '</span></div>');
 
     if (act.phase === 'result') {
-      html.push('<div class="act-result">' + (act.result === 'heads' ? 'HEADS' : 'TAILS') + '</div>');
+      const label = def.resultLabel ? def.resultLabel(act) : String(act.result || '').toUpperCase();
+      html.push('<div class="act-result">' + label + '</div>');
+      if (def.subLabel) {
+        const sub = def.subLabel(act);
+        if (sub) html.push('<div class="act-sub">' + sub + '</div>');
+      }
+      if (act.kind === 'poker' && act.data && act.data.hands) {
+        const board = (act.data.board || []).map(cardStr).join(' ');
+        const rows = act.players.map(id => '<div class="act-cards">' +
+          (id === meId ? 'YOU' : 'RIVAL') + ' &nbsp;' +
+          (act.data.hands[id] || []).map(cardStr).join(' ') + '</div>');
+        html.push('<div class="act-cards board">BOARD &nbsp;' + board + '</div>' + rows.join(''));
+      }
       const deltas = act.balances || {};
       const parts = act.players.map(id => {
         const d = deltas[id] || 0;
@@ -189,16 +218,27 @@ export class UI {
       });
       html.push('<div class="act-sub">BALANCE DELTA ' + parts.join('  ·  ') + '</div>');
     } else if (!mine) {
-      html.push('<div class="act-sub">Two players are dueling at this table.</div>');
-    } else if (!picked) {
-      html.push('<div class="act-sub">Pick a side. The host settles the round.</div>');
-      html.push('<div class="act-choices"><button data-side="heads" class="chip red">HEADS</button><button data-side="tails" class="chip dark">TAILS</button></div>');
+      html.push('<div class="act-sub">The table is playing ' + (def.label || act.kind || '').toUpperCase() + '.</div>');
     } else {
-      html.push('<div class="act-sub">You picked <b>' + picked.toUpperCase() + '</b>. Waiting for ' + waiting.length + ' player…</div>');
+      if (act.kind === 'poker') {
+        const hand = (handlers.hand || []).map(cardStr).join(' ');
+        html.push('<div class="act-cards">YOUR HAND &nbsp;' + (hand || '·····') + '</div>');
+        html.push('<div class="act-sub">BOARD WAITING ON THE CALL</div>');
+      }
+      if (def.pickInfo) html.push('<div class="act-sub">' + def.pickInfo(act) + '</div>');
+      if (!picked) {
+        const choices = def.choices || [{ v: 'heads', label: 'HEADS', cls: 'red' }, { v: 'tails', label: 'TAILS', cls: 'dark' }];
+        html.push('<div class="act-choices' + (choices.length > 2 ? ' wrap' : '') + '">' +
+          choices.map(c => '<button data-pick="' + c.v + '" class="chip ' + (c.cls || '') + '">' + c.label + '</button>').join('') +
+          '</div>');
+      } else {
+        const waitingLabel = waiting.length === 1 ? 'player' : 'players';
+        html.push('<div class="act-sub">You picked <b>' + String(picked).toUpperCase() + '</b>. Waiting for ' + waiting.length + ' ' + waitingLabel + '…</div>');
+      }
     }
     this.activityPanel.innerHTML = html.join('');
-    this.activityPanel.querySelectorAll('[data-side]').forEach(b => {
-      b.onclick = () => handlers.activityInput({ side: b.dataset.side });
+    this.activityPanel.querySelectorAll('[data-pick]').forEach(b => {
+      b.onclick = () => handlers.activityInput({ pick: b.dataset.pick });
     });
     this.activityPanel.querySelectorAll('[data-stake]').forEach(b => {
       b.onclick = () => handlers.stake && handlers.stake(Number(b.dataset.stake));

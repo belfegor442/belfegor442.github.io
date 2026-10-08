@@ -18,6 +18,7 @@ export class Net {
     this.onStatus = () => {};
     this.onMessage = () => {};
     this.onFirstUp = () => {};
+    this.onReconnect = () => {};
     this.retryTimer = null;
     this.gIdx = 0;
     this.gSwitch = 0;
@@ -161,7 +162,7 @@ export class Net {
         if (this.closed) { try { c.removeAllListeners(); c.end(true); } catch (e) {} return; }
         this.conns = [c];
         c.on('message', (t, p) => this.handle(t, p));
-        c.on('reconnect', () => this.onStatus('Reconnecting…'));
+        c.on('reconnect', () => { this.onStatus('Reconnecting…'); this.onReconnect(); });
         c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
         c.subscribe([this.topics.s, this.topics.host], () => {});
         this.onStatus('connected');

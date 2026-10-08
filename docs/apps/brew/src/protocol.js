@@ -36,4 +36,4 @@ export function topics(room) {
 }
 export const TYPES = ['hello', 'welcome', 'join', 'leave', 'mv', 'snap', 'sit', 'stand',
   'emote', 'chat', 'interact', 'obj', 'activity.start', 'activity.input',
-  'activity.update', 'activity.end', 'ack', 'err', 'ping', 'pong', 'bye', 'presence'];
+  'activity.update', 'activity.end', 'activity.hand', 'ack', 'err', 'ping', 'pong', 'bye', 'presence'];
