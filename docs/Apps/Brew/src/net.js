@@ -3,39 +3,45 @@ import { topics } from './protocol.js';
 function orderFor(room, brokers) {
   let h = 0;
   for (const ch of room) h = (h * 131 + ch.charCodeAt(0)) >>> 0;
-  const s = h % brokers.length;
+  const s = brokers.length ? h % brokers.length : 0;
   return brokers.slice(s).concat(brokers.slice(0, s));
 }
 
 export class Net {
   constructor(brokers) {
-    this.brokers = brokers;
+    this.brokers = brokers.filter(Boolean);
     this.conns = [];
-    this.pending = [];
     this.role = null;
     this.topics = null;
     this.room = null;
+    this.will = null;
     this.onStatus = () => {};
     this.onMessage = () => {};
     this.onFirstUp = () => {};
     this.onReconnect = () => {};
-    this.retryTimer = null;
-    this.gIdx = 0;
-    this.gSwitch = 0;
-    this.gConnectedOnce = false;
     this.closed = false;
+    this.attempt = 0;
+    this.reconnectTimer = null;
+    this.connectedOnce = false;
   }
 
   get up() { return this.conns.some(c => c.connected); }
 
-  close() {
-    this.closed = true;
-    if (this.retryTimer) { clearInterval(this.retryTimer); this.retryTimer = null; }
-    const list = this.conns;
-    this.conns = [];
+  clearReconnect() {
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+  }
+
+  destroyConnections() {
+    const list = this.conns.splice(0);
     for (const c of list) {
       try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
     }
+  }
+
+  close() {
+    this.closed = true;
+    this.clearReconnect();
+    this.destroyConnections();
   }
 
   handle(topic, payload) {
@@ -45,11 +51,16 @@ export class Net {
     this.onMessage(topic, msg);
   }
 
-  publish(topic, obj, opts) {
+  publish(topic, obj, opts = { qos: 0 }) {
+    if (!topic) return false;
     const payload = JSON.stringify(obj);
+    let sent = false;
     for (const c of this.conns) {
-      if (c.connected) { try { c.publish(topic, payload, opts || { qos: 0 }); } catch (e) {} }
+      if (c.connected) {
+        try { c.publish(topic, payload, opts); sent = true; } catch (e) {}
+      }
     }
+    return sent;
   }
 
   connectOne(url, will, onOk, onFail) {
@@ -57,12 +68,12 @@ export class Net {
     let c;
     try {
       c = mqtt.connect(url, {
-        connectTimeout: 9000,
-        reconnectPeriod: 3000,
+        connectTimeout: 10000,
+        reconnectPeriod: 0,
         keepalive: 30,
         protocolVersion: 4,
         clean: true,
-        resubscribe: true,
+        resubscribe: false,
         queueQoSZero: true,
         reconnectOnConnackError: true,
         clientId: 'brew-' + Math.random().toString(36).slice(2, 14),
@@ -70,8 +81,8 @@ export class Net {
       });
     } catch (e) { onFail(e); return; }
 
-    let done = false;
-    const timer = setTimeout(() => fail(new Error('timeout')), 10000);
+    let settled = false;
+    const timer = setTimeout(() => fail(new Error('timeout')), 11000);
     const cleanup = () => {
       clearTimeout(timer);
       c.removeListener('connect', connected);
@@ -79,15 +90,15 @@ export class Net {
       c.removeListener('offline', fail);
     };
     const fail = err => {
-      if (done) return;
-      done = true;
+      if (settled) return;
+      settled = true;
       cleanup();
       try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
-      onFail(err);
+      onFail(err || new Error('mqtt-connect-failed'));
     };
     const connected = () => {
-      if (done) return;
-      done = true;
+      if (settled) return;
+      settled = true;
       cleanup();
       c.on('error', () => {});
       onOk(c, url);
@@ -97,52 +108,86 @@ export class Net {
     c.once('offline', fail);
   }
 
+  setupConnection(c, role) {
+    this.conns = [c];
+    c.on('message', (t, p) => this.handle(t, p));
+    c.on('close', () => {
+      if (this.closed) return;
+      this.conns = this.conns.filter(x => x !== c);
+      this.onStatus('Connection lost — reconnecting…');
+      this.scheduleReconnect();
+    });
+    c.on('error', () => {});
+    if (role === 'guest') {
+      c.on('reconnect', () => this.onStatus('Reconnecting…'));
+    } else {
+      c.on('reconnect', () => this.onStatus('Reconnecting…'));
+    }
+  }
+
+  subscribeAndReady(c, role, firstConnection) {
+    const subs = role === 'host'
+      ? [this.topics.c, this.topics.pAll]
+      : [this.topics.s, this.topics.host];
+    c.subscribe(subs, { qos: 1 }, err => {
+      if (err || !c.connected || this.closed) {
+        try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
+        if (!this.closed) this.scheduleReconnect();
+        return;
+      }
+      if (role === 'host') {
+        c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }, () => {
+          if (firstConnection) {
+            this.connectedOnce = true;
+            this.onStatus('ready');
+            this.onFirstUp();
+          }
+        });
+      } else {
+        this.connectedOnce = true;
+        this.onStatus('connected');
+        this.onFirstUp();
+      }
+    });
+  }
+
+  scheduleReconnect() {
+    if (this.closed || this.reconnectTimer || !this.brokers.length) return;
+    const delay = Math.min(8000, 1000 + this.attempt * 1000);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connectCurrent();
+    }, delay);
+  }
+
+  connectCurrent() {
+    if (this.closed || !this.brokers.length) return;
+    const list = orderFor(this.room, this.brokers);
+    const url = list[this.attempt % list.length];
+    const index = this.attempt % list.length;
+    this.onStatus(this.connectedOnce ? 'Reconnecting…' : 'Connecting to the network…');
+    this.connectOne(url, this.will, c => {
+      if (this.closed) { try { c.end(true); } catch (e) {} return; }
+      this.attempt = index;
+      this.setupConnection(c, this.role);
+      this.subscribeAndReady(c, this.role, !this.connectedOnce);
+    }, () => {
+      this.attempt = (index + 1) % list.length;
+      this.scheduleReconnect();
+    });
+  }
+
   host(room, will) {
     this.close();
     this.closed = false;
     this.role = 'host';
     this.room = room;
+    this.will = will || null;
     this.topics = topics(room);
+    this.attempt = 0;
+    this.connectedOnce = false;
     this.onStatus('Connecting to the network…');
-    const list = orderFor(room, this.brokers);
-    let left = list.length, up = 0, first = true;
-    const attach = c => {
-      up++;
-      this.conns.push(c);
-      c.on('message', (t, p) => this.handle(t, p));
-      c.on('reconnect', () => {
-        this.onStatus('Reconnecting…');
-      });
-      c.on('connect', () => {
-        if (!first) {
-          c.subscribe([this.topics.c, this.topics.pAll], { qos: 1 }, () => {
-            try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }); } catch (e) {}
-          });
-        }
-      });
-      c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-      c.subscribe([this.topics.c, this.topics.pAll], { qos: 1 }, err => {
-        if (err) {
-          try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
-          return;
-        }
-        c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }, () => {
-          if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
-        });
-      });
-    };
-    for (const url of list) {
-      this.connectOne(url, will, attach, () => {
-        if (this.pending.indexOf(url) < 0) this.pending.push(url);
-        left--;
-        if (up === 0 && left === 0) this.onStatus('Cannot reach the game network. Check your connection and try again.');
-      });
-    }
-    this.retryTimer = setInterval(() => {
-      if (this.closed || !this.pending.length) return;
-      const url = this.pending.shift();
-      this.connectOne(url, will, attach, () => { if (this.pending.indexOf(url) < 0) this.pending.push(url); });
-    }, 25000);
+    this.connectCurrent();
   }
 
   guest(room, will) {
@@ -152,59 +197,22 @@ export class Net {
     this.room = room;
     this.will = will || null;
     this.topics = topics(room);
-    this.gIdx = 0;
-    this.gSwitch = 0;
+    this.attempt = 0;
+    this.connectedOnce = false;
     this.onStatus('Connecting to the network…');
-    this.guestAttempt();
+    this.connectCurrent();
   }
 
   rotate() {
-    if (this.role !== 'guest') return;
-    this.gIdx = (this.gIdx + 1) % this.brokers.length;
-    this.gSwitch = 0;
-    const list = this.conns;
-    this.conns = [];
-    for (const c of list) {
-      try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
-    }
-    this.onStatus('Looking in another network…');
-    this.guestAttempt();
-  }
-
-  guestAttempt() {
-    if (this.closed) return;
+    if (this.role !== 'guest' || !this.brokers.length) return;
     const list = orderFor(this.room, this.brokers);
-    const rotated = list.slice(this.gIdx).concat(list.slice(0, this.gIdx));
-    const attempt = (i) => {
-      if (this.closed) return;
-      if (i >= rotated.length) {
-        this.gSwitch++;
-        this.gIdx = (this.gIdx + 1) % this.brokers.length;
-        if (this.gSwitch < this.brokers.length * 2) setTimeout(() => this.guestAttempt(), 500);
-        else this.onStatus('Cannot reach the game network. Check your connection and try again.');
-        return;
-      }
-      this.connectOne(rotated[i], this.will, c => {
-        if (this.closed) { try { c.removeAllListeners(); c.end(true); } catch (e) {} return; }
-        this.conns = [c];
-        c.on('message', (t, p) => this.handle(t, p));
-        c.on('reconnect', () => { this.onStatus('Reconnecting…'); });
-        c.on('connect', () => {
-          if (this.gConnectedOnce) this.onReconnect();
-        });
-        c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-        c.subscribe([this.topics.s, this.topics.host], { qos: 1 }, err => {
-          if (err) {
-          try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
-          attempt(i + 1);
-          return;
-        }
-          this.gConnectedOnce = true;
-          this.onStatus('connected');
-          this.onFirstUp();
-        });
-      }, () => attempt(i + 1));
-    };
-    attempt(0);
+    const current = list[this.attempt % list.length];
+    const idx = list.indexOf(current);
+    this.destroyConnections();
+    this.clearReconnect();
+    this.attempt = (idx + 1) % list.length;
+    this.connectedOnce = false;
+    this.onStatus('Looking in another network…');
+    this.connectCurrent();
   }
 }
