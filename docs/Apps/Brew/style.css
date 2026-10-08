@@ -160,3 +160,13 @@ button{font:inherit;cursor:pointer}
   .activity{left:16px;right:16px;top:auto;bottom:230px;max-width:none}
   .entry h1{font-size:48px}
 }
+
+
+.touch-controls{position:fixed;inset:0;z-index:8;pointer-events:none;display:none}
+.touch-controls.visible{display:block}
+.joystick{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:118px;height:118px;border:2px solid rgba(233,200,119,.45);border-radius:50%;background:rgba(8,18,14,.34);pointer-events:auto;touch-action:none}
+.joystick span{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border-radius:50%;background:rgba(233,200,119,.82);box-shadow:0 5px 20px rgba(0,0,0,.35)}
+.touch-controls button{position:absolute;width:58px;height:58px;border-radius:50%;border:1px solid rgba(233,200,119,.6);background:rgba(8,18,14,.82);color:#f7e7b2;font-weight:800;pointer-events:auto;touch-action:manipulation}
+#touchInteract{right:max(24px,env(safe-area-inset-right));bottom:105px}
+#touchGame{right:max(92px,calc(env(safe-area-inset-right) + 68px));bottom:35px}
+@media (max-width:800px),(pointer:coarse){.touch-controls.visible{display:block}.hud-top{padding:10px}.roster{display:none}.emotes{display:none}.chatbox{max-width:70vw}.entry-card{width:min(92vw,460px)}}
