@@ -91,6 +91,13 @@ export function blocked(x, y, r = 14) {
   return false;
 }
 export function move(x, y, nx, ny, r = 14) {
+  const minX = MAP.wall + r, maxX = MAP.w - MAP.wall - r;
+  const minY = MAP.wall + r, maxY = MAP.h - MAP.wall - r;
+  nx = Math.max(minX, Math.min(maxX, Number(nx) || x));
+  ny = Math.max(minY, Math.min(maxY, Number(ny) || y));
+
+  // Resolve each axis independently. This prevents diagonal movement from
+  // tunnelling through corners and guarantees the player never leaves the map.
   let px = x;
   if (!blocked(nx, y, r)) px = nx;
   let py = y;
