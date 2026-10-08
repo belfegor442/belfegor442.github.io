@@ -118,11 +118,11 @@ function sendHost(msg, critical) {
     msg.mid = mid;
     pending.set(mid, { msg, at: Date.now(), tries: 1 });
   }
-  net.publish(T().c, Object.assign({ from: myUid }, msg));
+  net.publish(T().c, Object.assign({ from: myUid }, msg), { qos: critical !== false ? 1 : 0 });
 }
 function sendTo(uid, msg) {
   if (isHost && uid === myUid) { handleClient(Object.assign({}, msg, { to: null })); return; }
-  net.publish(T().s, Object.assign({ to: uid }, msg));
+  net.publish(T().s, Object.assign({ to: uid }, msg), { qos: 1 });
 }
 function broadcast(msg) { net.publish(T().s, msg); }
 
@@ -745,7 +745,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 6,
+  version: 8,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
