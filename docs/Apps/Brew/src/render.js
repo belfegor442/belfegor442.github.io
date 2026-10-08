@@ -134,7 +134,7 @@ export class Renderer {
     this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
     this.glbWorld = null;
     this.glbPlayer = null;
-    this.useImportedWorld = /[?&]glb=1(?:&|$)/.test(location.search);
+    // lobby.glb is the authoritative Brew world. The procedural scene is fallback-only.\n    this.useImportedWorld = true;\n    this.glbReady = false;
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
@@ -197,7 +197,7 @@ export class Renderer {
       console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
         this.glbWorld.blend.length + ' blend, size=' + world.bounds.max.map(v => Math.round(v)).join('x'));
     } catch (e) {
-      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
+      this.glbReady = false;\n      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
     }
     try {
       const player = await loadGLB('./Assets/gbl/Player/steve.skin.glb');
@@ -542,36 +542,36 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
-    this.useTex();
-    this.setTexM(this.mIdent);
-    this.setTexTint(1, 1, 1, 1);
-    this.bindTex(this.gpuFloor, this.texFloor);
-    gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-    this.glErr('floor');
-
-    this.useLit();
-    this.setLitM(this.mIdent);
-    this.setLitTint(1, 1, 1);
-    this.setLitLighting(def);
-    this.bindLit(this.gpuWorld);
-    gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-
-    if (this.lights) this.setLitTint(1.0, 0.86, 0.42);
-    else this.setLitTint(0.34, 0.34, 0.38);
-    this.bindLit(this.gpuLever);
-    gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
-    this.glErr('procWorld');
-
-    if (this.useImportedWorld && this.glbWorld && this.glbWorld.opaque.length) {
+    // The imported lobby is the actual map. Never render the procedural map beneath it.
+    if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useGLB(def);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
       this.glErr('lobbyOpaque');
+    } else {
+      // Emergency fallback only while lobby.glb cannot be loaded.
+      this.useTex();
+      this.setTexM(this.mIdent);
+      this.setTexTint(1, 1, 1, 1);
+      this.bindTex(this.gpuFloor, this.texFloor);
+      gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+
+      this.useLit();
+      this.setLitM(this.mIdent);
+      this.setLitTint(1, 1, 1);
+      this.setLitLighting(def);
+      this.bindLit(this.gpuWorld);
+      gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+
+      this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
+      this.bindLit(this.gpuLever);
+      gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.glErr('procWorld');
     }
 
-    if (this.useImportedWorld && this.glbPlayer && this.glbPlayer.opaque.length) {
+    if (this.glbReady && this.glbPlayer && this.glbPlayer.opaque.length) {
       this.useGLB(def);
       for (const p of list) {
         const px = p.rx != null ? p.rx : p.x;
@@ -647,7 +647,7 @@ export class Renderer {
 
     gl.enable(gl.BLEND);
     gl.depthMask(false);
-    if (this.glbWorld && this.glbWorld.blend.length) {
+    if (this.glbReady && this.glbWorld && this.glbWorld.blend.length) {
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       this.useGLB(def);
       for (const g of this.glbWorld.blend) this.drawGLBD(g);
