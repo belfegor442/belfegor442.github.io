@@ -569,6 +569,10 @@ input.on('chat', () => ui.focusChat());
 input.on('interact', interact);
 input.on('activity', startActivity);
 input.on('emote', key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); });
+input.on('camtoggle', () => {
+  const on = renderer.toggleFreeCam();
+  ui.toast(on ? 'FREE CAM — drag: orbit · wheel: zoom · arrows: pan · C: follow' : 'FOLLOW CAM');
+});
 
 ui.bind({
   enter,
@@ -607,8 +611,12 @@ function frame(now) {
   last = now;
   renderer.time = now / 1000;
 
+  if (renderer.freeCam) {
+    const ar = input.arrows();
+    if (ar.x || ar.y) renderer.panCam(ar.x, ar.y, dt);
+  }
   if (me && input.enabled && me.status === 'standing' && !input.typing()) {
-    const a = input.axis();
+    const a = input.axis(renderer.freeCam);
     if (a.x || a.y) {
       const spd = SPEED * (a.sprint ? 1.45 : 1) * dt;
       const r = collide(me.x, me.y, me.x + a.x * spd, me.y + a.y * spd, RADIUS);

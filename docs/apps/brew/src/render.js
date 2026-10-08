@@ -39,6 +39,9 @@ export class Renderer {
     this.cam = { x: MAP.w / 2, z: MAP.h / 2 };
     this.camOrbit = null;
     this.eye = { x: MAP.w / 2, y: 730, z: MAP.h / 2 + 650 };
+    this.orbit = { yaw: 0, pitch: Math.atan2(730, 650), dist: Math.hypot(730, 650) };
+    this.freeCam = false;
+    this._drag = null;
     this.glErrs = {};
     try { this.glDbg = /[?&]gldebug/.test(location.search); } catch (e) { this.glDbg = false; }
     this.stats = { frames: 0, draws: 0, gl: !!this.gl };
@@ -50,10 +53,53 @@ export class Renderer {
     this.mScratch = new Float32Array(16);
     this.enabledAttrs = new Set();
     this.buildOverlay();
+    this.bindCamera();
     if (this.gl) this.initGL();
     this.loadPixelFont();
     this.resize();
     try { window.__renderer = this; } catch (e) { /* noop */ }
+  }
+
+  bindCamera() {
+    const c = this.canvas;
+    if (!c) return;
+    c.addEventListener('contextmenu', e => e.preventDefault());
+    c.addEventListener('pointerdown', e => {
+      if (e.button !== 0 && e.button !== 2) return;
+      this._drag = { x: e.clientX, y: e.clientY };
+      try { c.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    });
+    c.addEventListener('pointermove', e => {
+      const d = this._drag;
+      if (!d) return;
+      this.orbit.yaw -= (e.clientX - d.x) * 0.006;
+      this.orbit.pitch = Math.max(0.2, Math.min(1.35, this.orbit.pitch + (e.clientY - d.y) * 0.006));
+      d.x = e.clientX; d.y = e.clientY;
+    });
+    const stop = e => {
+      this._drag = null;
+      try { c.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    };
+    c.addEventListener('pointerup', stop);
+    c.addEventListener('pointercancel', stop);
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      this.orbit.dist = Math.max(350, Math.min(3200, this.orbit.dist * Math.exp(e.deltaY * 0.0012)));
+    }, { passive: false });
+  }
+
+  toggleFreeCam() {
+    this.freeCam = !this.freeCam;
+    return this.freeCam;
+  }
+
+  panCam(ax, az, dt) {
+    const o = this.orbit;
+    const fx = -Math.sin(o.yaw), fz = -Math.cos(o.yaw);
+    const rx = -fz, rz = fx;
+    const sp = 620 * (o.dist / 977) * Math.min(0.1, dt || 0.016);
+    this.cam.x = Math.max(0, Math.min(MAP.w, this.cam.x + (rx * ax + fx * -az) * sp));
+    this.cam.z = Math.max(0, Math.min(MAP.h, this.cam.z + (rz * ax + fz * -az) * sp));
   }
 
   loadPixelFont() {
@@ -452,8 +498,10 @@ export class Renderer {
     const k = Math.min(1, (dt || 0.016) * 6);
     const tx = me ? (me.rx != null ? me.rx : me.x) : MAP.w / 2;
     const tz = me ? (me.ry != null ? me.ry : me.y) : MAP.h / 2;
-    this.cam.x += (tx - this.cam.x) * k;
-    this.cam.z += (tz - this.cam.z) * k;
+    if (!this.freeCam) {
+      this.cam.x += (tx - this.cam.x) * k;
+      this.cam.z += (tz - this.cam.z) * k;
+    }
 
     if (!this.gl) { this.drawFallback(); return; }
 
@@ -466,8 +514,13 @@ export class Renderer {
       this.eye.x = orb.ex; this.eye.y = orb.ey; this.eye.z = orb.ez;
       lookAt(this.mView, orb.ex, orb.ey, orb.ez, orb.tx, orb.ty, orb.tz);
     } else {
-      this.eye.x = this.cam.x; this.eye.y = 730; this.eye.z = this.cam.z + 650;
-      lookAt(this.mView, this.eye.x, this.eye.y, this.eye.z, this.cam.x, 0, this.cam.z);
+      const o = this.orbit;
+      const cp = Math.cos(o.pitch), sp = Math.sin(o.pitch);
+      const ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist;
+      const ey = sp * o.dist;
+      const ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist;
+      this.eye.x = ex; this.eye.y = ey; this.eye.z = ez;
+      lookAt(this.mView, ex, ey, ez, this.cam.x, 0, this.cam.z);
     }
     mul(this.mVP, this.mProj, this.mView);
 
