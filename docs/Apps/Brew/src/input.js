@@ -7,6 +7,39 @@ export class Input {
     window.addEventListener('keydown', e => this.down(e));
     window.addEventListener('keyup', e => this.up(e));
     window.addEventListener('blur', () => this.keys.clear());
+    this.touchAxis = { x: 0, y: 0, active: false };
+    this.bindTouch();
+  }
+
+  bindTouch() {
+    const root = document.getElementById('joystick');
+    const knob = root && root.querySelector('span');
+    if (!root || !knob) return;
+    const radius = 42;
+    const update = e => {
+      const r = root.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      const d = Math.hypot(dx, dy) || 1;
+      const k = Math.min(1, radius / d);
+      const x = dx * k, y = dy * k;
+      knob.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+      this.touchAxis.x = x / radius;
+      this.touchAxis.y = y / radius;
+      this.touchAxis.active = true;
+    };
+    const stop = e => {
+      try { root.releasePointerCapture(e.pointerId); } catch (_) {}
+      knob.style.transform = '';
+      this.touchAxis.x = this.touchAxis.y = 0;
+      this.touchAxis.active = false;
+    };
+    root.addEventListener('pointerdown', e => { root.setPointerCapture(e.pointerId); update(e); });
+    root.addEventListener('pointermove', e => { if (this.touchAxis.active) update(e); });
+    root.addEventListener('pointerup', stop);
+    root.addEventListener('pointercancel', stop);
+    document.getElementById('touchInteract')?.addEventListener('click', () => this.emit('interact'));
+    document.getElementById('touchGame')?.addEventListener('click', () => this.emit('activity'));
   }
 
   on(type, fn) { this.handlers[type] = fn; return this; }
@@ -53,6 +86,7 @@ export class Input {
     x = Math.max(-1, Math.min(1, x));
     y = Math.max(-1, Math.min(1, y));
     if (x && y) { const inv = Math.SQRT1_2; x *= inv; y *= inv; }
+    if (this.touchAxis.active) { x = this.touchAxis.x; y = this.touchAxis.y; }
     return { x, y, sprint: k.has('ShiftLeft') || k.has('ShiftRight') };
   }
 
