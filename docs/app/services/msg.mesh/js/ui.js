@@ -125,7 +125,8 @@ function messageHtml(m, peer) {
     ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><span class="ico">📎</span><span>${esc(m.attachment.filename || "file")}<small>${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
     : "";
   const body = m.text ? esc(m.text) : (att ? "" : `<span class="type-tag">(${esc(m.type)})</span>`);
-  return `<div class="message ${m.mine ? "mine " : ""}${m.sync === "sending" ? "pending " : ""}${m.sync === "failed" ? "failed " : ""}" data-id="${esc(m.id)}" data-rowid="${m.rowid != null ? m.rowid : ""}">
+  const rid = m.rowid != null && Number.isFinite(Number(m.rowid)) ? Number(m.rowid) : "";
+  return `<div class="message ${m.mine ? "mine " : ""}${m.sync === "sending" ? "pending " : ""}${m.sync === "failed" ? "failed " : ""}" data-id="${esc(m.id)}" data-rowid="${rid}">
     <div class="bubble">${body}${att}</div>
     <span class="message-meta">${esc(metaFor(m, peer))}</span>
   </div>`;

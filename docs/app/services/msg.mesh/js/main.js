@@ -522,8 +522,10 @@ async function loadOlder() {
 /* ---------------- store events ---------------- */
 
 function jumpTo(rowid) {
+  const rid = Number(rowid);
+  if (!Number.isFinite(rid)) return;
   requestAnimationFrame(() => {
-    const el = document.querySelector(`#messageList .message[data-rowid="${rowid}"]`);
+    const el = document.querySelector(`#messageList .message[data-rowid="${rid}"]`);
     if (el) {
       el.scrollIntoView({ block: "center" });
       el.classList.add("jump");
