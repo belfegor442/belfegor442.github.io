@@ -56,6 +56,7 @@ let gTimer = null;
 let nextStake = 25;
 let sndOn = true;
 let savedName = '';
+const settledActivityResults = new Set();
 const sndCache = {};
 
 try {
@@ -205,7 +206,9 @@ function guestHelloLoop() {
       net.rotate();
       return;
     }
-    ui.entryStatus('World ' + room + ' not found. Ask the host for the code.');
+    if (net) { try { net.close(); } catch (e) {} net = null; }
+    hostSeen = false;
+    ui.entryStatus('World ' + room + ' not found. Ask the host for the code, then try again.');
     return;
   }
   ui.entryStatus(hostSeen
@@ -458,38 +461,36 @@ function applyActivityStart(msg) {
   if (activity) ui.system(Registry[activity.kind] ? Registry[activity.kind].label + ' started at ' + activity.table : 'Activity started.');
 }
 
+function settleActivityResult(act) {
+  if (!act || !act.id || !act.balances || !me) return;
+  if (settledActivityResults.has(act.id)) return;
+  settledActivityResults.add(act.id);
+  const d = Number(act.balances[myUid] || 0);
+  if (!Number.isFinite(d) || d === 0) return;
+  me.balance = Math.max(0, (me.balance || 0) + d);
+  balance = me.balance;
+  try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
+  sfx(d > 0 ? 'win' : 'lose');
+  ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
+}
+
 function applyActivityUpdate(msg) {
   if (!activity || activity.id !== msg.id) activity = msg.activity || activity;
   else if (msg.activity) Object.assign(activity, msg.activity);
   else { activity.phase = msg.phase || activity.phase; if (msg.waiting) activity.waiting = msg.waiting; }
   if (activity && msg.activity && msg.activity.balances) activity.balances = msg.activity.balances;
   if (activity && msg.activity && msg.activity.result) activity.result = msg.activity.result;
+  if (activity && activity.phase === 'result') settleActivityResult(activity);
   renderActivityPanel();
   renderPrompt();
-  if (activity && activity.phase === 'result' && activity.balances && me) {
-    const d = activity.balances[myUid] || 0;
-    if (d !== 0) {
-      me.balance = Math.max(0, (me.balance || 0) + d);
-      balance = me.balance;
-      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
-      sfx(d > 0 ? 'win' : 'lose');
-      ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
-    }
-  }
 }
 
 function applyActivityEnd(msg) {
-  if (activity && msg.activity && msg.activity.balances && activity.id === msg.id) {
-    const d = (msg.activity.balances[myUid] || 0);
-    if (d !== 0 && (!activity.balances)) {
-      me.balance = Math.max(0, (me.balance || 0) + d);
-      balance = me.balance;
-      try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
-      sfx(d > 0 ? 'win' : 'lose');
-    }
+  if (msg.activity && msg.activity.id === msg.id) settleActivityResult(msg.activity);
+  if (activity && activity.id === msg.id) {
+    activity = null;
+    myHand = null;
   }
-  activity = null;
-  myHand = null;
   renderActivityPanel();
   renderPrompt();
 }
@@ -602,6 +603,7 @@ function leaveWorld() {
       net.close();
     }
   } catch (e) {}
+  net = null;
   location.reload();
 }
 
