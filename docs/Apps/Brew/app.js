@@ -1,11 +1,11 @@
-import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=9';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=9';
-import { Host } from './src/state.js?v=9';
-import { Net } from './src/net.js?v=9';
-import { Renderer } from './src/render.js?v=9';
-import { Input } from './src/input.js?v=9';
-import { UI } from './src/ui.js?v=9';
-import { Registry, kinds as activityKinds } from './src/activities.js?v=9';
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=10';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=10';
+import { Host } from './src/state.js?v=10';
+import { Net } from './src/net.js?v=10';
+import { Renderer } from './src/render.js?v=10';
+import { Input } from './src/input.js?v=10';
+import { UI } from './src/ui.js?v=10';
+import { Registry, kinds as activityKinds } from './src/activities.js?v=10';
 
 const BROKERS = (() => {
   try {
@@ -745,7 +745,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 9,
+  version: 10,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
