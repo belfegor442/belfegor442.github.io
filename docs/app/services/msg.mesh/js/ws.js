@@ -120,7 +120,8 @@ export function connect() {
       if (reader === state.selfNode) {
         setPointerLocal(data.peer_node_id, data.last_read_rowid);
       } else if (data.peer_node_id === state.selfNode) {
-        state.peerPointers.set(other, data.last_read_rowid);
+        const cur = state.peerPointers.get(other) || 0;
+        if (data.last_read_rowid > cur) state.peerPointers.set(other, data.last_read_rowid);
       }
       emit("readstate", data);
     }

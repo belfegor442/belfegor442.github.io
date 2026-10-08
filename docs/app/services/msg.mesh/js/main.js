@@ -174,9 +174,13 @@ async function markRead(peer) {
   if (max <= ptr) return;
   try {
     const r = await api.read(peer, max);
-    if (r && typeof r.my_last_read_rowid === "number") state.pointers.set(peer, r.my_last_read_rowid);
+    if (r && typeof r.my_last_read_rowid === "number") {
+      const cur = state.pointers.get(peer) || 0;
+      if (r.my_last_read_rowid > cur) state.pointers.set(peer, r.my_last_read_rowid);
+    }
     if (r && typeof r.peer_last_read_rowid === "number" && r.peer_last_read_rowid >= 0) {
-      state.peerPointers.set(peer, r.peer_last_read_rowid);
+      const curP = state.peerPointers.get(peer) || 0;
+      if (r.peer_last_read_rowid > curP) state.peerPointers.set(peer, r.peer_last_read_rowid);
     }
     ui.renderSidebar();
     if (state.activePeer === peer) ui.renderChatHead();
