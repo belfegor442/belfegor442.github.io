@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-brew-build="10">
+<html lang="en" data-brew-build="14">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="BREW — a browser-based 2.5D multiplayer social arcade world by North Assembly.">
 <title>BREW — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
-<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./style.css?v=14">
 </head>
 <body class="world">
 <canvas id="world"></canvas>
@@ -51,7 +51,7 @@
       <div class="chatbox">
         <div id="chatLog" class="chatlog"></div>
         <div class="chatrow">
-          <input id="chatInput" maxlength="140" placeholder="Enter to chat · proximity chat">
+          <input id="chatInput" maxlength="140" placeholder="PROXIMITY CHAT — ENTER TO SEND">
           <button id="chatSend">SEND</button>
         </div>
       </div>
@@ -64,18 +64,26 @@
 
 <div id="entry" class="entry">
   <div class="entry-card">
-    <p class="eyebrow">NORTH ASSEMBLY · 2.5D MULTIPLAYER WORLD</p>
-    <h1>BREW</h1>
-    <p class="lead">Walk in, meet people, sit at a table and play — coinflip, slots, high-low, rock paper scissors, roulette or heads-up poker are all inside the world.</p>
-    <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
-    <label class="field"><span>WORLD CODE <em>optional — leave empty to open a new world</em></span><input id="codeInput" maxlength="6" placeholder="A7F29" autocomplete="off"></label>
-    <button id="enterBtn" class="primary" type="button">ENTER THE WORLD</button>
-    <p id="entryStatus" class="status">Ready.</p>
+    <div class="sign">
+      <span class="bulbs"></span>
+      <p class="eyebrow">NORTH ASSEMBLY · SOCIAL ARCADE</p>
+      <h1>BREW</h1>
+      <span class="bulbs"></span>
+    </div>
+    <div class="entry-tags">
+      <span>COINFLIP</span><span>SLOTS</span><span>HIGH·LOW</span><span>RPS</span><span>ROULETTE</span><span>POKER</span>
+    </div>
+    <div class="entry-body">
+      <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
+      <label class="field"><span>WORLD CODE <em>OPTIONAL · EMPTY = NEW WORLD</em></span><input id="codeInput" maxlength="6" placeholder="A7F29" autocomplete="off"></label>
+      <button id="enterBtn" class="primary" type="button">ENTER THE WORLD</button>
+      <p id="entryStatus" class="status">Ready.</p>
+    </div>
     <p class="pid">PLAYER ID <strong id="myPid">----</strong></p>
   </div>
 </div>
 
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-<script type="module" src="./app.js?v=13"></script>
+<script type="module" src="./app.js?v=14"></script>
 </body>
 </html>
