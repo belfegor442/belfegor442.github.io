@@ -162,6 +162,8 @@ function startHost() {
   net.host(room, will);
 }
 
+function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
+
 function onHostReady() {
   const spawn = SPAWNS[0];
   me = entity({
@@ -176,6 +178,7 @@ function onHostReady() {
   ui.hideEntry();
   ui.system('World #' + room + ' is open. Share the code to invite people.');
   input.enabled = true;
+  setTouchControls(true);
 }
 
 function startGuest(code) {
@@ -365,6 +368,7 @@ function applyWelcome(msg) {
   ui.hideEntry();
   ui.system('You walked into world #' + room + '.');
   input.enabled = true;
+  setTouchControls(true);
   refreshHud();
   renderActivityPanel();
 }
@@ -604,6 +608,7 @@ function leaveWorld() {
     }
   } catch (e) {}
   net = null;
+  setTouchControls(false);
   location.reload();
 }
 
@@ -719,7 +724,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 3,
+  version: 4,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
