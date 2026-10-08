@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-brew-build="4">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Brew — North Assembly</title>
+<meta name="description" content="BREW — a browser-based 2.5D multiplayer social arcade world by North Assembly.">
+<title>BREW — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
 <link rel="stylesheet" href="./style.css">
 </head>
@@ -66,13 +67,13 @@
     <p class="lead">Walk in, meet people, sit at a table and play — coinflip, slots, high-low, rock paper scissors, roulette or heads-up poker are all inside the world.</p>
     <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
     <label class="field"><span>WORLD CODE <em>optional — leave empty to open a new world</em></span><input id="codeInput" maxlength="6" placeholder="A7F29" autocomplete="off"></label>
-    <button id="enterBtn" class="primary">ENTER THE WORLD</button>
+    <button id="enterBtn" class="primary" type="button">ENTER THE WORLD</button>
     <p id="entryStatus" class="status">Ready.</p>
     <p class="pid">PLAYER ID <strong id="myPid">----</strong></p>
   </div>
 </div>
 
-<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
-<script type="module" src="./app.js"></script>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
+<script type="module" src="./app.js?v=4"></script>
 </body>
 </html>
