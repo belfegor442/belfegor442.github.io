@@ -98,8 +98,19 @@ async function decodeImages(json, bin) {
     if (im.bufferView == null || !bin) { images.push(null); continue; }
     const bv = json.bufferViews[im.bufferView];
     const bytes = bin.subarray(bv.byteOffset || 0, (bv.byteOffset || 0) + bv.byteLength);
+    const blob = new Blob([bytes], { type: im.mimeType || 'image/png' });
     try {
-      images.push(await createImageBitmap(new Blob([bytes], { type: im.mimeType || 'image/png' })));
+      if (typeof createImageBitmap === 'function') {
+        images.push(await createImageBitmap(blob));
+      } else {
+        images.push(await new Promise((res, rej) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => { URL.revokeObjectURL(url); res(img); };
+          img.onerror = e => { URL.revokeObjectURL(url); rej(e); };
+          img.src = url;
+        }));
+      }
     } catch (e) {
       console.warn('[glb] image decode failed', e && e.message);
       images.push(null);
@@ -118,11 +129,21 @@ export async function loadGLB(url, opts = {}) {
     const p = m.pbrMetallicRoughness || {};
     const texIdx = p.baseColorTexture ? p.baseColorTexture.index : -1;
     const texRec = texIdx >= 0 && json.textures && json.textures[texIdx] ? json.textures[texIdx] : null;
-    const tex = texRec && texRec.source != null ? texRec.source : -1;
+    // EXT_texture_webp keeps the image index inside the extension, not at the
+    // top level of the texture record.
+    let tex = -1, smp = -1;
+    if (texRec) {
+      if (texRec.source != null) tex = texRec.source;
+      else {
+        const w = texRec.extensions && texRec.extensions.EXT_texture_webp;
+        if (w && w.source != null) tex = w.source;
+      }
+      if (texRec.sampler != null) smp = texRec.sampler;
+    }
     return {
       base: p.baseColorFactor || [1, 1, 1, 1],
       tex,
-      smp: texRec && texRec.sampler != null ? texRec.sampler : -1,
+      smp,
       unlit: !!(m.extensions && m.extensions.KHR_materials_unlit),
       blend: (m.alphaMode || 'OPAQUE') === 'BLEND'
     };
@@ -181,6 +202,47 @@ export async function loadGLB(url, opts = {}) {
     samplers: json.samplers || [],
     bounds: { min, max }
   };
+}
+
+// Drop the ceiling (and everything bolted to it) so the interior is visible
+// from the orbit camera, which sits above the building. Height is evaluated in
+// world space through each draw's matrix (node transforms included). A triangle
+// is dropped only when ALL of its vertices reach above minH: walls, door frames
+// and furniture touch the floor (their triangles reach down to y=0), so only
+// the roof plane, ducts and light rigs are removed.
+export function stripCeiling(draws, minH = 118) {
+  let dropped = 0;
+  for (const d of draws) {
+    const pos = d.pos, idx = d.idx, m = d.matrix;
+    const wy = v => m[1] * pos[v * 3] + m[5] * pos[v * 3 + 1] + m[9] * pos[v * 3 + 2] + m[13];
+    const before = dropped;
+    const keep = [];
+    const remap = new Map();
+    const npos = [], nnrm = [], nuv = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+      const ya = wy(a), yb = wy(b), yc = wy(c);
+      const mn = ya < yb ? (ya < yc ? ya : yc) : (yb < yc ? yb : yc);
+      if (mn >= minH) { dropped++; continue; }
+      for (const v of [a, b, c]) {
+        let nv = remap.get(v);
+        if (nv === undefined) {
+          nv = npos.length / 3;
+          remap.set(v, nv);
+          npos.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+          if (d.nrm) nnrm.push(d.nrm[v * 3], d.nrm[v * 3 + 1], d.nrm[v * 3 + 2]);
+          if (d.uv) nuv.push(d.uv[v * 2], d.uv[v * 2 + 1]);
+        }
+        keep.push(nv);
+      }
+    }
+    if (dropped === before) continue;
+    d.pos = new Float32Array(npos);
+    if (d.nrm) d.nrm = new Float32Array(nnrm);
+    if (d.uv) d.uv = new Float32Array(nuv);
+    d.idx = new (idx.constructor)(keep);
+  }
+  return dropped;
 }
 
 // Rasterise the world triangles into a coarse height grid. The lobby IS the

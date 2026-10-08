@@ -5,7 +5,7 @@ import {
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
-import { loadGLB, buildNav } from './glb.js';
+import { loadGLB, buildNav, stripCeiling } from './glb.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -21,6 +21,25 @@ const PALETTE = [
 ];
 
 const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
+
+// The lobby ships baked, unlit textures that render darker than the play
+// field expects: lift them without touching lit geometry or the player skin.
+const GLB_EXPOSURE = 1.6;
+
+// Inverse-transpose of the upper-left 3x3 of a column-major mat4, into a
+// 9-float column-major mat3. Correct normals under the lobby's non-uniform
+// (anisotropic) world scale, which a plain mat3(uM) would skew.
+function nrmMat3(m, out) {
+  const a = m[0], b = m[4], c = m[8];
+  const d = m[1], e = m[5], f = m[9];
+  const g = m[2], h = m[6], i = m[10];
+  const A = e * i - f * h, B = f * g - d * i, Cc = d * h - e * g;
+  const det = a * A + b * B + c * Cc;
+  const id = det ? 1 / det : 0;
+  out[0] = A * id; out[1] = (c * h - b * i) * id; out[2] = (b * f - c * e) * id;
+  out[3] = B * id; out[4] = (a * i - c * g) * id; out[5] = (c * d - a * f) * id;
+  out[6] = Cc * id; out[7] = (b * g - a * h) * id; out[8] = (a * e - b * d) * id;
+}
 
 export class Renderer {
   constructor(canvas) {
@@ -127,7 +146,7 @@ export class Renderer {
     gl.useProgram(this.pTex.prog);
     gl.uniform1i(this.pTex.u.uTex, 0);
     this.pGLB = this.makeProgram(VS_GLB, FS_GLB, ['aPos', 'aNrm', 'aUV'],
-      ['uVP', 'uM', 'uCam', 'uTex', 'uTint', 'uUnlit', 'uSunDir', 'uSunColor', 'uAmbient', 'uFogColor', 'uFogRange']);
+      ['uVP', 'uM', 'uN', 'uCam', 'uTex', 'uTint', 'uUnlit', 'uSunDir', 'uSunColor', 'uAmbient', 'uFogColor', 'uFogRange']);
     gl.useProgram(this.pGLB.prog);
     gl.uniform1i(this.pGLB.u.uTex, 0);
     this.isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
@@ -139,6 +158,7 @@ export class Renderer {
     this.glbReady = false;
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
+    this.mN3 = new Float32Array(9);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.disable(gl.CULL_FACE);
@@ -153,12 +173,14 @@ export class Renderer {
     wg.fillRect(0, 0, 1, 1);
     this.texWhite = this.uploadTexture(wc);
 
-    const world = newMesh(), lever = newMesh(), ring = newMesh();
+    const back = newMesh(), shell = newMesh(), props = newMesh(), lever = newMesh(), ring = newMesh();
     const floorT = newTMesh(), signT = newTMesh();
-    this.buildWorld(world, lever, floorT, signT);
+    this.buildWorld(back, shell, props, lever, floorT, signT);
     pushRing(ring, 0, 0, 0, 11.5, 15, C('#e9c877'), 24);
 
-    this.gpuWorld = this.uploadMesh(world, gl.STATIC_DRAW);
+    this.gpuBack = this.uploadMesh(back, gl.STATIC_DRAW);
+    this.gpuShell = this.uploadMesh(shell, gl.STATIC_DRAW);
+    this.gpuWorld = this.uploadMesh(props, gl.STATIC_DRAW);
     this.gpuLever = this.uploadMesh(lever, gl.STATIC_DRAW);
     this.gpuRing = this.uploadMesh(ring, gl.STATIC_DRAW);
     this.gpuFloor = this.uploadTexMesh(floorT, gl.STATIC_DRAW);
@@ -218,6 +240,8 @@ export class Renderer {
         min: [mnx + place[12], mny + place[13], mnz + place[14]],
         max: [mxx + place[12], mxy + place[13], mxz + place[14]]
       };
+      const noRoof = stripCeiling(world.draws);
+      this.glbReady = true;
       this.glbWorld = this.uploadGLB(world);
       const nav = buildNav(world.draws, MAP.w, MAP.h);
       setNav(nav);
@@ -226,7 +250,7 @@ export class Renderer {
         this.glbWorld.blend.length + ' blend, box=' +
         world.bounds.min.map(v => Math.round(v)).join(',') + '..' +
         world.bounds.max.map(v => Math.round(v)).join(',') +
-        ', nav ' + nav.open + '/' + nav.total + ' open cells');
+        ', nav ' + nav.open + '/' + nav.total + ' open cells, roof tris ' + noRoof);
     } catch (e) {
       this.glbReady = false;
       console.warn('[glb] world load failed, procedural fallback:', e && e.message);
@@ -376,9 +400,12 @@ export class Renderer {
     gpu.count = mesh.idx.length;
   }
 
-  buildWorld(M, lever, floorT, signT) {
+  // back   - dark backdrop plane, drawn under the imported lobby too
+  // shell  - procedural rug + perimeter walls, fallback scene only
+  // M      - gameplay props (tables, bar, seats, ...), drawn in both scenes
+  buildWorld(back, shell, M, lever, floorT, signT) {
     const wallC = C('#453424');
-    pushQuadLit(M, [
+    pushQuadLit(back, [
       [-2200, -1.5, -2200], [MAP.w + 2200, -1.5, -2200],
       [MAP.w + 2200, -1.5, MAP.h + 2200], [-2200, -1.5, MAP.h + 2200]
     ], [0.05, 0.042, 0.034]);
@@ -388,11 +415,11 @@ export class Renderer {
       switch (o.type) {
         case 'rug':
           // The central social area must exist visually as well as in the world data.
-          pushBox(M, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
-          pushBox(M, cx, 0.85, cz, o.w - 18, 0.18, o.h - 18, C('#245b47'));
+          pushBox(shell, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
+          pushBox(shell, cx, 0.85, cz, o.w - 18, 0.18, o.h - 18, C('#245b47'));
           break;
         case 'wall':
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, wallC);
+          pushBox(shell, cx, 0, cz, o.w, o.hgt, o.h, wallC);
           break;
         case 'table':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#6b4526'));
@@ -574,11 +601,28 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
-    // The imported lobby is the actual map. Never render the procedural map beneath it.
+    // The imported lobby is the actual map. The procedural shell (rug, outer
+    // walls) only exists as a fallback; gameplay props are drawn on both.
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useGLB(def);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
       this.glErr('lobbyOpaque');
+
+      this.useLit();
+      this.setLitM(this.mIdent);
+      this.setLitTint(1, 1, 1);
+      this.setLitLighting(def);
+      this.bindLit(this.gpuBack);
+      gl.drawElements(gl.TRIANGLES, this.gpuBack.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.bindLit(this.gpuWorld);
+      gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
+      this.bindLit(this.gpuLever);
+      gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.glErr('glbProps');
     } else {
       // Emergency fallback only while lobby.glb cannot be loaded.
       this.useTex();
@@ -592,6 +636,12 @@ export class Renderer {
       this.setLitM(this.mIdent);
       this.setLitTint(1, 1, 1);
       this.setLitLighting(def);
+      this.bindLit(this.gpuBack);
+      gl.drawElements(gl.TRIANGLES, this.gpuBack.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.bindLit(this.gpuShell);
+      gl.drawElements(gl.TRIANGLES, this.gpuShell.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
       this.bindLit(this.gpuWorld);
       gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -756,10 +806,15 @@ export class Renderer {
 
   drawGLBD(g, m) {
     const gl = this.gl, P = this.pGLB;
-    gl.uniformMatrix4fv(P.u.uM, false, m || g.matrix);
+    const wm = m || g.matrix;
+    gl.uniformMatrix4fv(P.u.uM, false, wm);
+    nrmMat3(wm, this.mN3);
+    gl.uniformMatrix3fv(P.u.uN, false, this.mN3);
     const mat = g.mat;
-    if (mat) gl.uniform4f(P.u.uTint, mat.base[0], mat.base[1], mat.base[2], mat.base[3]);
-    else gl.uniform4f(P.u.uTint, 1, 1, 1, 1);
+    if (mat) {
+      const k = mat.unlit ? GLB_EXPOSURE : 1;
+      gl.uniform4f(P.u.uTint, mat.base[0] * k, mat.base[1] * k, mat.base[2] * k, mat.base[3]);
+    } else gl.uniform4f(P.u.uTint, 1, 1, 1, 1);
     gl.uniform1f(P.u.uUnlit, mat && mat.unlit ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, g.tex || this.texWhite);

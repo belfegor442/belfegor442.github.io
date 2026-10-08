@@ -126,13 +126,14 @@ attribute vec3 aNrm;
 attribute vec2 aUV;
 uniform mat4 uVP;
 uniform mat4 uM;
+uniform mat3 uN;
 uniform vec3 uCam;
 varying vec3 vN;
 varying vec2 vUV;
 varying float vD;
 void main() {
   vec4 w = uM * vec4(aPos, 1.0);
-  vN = mat3(uM[0].xyz, uM[1].xyz, uM[2].xyz) * aNrm;
+  vN = uN * aNrm;
   vUV = aUV;
   vD = length(w.xyz - uCam);
   gl_Position = uVP * w;
