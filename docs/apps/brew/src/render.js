@@ -1,10 +1,11 @@
 import { MAP, OBJECTS, SEATS, OBJ_BY_ID } from './world.js';
 import {
   C, mul, perspective, lookAt, trs,
-  VS_MAIN, FS_MAIN, VS_TEX, FS_TEX,
+  VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB,
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
+import { loadGLB } from './glb.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -36,6 +37,10 @@ export class Renderer {
     this.time = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.cam = { x: MAP.w / 2, z: MAP.h / 2 };
+    this.camOrbit = null;
+    this.eye = { x: MAP.w / 2, y: 730, z: MAP.h / 2 + 650 };
+    this.glErrs = {};
+    try { this.glDbg = /[?&]gldebug/.test(location.search); } catch (e) { this.glDbg = false; }
     this.stats = { frames: 0, draws: 0, gl: !!this.gl };
     this.mProj = new Float32Array(16);
     this.mView = new Float32Array(16);
@@ -74,6 +79,16 @@ export class Renderer {
     this.pTex = this.makeProgram(VS_TEX, FS_TEX, ['aPos', 'aUV'], ['uVP', 'uM', 'uTex', 'uTint']);
     gl.useProgram(this.pTex.prog);
     gl.uniform1i(this.pTex.u.uTex, 0);
+    this.pGLB = this.makeProgram(VS_GLB, FS_GLB, ['aPos', 'aNrm', 'aUV'],
+      ['uVP', 'uM', 'uCam', 'uTex', 'uTint', 'uUnlit', 'uSunDir', 'uSunColor', 'uAmbient', 'uFogColor', 'uFogRange']);
+    gl.useProgram(this.pGLB.prog);
+    gl.uniform1i(this.pGLB.u.uTex, 0);
+    this.isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+    this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
+    this.glbWorld = null;
+    this.glbPlayer = null;
+    this.glbWorldAlpha = null;
+    this.mScratch2 = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.disable(gl.CULL_FACE);
@@ -81,6 +96,12 @@ export class Renderer {
     this.texFloor = this.uploadTexture(buildFloor());
     this.texDot = this.uploadTexture(dotTexture());
     this.texSign = this.uploadTexture(signTexture('BREW'));
+    const wc = document.createElement('canvas');
+    wc.width = wc.height = 1;
+    const wg = wc.getContext('2d');
+    wg.fillStyle = '#ffffff';
+    wg.fillRect(0, 0, 1, 1);
+    this.texWhite = this.uploadTexture(wc);
 
     const world = newMesh(), lever = newMesh(), ring = newMesh();
     const floorT = newTMesh(), signT = newTMesh();
@@ -111,6 +132,94 @@ export class Renderer {
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.016, 0.024, 0.055], fogRange: [850, 2900]
     };
+    this.loadGLBAssets();
+  }
+
+  async loadGLBAssets() {
+    try {
+      const world = await loadGLB('./Assets/gbl/world/lobby.glb');
+      const b = world.bounds;
+      const ox = MAP.w / 2 - (b.max[0] - b.min[0]) / 2 - b.min[0];
+      const oy = -b.min[1];
+      const oz = MAP.h / 2 - (b.max[2] - b.min[2]) / 2 - b.min[2];
+      const place = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ox, oy, oz, 1]);
+      for (const d of world.draws) d.matrix = mul(new Float32Array(16), place, d.matrix);
+      world.bounds = { min: [0, 0, 0], max: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]] };
+      this.glbWorld = this.uploadGLB(world);
+      console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
+        this.glbWorld.blend.length + ' blend, size=' + world.bounds.max.map(v => Math.round(v)).join('x'));
+    } catch (e) {
+      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
+    }
+    try {
+      const player = await loadGLB('./Assets/gbl/Player/steve.skin.glb');
+      const pb = player.bounds;
+      const shift = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
+        -(pb.min[0] + pb.max[0]) / 2, -pb.min[1], -(pb.min[2] + pb.max[2]) / 2, 1]);
+      this.glbPlayer = this.uploadGLB(player);
+      for (const g of this.glbPlayer.opaque) g.matrix = mul(new Float32Array(16), shift, g.matrix);
+      for (const g of this.glbPlayer.blend) g.matrix = mul(new Float32Array(16), shift, g.matrix);
+      console.log('[glb] player ready: height=' + (pb.max[1] - pb.min[1]).toFixed(1) +
+        ' draws=' + (this.glbPlayer.opaque.length + this.glbPlayer.blend.length));
+    } catch (e) {
+      console.warn('[glb] player load failed, procedural fallback:', e && e.message);
+    }
+  }
+
+  uploadGLB(glb) {
+    const gl = this.gl;
+    const out = { opaque: [], blend: [] };
+    const texCache = new Map();
+    for (const d of glb.draws) {
+      if (!d.idx || !d.idx.length) continue;
+      const m = d.mat >= 0 ? glb.materials[d.mat] : null;
+      const gpu = {
+        pos: this.gbuf(d.pos), nrm: this.gbuf(d.nrm), uv: this.gbuf(d.uv),
+        idx: gl.createBuffer(), count: d.idx.length,
+        type: d.idx instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT,
+        matrix: d.matrix, mat: m, tex: null
+      };
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gpu.idx);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, d.idx, gl.STATIC_DRAW);
+      if (gpu.type === gl.UNSIGNED_INT && !this.uintIdx) continue;
+      if (m && m.tex >= 0 && glb.images[m.tex]) {
+        if (!texCache.has(m.tex)) {
+          texCache.set(m.tex, this.uploadGLBTexture(glb.images[m.tex], glb.samplers[m.smp] || {}));
+        }
+        gpu.tex = texCache.get(m.tex);
+      }
+      if (m && m.blend) out.blend.push(gpu);
+      else out.opaque.push(gpu);
+    }
+    return out;
+  }
+
+  gbuf(arr) {
+    const gl = this.gl;
+    if (!arr) return null;
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+    return b;
+  }
+
+  uploadGLBTexture(bitmap, smp) {
+    const gl = this.gl;
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    const pot = v => v > 0 && (v & (v - 1)) === 0;
+    const wrap = w => (w === 33071 ? gl.CLAMP_TO_EDGE : w === 33648 ? gl.MIRRORED_REPEAT : gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap(smp.wrapS));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap(smp.wrapT));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smp.magFilter === 9728 ? gl.NEAREST : gl.LINEAR);
+    if (pot(bitmap.width) && pot(bitmap.height)) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, smp.minFilter === 9984 || smp.minFilter === 9985 ? gl.NEAREST : gl.LINEAR_MIPMAP_LINEAR);
+    } else {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+    return t;
   }
 
   makeProgram(vsSrc, fsSrc, attribs, uniforms) {
@@ -352,7 +461,14 @@ export class Renderer {
     const def = this.lights ? this.litDef : this.nightDef;
     const aspect = this.canvas.width / Math.max(1, this.canvas.height);
     perspective(this.mProj, Math.PI / 4, aspect, 5, 5200);
-    lookAt(this.mView, this.cam.x, 730, this.cam.z + 650, this.cam.x, 0, this.cam.z);
+    const orb = this.camOrbit;
+    if (orb) {
+      this.eye.x = orb.ex; this.eye.y = orb.ey; this.eye.z = orb.ez;
+      lookAt(this.mView, orb.ex, orb.ey, orb.ez, orb.tx, orb.ty, orb.tz);
+    } else {
+      this.eye.x = this.cam.x; this.eye.y = 730; this.eye.z = this.cam.z + 650;
+      lookAt(this.mView, this.eye.x, this.eye.y, this.eye.z, this.cam.x, 0, this.cam.z);
+    }
     mul(this.mVP, this.mProj, this.mView);
 
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -370,6 +486,7 @@ export class Renderer {
     this.bindTex(this.gpuFloor, this.texFloor);
     gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
     this.stats.draws++;
+    this.glErr('floor');
 
     this.useLit();
     this.setLitM(this.mIdent);
@@ -384,12 +501,38 @@ export class Renderer {
     this.bindLit(this.gpuLever);
     gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
     this.stats.draws++;
+    this.glErr('procWorld');
+
+    if (this.glbWorld && this.glbWorld.opaque.length) {
+      this.useGLB(def);
+      for (const g of this.glbWorld.opaque) this.drawGLBD(g);
+      this.glErr('lobbyOpaque');
+    }
+
+    if (this.glbPlayer && this.glbPlayer.opaque.length) {
+      this.useGLB(def);
+      for (const p of list) {
+        const px = p.rx != null ? p.rx : p.x;
+        const pz = p.ry != null ? p.ry : p.y;
+        const seated = p.status === 'seated' || p.anim === 'sit';
+        const walking = p.anim === 'walk' && !seated;
+        const ry = Math.PI / 2 - (p.dir || 0);
+        const phase = this.time * 11 + (p.id.charCodeAt(0) || 0);
+        const bob = walking ? Math.abs(Math.sin(phase)) * 1.2 : 0;
+        trs(this.mScratch, px, bob, pz, ry, 1, 1, 1);
+        for (const g of this.glbPlayer.opaque) {
+          mul(this.mScratch2, this.mScratch, g.matrix);
+          this.drawGLBD(g, this.mScratch2);
+        }
+      }
+    } else {
 
     const M = this.meshPlayers;
     M.pos.length = 0; M.nrm.length = 0; M.col.length = 0; M.idx.length = 0;
     for (const p of list) this.pushPlayer(M, p);
     if (M.idx.length) {
       this.fillMesh(this.gpuPlayers, M, gl.DYNAMIC_DRAW);
+      this.useLit();
       this.setLitM(this.mIdent);
       this.setLitTint(1, 1, 1);
       this.bindLit(this.gpuPlayers);
@@ -397,13 +540,19 @@ export class Renderer {
       this.stats.draws++;
     }
 
+    }
+
+    this.glErr('players');
+
     if (me) {
       trs(this.mScratch, me.rx != null ? me.rx : me.x, 1.4, me.ry != null ? me.ry : me.y, 0, 1, 1, 1);
+      this.useLit();
       this.setLitM(this.mScratch);
       this.setLitTint(1, 1, 1);
       this.bindLit(this.gpuRing);
       gl.drawElements(gl.TRIANGLES, this.gpuRing.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
+      this.glErr('ring');
     }
 
     const SH = this.meshShadows;
@@ -436,6 +585,12 @@ export class Renderer {
 
     gl.enable(gl.BLEND);
     gl.depthMask(false);
+    if (this.glbWorld && this.glbWorld.blend.length) {
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      this.useGLB(def);
+      for (const g of this.glbWorld.blend) this.drawGLBD(g);
+      this.glErr('lobbyBlend');
+    }
     this.useTex();
     this.setTexM(this.mIdent);
 
@@ -446,6 +601,7 @@ export class Renderer {
       this.bindTex(this.gpuShadows, this.texDot);
       gl.drawElements(gl.TRIANGLES, this.gpuShadows.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
+      this.glErr('shadows');
     }
 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -463,10 +619,12 @@ export class Renderer {
       this.bindTex(this.gpuGlows, this.texDot);
       gl.drawElements(gl.TRIANGLES, this.gpuGlows.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
+      this.glErr('glows');
     }
 
     gl.depthMask(true);
     gl.disable(gl.BLEND);
+    this.glErr('blend');
     this.drawOverlay(list, me, activity);
   }
 
@@ -474,7 +632,7 @@ export class Renderer {
     const gl = this.gl, P = this.pLit;
     gl.useProgram(P.prog);
     gl.uniformMatrix4fv(P.u.uVP, false, this.mVP);
-    gl.uniform3f(P.u.uCam, this.cam.x, 730, this.cam.z + 650);
+    gl.uniform3f(P.u.uCam, this.eye.x, this.eye.y, this.eye.z);
   }
 
   setLitM(m) { this.gl.uniformMatrix4fv(this.pLit.u.uM, false, m); }
@@ -488,6 +646,46 @@ export class Renderer {
     gl.uniform3f(u.uAmbient, def.amb[0], def.amb[1], def.amb[2]);
     gl.uniform3f(u.uFogColor, def.fog[0], def.fog[1], def.fog[2]);
     gl.uniform2f(u.uFogRange, def.fogRange[0], def.fogRange[1]);
+  }
+
+  useGLB(def) {
+    const gl = this.gl, P = this.pGLB;
+    gl.useProgram(P.prog);
+    gl.uniformMatrix4fv(P.u.uVP, false, this.mVP);
+    gl.uniform3f(P.u.uCam, this.eye.x, this.eye.y, this.eye.z);
+    gl.uniform3f(P.u.uSunDir, def.sunDir[0], def.sunDir[1], def.sunDir[2]);
+    gl.uniform3f(P.u.uSunColor, def.sun[0], def.sun[1], def.sun[2]);
+    gl.uniform3f(P.u.uAmbient, def.amb[0], def.amb[1], def.amb[2]);
+    gl.uniform3f(P.u.uFogColor, def.fog[0], def.fog[1], def.fog[2]);
+    gl.uniform2f(P.u.uFogRange, def.fogRange[0], def.fogRange[1]);
+  }
+
+  drawGLBD(g, m) {
+    const gl = this.gl, P = this.pGLB;
+    gl.uniformMatrix4fv(P.u.uM, false, m || g.matrix);
+    const mat = g.mat;
+    if (mat) gl.uniform4f(P.u.uTint, mat.base[0], mat.base[1], mat.base[2], mat.base[3]);
+    else gl.uniform4f(P.u.uTint, 1, 1, 1, 1);
+    gl.uniform1f(P.u.uUnlit, mat && mat.unlit ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, g.tex || this.texWhite);
+    this.bindAttrs(set => {
+      set(P.a.aPos, g.pos, 3);
+      set(P.a.aNrm, g.nrm, 3);
+      set(P.a.aUV, g.uv, 2);
+    });
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.idx);
+    gl.drawElements(gl.TRIANGLES, g.count, g.type, 0);
+    this.stats.draws++;
+  }
+
+  glErr(phase) {
+    if (!this.glDbg) return;
+    const e = this.gl.getError();
+    if (e && !this.glErrs[phase]) {
+      this.glErrs[phase] = e;
+      console.warn('[glERR] ' + e + ' after ' + phase);
+    }
   }
 
   useTex() {
@@ -505,7 +703,7 @@ export class Renderer {
     for (const i of this.enabledAttrs) gl.disableVertexAttribArray(i);
     this.enabledAttrs.clear();
     setup((loc, buf, size) => {
-      if (loc == null || loc < 0) return;
+      if (loc == null || loc < 0 || !buf) return;
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
@@ -596,7 +794,8 @@ export class Renderer {
     for (const p of list) {
       const seated = p.status === 'seated' || p.anim === 'sit';
       const isMe = !!me && p.id === me.id;
-      const anchor = this.sp(p.rx != null ? p.rx : p.x, seated ? 72 : 64, p.ry != null ? p.ry : p.y);
+      const topH = this.glbPlayer ? (seated ? 52 : 44) : (seated ? 72 : 64);
+      const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;
       o.font = '13px BrewPixel, Arial, sans-serif';

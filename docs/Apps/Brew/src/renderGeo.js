@@ -120,6 +120,50 @@ void main() {
   gl_FragColor = texture2D(uTex, vUV) * uTint;
 }`;
 
+export const VS_GLB = `
+attribute vec3 aPos;
+attribute vec3 aNrm;
+attribute vec2 aUV;
+uniform mat4 uVP;
+uniform mat4 uM;
+uniform vec3 uCam;
+varying vec3 vN;
+varying vec2 vUV;
+varying float vD;
+void main() {
+  vec4 w = uM * vec4(aPos, 1.0);
+  vN = mat3(uM[0].xyz, uM[1].xyz, uM[2].xyz) * aNrm;
+  vUV = aUV;
+  vD = length(w.xyz - uCam);
+  gl_Position = uVP * w;
+}`;
+
+export const FS_GLB = `
+precision mediump float;
+varying vec3 vN;
+varying vec2 vUV;
+varying float vD;
+uniform sampler2D uTex;
+uniform vec4 uTint;
+uniform float uUnlit;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform vec3 uAmbient;
+uniform vec3 uFogColor;
+uniform vec2 uFogRange;
+void main() {
+  vec4 c = texture2D(uTex, vUV) * uTint;
+  if (uUnlit < 0.5) {
+    vec3 n = normalize(vN);
+    float nd = max(dot(n, -uSunDir), 0.0);
+    float hemi = n.y * 0.5 + 0.5;
+    vec3 sky = mix(vec3(0.72, 0.68, 0.66), vec3(1.0, 0.98, 0.92), hemi);
+    c.rgb *= (uAmbient * sky + uSunColor * nd);
+  }
+  float fog = smoothstep(uFogRange.x, uFogRange.y, vD);
+  gl_FragColor = vec4(mix(c.rgb, uFogColor, fog), c.a);
+}`;
+
 /* ------------------------------------------------------------- mesh builders */
 
 export function newMesh() {

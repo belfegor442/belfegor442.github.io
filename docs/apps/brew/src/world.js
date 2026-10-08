@@ -6,23 +6,25 @@ export const OBJECTS = [
   { id: 'w-w', type: 'wall', x: 0, y: 0, w: MAP.wall, h: MAP.h, solid: true, hgt: 54 },
   { id: 'w-e', type: 'wall', x: MAP.w - MAP.wall, y: 0, w: MAP.wall, h: MAP.h, solid: true, hgt: 54 },
 
+  { id: 'monument', type: 'monument', x: 625, y: 90, w: 470, h: 1000, solid: true, hgt: 203 },
+
   { id: 'rug', type: 'rug', x: 420, y: 400, w: 780, h: 470, solid: false, hgt: 0 },
   { id: 'neon', type: 'sign', x: 640, y: 6, w: 430, h: 34, solid: false, hgt: 64, label: 'BREW' },
 
   { id: 'bar', type: 'bar', x: 1190, y: 74, w: 460, h: 112, solid: true, hgt: 48 },
   { id: 'shelf', type: 'shelf', x: 1210, y: 40, w: 420, h: 30, solid: false, hgt: 74 },
 
-  { id: 't1', type: 'table', kind: 'poker', x: 236, y: 292, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't2', type: 'table', kind: 'poker', x: 636, y: 246, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't3', type: 'table', kind: 'poker', x: 236, y: 706, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't4', type: 'table', kind: 'poker', x: 636, y: 754, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't5', type: 'table', kind: 'poker', x: 1112, y: 560, w: 250, h: 170, solid: true, hgt: 42 },
+  { id: 't1', type: 'table', kind: 'poker', x: 80, y: 180, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't2', type: 'table', kind: 'poker', x: 1150, y: 340, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't3', type: 'table', kind: 'poker', x: 80, y: 690, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't4', type: 'table', kind: 'poker', x: 1150, y: 700, w: 204, h: 142, solid: true, hgt: 40 },
+  { id: 't5', type: 'table', kind: 'poker', x: 80, y: 420, w: 250, h: 170, solid: true, hgt: 42 },
 
   { id: 'plant-1', type: 'plant', x: 74, y: 96, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'plant-2', type: 'plant', x: 1560, y: 1010, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'plant-3', type: 'plant', x: 78, y: 1016, w: 74, h: 74, solid: true, hgt: 62 },
-  { id: 'column', type: 'column', x: 1012, y: 300, w: 54, h: 54, solid: true, hgt: 150 },
-  { id: 'column-2', type: 'column', x: 1012, y: 900, w: 54, h: 54, solid: true, hgt: 150 },
+  { id: 'column', type: 'column', x: 1450, y: 300, w: 54, h: 54, solid: true, hgt: 150 },
+  { id: 'column-2', type: 'column', x: 1450, y: 920, w: 54, h: 54, solid: true, hgt: 150 },
 
   { id: 'lights', type: 'switch', x: 46, y: 548, w: 22, h: 56, solid: false, hgt: 44 },
   { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' }
@@ -56,10 +58,10 @@ export const SEATS = (() => {
 })();
 
 export const SPAWNS = [
-  { x: 700, y: 1080 }, { x: 800, y: 1080 }, { x: 900, y: 1080 },
-  { x: 600, y: 1076 }, { x: 1000, y: 1076 }, { x: 750, y: 1010 },
-  { x: 850, y: 1010 }, { x: 1150, y: 1080 }, { x: 460, y: 1076 },
-  { x: 1300, y: 1060 }, { x: 520, y: 980 }, { x: 1220, y: 980 }
+  { x: 480, y: 1100 }, { x: 300, y: 1100 }, { x: 480, y: 940 },
+  { x: 300, y: 940 }, { x: 500, y: 500 }, { x: 500, y: 240 },
+  { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
+  { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
 ];
 
 const SOLIDS = OBJECTS.filter(o => o.solid);
