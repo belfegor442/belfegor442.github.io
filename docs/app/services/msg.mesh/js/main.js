@@ -23,6 +23,12 @@ function normalizeUser(payload) {
   };
 }
 
+function showErr(box, text) {
+  if (!box) return;
+  box.textContent = text;
+  box.classList.toggle("hidden", !text);
+}
+
 /* ---------------- auth ---------------- */
 
 let authMode = "login";
@@ -32,20 +38,45 @@ function setMode(mode) {
   ui.setAuthTab(mode);
 }
 
-document.querySelectorAll(".tabs button").forEach((b) => {
-  b.addEventListener("click", () => setMode(b.dataset.tab));
+$("#authBack")?.addEventListener("click", () => {
+  setMode("login");
+  location.hash = "#/login";
 });
+
+$("#pwToggle")?.addEventListener("click", () => {
+  const pw = $("#authPassword");
+  const btn = $("#pwToggle");
+  if (!pw || !btn) return;
+  const show = pw.type === "password";
+  pw.type = show ? "text" : "password";
+  btn.textContent = show ? "Hide" : "Show";
+});
+
+// Caps Lock indicator while password is focused (matches native client).
+$("#authPassword")?.addEventListener("keydown", (e) => {
+  const warn = $("#capsWarn");
+  if (!warn) return;
+  const on = e.getModifierState && e.getModifierState("CapsLock");
+  warn.classList.toggle("hidden", !on);
+});
+$("#authPassword")?.addEventListener("blur", () => $("#capsWarn")?.classList.add("hidden"));
 
 $("#authForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const username = $("#authUsername").value.trim();
   const password = $("#authPassword").value;
   const errBox = $("#authError");
-  errBox.textContent = "";
+  showErr(errBox, "");
   authNotice = "";
-  if (!username || !password) { errBox.textContent = "Username and password are required."; return; }
+  if (!username || !password) { showErr(errBox, "Username and password are required."); return; }
+  if (authMode === "register" && password.length < 8) {
+    showErr(errBox, "Password must be 8-128 characters.");
+    return;
+  }
   const btn = $("#authSubmit");
   btn.disabled = true;
+  const status = $("#authStatus");
+  if (status) status.textContent = " Contacting server...";
   try {
     if (authMode === "register") {
       const display = $("#authDisplayName").value.trim() || username;
@@ -59,7 +90,8 @@ $("#authForm").addEventListener("submit", async (e) => {
     rememberUsername(username);
     await startSession();
   } catch (err) {
-    errBox.textContent = err instanceof ApiError ? friendlyError(err) : "Sign-in failed.";
+    showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Sign-in failed.");
+    if (status) status.textContent = authMode === "register" ? " Create Account" : " Sign In";
   } finally {
     btn.disabled = false;
   }
@@ -69,8 +101,6 @@ $("#authForm").addEventListener("submit", async (e) => {
 
 let booted = false;
 
-// Global 401 handler (idempotent): any authenticated call that comes back
-// 401 means the 24h session died. Drop to the login screen cleanly.
 function handleSessionLost() {
   if (!getToken()) return;
   setToken("");
@@ -109,7 +139,8 @@ async function startSession() {
 }
 
 async function initialLoad() {
-  $("#syncState").textContent = "SYNCING";
+  const sync = $("#syncState");
+  if (sync) sync.textContent = "SYNCING";
   try {
     const r = await api.history({ limit: 200 });
     const items = r.items || [];
@@ -129,7 +160,7 @@ async function initialLoad() {
   await primeUsers();
   ui.renderAll();
   emitFriends();
-  $("#syncState").textContent = "SYNCED";
+  if (sync) sync.textContent = "SYNCED";
 }
 
 function emitFriends() {
@@ -144,6 +175,7 @@ async function logout() {
   resetState();
   booted = false;
   ui.showAuth("login");
+  setMode("login");
   $("#authUsername").value = lastUsername();
   location.hash = "#/login";
   ui.toast("Signed out");
@@ -151,8 +183,6 @@ async function logout() {
 
 /* ---------------- router ---------------- */
 
-// Message to show once the auth view is (re)rendered — setAuthTab clears
-// #authError, so direct writes get wiped by any subsequent route().
 let authNotice = "";
 
 function route() {
@@ -162,7 +192,7 @@ function route() {
     if (seg === "register") setMode("register");
     else setMode("login");
     ui.showAuth(seg === "register" ? "register" : "login");
-    if (authNotice) $("#authError").textContent = authNotice;
+    if (authNotice) showErr($("#authError"), authNotice);
     return;
   }
   ui.showApp();
@@ -230,6 +260,7 @@ let pendingAttachment = null;
 function setPendingAttachment(att) {
   pendingAttachment = att;
   const bar = $("#pendingFile");
+  if (!bar) return;
   if (att) {
     bar.classList.remove("hidden");
     $("#pendingFileName").textContent = "📎 " + att.filename;
@@ -257,6 +288,7 @@ async function sendMessage() {
   const tmp = uid();
   pushLocal(peer, { id: tmp, text, env, attachment: env.attachment || null });
   input.value = "";
+  input.style.height = "28px";
   setPendingAttachment(null);
   ui.renderMessages();
   ui.renderSidebar();
@@ -299,10 +331,10 @@ async function retryMessage(peer, m) {
 
 /* ---------------- attachments ---------------- */
 
-const MAX_FILE = 700 * 1024; // stays under the 1 MB JSON body cap after base64
+const MAX_FILE = 700 * 1024;
 
-$("#attachBtn").addEventListener("click", () => $("#fileInput").click());
-$("#pendingFileCancel").addEventListener("click", () => setPendingAttachment(null));
+$("#sendFileBtn")?.addEventListener("click", () => $("#fileInput").click());
+$("#pendingFileCancel")?.addEventListener("click", () => setPendingAttachment(null));
 
 $("#fileInput").addEventListener("change", async () => {
   const file = $("#fileInput").files[0];
@@ -354,15 +386,18 @@ async function openAttachment(attachmentId, filename) {
 
 /* ---------------- dialogs ---------------- */
 
-document.querySelectorAll("dialog .dialog-head .icon-btn").forEach((b) => {
-  b.addEventListener("click", (e) => {
-    e.preventDefault();
-    b.closest("dialog").close();
+function wireDialogClose(sel) {
+  document.querySelectorAll(sel).forEach((b) => {
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      b.closest("dialog")?.close();
+    });
   });
-});
+}
+wireDialogClose("dialog .win-cap.close");
 
 function openNewChat() {
-  $("#newChatStatus").textContent = "";
+  showErr($("#newChatStatus"), "");
   $("#newChatResults").innerHTML = "";
   $("#newChatInput").value = "";
   ui.renderContacts();
@@ -375,12 +410,12 @@ $("#newChatForm").addEventListener("submit", async (e) => {
   const q = $("#newChatInput").value.trim().replace(/^@/, "");
   if (!q) return;
   const box = $("#newChatResults");
-  $("#newChatStatus").textContent = "Searching…";
+  showErr($("#newChatStatus"), "Searching…");
   box.innerHTML = "";
   try {
     const r = await api.usersSearch(q);
     const users = (r.users || []).filter((u) => String(u.user_id) !== state.user.user_id);
-    $("#newChatStatus").textContent = users.length ? "" : "No users found.";
+    showErr($("#newChatStatus"), users.length ? "" : "No users found.");
     for (const u of users) {
       state.users.set(String(u.user_id), { ...u, user_id: String(u.user_id) });
       const row = document.createElement("div");
@@ -388,15 +423,16 @@ $("#newChatForm").addEventListener("submit", async (e) => {
       const friend = isFriend(u.user_id);
       const pending = outgoingTo(u.user_id);
       const incoming = incomingFrom(u.user_id);
+      const online = u.status === "online";
       row.innerHTML = `<button type="button" class="user-item">
-        <div class="avatar">${esc(ui.initials(u.display_name || u.username))}</div>
+        <span class="dot ${online ? "on" : ""}"></span>
         <div><strong>${esc(u.display_name || u.username)}</strong><small>@${esc(u.username)}</small></div>
-        <span class="status ${u.status === "online" ? "on" : ""}">${esc(u.status || "")}</span>
+        <span class="status ${online ? "on" : ""}">${online ? "online" : "offline"}</span>
       </button>
-      ${friend ? '<span class="tag-ok">CONTACT</span>'
+      ${friend ? '<span class="tag-ok">FRIEND</span>'
         : incoming ? '<button type="button" class="mini-btn accept" data-act="accept">ACCEPT</button>'
-        : pending ? '<span class="tag-ok">REQUESTED</span>'
-        : '<button type="button" class="mini-btn" data-act="add">ADD CONTACT</button>'}`;
+        : pending ? '<span class="tag-ok">PENDING</span>'
+        : '<button type="button" class="mini-btn" data-act="add">Add Friend</button>'}`;
       row.querySelector(".user-item").addEventListener("click", () => {
         $("#newChatDialog").close();
         openChat("u" + u.user_id);
@@ -426,7 +462,7 @@ $("#newChatForm").addEventListener("submit", async (e) => {
       box.appendChild(row);
     }
   } catch (e2) {
-    $("#newChatStatus").textContent = friendlyError(e2);
+    showErr($("#newChatStatus"), friendlyError(e2));
   }
 });
 
@@ -500,27 +536,27 @@ function openProfile() {
   $("#profileName").textContent = u.display_name || u.username;
   $("#profileHandle").textContent = "@" + u.username;
   $("#profileDisplayName").value = u.display_name || "";
-  $("#profileStatus").textContent = "";
+  showErr($("#profileStatus"), "");
+  applyServerSettings();
   $("#profileDialog").showModal();
 }
 
 $("#profileForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#profileDisplayName").value.trim();
-  const box = $("#profileStatus");
-  if (!name || name.length > 64) { box.textContent = "Display name must be 1-64 characters."; return; }
+  if (!name || name.length > 64) { showErr($("#profileStatus"), "Display name must be 1-64 characters."); return; }
   try {
     const r = await api.usersUpdate(name);
     state.user = normalizeUser(r.user ? { user: r.user, role: state.user.role, tenant_id: state.user.tenant_id } : r);
     ui.renderProfile();
     $("#profileName").textContent = state.user.display_name;
     $("#profileAvatar").textContent = ui.initials(state.user.display_name);
-    box.textContent = "";
+    showErr($("#profileStatus"), "");
     $("#profileDialog").close();
     ui.toast("Profile updated");
     ui.renderMessages({ scroll: false });
   } catch (err) {
-    box.textContent = err.message;
+    showErr($("#profileStatus"), err.message);
   }
 });
 
@@ -532,31 +568,39 @@ $("#logoutBtn").addEventListener("click", () => {
 /* ---------------- app chrome ---------------- */
 
 $("#newChatBtn").addEventListener("click", openNewChat);
-$("#startBtn").addEventListener("click", openNewChat);
-$("#searchBtn").addEventListener("click", openSearch);
+$("#startBtn")?.addEventListener("click", openNewChat);
+$("#sendImBtn")?.addEventListener("click", openNewChat);
 $("#chatSearchBtn").addEventListener("click", openSearch);
+$("#settingsBtn")?.addEventListener("click", openProfile);
 $("#profileBtn").addEventListener("click", openProfile);
 $("#backBtn").addEventListener("click", () => {
   $("#chatPanel").classList.remove("mobile-open");
+  $("#chatPanel").classList.add("hidden");
+  $("#contactsCol").style.display = "";
   $("#details").classList.add("hidden");
   location.hash = "#/";
 });
 $("#chatInfoBtn").addEventListener("click", () => $("#details").classList.toggle("hidden"));
 $("#closeDetails").addEventListener("click", () => $("#details").classList.add("hidden"));
-$("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(); });
+$("#sendBtn").addEventListener("click", () => sendMessage());
 $("#loadOlder").addEventListener("click", loadOlder);
 
-document.querySelectorAll(".filters button").forEach((b) => {
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".filters button").forEach((x) => x.classList.remove("active"));
-    b.classList.add("active");
-    state.filter = b.dataset.filter;
-    ui.renderSidebar();
-  });
+// Composer: Enter sends, Shift+Enter newline; auto-grow textarea (max 5 lines).
+const msgInput = $("#messageInput");
+msgInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+msgInput?.addEventListener("input", () => {
+  msgInput.style.height = "28px";
+  const next = Math.min(msgInput.scrollHeight, 110);
+  msgInput.style.height = next + "px";
 });
 
 $("#conversationList").addEventListener("click", (e) => {
-  const row = e.target.closest(".conversation");
+  const row = e.target.closest(".contact-row");
   if (row) openChat(row.dataset.peer);
 });
 
@@ -567,7 +611,7 @@ $("#messageList").addEventListener("click", (e) => {
     openAttachment(att.dataset.att, att.dataset.attname);
     return;
   }
-  const msg = e.target.closest(".message");
+  const msg = e.target.closest(".msg-line");
   if (msg && msg.classList.contains("failed")) {
     const c = state.conversations.get(state.activePeer);
     const m = c && c.messages.find((x) => x.id === msg.dataset.id);
@@ -606,7 +650,7 @@ function jumpTo(rowid) {
   const rid = Number(rowid);
   if (!Number.isFinite(rid)) return;
   requestAnimationFrame(() => {
-    const el = document.querySelector(`#messageList .message[data-rowid="${rid}"]`);
+    const el = document.querySelector(`#messageList .msg-line[data-rowid="${rid}"]`);
     if (el) {
       el.scrollIntoView({ block: "center" });
       el.classList.add("jump");
@@ -639,7 +683,8 @@ on("messages", (detail) => {
 
 on("connection", () => ui.renderConnection());
 on("sync", (text) => {
-  $("#syncState").textContent = text;
+  const sync = $("#syncState");
+  if (sync) sync.textContent = text;
   if (text === "SYNCED") loadFriends().catch(() => null);
 });
 on("friends", async () => {
@@ -752,6 +797,90 @@ $("#sharedFiles").addEventListener("click", async (e) => {
   }
 });
 
+/* ---------------- menu bar (native-style) ---------------- */
+
+const menuActions = {
+  file: [
+    ["Open Messenger", () => { location.hash = "#/"; }],
+    ["-", null],
+    ["Settings...", openProfile],
+    ["-", null],
+    ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }],
+    ["Create Account...", () => { setMode("register"); location.hash = "#/register"; }],
+    ["Sign Out", logout],
+  ],
+  contacts: [
+    ["Contact List", () => { ui.setActive(null); }],
+    ["Search User...", openNewChat],
+    ["Add Friend...", openNewChat],
+    ["-", null],
+    ["Refresh", () => { loadFriends().catch(() => null); }],
+  ],
+  actions: [
+    ["Sync History", () => { if (booted) initialLoad(); }],
+    ["-", null],
+    ["Chats List", () => { ui.setActive(null); }],
+  ],
+  view: [
+    ["Contact List", () => { ui.setActive(null); }],
+    ["Sync History", () => { if (booted) initialLoad(); }],
+  ],
+  help: [
+    ["Server Status", async () => {
+      const h = await api.health();
+      ui.toast(h.ok ? "Server: online" : "Server: offline", !h.ok);
+    }],
+    ["About msg.mesh...", () => ui.toast("msg.mesh 1.0.8 — secure mesh messenger")],
+  ],
+};
+
+document.querySelectorAll(".menu-item[data-menu]").forEach((item) => {
+  let open = null;
+  item.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.querySelectorAll(".menu-dd").forEach((d) => d.remove());
+    document.querySelectorAll(".menu-item.open").forEach((x) => x.classList.remove("open"));
+    if (open === item.dataset.menu) { open = null; return; }
+    open = item.dataset.menu;
+    item.classList.add("open");
+    const key = item.dataset.menu;
+    const entries = (menuActions[key] || []).filter((en) => en[0] !== "-");
+    const dd = document.createElement("div");
+    dd.className = "menu-dd";
+    dd.style.cssText = "position:fixed;z-index:70;min-width:180px;background:#fff;border:1px solid #788cac;box-shadow:4px 4px 12px rgba(0,0,0,.3);padding:2px 0;font-size:12px";
+    for (const en of (menuActions[key] || [])) {
+      if (en[0] === "-") {
+        const sep = document.createElement("div");
+        sep.style.cssText = "height:1px;background:#c8cdd4;margin:3px 6px";
+        dd.appendChild(sep);
+        continue;
+      }
+      const row = document.createElement("button");
+      row.type = "button";
+      row.textContent = en[0];
+      row.style.cssText = "display:block;width:100%;text-align:left;border:0;background:none;padding:6px 16px;font-size:12px";
+      row.addEventListener("mouseenter", () => { row.style.background = "#3366cc"; row.style.color = "#fff"; });
+      row.addEventListener("mouseleave", () => { row.style.background = "none"; row.style.color = "#000"; });
+      row.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        dd.remove();
+        item.classList.remove("open");
+        open = null;
+        if (en[1]) en[1]();
+      });
+      dd.appendChild(row);
+    }
+    const r = item.getBoundingClientRect();
+    dd.style.left = Math.min(r.left, window.innerWidth - 190) + "px";
+    dd.style.top = r.bottom + "px";
+    document.body.appendChild(dd);
+  });
+});
+document.addEventListener("click", () => {
+  document.querySelectorAll(".menu-dd").forEach((d) => d.remove());
+  document.querySelectorAll(".menu-item.open").forEach((x) => x.classList.remove("open"));
+});
+
 /* ---------------- server settings ---------------- */
 
 function applyServerSettings() {
@@ -786,7 +915,6 @@ $("#serverApply").addEventListener("click", async () => {
 
 /* ---------------- presence / focus ---------------- */
 
-// Friend state has no realtime push: refresh it frequently and on focus.
 setInterval(() => {
   if (booted && getToken()) loadFriends().catch(() => null);
 }, 20000);
@@ -812,14 +940,12 @@ window.addEventListener("focus", () => {
 
 /* ---------------- mobile keyboard ---------------- */
 
-// iOS/Android virtual keyboards resize the visual viewport; keep the latest
-// messages and the composer in view while the user is typing.
 function scrollMessagesToBottom() {
   const wrap = $("#messages");
   if (wrap) wrap.scrollTop = wrap.scrollHeight;
 }
 
-$("#messageInput").addEventListener("focus", () => {
+msgInput?.addEventListener("focus", () => {
   setTimeout(scrollMessagesToBottom, 250);
 });
 
@@ -836,6 +962,7 @@ if (window.visualViewport) {
 
 async function boot() {
   ui.renderConnection();
+  setMode("login");
   await resolveApiBase();
   if (!getToken()) {
     $("#authUsername").value = lastUsername();
@@ -852,6 +979,7 @@ async function boot() {
         ? "Session expired — please sign in again."
         : "Cannot reach the msg.mesh server. Check your connection and retry.";
     ui.showAuth("login");
+    setMode("login");
     $("#authUsername").value = lastUsername();
     route();
   }

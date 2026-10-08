@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
-<meta name="theme-color" content="#080a0d">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a3caa">
+<meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,143 +18,203 @@
 </head>
 <body>
 
-<div id="authView" class="auth hidden">
-  <form class="auth-card" id="authForm" novalidate>
-    <div class="mesh-mark">◈</div>
-    <h1>msg.mesh</h1>
-    <p class="auth-sub">Secure conversations, synchronized across your msg.mesh clients.</p>
-    <div class="tabs" role="tablist">
-      <button type="button" data-tab="login" class="active" role="tab">SIGN IN</button>
-      <button type="button" data-tab="register" role="tab">CREATE ACCOUNT</button>
+<div id="authView" class="win-auth hidden">
+  <div class="win-frame">
+    <div class="win-titlebar"><span class="win-title-ico">◈</span><span class="win-title" id="authTitleBar">Sign In - msg.mesh</span></div>
+    <div class="win-menubar"><span class="menu-item">File</span><span class="menu-item">Help</span></div>
+    <div class="auth-client">
+      <form class="auth-card" id="authForm" novalidate>
+        <div class="auth-head">
+          <h1 id="authHeading">Sign In</h1>
+          <div class="auth-icon">◈</div>
+        </div>
+        <p class="auth-sub" id="authSub">Log in to the Weird Stuff Server</p>
+
+        <div class="field">
+          <label id="lblUsername">Username</label>
+          <div class="sunken">
+            <input id="authUsername" autocomplete="username" required minlength="3" maxlength="32" spellcheck="false" placeholder="Enter username">
+          </div>
+        </div>
+
+        <div class="field reg-only hidden">
+          <label id="lblDisplay">Display name (optional)</label>
+          <div class="sunken"><input id="authDisplayName" autocomplete="nickname" maxlength="64" placeholder="How others see you"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label-row">
+            <label id="lblPassword">Password</label>
+            <span class="caps-warn hidden" id="capsWarn">CAPS LOCK ON</span>
+          </div>
+          <div class="sunken pw-row">
+            <input id="authPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="Enter password">
+            <button type="button" class="xp-btn pw-toggle" id="pwToggle" tabindex="-1">Show</button>
+          </div>
+        </div>
+
+        <p class="error hidden" id="authError" role="alert"></p>
+
+        <div class="auth-actions">
+          <button type="button" class="xp-btn gray hidden" id="authBack">Back</button>
+          <button class="xp-btn primary" type="submit" id="authSubmit">Sign In</button>
+        </div>
+        <p class="auth-tip">Enter submits &nbsp;|&nbsp; Tab switches fields &nbsp;|&nbsp; Esc goes back</p>
+      </form>
     </div>
-    <label>USERNAME<input id="authUsername" autocomplete="username" required minlength="3" maxlength="32" spellcheck="false"></label>
-    <label class="reg-only hidden">DISPLAY NAME<input id="authDisplayName" autocomplete="nickname" maxlength="64" placeholder="Same as username"></label>
-    <label>PASSWORD<input id="authPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>
-    <button class="primary" type="submit" id="authSubmit">SIGN IN</button>
-    <p class="error" id="authError" role="alert"></p>
-  </form>
+    <div class="statusbar"><span class="led" id="authLed"></span><span id="authStatus"> Sign In</span></div>
+  </div>
 </div>
 
-<div id="appView" class="app hidden">
-  <header class="topbar">
-    <a class="brand" href="../../../">NORTH ASSEMBLY</a><span class="slash">/</span><span class="section">MSG.MESH</span>
-    <span id="connection" class="connection offline"><i></i> OFFLINE</span>
-  </header>
-  <main class="app-shell">
-    <aside class="sidebar">
-      <div class="profile">
-        <div class="avatar" id="selfAvatar">?</div>
-        <div><strong id="selfName">…</strong><small id="selfHandle">@…</small></div>
-        <button class="icon-btn" id="profileBtn" aria-label="Profile">•••</button>
-      </div>
-      <div class="sidebar-actions">
-        <button class="new-btn" id="newChatBtn">＋ NEW MESSAGE</button>
-        <button class="icon-btn search-btn" id="searchBtn" aria-label="Search">⌕</button>
-      </div>
-      <nav class="filters">
-        <button class="active" data-filter="all">ALL <span id="allCount">0</span></button>
-        <button data-filter="unread">UNREAD <span id="unreadCount">0</span></button>
-      </nav>
-      <section class="requests hidden" id="requestStrip" aria-label="Friend requests"></section>
-      <section class="conversation-list" id="conversationList"></section>
-      <div class="sidebar-footer"><span>msg.mesh web</span><span id="syncState">SYNCING</span></div>
-    </aside>
+<div id="appView" class="win-app hidden">
+  <div class="win-titlebar app-titlebar"><span class="win-title-ico">◈</span><span class="win-title">msg.mesh Messenger</span></div>
 
-    <section class="chat" id="chatPanel">
-      <div class="empty-state" id="emptyState">
-        <div class="mesh-mark">◈</div>
-        <h1>msg.mesh</h1>
-        <p>Sign in and open a conversation. Messages synchronize live with your desktop client through the msg.mesh mesh.</p>
-        <button class="primary" id="startBtn">START A CONVERSATION</button>
-      </div>
+  <div class="win-menubar" id="menuBar">
+    <span class="menu-item" data-menu="file">File</span>
+    <span class="menu-item" data-menu="contacts">Contacts</span>
+    <span class="menu-item" data-menu="actions">Actions</span>
+    <span class="menu-item" data-menu="view">View</span>
+    <span class="menu-item" data-menu="help">Help</span>
+  </div>
 
-      <div class="chat-view hidden" id="chatView">
-        <header class="chat-head">
-          <button class="back-btn" id="backBtn" aria-label="Back">‹</button>
-          <div class="avatar small" id="chatAvatar">?</div>
-          <div class="chat-title"><strong id="chatName">Conversation</strong><small id="chatMeta">…</small></div>
-          <div class="chat-tools"><button class="icon-btn" id="chatSearchBtn" title="Search messages">⌕</button><button class="icon-btn" id="chatInfoBtn" title="Details">ⓘ</button></div>
-        </header>
-        <div class="messages" id="messages">
-          <button class="load-older hidden" id="loadOlder">LOAD OLDER MESSAGES</button>
-          <div id="messageList"></div>
+  <div class="win-toolbar">
+    <button class="tb-btn" id="newChatBtn"><span class="tb-ico">👤</span>Add Contact</button>
+    <button class="tb-btn" id="sendImBtn"><span class="tb-ico">✉</span>Send IM</button>
+    <button class="tb-btn" id="sendFileBtn"><span class="tb-ico">📎</span>Send File</button>
+    <button class="tb-btn" id="settingsBtn"><span class="tb-ico">⚙</span>Settings</button>
+    <button class="tb-btn" id="profileBtn"><span class="tb-ico">ℹ</span>Profile</button>
+  </div>
+
+  <div class="client-area">
+    <div class="contacts-col" id="contactsCol">
+      <div class="panel-header contacts-header">Contacts</div>
+      <section class="requests hidden" id="requestStrip" aria-label="Friend Requests"></section>
+      <div class="sunken contacts-sunken">
+        <div class="contact-list" id="conversationList"></div>
+      </div>
+    </div>
+
+    <div class="empty-state" id="emptyState">
+      <div class="mesh-mark">◈</div>
+      <h1>msg.mesh Messenger</h1>
+      <p>Secure peer-to-peer mesh messenger. Select a contact on the left to open a conversation.</p>
+      <button class="xp-btn primary" id="startBtn" type="button">New Conversation</button>
+    </div>
+
+    <div class="chat-col hidden" id="chatPanel">
+      <button class="back-btn" id="backBtn" aria-label="Back">◀</button>
+      <div class="conv-header">
+        <div class="conv-avatar" id="chatAvatar">?</div>
+        <div class="conv-id">
+          <strong id="chatName">Conversation</strong>
+          <small class="conv-status" id="chatMeta">…</small>
         </div>
-      <div class="composer-wrap">
-        <div class="pending-file hidden" id="pendingFile"><span id="pendingFileName">📎 file</span><button type="button" id="pendingFileCancel" aria-label="Remove attachment">×</button></div>
-        <form class="composer" id="composer">
-            <button type="button" class="attach" id="attachBtn" title="Attach file">＋</button>
-            <input id="messageInput" autocomplete="off" maxlength="4000" placeholder="Message">
-            <button class="send" type="submit" aria-label="Send">↑</button>
-          </form>
+        <div class="conv-tools">
+          <button class="icon-btn" id="chatSearchBtn" title="Search">⌕</button>
+          <button class="icon-btn" id="chatInfoBtn" title="Details">ⓘ</button>
         </div>
       </div>
-    </section>
-
-    <aside class="details hidden" id="details">
-      <div class="details-head"><strong>Conversation</strong><button class="icon-btn" id="closeDetails">×</button></div>
-      <div class="details-avatar avatar large" id="detailsAvatar">?</div>
-      <h2 id="detailsName">Conversation</h2><p id="detailsHandle">@unknown</p>
-      <div class="detail-block"><span>STATUS</span><strong id="detailsStatus">—</strong></div>
-      <div class="detail-block"><span>MESSAGES</span><strong id="detailsMessages">0</strong></div>
-      <div class="detail-block"><span>LAST READ BY PEER</span><strong id="detailsRead">—</strong></div>
-      <div class="detail-block contact-actions">
-        <span>CONTACT</span>
-        <button class="ghost small" id="addContactBtn">ADD CONTACT</button>
-        <button class="ghost small hidden" id="removeContactBtn">REMOVE CONTACT</button>
+      <div class="messages-sunken sunken" id="messages">
+        <button class="load-older hidden" id="loadOlder">Load older messages</button>
+        <div id="messageList" class="message-list"></div>
       </div>
-      <div class="detail-block hidden" id="sharedFilesBlock">
-        <span>SHARED FILES</span>
-        <div id="sharedFiles"></div>
+      <div class="composer-strip">
+        <div class="pending-file hidden" id="pendingFile"><span id="pendingFileName"></span><button type="button" id="pendingFileCancel">×</button></div>
+        <div class="composer-row">
+          <div class="sunken composer-sunken">
+            <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Type a message... (Shift+Enter = newline)" autocomplete="off"></textarea>
+          </div>
+          <button class="xp-btn primary send-btn" type="button" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="details-panel hidden" id="details">
+      <div class="win-titlebar details-title">
+        <span class="win-title">Conversation</span>
+        <button class="win-cap close" id="closeDetails" aria-label="Close">✕</button>
+      </div>
+      <div class="details-body">
+        <div class="details-avatar" id="detailsAvatar">?</div>
+        <h2 id="detailsName">Conversation</h2>
+        <p id="detailsHandle">@unknown</p>
+        <div class="detail-row"><span>STATUS</span><strong id="detailsStatus">—</strong></div>
+        <div class="detail-row"><span>MESSAGES</span><strong id="detailsMessages">0</strong></div>
+        <div class="detail-row"><span>LAST READ BY PEER</span><strong id="detailsRead">—</strong></div>
+        <div class="detail-row contact-actions">
+          <span>CONTACT</span>
+          <button class="xp-btn gray small" id="addContactBtn">Add Friend</button>
+          <button class="xp-btn gray small hidden" id="removeContactBtn">Remove</button>
+        </div>
+        <div class="detail-row hidden" id="sharedFilesBlock">
+          <span>SHARED FILES</span>
+          <div id="sharedFiles" class="file-list"></div>
+        </div>
       </div>
     </aside>
-  </main>
+  </div>
+
+  <div class="statusbar app-statusbar">
+    <span class="led" id="connection"></span>
+    <span>msg.mesh Messenger&nbsp; |&nbsp; <span id="connLabel">Offline</span>&nbsp; |&nbsp; 1.0.8</span>
+    <span class="status-right"><span id="syncState">SYNCING</span>&nbsp;&nbsp; Online: <span id="onlineCount">0</span>&nbsp;&nbsp; Offline: <span id="offlineCount">0</span></span>
+  </div>
 </div>
 
 <dialog id="newChatDialog">
-  <form method="dialog" class="dialog-card" id="newChatForm">
-    <div class="dialog-head"><strong>New conversation</strong><button value="cancel" class="icon-btn" aria-label="Close">×</button></div>
-    <label>SEARCH BY USERNAME OR NAME<input id="newChatInput" required maxlength="64" placeholder="@username" autocomplete="off"></label>
-    <div class="user-results" id="newChatResults"></div>
-    <button class="primary" value="default" id="newChatOpen">FIND USER</button>
-    <div class="contacts-block">
-      <span class="block-label">CONTACTS</span>
-      <div class="user-results" id="contactResults"></div>
-    </div>
-    <p class="error" id="newChatStatus"></p>
-  </form>
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><span class="win-title">New Conversation</span><button class="win-cap close" value="cancel" id="newChatClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="newChatForm">
+      <label>SEARCH BY USERNAME OR NAME</label>
+      <div class="sunken"><input id="newChatInput" required maxlength="64" placeholder="Enter username" autocomplete="off"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="newChatOpen">Search</button></div>
+      <div class="user-results sunken" id="newChatResults"></div>
+      <div class="contacts-block">
+        <span class="block-label">CONTACTS</span>
+        <div class="user-results sunken" id="contactResults"></div>
+      </div>
+      <p class="error" id="newChatStatus"></p>
+    </form>
+  </div>
 </dialog>
 
 <dialog id="searchDialog">
-  <form method="dialog" class="dialog-card wide" id="searchForm">
-    <div class="dialog-head"><strong>Search messages</strong><button value="cancel" class="icon-btn" aria-label="Close">×</button></div>
-    <label>TEXT<input id="searchInput" required maxlength="120" placeholder="Search…" autocomplete="off"></label>
-    <button class="primary" type="submit" id="searchGo">SEARCH</button>
-    <div class="search-results" id="searchResults"><p class="hint">Search runs against your conversations on the server.</p></div>
-  </form>
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><span class="win-title">Search Messages</span><button class="win-cap close" value="cancel" id="searchClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="searchForm">
+      <label>TEXT</label>
+      <div class="sunken"><input id="searchInput" required maxlength="120" placeholder="Search…" autocomplete="off"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit">Search</button></div>
+      <div class="search-results sunken" id="searchResults"><p class="hint">Search runs against your conversations on the server.</p></div>
+    </form>
+  </div>
 </dialog>
 
 <dialog id="profileDialog">
-  <form method="dialog" class="dialog-card" id="profileForm">
-    <div class="dialog-head"><strong>Profile</strong><button value="cancel" class="icon-btn" aria-label="Close">×</button></div>
-    <div class="profile-id"><div class="avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small></div></div>
-    <label>DISPLAY NAME<input id="profileDisplayName" maxlength="64"></label>
-    <button class="primary" value="default" id="profileSave">SAVE CHANGES</button>
-    <div class="server-block">
-      <label>SERVER
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><span class="win-title">Settings - msg.mesh</span><button class="win-cap close" value="cancel" id="profileClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="profileForm">
+      <div class="profile-id"><div class="conv-avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small></div></div>
+      <label>DISPLAY NAME</label>
+      <div class="sunken"><input id="profileDisplayName" maxlength="64"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="profileSave">Save</button></div>
+      <div class="server-block">
+        <label>SERVER</label>
         <div class="server-row">
-          <input id="profileServer" spellcheck="false" autocomplete="off" placeholder="https://server">
-          <button type="button" class="server-apply" id="serverApply">SWITCH</button>
+          <div class="sunken"><input id="profileServer" spellcheck="false" autocomplete="off" placeholder="https://server"></div>
+          <button type="button" class="xp-btn gray" id="serverApply">Switch</button>
         </div>
-      </label>
-      <p class="hint" id="serverHint">Messages stay on this server. Switching signs you out locally.</p>
-    </div>
-    <button type="button" class="ghost" id="logoutBtn">SIGN OUT</button>
-    <p class="error" id="profileStatus"></p>
-  </form>
+        <p class="hint" id="serverHint">Messages stay on this server. Switching signs you out locally.</p>
+      </div>
+      <button type="button" class="xp-btn gray" id="logoutBtn">Sign Out</button>
+      <p class="error" id="profileStatus"></p>
+    </form>
+  </div>
 </dialog>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <input type="file" id="fileInput" class="hidden" tabindex="-1">
+<input type="file" id="attachInput" class="hidden" tabindex="-1" multiple>
 
 <script type="module" src="./js/main.js"></script>
 </body>
