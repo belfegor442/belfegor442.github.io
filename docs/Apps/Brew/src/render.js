@@ -438,7 +438,7 @@ export class Renderer {
       q = at(-4.5, -sw);
       pushBox(M, q[0], 0, q[1], 5, 9, 5, dark, c, s);
     } else if (seated) {
-      const q = at(0, 3);
+      const q = at(0, -5);
       pushBox(M, q[0], 17, q[1], 12, 5, 16, dark, c, s);
     } else {
       let q = at(4.5, 0);
@@ -447,7 +447,7 @@ export class Renderer {
       pushBox(M, q[0], 0, q[1], 5, 9, 5, dark, c, s);
     }
 
-    const mid = at(0, 0);
+    const mid = at(0, seated ? -7 : 0);
     const by = seated ? 21 : 9;
     const bh = seated ? 13 : 17;
     pushBox(M, mid[0], by, mid[1], 16, bh, 10, body, c, s);
@@ -503,6 +503,10 @@ export class Renderer {
     if (!this.freeCam) {
       this.cam.x += (tx - this.cam.x) * k;
       this.cam.z += (tz - this.cam.z) * k;
+      // Keep the camera target inside the playable room; never expose the void beyond the walls.
+      const margin = 180;
+      this.cam.x = Math.max(margin, Math.min(MAP.w - margin, this.cam.x));
+      this.cam.z = Math.max(margin, Math.min(MAP.h - margin, this.cam.z));
     }
 
     if (!this.gl) { this.drawFallback(); return; }
