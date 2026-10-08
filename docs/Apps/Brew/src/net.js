@@ -74,8 +74,8 @@ export class Net {
     const cleanup = () => {
       clearTimeout(timer);
       c.removeListener('connect', connected);
-      c.removeListener('error', failed);
-      c.removeListener('offline', failed);
+      c.removeListener('error', fail);
+      c.removeListener('offline', fail);
     };
     const fail = err => {
       if (done) return;
