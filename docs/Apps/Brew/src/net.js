@@ -101,9 +101,11 @@ export class Net {
         try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true }); } catch (e) {}
       });
       c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-      c.subscribe([this.topics.c, this.topics.pAll], () => {});
-      c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true });
-      if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
+      c.subscribe([this.topics.c, this.topics.pAll], err => {
+        if (err) { try { c.end(true); } catch (e) {} return; }
+        c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true });
+        if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
+      });
     };
     for (const url of list) {
       this.connectOne(url, will, attach, () => {
@@ -164,9 +166,11 @@ export class Net {
         c.on('message', (t, p) => this.handle(t, p));
         c.on('reconnect', () => { this.onStatus('Reconnecting…'); this.onReconnect(); });
         c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
-        c.subscribe([this.topics.s, this.topics.host], () => {});
-        this.onStatus('connected');
-        this.onFirstUp();
+        c.subscribe([this.topics.s, this.topics.host], err => {
+          if (err) { try { c.end(true); } catch (e) {} return; }
+          this.onStatus('connected');
+          this.onFirstUp();
+        });
       }, () => attempt(i + 1));
     };
     attempt(0);
