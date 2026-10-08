@@ -22,6 +22,7 @@ export class Net {
     this.retryTimer = null;
     this.gIdx = 0;
     this.gSwitch = 0;
+    this.gConnectedOnce = false;
     this.closed = false;
   }
 
@@ -61,7 +62,7 @@ export class Net {
         keepalive: 30,
         protocolVersion: 4,
         clean: true,
-        resubscribe: false,
+        resubscribe: true,
         queueQoSZero: true,
         reconnectOnConnackError: true,
         clientId: 'brew-' + Math.random().toString(36).slice(2, 14),
@@ -110,12 +111,21 @@ export class Net {
       this.conns.push(c);
       c.on('message', (t, p) => this.handle(t, p));
       c.on('reconnect', () => {
-        if (!this.up) this.onStatus('Reconnecting…');
-        try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }); } catch (e) {}
+        this.onStatus('Reconnecting…');
+      });
+      c.on('connect', () => {
+        if (!first) {
+          c.subscribe([this.topics.c, this.topics.pAll], { qos: 1 }, () => {
+            try { c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }); } catch (e) {}
+          });
+        }
       });
       c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
       c.subscribe([this.topics.c, this.topics.pAll], { qos: 1 }, err => {
-        if (err) { try { c.end(true); } catch (e) {} return; }
+        if (err) {
+          try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
+          return;
+        }
         c.publish(this.topics.host, '{"t":"presence","on":1}', { retain: true, qos: 1 }, () => {
           if (first) { first = false; this.onStatus('ready'); this.onFirstUp(); }
         });
@@ -178,10 +188,18 @@ export class Net {
         if (this.closed) { try { c.removeAllListeners(); c.end(true); } catch (e) {} return; }
         this.conns = [c];
         c.on('message', (t, p) => this.handle(t, p));
-        c.on('reconnect', () => { this.onStatus('Reconnecting…'); this.onReconnect(); });
+        c.on('reconnect', () => { this.onStatus('Reconnecting…'); });
+        c.on('connect', () => {
+          if (this.gConnectedOnce) this.onReconnect();
+        });
         c.on('close', () => { if (!this.up) this.onStatus('Connection lost — reconnecting…'); });
         c.subscribe([this.topics.s, this.topics.host], { qos: 1 }, err => {
-          if (err) { try { c.end(true); } catch (e) {} return; }
+          if (err) {
+          try { c.removeAllListeners(); c.on('error', () => {}); c.end(true); } catch (e) {}
+          attempt(i + 1);
+          return;
+        }
+          this.gConnectedOnce = true;
           this.onStatus('connected');
           this.onFirstUp();
         });
