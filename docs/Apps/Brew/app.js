@@ -199,7 +199,7 @@ function startGuest(code) {
 function guestHelloLoop() {
   clearTimeout(gTimer);
   if (welcomed || isHost) return;
-  if (hostSeen && net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  if (net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
   gTries++;
   if (welcomed) return;
   if (gTries > MAX_HELLO) {
