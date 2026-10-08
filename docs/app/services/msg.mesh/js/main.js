@@ -288,7 +288,6 @@ async function sendMessage() {
   const tmp = uid();
   pushLocal(peer, { id: tmp, text, env, attachment: env.attachment || null });
   input.value = "";
-  input.style.height = "28px";
   setPendingAttachment(null);
   ui.renderMessages();
   ui.renderSidebar();
@@ -585,7 +584,7 @@ $("#closeDetails").addEventListener("click", () => $("#details").classList.add("
 $("#sendBtn").addEventListener("click", () => sendMessage());
 $("#loadOlder").addEventListener("click", loadOlder);
 
-// Composer: Enter sends, Shift+Enter newline; auto-grow textarea (max 5 lines).
+// Composer: Enter sends, Shift+Enter newline; auto-grow via rows (CSP-safe).
 const msgInput = $("#messageInput");
 msgInput?.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -594,9 +593,8 @@ msgInput?.addEventListener("keydown", (e) => {
   }
 });
 msgInput?.addEventListener("input", () => {
-  msgInput.style.height = "28px";
-  const next = Math.min(msgInput.scrollHeight, 110);
-  msgInput.style.height = next + "px";
+  const lines = Math.min(msgInput.value.split("\n").length, 5);
+  msgInput.rows = Math.max(1, lines);
 });
 
 $("#conversationList").addEventListener("click", (e) => {
@@ -835,45 +833,35 @@ const menuActions = {
 };
 
 document.querySelectorAll(".menu-item[data-menu]").forEach((item) => {
-  let open = null;
+  const slot = item.closest(".menu-slot") || item.parentElement;
   item.addEventListener("click", (e) => {
     e.stopPropagation();
     document.querySelectorAll(".menu-dd").forEach((d) => d.remove());
     document.querySelectorAll(".menu-item.open").forEach((x) => x.classList.remove("open"));
-    if (open === item.dataset.menu) { open = null; return; }
-    open = item.dataset.menu;
+    if (item.classList.contains("open")) return;
     item.classList.add("open");
     const key = item.dataset.menu;
-    const entries = (menuActions[key] || []).filter((en) => en[0] !== "-");
     const dd = document.createElement("div");
     dd.className = "menu-dd";
-    dd.style.cssText = "position:fixed;z-index:70;min-width:180px;background:#fff;border:1px solid #788cac;box-shadow:4px 4px 12px rgba(0,0,0,.3);padding:2px 0;font-size:12px";
     for (const en of (menuActions[key] || [])) {
       if (en[0] === "-") {
         const sep = document.createElement("div");
-        sep.style.cssText = "height:1px;background:#c8cdd4;margin:3px 6px";
+        sep.className = "dd-sep";
         dd.appendChild(sep);
         continue;
       }
       const row = document.createElement("button");
       row.type = "button";
       row.textContent = en[0];
-      row.style.cssText = "display:block;width:100%;text-align:left;border:0;background:none;padding:6px 16px;font-size:12px";
-      row.addEventListener("mouseenter", () => { row.style.background = "#3366cc"; row.style.color = "#fff"; });
-      row.addEventListener("mouseleave", () => { row.style.background = "none"; row.style.color = "#000"; });
       row.addEventListener("click", (ev) => {
         ev.stopPropagation();
         dd.remove();
         item.classList.remove("open");
-        open = null;
         if (en[1]) en[1]();
       });
       dd.appendChild(row);
     }
-    const r = item.getBoundingClientRect();
-    dd.style.left = Math.min(r.left, window.innerWidth - 190) + "px";
-    dd.style.top = r.bottom + "px";
-    document.body.appendChild(dd);
+    slot.appendChild(dd);
   });
 });
 document.addEventListener("click", () => {

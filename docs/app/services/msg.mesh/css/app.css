@@ -87,8 +87,21 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
   border-bottom:1px solid var(--xp-toolbar-line);
   font-size:12px;
 }
+.menu-slot{position:relative}
 .menu-item{padding:4px 10px;border-radius:2px;user-select:none}
 .menu-item:hover,.menu-item.open{background:var(--xp-sel);color:#fff}
+.menu-dd{
+  position:absolute;top:100%;left:0;z-index:70;min-width:180px;
+  background:#fff;border:1px solid var(--xp-border);
+  box-shadow:4px 4px 12px rgba(0,0,0,.3);
+  padding:2px 0;font-size:12px;color:#000;
+}
+.menu-dd .dd-sep{height:1px;background:#c8cdd4;margin:3px 6px}
+.menu-dd button{
+  display:block;width:100%;text-align:left;
+  border:0;background:none;padding:6px 16px;font-size:12px;color:#000;
+}
+.menu-dd button:hover{background:var(--xp-sel);color:#fff}
 .win-toolbar{
   display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;
   padding:4px 6px;
@@ -367,7 +380,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
 .composer-row{display:flex;gap:8px;align-items:stretch}
 .composer-sunken{flex:1;min-width:0;display:flex}
 .composer-sunken textarea{
-  flex:1;min-width:0;resize:none;height:28px;max-height:110px;
+  flex:1;min-width:0;resize:none;
+  min-height:28px;max-height:110px;
   border:0;background:transparent;padding:5px 8px;
   font-size:13px;outline:0;line-height:18px;overflow:auto;
 }
