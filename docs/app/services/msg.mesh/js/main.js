@@ -538,6 +538,7 @@ $("#chatSearchBtn").addEventListener("click", openSearch);
 $("#profileBtn").addEventListener("click", openProfile);
 $("#backBtn").addEventListener("click", () => {
   $("#chatPanel").classList.remove("mobile-open");
+  $("#details").classList.add("hidden");
   location.hash = "#/";
 });
 $("#chatInfoBtn").addEventListener("click", () => $("#details").classList.toggle("hidden"));
@@ -808,6 +809,28 @@ window.addEventListener("focus", () => {
     refreshUser(Number(state.activePeer.slice(1))).then(() => ui.renderChatHead()).catch(() => null);
   }
 });
+
+/* ---------------- mobile keyboard ---------------- */
+
+// iOS/Android virtual keyboards resize the visual viewport; keep the latest
+// messages and the composer in view while the user is typing.
+function scrollMessagesToBottom() {
+  const wrap = $("#messages");
+  if (wrap) wrap.scrollTop = wrap.scrollHeight;
+}
+
+$("#messageInput").addEventListener("focus", () => {
+  setTimeout(scrollMessagesToBottom, 250);
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    if (!state.activePeer) return;
+    if (document.activeElement === $("#messageInput")) {
+      requestAnimationFrame(scrollMessagesToBottom);
+    }
+  });
+}
 
 /* ---------------- boot ---------------- */
 
