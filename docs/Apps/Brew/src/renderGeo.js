@@ -154,12 +154,20 @@ uniform vec3 uFogColor;
 uniform vec2 uFogRange;
 void main() {
   vec4 c = texture2D(uTex, vUV) * uTint;
+  vec3 n = normalize(vN + vec3(0.0, 1e-4, 0.0));
+  float nd = max(dot(n, -uSunDir), 0.0);
+  float hemi = n.y * 0.5 + 0.5;
+  vec3 sky = mix(vec3(0.72, 0.68, 0.66), vec3(1.0, 0.98, 0.92), hemi);
   if (uUnlit < 0.5) {
-    vec3 n = normalize(vN);
-    float nd = max(dot(n, -uSunDir), 0.0);
-    float hemi = n.y * 0.5 + 0.5;
-    vec3 sky = mix(vec3(0.72, 0.68, 0.66), vec3(1.0, 0.98, 0.92), hemi);
     c.rgb *= (uAmbient * sky + uSunColor * nd);
+  } else {
+    // Baked textures still need form: shade them gently with the baked key
+    // light without washing out the painted detail, then lift saturation so
+    // the room reads rich instead of washed out.
+    float shape = 0.62 + 0.24 * hemi + 0.30 * nd;
+    c.rgb *= shape;
+    float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+    c.rgb = clamp(mix(vec3(lum), c.rgb, 1.08), 0.0, 1.0);
   }
   float fog = smoothstep(uFogRange.x, uFogRange.y, vD);
   gl_FragColor = vec4(mix(c.rgb, uFogColor, fog), c.a);

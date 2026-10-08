@@ -204,6 +204,35 @@ export async function loadGLB(url, opts = {}) {
   };
 }
 
+// The lobby exports carry no NORMAL attribute, which leaves the shader with a
+// zero normal and makes lit shading impossible. Build smooth per-vertex normals
+// by accumulating face normals onto shared vertices (model space, the draw
+// matrix and its inverse-transpose take care of the rest).
+export function genNormals(draws) {
+  let made = 0;
+  for (const d of draws) {
+    if (d.nrm || !d.pos || !d.idx) continue;
+    const pos = d.pos, idx = d.idx;
+    const nrm = new Float32Array(pos.length);
+    for (let t = 0; t + 2 < idx.length; t += 3) {
+      const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (!isFinite(nx) || !isFinite(ny) || !isFinite(nz)) continue;
+      for (const o of [a, b, c]) { nrm[o] += nx; nrm[o + 1] += ny; nrm[o + 2] += nz; }
+    }
+    for (let v = 0; v < nrm.length; v += 3) {
+      const l = Math.hypot(nrm[v], nrm[v + 1], nrm[v + 2]);
+      if (l > 1e-8) { nrm[v] /= l; nrm[v + 1] /= l; nrm[v + 2] /= l; }
+      else { nrm[v] = 0; nrm[v + 1] = 1; nrm[v + 2] = 0; }
+    }
+    d.nrm = nrm;
+    made++;
+  }
+  return made;
+}
+
 // Drop the ceiling (and everything bolted to it) so the interior is visible
 // from the orbit camera, which sits above the building. Height is evaluated in
 // world space through each draw's matrix (node transforms included). A triangle

@@ -5,7 +5,7 @@ import {
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
-import { loadGLB, buildNav, stripCeiling } from './glb.js';
+import { loadGLB, buildNav, stripCeiling, genNormals } from './glb.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -174,9 +174,15 @@ export class Renderer {
     this.texWhite = this.uploadTexture(wc);
 
     const back = newMesh(), shell = newMesh(), props = newMesh(), lever = newMesh(), ring = newMesh();
-    const floorT = newTMesh(), signT = newTMesh();
+    const floorT = newTMesh(), signT = newTMesh(), apronT = newTMesh();
     this.buildWorld(back, shell, props, lever, floorT, signT);
     pushRing(ring, 0, 0, 0, 11.5, 15, C('#e9c877'), 24);
+    // Dark apron around the building so the orbit camera never stares into
+    // raw clear color past the walls.
+    pushT(apronT, [
+      [-900, 0, -700], [MAP.w + 900, 0, -700],
+      [MAP.w + 900, 0, MAP.h + 900], [-900, 0, MAP.h + 900]
+    ], [[0, 0], [4, 0], [4, 4], [0, 4]]);
 
     this.gpuBack = this.uploadMesh(back, gl.STATIC_DRAW);
     this.gpuShell = this.uploadMesh(shell, gl.STATIC_DRAW);
@@ -185,6 +191,7 @@ export class Renderer {
     this.gpuRing = this.uploadMesh(ring, gl.STATIC_DRAW);
     this.gpuFloor = this.uploadTexMesh(floorT, gl.STATIC_DRAW);
     this.gpuSign = this.uploadTexMesh(signT, gl.STATIC_DRAW);
+    this.gpuApron = this.uploadTexMesh(apronT, gl.STATIC_DRAW);
 
     this.meshPlayers = newMesh();
     this.meshShadows = newTMesh();
@@ -242,10 +249,21 @@ export class Renderer {
       };
       const noRoof = stripCeiling(world.draws);
       this.glbReady = true;
-      this.glbWorld = this.uploadGLB(world);
+      // Nav is derived from the full geometry (collision stays identical to
+      // the reference floor plan) before the render-only cleanup below.
       const nav = buildNav(world.draws, MAP.w, MAP.h);
       setNav(nav);
       this.nav = nav;
+      genNormals(world.draws);
+      // The export also ships a huge untextured pure-black shell that only
+      // peeks through as black patches over the floor. It carries no visible
+      // furniture (couches and walls live in the textured draws), so drop it
+      // from the render list.
+      world.draws = world.draws.filter(d => {
+        const m = d.mat >= 0 ? world.materials[d.mat] : null;
+        return !(m && m.tex < 0 && m.unlit && (m.base[0] + m.base[1] + m.base[2]) < 0.06);
+      });
+      this.glbWorld = this.uploadGLB(world);
       console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
         this.glbWorld.blend.length + ' blend, box=' +
         world.bounds.min.map(v => Math.round(v)).join(',') + '..' +
@@ -604,6 +622,13 @@ export class Renderer {
     // The imported lobby is the actual map. The procedural shell (rug, outer
     // walls) only exists as a fallback; gameplay props are drawn on both.
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
+      this.useTex();
+      this.setTexM(this.mIdent);
+      this.setTexTint(0.24, 0.20, 0.16, 1);
+      this.bindTex(this.gpuApron, this.texFloor);
+      gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+
       this.useGLB(def);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
       this.glErr('lobbyOpaque');
@@ -923,22 +948,29 @@ export class Renderer {
     o.clearRect(0, 0, this.vw, this.vh);
     const now = Date.now();
 
-    for (const sd of SEATS) {
-      if (sd.occupiedBy) continue;
-      const c1 = this.sp(sd.x, 12, sd.y);
-      if (!c1) continue;
-      const e = this.sp(sd.x + 17, 12, sd.y);
-      if (!e) continue;
-      const r = Math.hypot(e.x - c1.x, e.y - c1.y);
-      if (r < 2 || r > 300) continue;
-      o.globalAlpha = 0.5 + Math.sin(this.time * 3) * 0.2;
-      o.strokeStyle = 'rgba(233,200,119,.9)';
-      o.lineWidth = 2;
-      o.beginPath();
-      o.arc(c1.x, c1.y, r, 0, Math.PI * 2);
-      o.stroke();
+    if (me) {
+      const meX = me.rx != null ? me.rx : me.x;
+      const meZ = me.ry != null ? me.ry : me.y;
+      for (const sd of SEATS) {
+        if (sd.occupiedBy) continue;
+        const dist = Math.hypot(sd.x - meX, sd.y - meZ);
+        if (dist > 54) continue;
+        const c1 = this.sp(sd.x, 12, sd.y);
+        if (!c1) continue;
+        const e = this.sp(sd.x + 17, 12, sd.y);
+        if (!e) continue;
+        const r = Math.hypot(e.x - c1.x, e.y - c1.y);
+        if (r < 2 || r > 300) continue;
+        const near = 1 - dist / 54;
+        o.globalAlpha = 0.18 + near * 0.4 + Math.sin(this.time * 3) * 0.05;
+        o.strokeStyle = 'rgba(233,200,119,.9)';
+        o.lineWidth = 1.5;
+        o.beginPath();
+        o.arc(c1.x, c1.y, r, 0, Math.PI * 2);
+        o.stroke();
+      }
+      o.globalAlpha = 1;
     }
-    o.globalAlpha = 1;
 
     for (const p of list) {
       const seated = p.status === 'seated' || p.anim === 'sit';
@@ -1000,7 +1032,7 @@ export class Renderer {
       cx, cy, Math.max(this.vw, this.vh) * 0.75
     );
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,.62)');
+    vg.addColorStop(1, 'rgba(0,0,0,.55)');
     o.fillStyle = vg;
     o.fillRect(0, 0, this.vw, this.vh);
   }
