@@ -1,11 +1,11 @@
-import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js';
-import { Host } from './src/state.js';
-import { Net } from './src/net.js';
-import { Renderer } from './src/render.js';
-import { Input } from './src/input.js';
-import { UI } from './src/ui.js';
-import { Registry, kinds as activityKinds } from './src/activities.js';
+import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js?v=8';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js?v=8';
+import { Host } from './src/state.js?v=8';
+import { Net } from './src/net.js?v=8';
+import { Renderer } from './src/render.js?v=8';
+import { Input } from './src/input.js?v=8';
+import { UI } from './src/ui.js?v=8';
+import { Registry, kinds as activityKinds } from './src/activities.js?v=8';
 
 const BROKERS = (() => {
   try {
