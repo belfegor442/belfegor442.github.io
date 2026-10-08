@@ -241,6 +241,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
   border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
   background:var(--xp-face);
 }
+.contacts-col.contacts-mobile-hidden{display:none!important}
 .panel-header{
   height:24px;display:flex;align-items:center;
   padding:0 8px;

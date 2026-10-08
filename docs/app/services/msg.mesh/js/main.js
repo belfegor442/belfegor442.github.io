@@ -575,7 +575,7 @@ $("#profileBtn").addEventListener("click", openProfile);
 $("#backBtn").addEventListener("click", () => {
   $("#chatPanel").classList.remove("mobile-open");
   $("#chatPanel").classList.add("hidden");
-  $("#contactsCol").style.display = "";
+  $("#contactsCol").classList.remove("contacts-mobile-hidden");
   $("#details").classList.add("hidden");
   location.hash = "#/";
 });

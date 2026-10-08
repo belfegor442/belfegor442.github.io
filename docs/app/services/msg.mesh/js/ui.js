@@ -382,7 +382,7 @@ export function setActive(peer) {
   }
   if (contacts) {
     const mobile = window.matchMedia("(max-width:650px)").matches;
-    contacts.style.display = mobile && open ? "none" : "";
+    contacts.classList.toggle("contacts-mobile-hidden", mobile && open);
   }
   renderSidebar();
   if (open) {
