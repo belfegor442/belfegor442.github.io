@@ -6,8 +6,8 @@ const LAST_USER_KEY = "msg.mesh.lastUser";
 // The primary server may be offline; the client must not stay dead because
 // of it — every candidate speaking the msg.mesh protocol is equivalent.
 const SERVER_CANDIDATES = [
-  "https://belfegor442-pc.tail026d9a.ts.net",
   "https://pene.tail026d9a.ts.net",
+  "https://belfegor442-pc.tail026d9a.ts.net",
 ];
 
 const DEFAULT_API = SERVER_CANDIDATES[0];
