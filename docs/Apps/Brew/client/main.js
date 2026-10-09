@@ -28,7 +28,8 @@ class BrewApp {
       onError: (err) => this._onNetError(err),
     });
     this.inRoom = false;
-    this.lastFrame = performance.now();
+    this.lastFrame = Date.now();
+    this.seqEpoch = Date.now();
     this.lastUiAt = 0;
     this.lastMoveSentAt = 0;
     this.screen = 'auth';
@@ -39,7 +40,8 @@ class BrewApp {
     this.store.on('toast', (item) => this.ui.toast(item));
     this.ui.showScreen('auth');
     this.ui.focusName(localStorage.getItem(LAST_NAME_KEY) || '');
-    const loop = (now) => {
+    const loop = () => {
+      const now = Date.now();
       const dt = Math.min(64, now - this.lastFrame);
       this.lastFrame = now;
       this._frame(dt, now);
@@ -48,12 +50,12 @@ class BrewApp {
     requestAnimationFrame(loop);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        this.lastFrame = performance.now();
+        this.lastFrame = Date.now();
         return;
       }
       this.input.reset();
       if (this.inRoom && this._mountedStationId() === null) {
-        this.net.send(C2S.MOVE, { dx: 0, dz: 0, seq: Math.floor(Date.now() / 50) });
+        this.net.send(C2S.MOVE, { dx: 0, dz: 0, seq: this._seq() });
       }
     });
     this._restoreSession();
@@ -482,6 +484,10 @@ class BrewApp {
     return this.store.room.world.stations.find((s) => s.id === id) || null;
   }
 
+  _seq() {
+    return Math.floor((Date.now() - this.seqEpoch) / 50) % 1e9;
+  }
+
   _frame(dt, now) {
     const intent = this.input.update();
     const self = this.store.self;
@@ -491,10 +497,10 @@ class BrewApp {
     this.store.tick(dt, now);
 
     if (usable && this.input.shouldSendIntent(now)) {
-      this.net.send(C2S.MOVE, { dx: intent.dx, dz: intent.dz, seq: Math.floor(now / 50) });
+      this.net.send(C2S.MOVE, { dx: intent.dx, dz: intent.dz, seq: this._seq() });
       this.lastMoveSentAt = now;
     } else if (usable && intent.dx === 0 && intent.dz === 0 && now - this.lastMoveSentAt > 1000) {
-      this.net.send(C2S.MOVE, { dx: 0, dz: 0, seq: Math.floor(now / 50) });
+      this.net.send(C2S.MOVE, { dx: 0, dz: 0, seq: this._seq() });
       this.lastMoveSentAt = now;
     }
 

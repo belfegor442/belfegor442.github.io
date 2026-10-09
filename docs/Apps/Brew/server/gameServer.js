@@ -190,6 +190,11 @@ export class GameServer {
     }
     if (msg.type === C2S.PING) {
       conn.send({ type: S2C.PONG, requestId: msg.requestId, payload: { t: msg.payload.t, serverTime: Date.now() } });
+      const pingRoom = this.roomManager.findByPlayer(conn.playerId);
+      if (pingRoom) {
+        const pingPlayer = pingRoom.getPlayer(conn.playerId);
+        if (pingPlayer) pingRoom.touch(pingPlayer);
+      }
       return;
     }
     if (msg.type === C2S.ROOM_LIST) {

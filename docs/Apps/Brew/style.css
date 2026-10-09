@@ -44,6 +44,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 .world-card .count,.world-card .chips{color:var(--muted);font-size:10px;letter-spacing:.14em}
 .world-card .count b,.world-card .chips b{color:var(--ink);font-weight:700}
 .world-card .count i{font-style:normal;color:var(--gold-dim);margin:0 1px}
+.world-card .count em{font-style:normal;margin-left:.7em}
+.world-card .chips em{font-style:normal}
+.world-card .chips b{margin-left:.7em}
 .world-card .mini{background:transparent;border:0;border-left:1px solid var(--line);height:auto;color:var(--muted)}
 .world-card .mini:hover{background:var(--gold);color:#14100a}
 

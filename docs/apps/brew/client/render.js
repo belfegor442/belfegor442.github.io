@@ -1,422 +1,139 @@
-import { WORLD, STATION, PLAYER, AVATAR_COLORS } from '../shared/constants.js';
+import { WORLD, STATION, AVATAR_COLORS } from '../shared/constants.js';
+import { Renderer as GLRenderer } from '../src/renderPlay.js';
 
-const SQUASH = 0.66;
+const S = 40;
+const CHAT_MS = 6500;
 
-export class Camera {
-  constructor() {
-    this.scale = 40;
-    this.offsetX = 0;
-    this.offsetY = 0;
-    this.width = 800;
-    this.height = 600;
+function scaleWorld(world) {
+  const width = ((world && world.width) || WORLD.width) * S;
+  const depth = ((world && world.depth) || WORLD.depth) * S;
+  const stations = ((world && world.stations) || []).map((st) => ({
+    id: st.id,
+    x: st.x * S,
+    machineZ: st.machineZ * S,
+    standX: st.standX * S,
+    standZ: st.standZ * S,
+    approachX: st.approachX * S,
+    approachZ: st.approachZ * S,
+    facing: st.facing,
+    occupiedBy: st.occupiedBy,
+  }));
+  const obstacles = ((world && world.obstacles) || []).map((o) => ({
+    kind: o.kind,
+    ref: o.ref,
+    minX: o.minX * S,
+    maxX: o.maxX * S,
+    minZ: o.minZ * S,
+    maxZ: o.maxZ * S,
+  }));
+  return { width, depth, stations, obstacles };
+}
+
+class PickCamera {
+  constructor(renderer) {
+    this.renderer = renderer;
   }
 
-  resize(width, height) {
-    this.width = width;
-    this.height = height;
-    const margin = 1.5;
-    const sx = width / (WORLD.width + margin * 2);
-    const sy = height / ((WORLD.depth + margin * 2) * SQUASH);
-    this.scale = Math.min(sx, sy);
-    this.offsetX = width / 2 - (WORLD.width / 2) * this.scale;
-    this.offsetY = height / 2 - (WORLD.depth / 2) * this.scale * SQUASH + height * 0.03;
-  }
-
-  worldToScreen(x, z) {
-    return {
-      x: x * this.scale + this.offsetX,
-      y: z * this.scale * SQUASH + this.offsetY,
-    };
-  }
-
-  screenToWorld(sx, sy) {
-    return {
-      x: (sx - this.offsetX) / this.scale,
-      z: (sy - this.offsetY) / (this.scale * SQUASH),
-    };
-  }
-
-  unit(dy = 1) {
-    return { x: this.scale, y: this.scale * SQUASH * dy };
+  screenToWorld(px, py) {
+    const p = this.renderer.gl.groundAt(px, py);
+    if (!p) return { x: WORLD.width / 2, z: WORLD.depth / 2 };
+    return { x: p.x / S, z: p.z / S };
   }
 }
 
 export class Renderer {
   constructor(canvas, store) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
     this.store = store;
-    this.camera = new Camera();
     this.selection = null;
     this.hover = null;
     this.particles = [];
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
+    this._worldKey = null;
+    this._emoteAt = new Map();
+    this.camera = new PickCamera(this);
+    this.gl = new GLRenderer(canvas, {
+      world: scaleWorld(null),
+      follow: false,
+      orbitDrag: false,
+    });
+    window.addEventListener('resize', () => this.gl.resize());
   }
 
-  resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const rect = this.canvas.getBoundingClientRect();
-    const width = Math.max(320, Math.floor(rect.width || window.innerWidth));
-    const height = Math.max(240, Math.floor(rect.height || window.innerHeight));
-    this.canvas.width = Math.floor(width * dpr);
-    this.canvas.height = Math.floor(height * dpr);
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.cssWidth = width;
-    this.cssHeight = height;
-    this.camera.resize(width, height);
+  _syncWorld() {
+    const w = this.store.room && this.store.room.world;
+    const width = (w && w.width) || WORLD.width;
+    const depth = (w && w.depth) || WORLD.depth;
+    const sc = (w && w.stations && w.stations.length) || 0;
+    const oc = (w && w.obstacles && w.obstacles.length) || 0;
+    const key = `${width}x${depth}:${sc}:${oc}`;
+    if (key === this._worldKey) return;
+    this._worldKey = key;
+    this.gl.setWorld(scaleWorld(w));
   }
 
-  worldToScreen(x, z) {
-    return this.camera.worldToScreen(x, z);
+  _latestChat(now) {
+    const map = new Map();
+    for (const entry of this.store.chat) {
+      if (now - entry.at > CHAT_MS) continue;
+      map.set(entry.playerId, { text: entry.text, at: entry.at });
+    }
+    return map;
   }
 
-  screenToWorld(x, y) {
-    return this.camera.screenToWorld(x, y);
+  _mapPlayer(p, now, chatBy) {
+    const mounted = p.stationId !== null && p.stationId !== undefined;
+    const prev = this._emoteAt.get(p.id);
+    if (p.emote && (!prev || prev.text !== p.emote)) {
+      this._emoteAt.set(p.id, { text: p.emote, at: now });
+    }
+    const stamp = this._emoteAt.get(p.id);
+    const dim = p.online === false;
+    const base = p.name || p.username || 'Player';
+    return {
+      id: p.id,
+      name: `${base}${p.ready ? ' *' : ''}${dim ? ' (off)' : ''}`,
+      x: p.x * S,
+      y: p.z * S,
+      dir: p.facing || 0,
+      anim: mounted ? 'sit' : p.anim === 'WALK' ? 'walk' : 'idle',
+      status: mounted ? 'seated' : 'standing',
+      color: p.color || AVATAR_COLORS[0],
+      chat: chatBy ? chatBy.get(p.id) || null : null,
+      emote: p.emote || null,
+      emoteAt: stamp && stamp.text === p.emote ? stamp.at : 0,
+      effects: p.effects || [],
+      mischief: p.mischief,
+    };
   }
 
   draw(now = Date.now()) {
-    const ctx = this.ctx;
-    const store = this.store;
-    ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    this.drawBackdrop(ctx);
-    this.drawFloor(ctx, now);
-    this.drawAreaEffects(ctx, store.areas, now);
-
-    const drawables = [];
-    for (const obstacle of this._obstacles()) drawables.push({ z: (obstacle.minZ + obstacle.maxZ) / 2, kind: 'obstacle', data: obstacle });
-    const stations = this._stations();
-    for (const station of stations) {
-      drawables.push({ z: station.machineZ + 0.4, kind: 'station', data: station });
-    }
-    for (const player of store.renderPlayers(now)) {
-      drawables.push({ z: player.z, kind: 'player', data: player });
-    }
-    drawables.sort((a, b) => a.z - b.z);
-    for (const item of drawables) {
-      if (item.kind === 'obstacle') this.drawObstacle(ctx, item.data);
-      else if (item.kind === 'station') this.drawStation(ctx, item.data, now);
-      else this.drawPlayer(ctx, item.data, now);
-    }
-
-    this.drawParticles(ctx, now);
-    this.drawRoomEventOverlay(ctx, store.room, now);
-    this.drawVignette(ctx);
+    this._syncWorld();
+    const inRoom = !!(this.store.room && this.store.self);
+    const chatBy = inRoom ? this._latestChat(now) : null;
+    const list = inRoom
+      ? this.store.renderPlayers(now).map((p) => this._mapPlayer(p, now, chatBy))
+      : [];
+    const me = this.store.self
+      ? list.find((m) => m.id === this.store.self.id) || null
+      : null;
+    this.gl.time = now / 1000;
+    this.gl.draw(me, list, null, 0.016);
+    if (this.gl.gl) this._drawExtras(now, list, me);
   }
 
-  _obstacles() {
-    if (this.store.room && this.store.room.world) return this.store.room.world.obstacles || [];
-    return [];
-  }
-
-  _stations() {
-    if (this.store.room && this.store.room.world) return this.store.room.world.stations || [];
-    return [];
-  }
-
-  drawBackdrop(ctx) {
-    const g = ctx.createLinearGradient(0, 0, 0, this.cssHeight);
-    g.addColorStop(0, '#0b0f1a');
-    g.addColorStop(1, '#141a2b');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
-  }
-
-  drawFloor(ctx, now) {
-    const tl = this.worldToScreen(0, 0);
-    const br = this.worldToScreen(WORLD.width, WORLD.depth);
-    ctx.save();
-    ctx.fillStyle = '#1d2233';
-    ctx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= WORLD.width; x += 1) {
-      const a = this.worldToScreen(x, 0);
-      const b = this.worldToScreen(x, WORLD.depth);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-    for (let z = 0; z <= WORLD.depth; z += 1) {
-      const a = this.worldToScreen(0, z);
-      const b = this.worldToScreen(WORLD.width, z);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-
-    const sign = this.worldToScreen(WORLD.width / 2, 0.35);
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = `700 ${Math.max(10, this.camera.scale * 0.32)}px "Segoe UI", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('BREW  BAR', sign.x, sign.y);
-    ctx.restore();
-    void now;
-  }
-
-  drawObstacle(ctx, box) {
-    const a = this.worldToScreen(box.minX, box.minZ);
-    const b = this.worldToScreen(box.maxX, box.maxZ);
-    const w = b.x - a.x;
-    const h = b.y - a.y;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    roundRect(ctx, a.x + 3, a.y + 5, w, h, 6);
-    ctx.fill();
-    if (box.kind === 'bar') {
-      ctx.fillStyle = '#4a3222';
-      roundRect(ctx, a.x, a.y, w, h, 6);
-      ctx.fill();
-      ctx.fillStyle = '#6b4a30';
-      ctx.fillRect(a.x + 4, a.y + 4, w - 8, Math.max(3, h * 0.25));
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(a.x + 4, a.y + h - 8, w - 8, 4);
-    } else {
-      ctx.fillStyle = '#3a2f4a';
-      roundRect(ctx, a.x, a.y, w, h, 8);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.07)';
-      roundRect(ctx, a.x + 3, a.y + 3, w - 6, h * 0.4, 6);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  drawStation(ctx, station, now) {
-    const store = this.store;
-    const machine = store.machines.get(station.id);
-    const top = this.worldToScreen(station.x - STATION.machineWidth / 2, station.machineZ - STATION.machineDepth / 2);
-    const bottom = this.worldToScreen(station.x + STATION.machineWidth / 2, station.machineZ + STATION.machineDepth / 2);
-    const w = bottom.x - top.x;
-    const h = bottom.y - top.y;
-    const bodyH = Math.max(26, this.camera.scale * 1.5);
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath();
-    ctx.ellipse(top.x + w / 2, bottom.y + 4, w * 0.55, h * 0.35, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const grad = ctx.createLinearGradient(0, top.y - bodyH, 0, bottom.y);
-    grad.addColorStop(0, '#2e3550');
-    grad.addColorStop(1, '#1b2033');
-    ctx.fillStyle = grad;
-    roundRect(ctx, top.x, top.y - bodyH, w, h + bodyH, 8);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, top.x, top.y - bodyH, w, h + bodyH, 8);
-    ctx.stroke();
-
-    const screenX = top.x + w * 0.1;
-    const screenY = top.y - bodyH + h * 0.2;
-    const screenW = w * 0.8;
-    const screenH = h * 1.1;
-    ctx.fillStyle = '#0a0d17';
-    roundRect(ctx, screenX, screenY, screenW, screenH, 5);
-    ctx.fill();
-
-    this.drawReels(ctx, machine, screenX, screenY, screenW, screenH, now);
-
-    const meterX = top.x + w * 0.12;
-    const meterY = bottom.y + 6;
-    const meterW = w * 0.76;
-    const meterH = Math.max(6, this.camera.scale * 0.16);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    roundRect(ctx, meterX, meterY, meterW, meterH, meterH / 2);
-    ctx.fill();
-    const heat = machine ? machine.heat : 0;
-    const heatColor = heat >= 90 ? '#ff4d3d' : heat >= 75 ? '#ff9d3d' : heat >= 50 ? '#ffd93d' : '#4fd07a';
-    ctx.fillStyle = heatColor;
-    roundRect(ctx, meterX, meterY, Math.max(2, (meterW * Math.min(100, heat)) / 100), meterH, meterH / 2);
-    ctx.fill();
-
-    if (machine && machine.ownerId) {
-      const owner = store.players.get(machine.ownerId);
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.font = `600 ${Math.max(9, this.camera.scale * 0.24)}px "Segoe UI", system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`#${station.id + 1}`, top.x + w / 2, top.y - bodyH - 6);
-      if (owner && owner.name) {
-        ctx.fillStyle = owner.color || '#fff';
-        ctx.font = `500 ${Math.max(8, this.camera.scale * 0.2)}px "Segoe UI", system-ui, sans-serif`;
-        ctx.fillText(owner.name.slice(0, 10), top.x + w / 2, meterY + meterH + 13);
+  pickPlayer(worldX, worldZ, players) {
+    let best = null;
+    let bestDist = 1.2 * 1.2;
+    for (const player of players) {
+      const dx = player.x - worldX;
+      const dz = player.z - worldZ;
+      const d = dx * dx + dz * dz;
+      if (d < bestDist) {
+        bestDist = d;
+        best = player;
       }
     }
-
-    if (machine && machine.overbrewDeadline && machine.overbrewDeadline > now) {
-      const remain = Math.max(0, (machine.overbrewDeadline - now) / 1000);
-      ctx.fillStyle = '#ff5b45';
-      ctx.font = `800 ${Math.max(11, this.camera.scale * 0.34)}px "Segoe UI", system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(remain.toFixed(1), top.x + w / 2, top.y - bodyH - 22);
-    }
-    ctx.restore();
-  }
-
-  drawReels(ctx, machine, x, y, w, h, now) {
-    const count = 3;
-    const cellW = w / count;
-    for (let i = 0; i < count; i += 1) {
-      const cx = x + cellW * (i + 0.5);
-      const cy = y + h * 0.5;
-      const r = Math.min(cellW * 0.34, h * 0.4);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#11162a';
-      ctx.fill();
-      ctx.clip();
-
-      const view = this.store.machineView(machine, now);
-      const reel = view && view.reels ? view.reels[i] : null;
-      const angle = reel ? ((reel.angle % 360) * Math.PI) / 180 : 0;
-      ctx.strokeStyle = reel && reel.stopped ? qualityColor(reel.quality) : '#5f6b96';
-      ctx.lineWidth = Math.max(3, r * 0.22);
-      ctx.beginPath();
-      ctx.moveTo(cx - Math.cos(angle) * r, cy - Math.sin(angle) * r);
-      ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx - r * 0.5, cy);
-      ctx.lineTo(cx + r * 0.5, cy);
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
-
-      if (view && view.holds && view.holds[i]) {
-        ctx.fillStyle = 'rgba(80,180,255,0.9)';
-        ctx.font = `700 ${Math.max(8, r * 0.55)}px "Segoe UI", system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText('H', cx, y - 4);
-      }
-    }
-    void machine;
-  }
-
-  drawPlayer(ctx, player, now) {
-    const pos = this.worldToScreen(player.x, player.z);
-    const scale = this.camera.scale;
-    const bodyW = Math.max(10, scale * PLAYER.radius * 1.5);
-    const bodyH = Math.max(14, scale * 0.72);
-    const mounted = player.stationId !== null && player.stationId !== undefined;
-    const isSelf = this.store.self && player.id === this.store.self.id;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(pos.x, pos.y + 3, bodyW * 0.6, bodyW * 0.28, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (this.selection === player.id || this.hover === player.id) {
-      ctx.strokeStyle = this.selection === player.id ? '#ffd76a' : 'rgba(255,255,255,0.6)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y + 3, bodyW * 0.75, bodyW * 0.36, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    const walk = player.anim === 'WALK' ? Math.sin(now / 90 + player.x) * 2 : 0;
-    const lean = mounted ? -3 : 0;
-    const color = player.color || AVATAR_COLORS[0];
-    const dim = player.online === false;
-
-    ctx.globalAlpha = dim ? 0.55 : 1;
-    ctx.fillStyle = shade(color, -0.25);
-    roundRect(ctx, pos.x - bodyW / 2, pos.y - bodyH + walk, bodyW, bodyH, bodyW * 0.4);
-    ctx.fill();
-
-    ctx.fillStyle = color;
-    roundRect(ctx, pos.x - bodyW / 2 + 1.5, pos.y - bodyH + walk + 1.5, bodyW - 3, bodyH * 0.62, bodyW * 0.35);
-    ctx.fill();
-
-    const headR = Math.max(5, scale * 0.26);
-    ctx.fillStyle = '#f2d3b3';
-    ctx.beginPath();
-    ctx.arc(pos.x + lean, pos.y - bodyH - headR * 0.3 + walk, headR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = shade(color, 0.15);
-    ctx.beginPath();
-    ctx.arc(pos.x + lean, pos.y - bodyH - headR * 0.75 + walk, headR * 0.95, Math.PI, Math.PI * 2);
-    ctx.fill();
-
-    ctx.globalAlpha = 1;
-
-    const tag = `${player.name || 'Player'}${player.ready ? ' *' : ''}${dim ? ' (off)' : ''}`;
-    ctx.font = `600 ${Math.max(9, scale * 0.24)}px "Segoe UI", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    const tagY = pos.y - bodyH - headR * 2.1 + walk;
-    const width = ctx.measureText(tag).width;
-    ctx.fillStyle = 'rgba(8,10,18,0.72)';
-    roundRect(ctx, pos.x - width / 2 - 5, tagY - 12, width + 10, 15, 7);
-    ctx.fill();
-    ctx.fillStyle = isSelf ? '#ffd76a' : '#eef1ff';
-    ctx.fillText(tag, pos.x, tagY);
-
-    if (player.emote) {
-      const bubbleY = tagY - 22;
-      ctx.fillStyle = 'rgba(255,255,255,0.94)';
-      roundRect(ctx, pos.x - 34, bubbleY - 14, 68, 18, 9);
-      ctx.fill();
-      ctx.fillStyle = '#1b2033';
-      ctx.font = `700 10px "Segoe UI", system-ui, sans-serif`;
-      ctx.fillText(String(player.emote), pos.x, bubbleY - 1);
-    }
-
-    if (player.effects && player.effects.length) {
-      let ex = pos.x + bodyW * 0.6;
-      for (const kind of player.effects) {
-        ctx.fillStyle = effectColor(kind);
-        ctx.beginPath();
-        ctx.arc(ex, pos.y - bodyH * 0.5, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ex += 9;
-      }
-    }
-
-    if (this.store.self && player.id === this.store.self.id && player.mischief !== undefined) {
-      const barW = bodyW * 1.4;
-      const barX = pos.x - barW / 2;
-      const barY = pos.y + 9;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      roundRect(ctx, barX, barY, barW, 5, 3);
-      ctx.fill();
-      ctx.fillStyle = '#a55fe0';
-      roundRect(ctx, barX, barY, (barW * Math.min(100, player.mischief)) / 100, 5, 3);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  drawAreaEffects(ctx, areas, now) {
-    for (const area of areas || []) {
-      if (area.until && area.until < now) continue;
-      const pos = this.worldToScreen(area.x || WORLD.width / 2, area.z || WORLD.depth / 2);
-      const radius = (area.radius || 3) * this.camera.scale;
-      const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, radius);
-      g.addColorStop(0, 'rgba(120,120,120,0.42)');
-      g.addColorStop(1, 'rgba(120,120,120,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    return best;
   }
 
   addBurst(worldX, worldZ, color, count = 10) {
@@ -434,63 +151,248 @@ export class Renderer {
     if (this.particles.length > 300) this.particles.splice(0, this.particles.length - 300);
   }
 
-  drawParticles(ctx, now) {
+  _drawExtras(now, list, me) {
+    const g = this.gl;
+    const o = g.octx;
+    o.setTransform(g.dpr, 0, 0, g.dpr, 0, 0);
+    o.textAlign = 'left';
+    o.textBaseline = 'alphabetic';
+    const world = this.store.room && this.store.room.world;
+    if (world) {
+      for (const st of world.stations) this._drawMachine(o, st, now);
+    }
+    this._drawAreas(o, now);
+    this._drawSelection(o, list);
+    this._drawPlayerExtras(o, list, me);
+    this._drawParticles(o, now);
+    this._drawEvent(o, now);
+  }
+
+  _drawMachine(o, st, now) {
+    const g = this.gl;
+    const machine = this.store.machines.get(st.id);
+    const z = (st.machineZ + STATION.machineDepth / 2) * S + 3;
+    const x0 = (st.x - STATION.machineWidth / 2) * S;
+    const x1 = (st.x + STATION.machineWidth / 2) * S;
+    const b0 = g.sp(x0, 40, z), b1 = g.sp(x1, 40, z);
+    const t1 = g.sp(x1, 84, z), t0 = g.sp(x0, 84, z);
+    if (!b0 || !b1 || !t1 || !t0) return;
+    const q = (u, v) => ({
+      x: (b0.x * (1 - u) + b1.x * u) * (1 - v) + (t0.x * (1 - u) + t1.x * u) * v,
+      y: (b0.y * (1 - u) + b1.y * u) * (1 - v) + (t0.y * (1 - u) + t1.y * u) * v,
+    });
+    const quad = (u0, v0, u1, v1) => {
+      const p1 = q(u0, v0), p2 = q(u1, v0), p3 = q(u1, v1), p4 = q(u0, v1);
+      o.beginPath();
+      o.moveTo(p1.x, p1.y);
+      o.lineTo(p2.x, p2.y);
+      o.lineTo(p3.x, p3.y);
+      o.lineTo(p4.x, p4.y);
+      o.closePath();
+    };
+
+    o.fillStyle = 'rgba(0,0,0,0.45)';
+    quad(0.05, 0.0, 0.95, 1.0);
+    o.fill();
+    o.fillStyle = '#0a0d17';
+    quad(0.07, 0.16, 0.93, 0.96);
+    o.fill();
+
+    const view = this.store.machineView(machine, now);
+    for (let i = 0; i < 3; i += 1) {
+      const u = 0.25 + i * 0.25;
+      const c = q(u, 0.56);
+      const e0 = q(u - 0.11, 0.56);
+      const e1 = q(u + 0.11, 0.56);
+      const r = Math.hypot(e1.x - e0.x, e1.y - e0.y) / 2;
+      if (r < 2) continue;
+      o.save();
+      o.beginPath();
+      o.arc(c.x, c.y, r, 0, Math.PI * 2);
+      o.fillStyle = '#11162a';
+      o.fill();
+      o.clip();
+      const reel = view && view.reels ? view.reels[i] : null;
+      const angle = reel ? ((reel.angle % 360) * Math.PI) / 180 : 0;
+      o.strokeStyle = reel && reel.stopped ? qualityColor(reel.quality) : '#5f6b96';
+      o.lineWidth = Math.max(3, r * 0.22);
+      o.beginPath();
+      o.moveTo(c.x - Math.cos(angle) * r, c.y - Math.sin(angle) * r);
+      o.lineTo(c.x + Math.cos(angle) * r, c.y + Math.sin(angle) * r);
+      o.stroke();
+      o.strokeStyle = 'rgba(255,255,255,0.55)';
+      o.lineWidth = 2;
+      o.beginPath();
+      o.moveTo(c.x - r * 0.5, c.y);
+      o.lineTo(c.x + r * 0.5, c.y);
+      o.stroke();
+      o.restore();
+      o.strokeStyle = 'rgba(255,255,255,0.18)';
+      o.lineWidth = 1.5;
+      o.beginPath();
+      o.arc(c.x, c.y, r, 0, Math.PI * 2);
+      o.stroke();
+      if (view && view.holds && view.holds[i]) {
+        o.fillStyle = 'rgba(80,180,255,0.9)';
+        o.font = `700 ${Math.max(8, Math.round(r * 0.6))}px Arial`;
+        o.textAlign = 'center';
+        o.textBaseline = 'middle';
+        o.fillText('H', c.x, q(u, 0.9).y);
+        o.textAlign = 'left';
+        o.textBaseline = 'alphabetic';
+      }
+    }
+
+    const heat = machine ? machine.heat : 0;
+    o.fillStyle = 'rgba(0,0,0,0.6)';
+    quad(0.12, 0.04, 0.88, 0.12);
+    o.fill();
+    const frac = Math.max(0, Math.min(100, heat)) / 100;
+    if (frac > 0.01) {
+      o.fillStyle = heat >= 90 ? '#ff4d3d' : heat >= 75 ? '#ff9d3d' : heat >= 50 ? '#ffd93d' : '#4fd07a';
+      quad(0.12, 0.04, 0.12 + 0.76 * frac, 0.12);
+      o.fill();
+    }
+
+    const top = g.sp(st.x * S, 96, z);
+    if (top) {
+      o.textAlign = 'center';
+      o.textBaseline = 'alphabetic';
+      o.font = '600 12px Arial';
+      o.fillStyle = 'rgba(0,0,0,.85)';
+      o.fillText(`#${st.id + 1}`, top.x + 1, top.y + 1);
+      o.fillStyle = 'rgba(255,255,255,0.75)';
+      o.fillText(`#${st.id + 1}`, top.x, top.y);
+      if (machine && machine.ownerId) {
+        const owner = this.store.players.get(machine.ownerId);
+        if (owner && owner.name) {
+          o.font = '500 11px Arial';
+          o.fillStyle = owner.color || '#fff';
+          o.fillText(owner.name.slice(0, 10), top.x, top.y + 14);
+        }
+      }
+      if (machine && machine.overbrewDeadline && machine.overbrewDeadline > now) {
+        const remain = Math.max(0, (machine.overbrewDeadline - now) / 1000);
+        o.font = '800 14px Arial';
+        o.fillStyle = '#ff5b45';
+        o.fillText(remain.toFixed(1), top.x, top.y - 14);
+      }
+      o.textAlign = 'left';
+      o.textBaseline = 'alphabetic';
+    }
+  }
+
+  _drawAreas(o, now) {
+    const g = this.gl;
+    for (const area of this.store.areas || []) {
+      if (area.until && area.until < now) continue;
+      const r = (area.radius || 3) * S;
+      const cx = (area.x != null ? area.x : WORLD.width / 2) * S;
+      const cz = (area.z != null ? area.z : WORLD.depth / 2) * S;
+      const c = g.sp(cx, 2, cz);
+      const px = g.sp(cx + r, 2, cz);
+      const pz = g.sp(cx, 2, cz + r);
+      if (!c || !px || !pz) continue;
+      const rx = Math.hypot(px.x - c.x, px.y - c.y);
+      const rz = Math.hypot(pz.x - c.x, pz.y - c.y);
+      if (rx < 2 || rz < 2 || rx > 3000) continue;
+      o.save();
+      o.translate(c.x, c.y);
+      o.scale(rx / 64, rz / 64);
+      const grd = o.createRadialGradient(0, 0, 0, 0, 0, 64);
+      grd.addColorStop(0, 'rgba(130,150,175,0.40)');
+      grd.addColorStop(1, 'rgba(130,150,175,0)');
+      o.fillStyle = grd;
+      o.beginPath();
+      o.arc(0, 0, 64, 0, Math.PI * 2);
+      o.fill();
+      o.restore();
+    }
+  }
+
+  _drawSelection(o, list) {
+    const id = this.selection || this.hover;
+    if (!id) return;
+    const m = list.find((p) => p.id === id);
+    if (!m) return;
+    const g = this.gl;
+    const c = g.sp(m.x, 1.5, m.y);
+    const px = g.sp(m.x + 17, 1.5, m.y);
+    const pz = g.sp(m.x, 1.5, m.y + 17);
+    if (!c || !px || !pz) return;
+    const rx = Math.hypot(px.x - c.x, px.y - c.y);
+    const rz = Math.hypot(pz.x - c.x, pz.y - c.y);
+    if (rx < 2 || rz < 2) return;
+    o.strokeStyle = this.selection === id ? '#ffd76a' : 'rgba(255,255,255,0.6)';
+    o.lineWidth = 2;
+    o.beginPath();
+    o.ellipse(c.x, c.y, rx, rz, 0, 0, Math.PI * 2);
+    o.stroke();
+  }
+
+  _drawPlayerExtras(o, list, me) {
+    const g = this.gl;
+    for (const m of list) {
+      if (!m.effects || !m.effects.length) continue;
+      const base = g.sp(m.x, 34, m.y);
+      if (!base) continue;
+      let ex = base.x + 24;
+      for (const kind of m.effects) {
+        o.fillStyle = effectColor(kind);
+        o.beginPath();
+        o.arc(ex, base.y, 4, 0, Math.PI * 2);
+        o.fill();
+        ex += 9;
+      }
+    }
+    if (me && me.mischief !== undefined) {
+      const base = g.sp(me.x, 0, me.y);
+      if (base) {
+        const barW = 56;
+        const barX = base.x - barW / 2;
+        const barY = base.y + 6;
+        o.fillStyle = 'rgba(0,0,0,0.5)';
+        roundRect(o, barX, barY, barW, 5, 3);
+        o.fill();
+        o.fillStyle = '#a55fe0';
+        roundRect(o, barX, barY, (barW * Math.min(100, me.mischief)) / 100, 5, 3);
+        o.fill();
+      }
+    }
+  }
+
+  _drawParticles(o, now) {
+    const g = this.gl;
     this.particles = this.particles.filter((p) => now - p.born < p.life);
     for (const p of this.particles) {
       const age = (now - p.born) / p.life;
-      const pos = this.worldToScreen(p.x + p.vx * age, p.z + p.vz * age);
-      ctx.globalAlpha = 1 - age;
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
-      ctx.fill();
+      const c = g.sp((p.x + p.vx * age) * S, 12, (p.z + p.vz * age) * S);
+      if (!c) continue;
+      o.globalAlpha = 1 - age;
+      o.fillStyle = p.color;
+      o.beginPath();
+      o.arc(c.x, c.y, 3, 0, Math.PI * 2);
+      o.fill();
     }
-    ctx.globalAlpha = 1;
+    o.globalAlpha = 1;
   }
 
-  drawRoomEventOverlay(ctx, room, now) {
-    if (!room || !room.activeEvent) return;
-    const remain = room.activeEvent.endsAt - now;
+  _drawEvent(o, now) {
+    const g = this.gl;
+    const ev = this.store.room && this.store.room.activeEvent;
+    if (!ev) return;
+    const remain = (ev.endsAt || 0) - now;
     if (remain <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = 0.12 + 0.05 * Math.sin(now / 300);
-    ctx.fillStyle = room.activeEvent.kind === 'HAPPY_HOUR' ? '#ffd93d' : '#4fd0ff';
-    ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
-    ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${room.activeEvent.kind} · ${Math.ceil(remain / 1000)}s`, 16, this.cssHeight - 16);
-  }
-
-  drawVignette(ctx) {
-    const g = ctx.createRadialGradient(
-      this.cssWidth / 2,
-      this.cssHeight / 2,
-      Math.min(this.cssWidth, this.cssHeight) * 0.35,
-      this.cssWidth / 2,
-      this.cssHeight / 2,
-      Math.max(this.cssWidth, this.cssHeight) * 0.75,
-    );
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0.5)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
-  }
-
-  pickPlayer(worldX, worldZ, players) {
-    let best = null;
-    let bestDist = 1.2 * 1.2;
-    for (const player of players) {
-      const dx = player.x - worldX;
-      const dz = player.z - worldZ;
-      const d = dx * dx + dz * dz;
-      if (d < bestDist) {
-        bestDist = d;
-        best = player;
-      }
-    }
-    return best;
+    o.save();
+    o.globalAlpha = 0.12 + 0.05 * Math.sin(now / 300);
+    o.fillStyle = ev.kind === 'HAPPY_HOUR' ? '#ffd93d' : '#4fd0ff';
+    o.fillRect(0, 0, g.vw, g.vh);
+    o.restore();
+    o.fillStyle = 'rgba(255,255,255,0.85)';
+    o.font = '700 13px Arial';
+    o.textAlign = 'left';
+    o.textBaseline = 'alphabetic';
+    o.fillText(`${ev.kind} · ${Math.ceil(remain / 1000)}s`, 16, g.vh - 16);
   }
 }
 
@@ -529,18 +431,4 @@ function effectColor(kind) {
     default:
       return '#ffffff';
   }
-}
-
-function shade(hex, amount) {
-  const value = hex.replace('#', '');
-  if (value.length !== 6) return hex;
-  const num = parseInt(value, 16);
-  const r = clamp255(((num >> 16) & 255) * (1 + amount));
-  const g = clamp255(((num >> 8) & 255) * (1 + amount));
-  const b = clamp255((num & 255) * (1 + amount));
-  return `rgb(${r},${g},${b})`;
-}
-
-function clamp255(v) {
-  return Math.max(0, Math.min(255, Math.round(v)));
 }

@@ -463,19 +463,21 @@ export function pushT(M, p, uv) {
 
 /* ------------------------------------------------------------------- textures */
 
-export function buildFloor(decal = true) {
+export function buildFloor(decor = true, w = MAP.w, h = MAP.h, decal = decor) {
   const c = document.createElement('canvas');
-  c.width = MAP.w; c.height = MAP.h;
+  c.width = w; c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = '#2c2018';
-  g.fillRect(0, 0, MAP.w, MAP.h);
-  for (let y = 0; y < MAP.h; y += 58) {
-    g.fillStyle = (y / 58) % 2 ? 'rgba(255,255,255,.022)' : 'rgba(0,0,0,.10)';
-    g.fillRect(0, y, MAP.w, 58);
+  g.fillStyle = decor ? '#2c2018' : '#1d2233';
+  g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 58) {
+    g.fillStyle = (y / 58) % 2
+      ? (decor ? 'rgba(255,255,255,.022)' : 'rgba(255,255,255,.035)')
+      : 'rgba(0,0,0,.10)';
+    g.fillRect(0, y, w, 58);
     g.fillStyle = 'rgba(0,0,0,.28)';
-    g.fillRect(0, y, MAP.w, 2);
+    g.fillRect(0, y, w, 2);
     const off = (Math.floor(y / 58) % 2) * 180;
-    for (let x = off; x < MAP.w; x += 360) {
+    for (let x = off; x < w; x += 360) {
       g.fillStyle = 'rgba(0,0,0,.25)';
       g.fillRect(x, y, 2, 58);
     }

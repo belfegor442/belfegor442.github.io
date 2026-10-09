@@ -279,6 +279,7 @@ export class Room {
     player.status = 'ONLINE';
     player.rejoined = true;
     player.disconnectedAt = 0;
+    this.touch(player);
     if (player.stationId !== null) {
       const station = this.stationById(player.stationId);
       if (station) station.occupiedBy = player.id;
