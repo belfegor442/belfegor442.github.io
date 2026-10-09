@@ -25,7 +25,7 @@ const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
 // The lobby ships baked, unlit textures that render darker than the play
 // field expects: lift them without touching lit geometry or the player skin.
 const GLB_EXPOSURE = 1.6;
-const PLAYER_SCALE = 1.75;
+const PLAYER_SCALE = 2.1;
 
 // Inverse-transpose of the upper-left 3x3 of a column-major mat4, into a
 // 9-float column-major mat3. Correct normals under the lobby's non-uniform
@@ -1254,7 +1254,7 @@ export class Renderer {
     for (const p of list) {
       const seated = p.status === 'seated' || p.anim === 'sit';
       const isMe = !!me && p.id === me.id;
-      const topH = this.glbPlayer ? (seated ? 52 : 64) : (seated ? 72 : 64);
+      const topH = this.glbPlayer ? (seated ? 62 : 76) : (seated ? 72 : 64);
       const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;
