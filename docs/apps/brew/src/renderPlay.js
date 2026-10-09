@@ -25,6 +25,7 @@ const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
 // The lobby ships baked, unlit textures that render darker than the play
 // field expects: lift them without touching lit geometry or the player skin.
 const GLB_EXPOSURE = 1.6;
+const PLAYER_SCALE = 1.75;
 
 // Inverse-transpose of the upper-left 3x3 of a column-major mat4, into a
 // 9-float column-major mat3. Correct normals under the lobby's non-uniform
@@ -84,8 +85,8 @@ export class Renderer {
     this._worldKey = worldKeyOf(this.worldSpec);
     this.cam = { x: this.bounds.w / 2, z: this.bounds.h / 2 };
     this.camOrbit = null;
-    this.eye = { x: this.cam.x, y: 730, z: this.cam.z + 650 };
-    this.orbit = { yaw: 0, pitch: Math.atan2(730, 650), dist: Math.hypot(730, 650) };
+    this.eye = { x: this.cam.x, y: 880, z: this.cam.z + 520 };
+    this.orbit = { yaw: 0, pitch: Math.atan2(880, 520), dist: Math.hypot(880, 520) };
     this.freeCam = false;
     this._drag = null;
     this._pts = new Map();
@@ -268,7 +269,7 @@ export class Renderer {
       this.litDef = {
         amb: [0.46, 0.46, 0.52], sun: [0.84, 0.87, 0.98],
         sunDir: [-0.45 / n, -1 / n, -0.35 / n],
-        fog: [0.05, 0.06, 0.10], fogRange: [950, 2600]
+        fog: [0.075, 0.085, 0.12], fogRange: [1500, 3600]
       };
       this.nightDef = {
         amb: [0.14, 0.16, 0.28], sun: [0.18, 0.21, 0.36],
@@ -279,7 +280,7 @@ export class Renderer {
       this.litDef = {
         amb: [0.44, 0.42, 0.46], sun: [0.92, 0.86, 0.74],
         sunDir: [-0.45 / n, -1 / n, -0.35 / n],
-        fog: [0.055, 0.043, 0.035], fogRange: [1150, 3300]
+        fog: [0.075, 0.062, 0.05], fogRange: [1750, 4300]
       };
       this.nightDef = {
         amb: [0.15, 0.17, 0.30], sun: [0.20, 0.22, 0.38],
@@ -894,7 +895,7 @@ export class Renderer {
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useTex();
       this.setTexM(this.mIdent);
-      this.setTexTint(0.24, 0.20, 0.16, 1);
+      this.setTexTint(0.44, 0.37, 0.29, 1);
       this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -924,7 +925,7 @@ export class Renderer {
       // from staring past the walls into raw clear color.
       this.useTex();
       this.setTexM(this.mIdent);
-      this.setTexTint(0.24, 0.20, 0.16, 1);
+      this.setTexTint(0.44, 0.37, 0.29, 1);
       this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -965,7 +966,7 @@ export class Renderer {
         const ry = Math.PI / 2 - (p.dir || 0);
         const phase = this.time * 11 + (p.id.charCodeAt(0) || 0);
         const bob = walking ? Math.abs(Math.sin(phase)) * 1.2 : 0;
-        trs(this.mScratch, px, bob, pz, ry, 1, 1, 1);
+        trs(this.mScratch, px, bob, pz, ry, PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE);
         for (const g of this.glbPlayer.opaque) {
           mul(this.mScratch2, this.mScratch, g.matrix);
           this.drawGLBD(g, this.mScratch2);
@@ -1009,7 +1010,7 @@ export class Renderer {
       const x = p.rx != null ? p.rx : p.x;
       const z = p.ry != null ? p.ry : p.y;
       const seated = p.status === 'seated' || p.anim === 'sit';
-      const ss = this.clientMode ? 1.3 : 1;
+      const ss = PLAYER_SCALE;
       const rx = (seated ? 15 : 13) * ss, rz = (seated ? 8 : 7) * ss;
       pushT(SH, [
         [x - rx, 2, z - rz], [x + rx, 2, z - rz], [x + rx, 2, z + rz], [x - rx, 2, z + rz]
@@ -1253,7 +1254,7 @@ export class Renderer {
     for (const p of list) {
       const seated = p.status === 'seated' || p.anim === 'sit';
       const isMe = !!me && p.id === me.id;
-      const topH = this.glbPlayer ? (seated ? 52 : 44) : (seated ? 72 : 64);
+      const topH = this.glbPlayer ? (seated ? 52 : 64) : (seated ? 72 : 64);
       const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;
