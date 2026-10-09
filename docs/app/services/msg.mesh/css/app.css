@@ -137,6 +137,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
 }
 .menu-dd button:hover{background:var(--xp-sel);color:#fff}
 .menu-dd .dd-ico{width:16px;height:16px;flex:none}
+/* nested submenu (native File > Theme flyout opens right of the parent row) */
+.dd-row-wrap{position:relative;width:100%}
+.dd-sub{display:none;top:0;left:100%;margin-left:-2px;min-width:170px;padding:2px 0}
+.dd-row-wrap:hover>.dd-sub,.dd-row-wrap.sub-open>.dd-sub{display:block}
+.dd-item.has-sub{justify-content:space-between;padding-left:21px}
+.dd-sub-arrow{margin-left:auto;font-size:12px;line-height:1;opacity:.85}
 .win-toolbar{
   display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;
   padding:4px 6px;
@@ -341,6 +347,9 @@ dialog .win-cap.close{
   color:transparent;font-size:0;
 }
 .field{margin-bottom:12px}
+.theme-row{display:flex;gap:6px;flex-wrap:wrap}
+.theme-opt{flex:1;min-width:110px}
+.theme-opt.on{border:2px solid var(--xp-accent);font-weight:700}
 .field label{display:block;font-size:11px;color:var(--xp-dim);margin-bottom:4px}
 .field-label-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .caps-warn{font-size:10px;color:var(--xp-warn);font-weight:700}

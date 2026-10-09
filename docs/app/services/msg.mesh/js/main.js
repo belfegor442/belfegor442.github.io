@@ -4,6 +4,7 @@ import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
 import { playSound, primeSound } from "./sound.js";
+import { setTheme } from "./theme.js";
 
 const $ = ui.$;
 const esc = ui.esc;
@@ -869,6 +870,12 @@ const menuActions = {
     ["Open Messenger", () => { location.hash = "#/"; }, "Windows Messenger.png"],
     ["-", null],
     ["Settings...", openProfile, "Control Panel.png"],
+    // Native File menu has a Theme submenu; web ships the two themes it
+    // implements (XP Luna + Windows 98).
+    ["Theme", null, null, [
+      ["Windows XP", () => setTheme("winxp"), "Theme.png"],
+      ["Windows 98", () => setTheme("win98"), "Theme.png"],
+    ]],
     ["-", null],
     ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }, "Login Question.png"],
     ["Create Account...", () => { setMode("register"); location.hash = "#/register"; }, "User Accounts.png"],
@@ -877,7 +884,7 @@ const menuActions = {
   contacts: [
     ["Contact List", () => { ui.setActive(null); }, "Address Book.png"],
     ["Search User...", openNewChat, "Search.png"],
-    ["Add Friend...", openNewChat, "User Accounts.png"],
+    ["Add Friend...", openNewChat, "User Accounts.png", "address_book_card_users.png"],
     ["-", null],
     ["Refresh", () => { loadFriends().catch(() => null); }, "Network Connections.png"],
   ],
@@ -902,6 +909,62 @@ const menuActions = {
   ],
 };
 
+// en = [label, action, iconFile, extra]; extra is either a string (win98 icon
+// override passed through to theme.js) or an array (nested submenu, as in the
+// native File > Theme flyout). Submenu parent rows carry no icon, matching
+// native draw_action_icon (empty action = no art).
+function buildMenuRow(en, dd, item) {
+  if (en[0] === "-") {
+    const sep = document.createElement("div");
+    sep.className = "dd-sep";
+    dd.appendChild(sep);
+    return;
+  }
+  const isSub = Array.isArray(en[3]);
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = isSub ? "dd-item has-sub" : "dd-item";
+  if (!isSub && en[2]) {
+    const ic = document.createElement("img");
+    ic.className = "dd-ico";
+    ic.src = "./assets/xp/icons/" + en[2];
+    ic.alt = "";
+    ic.width = 16;
+    ic.height = 16;
+    if (typeof en[3] === "string") ic.dataset.w98 = en[3];
+    row.appendChild(ic);
+  }
+  row.appendChild(document.createTextNode(en[0]));
+  if (isSub) {
+    const arrow = document.createElement("span");
+    arrow.className = "dd-sub-arrow";
+    arrow.textContent = ">";
+    row.appendChild(arrow);
+    const wrap = document.createElement("div");
+    wrap.className = "dd-row-wrap";
+    row.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const wasOpen = wrap.classList.contains("sub-open");
+      dd.querySelectorAll(".dd-row-wrap.sub-open").forEach((w) => w.classList.remove("sub-open"));
+      wrap.classList.toggle("sub-open", !wasOpen);
+    });
+    const sub = document.createElement("div");
+    sub.className = "menu-dd dd-sub";
+    for (const child of en[3]) buildMenuRow(child, sub, item);
+    wrap.appendChild(row);
+    wrap.appendChild(sub);
+    dd.appendChild(wrap);
+    return;
+  }
+  row.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    document.querySelectorAll(".menu-dd").forEach((d) => d.remove());
+    item.classList.remove("open");
+    if (en[1]) en[1]();
+  });
+  dd.appendChild(row);
+}
+
 document.querySelectorAll(".menu-item[data-menu]").forEach((item) => {
   const slot = item.closest(".menu-slot") || item.parentElement;
   item.addEventListener("click", (e) => {
@@ -913,33 +976,7 @@ document.querySelectorAll(".menu-item[data-menu]").forEach((item) => {
     const key = item.dataset.menu;
     const dd = document.createElement("div");
     dd.className = "menu-dd";
-    for (const en of (menuActions[key] || [])) {
-      if (en[0] === "-") {
-        const sep = document.createElement("div");
-        sep.className = "dd-sep";
-        dd.appendChild(sep);
-        continue;
-      }
-      const row = document.createElement("button");
-      row.type = "button";
-      if (en[2]) {
-        const ic = document.createElement("img");
-        ic.className = "dd-ico";
-        ic.src = "./assets/xp/icons/" + en[2];
-        ic.alt = "";
-        ic.width = 16;
-        ic.height = 16;
-        row.appendChild(ic);
-      }
-      row.appendChild(document.createTextNode(en[0]));
-      row.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        dd.remove();
-        item.classList.remove("open");
-        if (en[1]) en[1]();
-      });
-      dd.appendChild(row);
-    }
+    for (const en of (menuActions[key] || [])) buildMenuRow(en, dd, item);
     slot.appendChild(dd);
   });
 });

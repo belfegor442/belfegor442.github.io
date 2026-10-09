@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="winxp">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
@@ -15,6 +15,8 @@
 <link rel="apple-touch-icon" href="../../../icon.jpg">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="stylesheet" href="./css/app.css">
+<link rel="stylesheet" href="./css/win98.css">
+<script src="./js/theme-apply.js"></script>
 </head>
 <body>
 
@@ -71,7 +73,7 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><span class="win-title">Create Account</span><button class="win-cap close" value="cancel" id="regClose" aria-label="Close"></button></div>
     <form class="dlg-body" id="regForm">
-      <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" alt="" width="16" height="16">Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
+      <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" data-w98="address_book_user.png" alt="" width="16" height="16">Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
       <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/Address Book.png" alt="" width="16" height="16">Display name (optional)</label><div class="sunken"><input id="regDisplay2" autocomplete="nickname" maxlength="64"></div></div>
       <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/Key.png" alt="" width="16" height="16">Password</label><div class="sunken"><input id="regPassword2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div></div>
       <p class="error hidden" id="regError"></p>
@@ -84,7 +86,7 @@
 </dialog>
 
 <div id="appView" class="win-app hidden">
-  <div class="win-titlebar app-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Windows Messenger.png" alt="" width="16" height="16"><span class="win-title">msg.mesh Messenger</span><span class="win-caps"><span class="win-cap minimize"></span><span class="win-cap maximize"></span><span class="win-cap close"></span></span></div>
+  <div class="win-titlebar app-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Windows Messenger.png" data-w98="title_icon.png" alt="" width="16" height="16"><span class="win-title">msg.mesh Messenger</span><span class="win-caps"><span class="win-cap minimize"></span><span class="win-cap maximize"></span><span class="win-cap close"></span></span></div>
 
   <div class="win-menubar" id="menuBar">
     <span class="menu-slot"><span class="menu-item" data-menu="file">File</span></span>
@@ -99,7 +101,7 @@
     <button class="tb-btn" id="sendImBtn"><img class="tb-ico" src="./assets/xp/icons/TB IM.png" alt="" width="16" height="16">Send IM</button>
     <button class="tb-btn" id="sendFileBtn"><img class="tb-ico" src="./assets/xp/icons/TB File.png" alt="" width="16" height="16">Send File</button>
     <button class="tb-btn" id="settingsBtn"><img class="tb-ico" src="./assets/xp/icons/TB Settings.png" alt="" width="16" height="16">Settings</button>
-    <button class="tb-btn" id="profileBtn"><img class="tb-ico" src="./assets/xp/icons/Properties.png" alt="" width="16" height="16">Profile</button>
+    <button class="tb-btn" id="profileBtn"><img class="tb-ico" src="./assets/xp/icons/Properties.png" data-w98="directory_control_panel-0.png" alt="" width="16" height="16">Profile</button>
     <button class="tb-btn" id="helpBtn"><img class="tb-ico" src="./assets/xp/icons/TB Help.png" alt="" width="16" height="16">Help</button>
   </div>
 
@@ -213,9 +215,14 @@
     <div class="win-titlebar"><span class="win-title">Settings - msg.mesh</span><button class="win-cap close" value="cancel" id="profileClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="profileForm">
       <div class="profile-id"><div class="conv-avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small></div></div>
+      <label>THEME</label>
+      <div class="theme-row">
+        <button type="button" class="xp-btn gray theme-opt" data-theme-opt="winxp">Windows XP</button>
+        <button type="button" class="xp-btn gray theme-opt" data-theme-opt="win98">Windows 98</button>
+      </div>
       <label>DISPLAY NAME</label>
       <div class="sunken"><input id="profileDisplayName" maxlength="64"></div>
-      <div class="field"><label class="chk-row"><input type="checkbox" id="showTimestamps" checked> Show timestamps</label></div>
+      <div class="field"><label class="chk-row"><input type="checkbox" id="showTimestamps" checked><span class="chk-x">x</span> Show timestamps</label></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="profileSave">Save</button></div>
       <div class="server-block">
         <label>SERVER</label>

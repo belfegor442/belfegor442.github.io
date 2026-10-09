@@ -1,0 +1,368 @@
+/* Windows 98 theme — mirrors native ThemeManager apply_win98_colors +
+   draw_win98_* using the REAL RetroWindowsGUI sprites from the native client.
+   Loaded after app.css; every rule scoped to [data-theme="win98"] so XP Luna
+   stays untouched. The auth/logon screen is intentionally NOT themed (native
+   draw_xp_logon_background is unconditional). */
+
+.chk-x{display:none}
+[data-theme="win98"] .i98-hidden{display:none!important}
+
+[data-theme="win98"]{
+  --xp-bg:#d4d0c8;
+  --xp-face:#d4d0c8;
+  --xp-white:#fff;
+  --xp-text:#000;
+  --xp-dim:#404040;
+  --xp-border:#808080;
+  --xp-title-a:#000080;
+  --xp-title-b:#000080;
+  --xp-title-fg:#fff;
+  --xp-accent:#000080;
+  --xp-accent-dark:#000080;
+  --xp-menu-bg:#c0c0c0;
+  --xp-toolbar-a:#c0c0c0;
+  --xp-toolbar-b:#c0c0c0;
+  --xp-toolbar-line:#808080;
+  --xp-sunken-light:#808080;
+  --xp-shadow-in:#808080;
+  --xp-shadow-out:#fff;
+  --xp-dark:#000;
+  --xp-hl:#0a246a;
+  --xp-sel:#0a246a;
+  --xp-chat-self:#000080;
+  --xp-chat-other:#000;
+  --xp-chat-ts:#808080;
+  --xp-out-bg:transparent;
+  --xp-group:#000080;
+  --xp-header:#c0c0c0;
+  --xp-error:#ff0000;
+}
+[data-theme="win98"] body{background:#d4d0c8}
+[data-theme="win98"] ::selection{background:#0a246a;color:#fff}
+
+/* ---------- scrollbars (native: tiled Slider_Background track, stretched
+   Slider_Handle thumb at x+1, no arrow buttons) ---------- */
+[data-theme="win98"] ::-webkit-scrollbar{width:16px;height:16px}
+[data-theme="win98"] ::-webkit-scrollbar-track{
+  background:#c0c0c0 url("../assets/win98/gui/Windows_Slider_Background.png") 0 0/100% 4px repeat-y;
+}
+[data-theme="win98"] ::-webkit-scrollbar-thumb{
+  background:#c0c0c0 url("../assets/win98/gui/Windows_Slider_Handle.png") no-repeat center/14px 100%;
+}
+[data-theme="win98"] ::-webkit-scrollbar-thumb:hover{filter:none}
+[data-theme="win98"] ::-webkit-scrollbar:horizontal{height:16px}
+[data-theme="win98"] ::-webkit-scrollbar-track:horizontal{
+  background:#c0c0c0 url("../assets/win98/gui/Windows_Slider_Background.png") 0 0/4px 100% repeat-x;
+}
+[data-theme="win98"] ::-webkit-scrollbar-thumb:horizontal{
+  background:#c0c0c0 url("../assets/win98/gui/Windows_Slider_Handle.png") no-repeat center/100% 14px;
+}
+[data-theme="win98"] ::-webkit-scrollbar-corner{background:#d4d0c8}
+[data-theme="win98"] ::-webkit-scrollbar-button{display:none}
+
+/* ---------- window chrome (Window_Base m3 + Window_Header m3) ---------- */
+[data-theme="win98"] .win-frame{
+  background:#d4d0c8;
+  border:3px solid transparent;
+  border-top-width:0;
+  border-image:url("../assets/win98/gui/Window_Base.png") 3 fill / 3px;
+  box-shadow:0 8px 40px rgba(0,0,0,.45);
+}
+[data-theme="win98"] .win-app{
+  background:#d4d0c8;
+  border:3px solid transparent;
+  border-top-width:0;
+  border-image:url("../assets/win98/gui/Window_Base.png") 3 fill / 3px;
+}
+[data-theme="win98"] .win-app.inactive{
+  border-image:url("../assets/win98/gui/Window_Base.png") 3 fill / 3px;
+}
+[data-theme="win98"] .win-titlebar{
+  height:26px;gap:2px;
+  padding:0 3px;
+  background:#000080;
+  border:3px solid transparent;
+  border-image:url("../assets/win98/gui/Window_Header.png") 3 fill / 3px;
+  color:#fff;
+  font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
+  font-weight:700;font-size:11px;
+}
+[data-theme="win98"] .win-app.inactive .win-titlebar{
+  background:#8c8c8c;
+  border-image:url("../assets/win98/gui/Window_Header_Inactive.png") 3 fill / 3px;
+}
+[data-theme="win98"] .win-title-ico{width:16px;height:16px;margin:0}
+[data-theme="win98"] .win-title{text-shadow:none}
+[data-theme="win98"] .win-caps{gap:0}
+[data-theme="win98"] .win-cap{
+  width:16px;height:14px;
+  border:3px solid transparent;border-radius:0;
+  background:transparent;
+  background-image:none;
+  border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
+  position:relative;
+}
+[data-theme="win98"] .win-cap.close{
+  background-image:none;
+  border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
+  margin-left:2px;
+}
+[data-theme="win98"] .win-cap:hover{border-image-source:url("../assets/win98/gui/Windows_Button_Focus.png")}
+[data-theme="win98"] .win-cap:active{border-image-source:url("../assets/win98/gui/Windows_Button_Pressed.png")}
+/* pixel glyphs exactly as native: min = bottom line, max = outline rect,
+   close = X of two 1px pens (coordinates relative to the 10x8 face) */
+[data-theme="win98"] .win-cap::before,
+[data-theme="win98"] .win-cap::after{content:"";position:absolute;background:#000}
+[data-theme="win98"] .win-cap.minimize::before{left:0;bottom:1px;width:7px;height:1px}
+[data-theme="win98"] .win-cap.maximize::before{
+  left:0;top:1px;width:9px;height:7px;
+  background:transparent;border:1px solid #000;
+}
+[data-theme="win98"] .win-cap.maximize::after{display:none}
+[data-theme="win98"] .win-cap.close::before{left:0;top:3px;width:10px;height:1px;transform:rotate(45deg)}
+[data-theme="win98"] .win-cap.close::after{left:0;top:3px;width:10px;height:1px;transform:rotate(-45deg)}
+
+/* ---------- menu bar + dropdown (native render_menu_dropdown: raised +
+   etched panel, 24px rows, icon x+5, text x+26, hover = #0a246a) ---------- */
+[data-theme="win98"] .win-menubar{
+  background:#c0c0c0;
+  border-bottom:1px solid #808080;
+  padding:2px 3px;gap:0;
+}
+[data-theme="win98"] .menu-item{padding:3px 8px;border-radius:0;color:#000}
+[data-theme="win98"] .menu-item:hover,
+[data-theme="win98"] .menu-item.open{background:#0a246a;color:#fff}
+[data-theme="win98"] .menu-dd{
+  background:#c0c0c0;
+  border:1px solid #fff;
+  border-right-color:#808080;
+  border-bottom-color:#808080;
+  box-shadow:inset 1px 1px 0 #808080,inset -1px -1px 0 #fff,3px 3px 8px rgba(0,0,0,.3);
+  padding:4px;
+  font-size:12px;color:#000;
+}
+[data-theme="win98"] .menu-dd button{
+  height:24px;
+  padding:0 10px 0 0;
+  gap:5px;
+  border-radius:0;
+  font-size:12px;color:#000;
+}
+[data-theme="win98"] .menu-dd button:hover{background:#0a246a;color:#fff}
+[data-theme="win98"] .menu-dd .dd-sep{background:#808080;margin:2px 1px}
+[data-theme="win98"] .menu-dd .dd-ico{width:16px;height:16px}
+[data-theme="win98"] .dd-sub-arrow{margin-left:auto;font-size:12px;line-height:1}
+[data-theme="win98"] .menu-dd .dd-item.has-sub{padding-left:21px}
+
+/* ---------- toolbar (flat face, white top line, gray shadow bottom) ---------- */
+[data-theme="win98"] .win-toolbar{
+  background:#c0c0c0;
+  border-top:1px solid #fff;
+  border-bottom:1px solid #808080;
+  padding:3px 5px;gap:3px;
+}
+[data-theme="win98"] .tb-btn{
+  border:1px solid transparent;border-radius:0;
+  background:transparent;
+  font-size:12px;
+}
+[data-theme="win98"] .tb-btn:hover{
+  border:3px solid transparent;
+  background:#d4d0c8;
+  border-image:url("../assets/win98/gui/Windows_Button_Focus.png") 3 fill / 3px;
+}
+[data-theme="win98"] .tb-btn:active{
+  border-image:url("../assets/win98/gui/Windows_Button_Pressed.png") 3 fill / 3px;
+}
+[data-theme="win98"] .tb-ico{opacity:1}
+
+/* ---------- status bar (face + 1px top line #808080, native default) ---- */
+[data-theme="win98"] .statusbar{
+  background:#c0c0c0;
+  border-top:1px solid #808080;
+  height:22px;
+  font-size:11px;color:#000;
+}
+[data-theme="win98"] .status-right{color:#404040}
+
+/* ---------- buttons (Windows_Button m3, black Tahoma 12px) ---------- */
+[data-theme="win98"] .xp-btn,
+[data-theme="win98"] .xp-btn.gray,
+[data-theme="win98"] .xp-btn.primary{
+  background:#d4d0c8;
+  border:3px solid transparent;border-radius:0;
+  border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
+  color:#000;font-weight:400;font-size:12px;
+  text-shadow:none;
+  height:26px;padding:0 12px;
+}
+[data-theme="win98"] .xp-btn:hover,
+[data-theme="win98"] .xp-btn.gray:hover,
+[data-theme="win98"] .xp-btn.primary:hover{
+  background:#d4d0c8;
+  border-image:url("../assets/win98/gui/Windows_Button_Focus.png") 3 fill / 3px;
+  color:#000;
+}
+[data-theme="win98"] .xp-btn:active,
+[data-theme="win98"] .xp-btn.gray:active,
+[data-theme="win98"] .xp-btn.primary:active{
+  background:#d4d0c8;
+  border-image:url("../assets/win98/gui/Windows_Button_Pressed.png") 3 fill / 3px;
+  color:#000;filter:none;padding-top:1px;
+}
+[data-theme="win98"] .xp-btn:disabled{opacity:1;filter:none;cursor:default}
+[data-theme="win98"] .xp-btn.primary{min-width:80px}
+[data-theme="win98"] .xp-btn.small{height:24px}
+[data-theme="win98"] .icon-btn{
+  border-radius:0;color:#000;
+}
+[data-theme="win98"] .icon-btn:hover{
+  background:#d4d0c8;
+  border-color:#fff #808080 #808080 #fff;
+}
+[data-theme="win98"] .back-btn,
+[data-theme="win98"] .load-older,
+[data-theme="win98"] .mini-btn,
+[data-theme="win98"] .req-btn{
+  background:#d4d0c8;
+  border:2px solid;
+  border-color:#fff #808080 #808080 #fff;
+  border-radius:0;color:#000;
+}
+[data-theme="win98"] .back-btn:active,
+[data-theme="win98"] .load-older:active,
+[data-theme="win98"] .mini-btn:active,
+[data-theme="win98"] .req-btn:active{
+  border-color:#808080 #fff #fff #808080;
+}
+
+/* ---------- sunken / raised frames (Inner_Frame m2 sunken, Inverted m4 raised) ---- */
+[data-theme="win98"] .sunken{
+  background:#fff;
+  border:2px solid transparent;
+  border-image:url("../assets/win98/gui/Windows_Inner_Frame.png") 2 fill / 2px;
+}
+[data-theme="win98"] .raised,
+[data-theme="win98"] .contacts-col,
+[data-theme="win98"] .conv-header,
+[data-theme="win98"] .composer-strip{
+  background:#d4d0c8;
+  border:4px solid transparent;
+  border-image:url("../assets/win98/gui/Windows_Inner_Frame_Inverted.png") 4 fill / 4px;
+}
+[data-theme="win98"] .panel-header{
+  background:#c0c0c0;color:#000;
+  border-bottom:1px solid #808080;
+}
+
+/* ---------- client area: solid window face (native fill_background, no wallpaper) ---- */
+[data-theme="win98"] .client-area{background:#d4d0c8}
+
+/* ---------- contacts ---------- */
+[data-theme="win98"] .requests{
+  background:#c0c0c0;
+  border-bottom:1px solid #808080;
+}
+[data-theme="win98"] .contact-row:hover{background:#e8e8e8}
+[data-theme="win98"] .contact-row.active{background:#0a246a;color:#fff}
+[data-theme="win98"] .contact-row.active .contact-time,
+[data-theme="win98"] .contact-row.active .contact-preview,
+[data-theme="win98"] .contact-row.active .msg-type-label{color:#d8e8ff}
+[data-theme="win98"] .contact-time,
+[data-theme="win98"] .msg-type-label,
+[data-theme="win98"] .list-empty{color:#808080}
+[data-theme="win98"] .contact-preview{color:#404040}
+[data-theme="win98"] .group-label{color:#000080;background:#fff}
+[data-theme="win98"] .unread{border-radius:0}
+
+/* ---------- chat ---------- */
+[data-theme="win98"] .conv-avatar,
+[data-theme="win98"] .details-avatar{
+  background:#000080;
+  border-color:#000;
+}
+[data-theme="win98"] .msg-line.other .who{color:#000}
+[data-theme="win98"] .msg-line .st{color:#808080}
+[data-theme="win98"] .msg-line.failed .st{color:#ff0000}
+[data-theme="win98"] .msg-line.pending .st{color:#808000}
+[data-theme="win98"] .att-chip{
+  background:#d4d0c8;
+  border:1px solid #808080;
+  color:#000;
+}
+[data-theme="win98"] .att-chip small{color:#404040}
+[data-theme="win98"] .day-divider{color:#808080}
+[data-theme="win98"] .pending-file{
+  background:#d4d0c8;
+  border:1px solid #808080;color:#000;
+}
+
+/* ---------- empty state (flat face, no Bliss shadows) ---------- */
+[data-theme="win98"] .empty-state h1,
+[data-theme="win98"] .empty-state p{color:#000;text-shadow:none}
+[data-theme="win98"] .empty-state .mesh-mark{filter:none}
+
+/* ---------- details panel ---------- */
+[data-theme="win98"] .detail-row{border-color:#808080}
+[data-theme="win98"] .file-row{
+  background:#fff;
+  border-color:#808080;color:#000;
+}
+
+/* ---------- dialogs ---------- */
+[data-theme="win98"] .user-item:hover{
+  background:#0a246a;border-color:#0a246a;color:#fff;
+}
+[data-theme="win98"] .user-item:hover small,
+[data-theme="win98"] .user-item:hover .status{color:#d8e8ff}
+[data-theme="win98"] .search-hit:hover{background:#0a246a;color:#fff}
+[data-theme="win98"] .search-hit:hover strong,
+[data-theme="win98"] .search-hit:hover p,
+[data-theme="win98"] .search-hit:hover .meta{color:#fff}
+[data-theme="win98"] .search-hit{border-bottom-color:#a0a0a0}
+[data-theme="win98"] .tag-ok{
+  border-color:#4a801e;background:#e8f0e8;color:#0a600a;
+}
+[data-theme="win98"] .about-brand{color:#000080}
+
+/* ---------- checkbox (native draw_checkbox: 13x13 white box, 1px #808080
+   border, black "x") ---------- */
+[data-theme="win98"] input[type=checkbox]{
+  width:13px;height:13px;
+  background:#fff;
+  border:1px solid #808080;
+  border-radius:0;
+}
+[data-theme="win98"] input[type=checkbox]:checked{background:#fff}
+[data-theme="win98"] .chk-row input:checked + .chk-x{
+  display:inline-block;
+  width:13px;margin-left:-21px;
+  font:bold 11px/13px "Tahoma",sans-serif;
+  color:#000;text-align:center;
+  pointer-events:none;vertical-align:top;
+}
+
+/* ---------- theme picker (settings dialog) ---------- */
+[data-theme="win98"] .theme-opt.on{
+  border:3px solid transparent;
+  border-image:url("../assets/win98/gui/Windows_Button_Pressed.png") 3 fill / 3px;
+  font-weight:700;
+}
+
+/* ---------- toasts ---------- */
+[data-theme="win98"] .toast{background:#d4d0c8;color:#000}
+[data-theme="win98"] .toast.error{color:#ff0000}
+
+/* ---------- mobile (beat app.css media queries by specificity) ---------- */
+@media(max-width:650px){
+  [data-theme="win98"] .win-titlebar{
+    height:calc(26px + env(safe-area-inset-top));
+    padding-top:env(safe-area-inset-top);
+  }
+  [data-theme="win98"] .statusbar{
+    height:calc(22px + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  [data-theme="win98"] .tb-btn{height:32px}
+  [data-theme="win98"] .xp-btn{min-height:32px}
+}
