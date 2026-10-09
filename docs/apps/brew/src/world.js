@@ -57,7 +57,7 @@ export const SEATS = (() => {
 })();
 
 export const SPAWNS = [
-  { x: 480, y: 1100 }, { x: 300, y: 1100 }, { x: 512, y: 940 },
+  { x: 510, y: 1100 }, { x: 300, y: 1100 }, { x: 512, y: 940 },
   { x: 300, y: 940 }, { x: 430, y: 560 }, { x: 430, y: 260 },
   { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
   { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
@@ -108,7 +108,10 @@ function navBlockedAt(x, y, r) {
 }
 
 export function blocked(x, y, r = 14) {
-  if (navBlockedAt(x, y, r)) return true;
+  // Nav queries use a tighter radius than the body: chair rows and table
+  // legs are rasterised cell-by-cell at 16 units, and a full-body query made
+  // every aisle feel one-and-a-half players too narrow.
+  if (navBlockedAt(x, y, Math.max(4, r - 6))) return true;
   for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
   return false;
 }
@@ -117,6 +120,7 @@ export function move(x, y, nx, ny, r = 14) {
   const minY = MAP.wall + r, maxY = MAP.h - MAP.wall - r;
   nx = Math.max(minX, Math.min(maxX, Number(nx) || x));
   ny = Math.max(minY, Math.min(maxY, Number(ny) || y));
+  const tight = Math.max(4, r - 6);
 
   // Resolve each axis independently. This prevents diagonal movement from
   // tunnelling through corners and guarantees the player never leaves the map.
@@ -126,6 +130,30 @@ export function move(x, y, nx, ny, r = 14) {
   let py = y;
   if (!blocked(px, ny, r)) py = ny;
   if (stuck && px === x && py === y && !blocked(nx, ny, r)) { px = nx; py = ny; }
+  if (!stuck) {
+    // Scrape past furniture: if the full body is blocked, slide through the
+    // gap at skin width instead of dead-stopping against every chair.
+    if (px === x && !blocked(nx, y, tight)) px = nx;
+    if (py === y && !blocked(px, ny, tight)) py = ny;
+    // Corner slide: fully stuck against an obstacle but the floor beside it
+    // is open — drift around it in the travel direction instead of stopping.
+    if (px === x && py === y && (nx !== x || ny !== y)) {
+      const dx = nx - x, dy = ny - y;
+      const len = Math.hypot(dx, dy) || 1;
+      const tx = -dy / len, ty = dx / len; // tangent
+      for (const off of [6, 12, 20, 30]) {
+        if (!blocked(x + tx * off + dx, y + ty * off + dy, tight)) {
+          px = x + tx * off + dx; py = y + ty * off + dy; break;
+        }
+        if (!blocked(x - tx * off + dx, y - ty * off + dy, tight)) {
+          px = x - tx * off + dx; py = y - ty * off + dy; break;
+        }
+      }
+    }
+  } else if (px === x && py === y) {
+    if (!blocked(nx, y, tight)) px = nx;
+    if (!blocked(px, ny, tight)) py = ny;
+  }
   return { x: px, y: py };
 }
 export function dist(a, b) {

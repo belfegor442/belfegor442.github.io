@@ -679,7 +679,7 @@ function frame(now) {
     const wy = -sy * a.x + cy * a.y;
     const moving = Math.hypot(wx, wy) > 0.02;
     const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
-    const accel = moving ? 1250 : 1650;
+    const accel = moving ? 2600 : 2200;
     const targetX = moving ? wx * targetSpeed : 0;
     const targetY = moving ? wy * targetSpeed : 0;
     const blend = Math.min(1, accel * dt / Math.max(targetSpeed, 1));

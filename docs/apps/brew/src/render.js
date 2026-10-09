@@ -24,7 +24,7 @@ const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
 
 // The lobby ships baked, unlit textures that render darker than the play
 // field expects: lift them without touching lit geometry or the player skin.
-const GLB_EXPOSURE = 1.6;
+const GLB_EXPOSURE = 1.5;
 
 // Inverse-transpose of the upper-left 3x3 of a column-major mat4, into a
 // 9-float column-major mat3. Correct normals under the lobby's non-uniform
@@ -47,6 +47,9 @@ export class Renderer {
     const opts = { antialias: true, alpha: false, depth: true, powerPreference: 'high-performance' };
     this.gl = canvas.getContext('webgl2', opts) || canvas.getContext('webgl', opts) ||
       canvas.getContext('experimental-webgl', opts);
+    this.anisoExt = this.gl && (this.gl.getExtension('EXT_texture_filter_anisotropic') ||
+      this.gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic') ||
+      this.gl.getExtension('MOZ_EXT_texture_filter_anisotropic'));
     this.fctx = null;
     if (!this.gl) {
       console.error('WebGL unavailable');
@@ -372,6 +375,13 @@ export class Renderer {
     return b;
   }
 
+  setAniso(t) {
+    const gl = this.gl;
+    if (!this.anisoExt) return;
+    const max = gl.getParameter(this.anisoExt.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+    gl.texParameterf(gl.TEXTURE_2D, this.anisoExt.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+  }
+
   uploadGLBTexture(bitmap, smp) {
     const gl = this.gl;
     const t = gl.createTexture();
@@ -388,6 +398,7 @@ export class Renderer {
     } else {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }
+    this.setAniso(t);
     return t;
   }
 
@@ -424,6 +435,7 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    this.setAniso(t);
     return t;
   }
 
@@ -652,7 +664,7 @@ export class Renderer {
     // Fog scales with zoom: fixed range drowned distant views in haze, so
     // you could never pull far enough back to read the whole map.
     const camDist = orb ? 977 : (this.fp && me ? 520 : this.orbit.dist);
-    this.fogNow = [camDist * 1.18, Math.max(3300, camDist * 3.4)];
+    this.fogNow = [camDist * 1.02, Math.max(3000, camDist * 2.8)];
     if (orb) {
       this.eye.x = orb.ex; this.eye.y = orb.ey; this.eye.z = orb.ez;
       lookAt(this.mView, orb.ex, orb.ey, orb.ez, orb.tx, orb.ty, orb.tz);
@@ -857,8 +869,8 @@ export class Renderer {
     if (GLM.idx.length) {
       this.fillTexMesh(this.gpuGlows, GLM, gl.DYNAMIC_DRAW);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      if (this.lights) this.setTexTint(1.0, 0.84, 0.55, 0.20);
-      else this.setTexTint(1.0, 0.8, 0.4, 0.26);
+      if (this.lights) this.setTexTint(1.0, 0.84, 0.55, 0.62);
+      else this.setTexTint(1.0, 0.8, 0.4, 0.45);
       this.bindTex(this.gpuGlows, this.texDot);
       gl.drawElements(gl.TRIANGLES, this.gpuGlows.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
