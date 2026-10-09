@@ -277,18 +277,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
   text-shadow:1px 1px 0 rgba(0,0,0,.3);
   min-height:1em;
 }
-.logon-power{
+.logon-add{
   position:absolute;left:clamp(12px,3vw,36px);bottom:clamp(16px,5vh,48px);
   display:flex;align-items:center;gap:12px;
   border:0;background:transparent;padding:4px 8px;
   cursor:pointer;
 }
-.logon-power img{width:40px;height:40px}
-.logon-power span{
+.logon-add img{width:40px;height:40px}
+.logon-add span{
   font-size:clamp(14px,2vw,20px);
   color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.55);
 }
-.logon-power:hover span{color:#ffeca0}
+.logon-add:hover span{color:#ffeca0}
 .caps-warn{
   position:absolute;right:8px;top:50%;transform:translateY(-50%);
   font-size:11px;color:#c89600;font-weight:700;
@@ -301,9 +301,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
   .logon-col{width:min(320px,88vw);align-items:stretch}
   .logon-tile-label{font-size:20px}
   .logon-fields{position:static;transform:none;width:100%;margin-top:8px}
-  .logon-power{left:16px;bottom:16px}
-  .logon-power img{width:32px;height:32px}
-  .logon-power span{font-size:14px}
+  .logon-add{left:16px;bottom:16px}
+  .logon-add img{width:32px;height:32px}
+  .logon-add span{font-size:14px}
 }
 /* dialog close uses real btn_close sprite */
 dialog .win-cap.close{

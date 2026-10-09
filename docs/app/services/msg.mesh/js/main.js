@@ -41,8 +41,16 @@ function setMode(mode) {
 // Tile selection: known user (password only) vs Other User (username+password).
 $("#tileKnown")?.addEventListener("click", () => {
   ui.selectLogonTile("login");
-  $("#authUsername").value = lastUsername() || "";
-  $("#authPassword").focus();
+  const remembered = lastUsername();
+  if (remembered) {
+    $("#authUsername").value = remembered;
+    $("#authPassword").focus();
+  } else {
+    // No saved account yet: keep the username field visible so sign-in is possible.
+    $("#rowUsername").classList.remove("hidden");
+    $("#authUsername").value = "";
+    $("#authUsername").focus();
+  }
 });
 $("#tileOther")?.addEventListener("click", () => {
   ui.selectLogonTile("other");
@@ -52,10 +60,15 @@ $("#tileOther")?.addEventListener("click", () => {
 });
 
 // Register dialog buttons.
+$("#addAccountBtn")?.addEventListener("click", () => {
+  setMode("register");
+  location.hash = "#/register";
+});
 $("#regClose")?.addEventListener("click", () => setMode("login"));
 $("#regBack2")?.addEventListener("click", () => setMode("login"));
 $("#registerDialog")?.addEventListener("close", () => {
   if (authMode === "register") authMode = "login";
+  if (location.hash === "#/register") location.hash = "#/login";
 });
 
 $("#regForm")?.addEventListener("submit", async (e) => {
@@ -103,8 +116,13 @@ $("#authForm").addEventListener("submit", async (e) => {
   const password = $("#authPassword").value;
   const errBox = $("#authError");
   showErr(errBox, "");
+  if (!username) {
+    $("#rowUsername")?.classList.remove("hidden");
+    showErr(errBox, "Enter your user name.");
+    $("#authUsername")?.focus();
+    return;
+  }
   if (!password) { showErr(errBox, "Password is required."); return; }
-  if (!username) { showErr(errBox, "Select a tile and enter your user name."); return; }
   const btn = $("#authSubmit");
   btn.disabled = true;
   const hint = $("#authHint");
