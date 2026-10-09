@@ -296,7 +296,7 @@ export function pushT(M, p, uv) {
 
 /* ------------------------------------------------------------------- textures */
 
-export function buildFloor() {
+export function buildFloor(decal = true) {
   const c = document.createElement('canvas');
   c.width = MAP.w; c.height = MAP.h;
   const g = c.getContext('2d');
@@ -313,6 +313,10 @@ export function buildFloor() {
       g.fillRect(x, y, 2, 58);
     }
   }
+  // The rug/table decals describe THIS room's floor plan. The apron ground
+  // reuses the wood texture outside the walls, where those decals would
+  // ghost onto the void as floating furniture shadows.
+  if (!decal) return c;
   for (const o of OBJECTS) {
     if (o.type === 'rug') {
       g.save();

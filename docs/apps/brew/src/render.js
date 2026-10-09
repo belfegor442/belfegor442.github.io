@@ -61,6 +61,9 @@ export class Renderer {
     this.orbit = { yaw: 0, pitch: Math.atan2(730, 650), dist: Math.hypot(730, 650) };
     this.freeCam = false;
     this._drag = null;
+    this._pts = new Map();
+    this._pinch = 0;
+    this.fogNow = [1150, 3300];
     this.glErrs = {};
     try { this.glDbg = /[?&]gldebug/.test(location.search); } catch (e) { this.glDbg = false; }
     this.stats = { frames: 0, draws: 0, gl: !!this.gl };
@@ -76,6 +79,11 @@ export class Renderer {
     if (this.gl) this.initGL();
     this.loadPixelFont();
     this.resize();
+    // Narrow (portrait) screens start pulled back so the full map width fits.
+    try {
+      const a = this.canvas.width / Math.max(1, this.canvas.height);
+      if (a < 1.3) this.orbit.dist = Math.min(1600, 977 * 1.3 / Math.max(0.6, a));
+    } catch (e) { /* noop */ }
     try { window.__renderer = this; } catch (e) { /* noop */ }
   }
 
@@ -85,10 +93,26 @@ export class Renderer {
     c.addEventListener('contextmenu', e => e.preventDefault());
     c.addEventListener('pointerdown', e => {
       if (e.button !== 0 && e.button !== 2) return;
+      this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this._drag = { x: e.clientX, y: e.clientY };
       try { c.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
     });
     c.addEventListener('pointermove', e => {
+      if (!this._pts.has(e.pointerId)) return;
+      this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this._pts.size >= 2) {
+        const v = [...this._pts.values()];
+        const d = Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y);
+        if (this._pinch > 0) {
+          const k = d / this._pinch;
+          if (k > 0 && isFinite(k)) {
+            this.orbit.dist = Math.max(350, Math.min(4800, this.orbit.dist / k));
+          }
+        }
+        this._pinch = d;
+        this._drag = null;
+        return;
+      }
       const d = this._drag;
       if (!d) return;
       this.orbit.yaw -= (e.clientX - d.x) * 0.006;
@@ -96,14 +120,16 @@ export class Renderer {
       d.x = e.clientX; d.y = e.clientY;
     });
     const stop = e => {
-      this._drag = null;
+      this._pts.delete(e.pointerId);
+      if (this._pts.size < 2) this._pinch = 0;
+      if (!this._pts.size) this._drag = null;
       try { c.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
     };
     c.addEventListener('pointerup', stop);
     c.addEventListener('pointercancel', stop);
     c.addEventListener('wheel', e => {
       e.preventDefault();
-      this.orbit.dist = Math.max(350, Math.min(3200, this.orbit.dist * Math.exp(e.deltaY * 0.0012)));
+      this.orbit.dist = Math.max(350, Math.min(4800, this.orbit.dist * Math.exp(e.deltaY * 0.0012)));
     }, { passive: false });
   }
 
@@ -164,6 +190,7 @@ export class Renderer {
     gl.disable(gl.CULL_FACE);
 
     this.texFloor = this.uploadTexture(buildFloor());
+    this.texApron = this.uploadTexture(buildFloor(false));
     this.texDot = this.uploadTexture(dotTexture());
     this.texSign = this.uploadTexture(signTexture('BREW'));
     const wc = document.createElement('canvas');
@@ -178,10 +205,11 @@ export class Renderer {
     this.buildWorld(back, shell, props, lever, floorT, signT);
     pushRing(ring, 0, 0, 0, 11.5, 15, C('#e9c877'), 24);
     // Dark apron around the building so the orbit camera never stares into
-    // raw clear color past the walls.
+    // raw clear color past the walls. Plain wood (no room decals), matching
+    // the extent of the lit back quad so the two share one silhouette.
     pushT(apronT, [
-      [-900, 0, -700], [MAP.w + 900, 0, -700],
-      [MAP.w + 900, 0, MAP.h + 900], [-900, 0, MAP.h + 900]
+      [-2200, 0, -2200], [MAP.w + 2200, 0, -2200],
+      [MAP.w + 2200, 0, MAP.h + 2200], [-2200, 0, MAP.h + 2200]
     ], [[0, 0], [4, 0], [4, 4], [0, 4]]);
 
     this.gpuBack = this.uploadMesh(back, gl.STATIC_DRAW);
@@ -594,8 +622,18 @@ export class Renderer {
     const gl = this.gl;
     const def = this.lights ? this.litDef : this.nightDef;
     const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-    perspective(this.mProj, Math.PI / 4, aspect, 5, 5200);
+    // Keep the horizontal view wide on portrait/narrow screens so the whole
+    // room fits instead of a thin slice; desktop keeps the classic 45° vFOV.
+    const BASE_FOV = Math.PI / 4, HREF = 1.6;
+    const fovy = aspect < HREF
+      ? Math.min(1.4, 2 * Math.atan(Math.tan(BASE_FOV / 2) * HREF / Math.max(0.4, aspect)))
+      : BASE_FOV;
+    perspective(this.mProj, fovy, aspect, 5, 9000);
     const orb = this.camOrbit;
+    // Fog scales with zoom: fixed range drowned distant views in haze, so
+    // you could never pull far enough back to read the whole map.
+    const camDist = orb ? 977 : this.orbit.dist;
+    this.fogNow = [camDist * 1.18, Math.max(3300, camDist * 3.4)];
     if (orb) {
       this.eye.x = orb.ex; this.eye.y = orb.ey; this.eye.z = orb.ez;
       lookAt(this.mView, orb.ex, orb.ey, orb.ez, orb.tx, orb.ty, orb.tz);
@@ -625,7 +663,7 @@ export class Renderer {
       this.useTex();
       this.setTexM(this.mIdent);
       this.setTexTint(0.24, 0.20, 0.16, 1);
-      this.bindTex(this.gpuApron, this.texFloor);
+      this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
 
@@ -814,7 +852,7 @@ export class Renderer {
     gl.uniform3f(u.uSunColor, def.sun[0], def.sun[1], def.sun[2]);
     gl.uniform3f(u.uAmbient, def.amb[0], def.amb[1], def.amb[2]);
     gl.uniform3f(u.uFogColor, def.fog[0], def.fog[1], def.fog[2]);
-    gl.uniform2f(u.uFogRange, def.fogRange[0], def.fogRange[1]);
+    gl.uniform2f(u.uFogRange, this.fogNow[0], this.fogNow[1]);
   }
 
   useGLB(def) {
@@ -826,7 +864,7 @@ export class Renderer {
     gl.uniform3f(P.u.uSunColor, def.sun[0], def.sun[1], def.sun[2]);
     gl.uniform3f(P.u.uAmbient, def.amb[0], def.amb[1], def.amb[2]);
     gl.uniform3f(P.u.uFogColor, def.fog[0], def.fog[1], def.fog[2]);
-    gl.uniform2f(P.u.uFogRange, def.fogRange[0], def.fogRange[1]);
+    gl.uniform2f(P.u.uFogRange, this.fogNow[0], this.fogNow[1]);
   }
 
   drawGLBD(g, m) {
