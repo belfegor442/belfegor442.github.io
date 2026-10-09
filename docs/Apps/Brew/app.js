@@ -620,10 +620,14 @@ input.on('chat', () => ui.focusChat());
 input.on('interact', interact);
 input.on('activity', startActivity);
 input.on('emote', key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); });
-input.on('camtoggle', () => {
-  const on = renderer.toggleFreeCam();
-  ui.toast(on ? 'FREE CAM — drag: orbit · wheel: zoom · arrows: pan · C: follow' : 'FOLLOW CAM');
-});
+  input.on('camtoggle', () => {
+    const on = renderer.toggleFreeCam();
+    ui.toast(on ? 'FREE CAM — drag: orbit · wheel: zoom · arrows: pan · C: follow' : 'FOLLOW CAM');
+  });
+  input.on('fp', () => {
+    const on = renderer.toggleFP();
+    ui.toast(on ? 'FIRST PERSON — drag: look · WASD: move · V: exit' : 'FOLLOW CAM');
+  });
 
 ui.bind({
   enter,

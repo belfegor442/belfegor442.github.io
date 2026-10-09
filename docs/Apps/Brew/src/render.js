@@ -60,6 +60,8 @@ export class Renderer {
     this.eye = { x: MAP.w / 2, y: 730, z: MAP.h / 2 + 650 };
     this.orbit = { yaw: 0, pitch: Math.atan2(730, 650), dist: Math.hypot(730, 650) };
     this.freeCam = false;
+    this.fp = false;
+    this.fpPitch = 0;
     this._drag = null;
     this._pts = new Map();
     this._pinch = 0;
@@ -116,7 +118,11 @@ export class Renderer {
       const d = this._drag;
       if (!d) return;
       this.orbit.yaw -= (e.clientX - d.x) * 0.006;
-      this.orbit.pitch = Math.max(0.2, Math.min(1.35, this.orbit.pitch + (e.clientY - d.y) * 0.006));
+      if (this.fp) {
+        this.fpPitch = Math.max(-1.1, Math.min(0.75, this.fpPitch - (e.clientY - d.y) * 0.005));
+      } else {
+        this.orbit.pitch = Math.max(0.2, Math.min(1.35, this.orbit.pitch + (e.clientY - d.y) * 0.006));
+      }
       d.x = e.clientX; d.y = e.clientY;
     });
     const stop = e => {
@@ -134,9 +140,22 @@ export class Renderer {
   }
 
   toggleFreeCam() {
+    if (this.fp) this.fp = false;
     this.freeCam = !this.freeCam;
     if (!this.freeCam) { this.cam.x = MAP.w / 2; this.cam.z = MAP.h / 2; }
     return this.freeCam;
+  }
+
+  toggleFP() {
+    this.fp = !this.fp;
+    if (this.fp) {
+      this.freeCam = false;
+      this._prevPitch = this.orbit.pitch;
+      this.fpPitch = Math.max(-1.1, Math.min(0.75, 1.0 - this.orbit.pitch));
+    } else {
+      this.orbit.pitch = Math.max(0.55, Math.min(1.35, this._prevPitch || 0.85));
+    }
+    return this.fp;
   }
 
   panCam(ax, az, dt) {
@@ -632,11 +651,23 @@ export class Renderer {
     const orb = this.camOrbit;
     // Fog scales with zoom: fixed range drowned distant views in haze, so
     // you could never pull far enough back to read the whole map.
-    const camDist = orb ? 977 : this.orbit.dist;
+    const camDist = orb ? 977 : (this.fp && me ? 520 : this.orbit.dist);
     this.fogNow = [camDist * 1.18, Math.max(3300, camDist * 3.4)];
     if (orb) {
       this.eye.x = orb.ex; this.eye.y = orb.ey; this.eye.z = orb.ez;
       lookAt(this.mView, orb.ex, orb.ey, orb.ez, orb.tx, orb.ty, orb.tz);
+    } else if (this.fp && me) {
+      // First person: eye sits at the avatar's head; yaw stays shared with
+      // orbit so WASD/joystick movement is already view-relative.
+      const o = this.orbit;
+      const px = me.rx != null ? me.rx : me.x;
+      const pz = me.ry != null ? me.ry : me.y;
+      const bob = me.anim === 'walk' ? Math.sin(this.time * 11) * 0.7 : 0;
+      const ex = px, ey = 24.5 + bob, ez = pz;
+      const cp = Math.cos(this.fpPitch), sp = Math.sin(this.fpPitch);
+      this.eye.x = ex; this.eye.y = ey; this.eye.z = ez;
+      lookAt(this.mView, ex, ey, ez,
+        ex - Math.sin(o.yaw) * cp * 100, ey + sp * 100, ez - Math.cos(o.yaw) * cp * 100);
     } else {
       const o = this.orbit;
       const cp = Math.cos(o.pitch), sp = Math.sin(o.pitch);
@@ -719,6 +750,7 @@ export class Renderer {
     if (this.glbReady && this.glbPlayer && this.glbPlayer.opaque.length) {
       this.useGLB(def);
       for (const p of list) {
+        if (this.fp && me && p.id === me.id) continue;
         const px = p.rx != null ? p.rx : p.x;
         const pz = p.ry != null ? p.ry : p.y;
         const seated = p.status === 'seated' || p.anim === 'sit';
@@ -736,7 +768,10 @@ export class Renderer {
 
     const M = this.meshPlayers;
     M.pos.length = 0; M.nrm.length = 0; M.col.length = 0; M.idx.length = 0;
-    for (const p of list) this.pushPlayer(M, p);
+    for (const p of list) {
+      if (this.fp && me && p.id === me.id) continue;
+      this.pushPlayer(M, p);
+    }
     if (M.idx.length) {
       this.fillMesh(this.gpuPlayers, M, gl.DYNAMIC_DRAW);
       this.useLit();
@@ -751,7 +786,7 @@ export class Renderer {
 
     this.glErr('players');
 
-    if (me) {
+    if (me && !this.fp) {
       trs(this.mScratch, me.rx != null ? me.rx : me.x, 1.4, me.ry != null ? me.ry : me.y, 0, 1, 1, 1);
       this.useLit();
       this.setLitM(this.mScratch);
@@ -767,6 +802,7 @@ export class Renderer {
     const GLM = this.meshGlows;
     GLM.pos.length = 0; GLM.uv.length = 0; GLM.idx.length = 0;
     for (const p of list) {
+      if (this.fp && me && p.id === me.id) continue;
       const x = p.rx != null ? p.rx : p.x;
       const z = p.ry != null ? p.ry : p.y;
       const seated = p.status === 'seated' || p.anim === 'sit';
@@ -1013,6 +1049,7 @@ export class Renderer {
     for (const p of list) {
       const seated = p.status === 'seated' || p.anim === 'sit';
       const isMe = !!me && p.id === me.id;
+      if (isMe && this.fp) continue;
       const topH = this.glbPlayer ? (seated ? 52 : 44) : (seated ? 72 : 64);
       const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;

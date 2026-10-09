@@ -63,6 +63,7 @@ export class Input {
     if (c === 'KeyE' || c === 'KeyQ') { e.preventDefault(); this.emit('interact'); return; }
     if (c === 'KeyF') { e.preventDefault(); this.emit('activity'); return; }
     if (c === 'KeyC') { e.preventDefault(); this.emit('camtoggle'); return; }
+    if (c === 'KeyV') { e.preventDefault(); this.emit('fp'); return; }
     if (/^Digit[1-5]$/.test(c)) { this.emit('emote', ['wave', 'laugh', 'clap', 'dance', 'think'][+c.slice(5) - 1]); return; }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(c)) e.preventDefault();
     this.keys.add(c);
