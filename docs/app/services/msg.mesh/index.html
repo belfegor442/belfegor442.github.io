@@ -71,9 +71,9 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><span class="win-title">Create Account</span><button class="win-cap close" value="cancel" id="regClose" aria-label="Close"></button></div>
     <form class="dlg-body" id="regForm">
-      <div class="field"><label>Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
-      <div class="field"><label>Display name (optional)</label><div class="sunken"><input id="regDisplay2" autocomplete="nickname" maxlength="64"></div></div>
-      <div class="field"><label>Password</label><div class="sunken"><input id="regPassword2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div></div>
+      <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" alt="" width="16" height="16">Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
+      <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/Address Book.png" alt="" width="16" height="16">Display name (optional)</label><div class="sunken"><input id="regDisplay2" autocomplete="nickname" maxlength="64"></div></div>
+      <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/Key.png" alt="" width="16" height="16">Password</label><div class="sunken"><input id="regPassword2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div></div>
       <p class="error hidden" id="regError"></p>
       <div class="dlg-actions">
         <button class="xp-btn gray" type="button" id="regBack2">Back</button>
@@ -100,6 +100,7 @@
     <button class="tb-btn" id="sendFileBtn"><img class="tb-ico" src="./assets/xp/icons/TB File.png" alt="" width="16" height="16">Send File</button>
     <button class="tb-btn" id="settingsBtn"><img class="tb-ico" src="./assets/xp/icons/TB Settings.png" alt="" width="16" height="16">Settings</button>
     <button class="tb-btn" id="profileBtn"><img class="tb-ico" src="./assets/xp/icons/Properties.png" alt="" width="16" height="16">Profile</button>
+    <button class="tb-btn" id="helpBtn"><img class="tb-ico" src="./assets/xp/icons/TB Help.png" alt="" width="16" height="16">Help</button>
   </div>
 
   <div class="client-area">
@@ -112,7 +113,7 @@
     </div>
 
     <div class="empty-state" id="emptyState">
-      <div class="mesh-mark">◈</div>
+      <img class="mesh-mark" src="./assets/xp/icons/Windows Messenger.png" alt="" width="56" height="56" draggable="false">
       <h1>msg.mesh Messenger</h1>
       <p>Secure peer-to-peer mesh messenger. Select a contact on the left to open a conversation.</p>
       <button class="xp-btn primary" id="startBtn" type="button">New Conversation</button>
@@ -120,15 +121,15 @@
 
     <div class="chat-col hidden" id="chatPanel">
       <div class="conv-header">
-        <button class="back-btn" id="backBtn" aria-label="Back">◀</button>
+        <button class="back-btn" id="backBtn" aria-label="Back"><img src="./assets/xp/icons/Back.png" alt="" width="16" height="16" draggable="false"></button>
         <div class="conv-avatar" id="chatAvatar">?</div>
         <div class="conv-id">
           <strong id="chatName">Conversation</strong>
           <small class="conv-status" id="chatMeta">…</small>
         </div>
         <div class="conv-tools">
-          <button class="icon-btn" id="chatSearchBtn" title="Search">⌕</button>
-          <button class="icon-btn" id="chatInfoBtn" title="Details">ⓘ</button>
+          <button class="icon-btn" id="chatSearchBtn" title="Search"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16" draggable="false"></button>
+          <button class="icon-btn" id="chatInfoBtn" title="Details"><img src="./assets/xp/icons/Information.png" alt="" width="16" height="16" draggable="false"></button>
         </div>
       </div>
       <div class="messages-sunken sunken" id="messages">
@@ -164,7 +165,7 @@
           <button class="xp-btn gray small hidden" id="removeContactBtn">Remove</button>
         </div>
         <div class="detail-row hidden" id="sharedFilesBlock">
-          <span>SHARED FILES</span>
+          <span><img src="./assets/xp/icons/Folder Closed.png" alt="" width="14" height="14">SHARED FILES</span>
           <div id="sharedFiles" class="file-list"></div>
         </div>
       </div>
@@ -182,7 +183,7 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><span class="win-title">New Conversation</span><button class="win-cap close" value="cancel" id="newChatClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="newChatForm">
-      <label>SEARCH BY USERNAME OR NAME</label>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16">SEARCH BY USERNAME OR NAME</label>
       <div class="sunken"><input id="newChatInput" required maxlength="64" placeholder="Enter username" autocomplete="off"></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="newChatOpen">Search</button></div>
       <div class="user-results sunken" id="newChatResults"></div>
@@ -199,7 +200,7 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><span class="win-title">Search Messages</span><button class="win-cap close" value="cancel" id="searchClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="searchForm">
-      <label>TEXT</label>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16">TEXT</label>
       <div class="sunken"><input id="searchInput" required maxlength="120" placeholder="Search…" autocomplete="off"></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit">Search</button></div>
       <div class="search-results sunken" id="searchResults"><p class="hint">Search runs against your conversations on the server.</p></div>
@@ -214,6 +215,7 @@
       <div class="profile-id"><div class="conv-avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small></div></div>
       <label>DISPLAY NAME</label>
       <div class="sunken"><input id="profileDisplayName" maxlength="64"></div>
+      <div class="field"><label class="chk-row"><input type="checkbox" id="showTimestamps" checked> Show timestamps</label></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="profileSave">Save</button></div>
       <div class="server-block">
         <label>SERVER</label>
@@ -226,6 +228,21 @@
       <button type="button" class="xp-btn gray" id="logoutBtn">Sign Out</button>
       <p class="error" id="profileStatus"></p>
     </form>
+  </div>
+</dialog>
+
+<!-- About dialog (native render_about_ui card + real Windows logo asset) -->
+<dialog id="aboutDialog">
+  <div class="win-frame dlg-frame about-frame">
+    <div class="win-titlebar"><span class="win-title">About msg.mesh</span><button class="win-cap close" id="aboutClose" aria-label="Close"></button></div>
+    <div class="dlg-body about-body">
+      <img class="about-logo" src="./assets/xp/login/windows_logo.png" alt="" width="72" height="72" draggable="false">
+      <h2 class="about-brand">msg.mesh</h2>
+      <p class="about-ver">Version 1.0.8</p>
+      <p class="about-line">Secure peer-to-peer mesh messenger.</p>
+      <p class="about-line">Local SQLite storage + Weird Stuff Server control plane.</p>
+      <div class="dlg-actions"><button class="xp-btn primary" type="button" id="aboutOk">Close</button></div>
+    </div>
   </div>
 </dialog>
 

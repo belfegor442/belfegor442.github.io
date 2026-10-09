@@ -1,4 +1,5 @@
 import { state, conversationOrder, peerLabel, peerUser, isFriend, incomingRequests, outgoingRequests } from "./store.js";
+import { playSound } from "./sound.js";
 
 export const $ = (s) => document.querySelector(s);
 
@@ -38,9 +39,18 @@ export function toast(text, isError) {
   const box = $("#toasts");
   const el = document.createElement("div");
   el.className = "toast" + (isError ? " error" : "");
-  el.textContent = text;
+  const img = document.createElement("img");
+  // Native dialog icon mapping: error -> Critical.png, info -> Information.png
+  img.src = isError ? "./assets/xp/icons/Critical.png" : "./assets/xp/icons/Information.png";
+  img.alt = "";
+  img.width = 16;
+  img.height = 16;
+  el.appendChild(img);
+  el.appendChild(document.createTextNode(String(text ?? "")));
   box.appendChild(el);
   setTimeout(() => el.remove(), 3500);
+  // Auth flows play their own logon/logoff sounds.
+  if (!String(text ?? "").startsWith("Signed")) playSound(isError ? "error" : "notification");
 }
 
 export function showAuth(tab) {
@@ -120,7 +130,7 @@ export function renderRequests() {
     const u = state.users.get(String(r.sender_user_id));
     const name = u ? (u.display_name || u.username) : "u" + r.sender_user_id;
     rows.push(`<div class="request-row" data-req="${esc(r.request_id)}" data-kind="in">
-      <span class="dot on"></span>
+      <img class="req-ico" src="./assets/xp/icons/Important.png" alt="" width="16" height="16">
       <div class="request-main"><strong>${esc(name)}</strong><small>wants to connect</small></div>
       <button type="button" class="req-btn accept" data-act="accept" title="Accept">✓</button>
       <button type="button" class="req-btn decline" data-act="decline" title="Decline">✕</button>
@@ -244,7 +254,7 @@ function statusGlyph(m, peer) {
 
 function messageLineHtml(m, peer) {
   const att = m.attachment
-    ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><span>📎</span><span>${esc(m.attachment.filename || "file")}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
+    ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"><span>${esc(m.attachment.filename || "file")}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
     : "";
   const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
   const body = m.text ? esc(m.text) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
@@ -371,7 +381,7 @@ export function renderDetails() {
       filesBlock.classList.remove("hidden");
       filesBox.innerHTML = files.map((a) =>
         `<button type="button" class="file-row" data-att="${esc(a.id)}" data-attname="${esc(a.filename || "file")}">
-          <span>📎</span><span>${esc(a.filename || "file")}<small> ${esc(a.type || "")}${a.size ? " · " + fileSize(a.size) : ""}</small></span>
+          <img src="./assets/xp/icons/Generic Document.png" alt="" width="16" height="16"><span>${esc(a.filename || "file")}<small> ${esc(a.type || "")}${a.size ? " · " + fileSize(a.size) : ""}</small></span>
         </button>`
       ).join("");
     }

@@ -3,6 +3,7 @@ import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememb
 import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
+import { playSound, primeSound } from "./sound.js";
 
 const $ = ui.$;
 const esc = ui.esc;
@@ -78,8 +79,9 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   const display = $("#regDisplay2").value.trim() || username;
   const errBox = $("#regError");
   showErr(errBox, "");
-  if (!username || !password) { showErr(errBox, "Username and password are required."); return; }
-  if (password.length < 8) { showErr(errBox, "Password must be 8-128 characters."); return; }
+  primeSound("logon");
+  if (!username || !password) { showErr(errBox, "Username and password are required."); playSound("error"); return; }
+  if (password.length < 8) { showErr(errBox, "Password must be 8-128 characters."); playSound("error"); return; }
   const btn = $("#regSubmit2");
   btn.disabled = true;
   try {
@@ -89,8 +91,10 @@ $("#regForm")?.addEventListener("submit", async (e) => {
     rememberUsername(username);
     $("#registerDialog").close();
     await startSession();
+    playSound("logon");
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Registration failed.");
+    playSound("error");
   } finally {
     btn.disabled = false;
   }
@@ -120,20 +124,24 @@ $("#authForm").addEventListener("submit", async (e) => {
     $("#rowUsername")?.classList.remove("hidden");
     showErr(errBox, "Enter your user name.");
     $("#authUsername")?.focus();
+    playSound("error");
     return;
   }
-  if (!password) { showErr(errBox, "Password is required."); return; }
+  if (!password) { showErr(errBox, "Password is required."); playSound("error"); return; }
   const btn = $("#authSubmit");
   btn.disabled = true;
   const hint = $("#authHint");
   if (hint) hint.textContent = "Contacting server...";
+  primeSound("logon");
   try {
     const r = await api.login(username, password);
     setToken(r.session_token);
     rememberUsername(username);
     await startSession();
+    playSound("logon");
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Sign-in failed.");
+    playSound("error");
     if (hint) hint.textContent = "";
   } finally {
     btn.disabled = false;
@@ -177,8 +185,10 @@ async function startSession() {
   await initialLoad();
   wsConnect();
   booted = true;
-  if (!location.hash || location.hash === "#") location.hash = "#/";
+  ["message", "click", "menu", "error", "notification"].forEach(primeSound);
+  if (!location.hash || location.hash === "#/") location.hash = "#/";
   route();
+  syncInactive();
   ui.toast("Signed in as " + (state.user.display_name || state.user.username));
 }
 
@@ -213,6 +223,7 @@ function emitFriends() {
 }
 
 async function logout() {
+  primeSound("logoff");
   try { await api.logout(); } catch { /* session may already be gone */ }
   setToken("");
   wsDisconnect();
@@ -220,6 +231,7 @@ async function logout() {
   booted = false;
   ui.showAuth("login");
   setMode("login");
+  playSound("logoff");
   const remembered = lastUsername();
   if (remembered) {
     $("#authUsername").value = remembered;
@@ -245,6 +257,7 @@ function route() {
     return;
   }
   ui.showApp();
+  syncInactive();
   if (seg === "chat" && rest[0]) {
     openChat(decodeURIComponent(rest[0]), { push: false });
   } else if (seg === "search") {
@@ -312,7 +325,7 @@ function setPendingAttachment(att) {
   if (!bar) return;
   if (att) {
     bar.classList.remove("hidden");
-    $("#pendingFileName").textContent = "📎 " + att.filename;
+    $("#pendingFileName").innerHTML = '<img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"> ' + esc(att.filename);
   } else {
     bar.classList.add("hidden");
     $("#pendingFileName").textContent = "";
@@ -713,6 +726,9 @@ on("conversations", () => {
 
 on("messages", (detail) => {
   ui.renderSidebar();
+  if (detail && detail.item && detail.item.sender_node_id !== state.selfNode) {
+    playSound("message");
+  }
   if (detail && detail.peer && detail.peer !== state.activePeer) {
     const u = state.users.get(String(Number(String(detail.peer).slice(1))));
     notifyIncoming({
@@ -846,38 +862,43 @@ $("#sharedFiles").addEventListener("click", async (e) => {
 
 /* ---------------- menu bar (native-style) ---------------- */
 
+// Icon files map 1:1 to the native client's kXpIcons entries (menu actions
+// get the same 16px art the native render_menu_dropdown draws).
 const menuActions = {
   file: [
-    ["Open Messenger", () => { location.hash = "#/"; }],
+    ["Open Messenger", () => { location.hash = "#/"; }, "Windows Messenger.png"],
     ["-", null],
-    ["Settings...", openProfile],
+    ["Settings...", openProfile, "Control Panel.png"],
     ["-", null],
-    ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }],
-    ["Create Account...", () => { setMode("register"); location.hash = "#/register"; }],
-    ["Sign Out", logout],
+    ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }, "Login Question.png"],
+    ["Create Account...", () => { setMode("register"); location.hash = "#/register"; }, "User Accounts.png"],
+    ["Sign Out", logout, "Logout.png"],
   ],
   contacts: [
-    ["Contact List", () => { ui.setActive(null); }],
-    ["Search User...", openNewChat],
-    ["Add Friend...", openNewChat],
+    ["Contact List", () => { ui.setActive(null); }, "Address Book.png"],
+    ["Search User...", openNewChat, "Search.png"],
+    ["Add Friend...", openNewChat, "User Accounts.png"],
     ["-", null],
-    ["Refresh", () => { loadFriends().catch(() => null); }],
+    ["Refresh", () => { loadFriends().catch(() => null); }, "Network Connections.png"],
   ],
   actions: [
-    ["Sync History", () => { if (booted) initialLoad(); }],
+    ["Sync History", () => { if (booted) initialLoad(); }, "IE History.png"],
     ["-", null],
-    ["Chats List", () => { ui.setActive(null); }],
+    ["Chats List", () => { ui.setActive(null); }, "Windows Messenger.png"],
   ],
   view: [
-    ["Contact List", () => { ui.setActive(null); }],
-    ["Sync History", () => { if (booted) initialLoad(); }],
+    ["Contact List", () => { ui.setActive(null); }, "Address Book.png"],
+    ["Sync History", () => { if (booted) initialLoad(); }, "IE History.png"],
   ],
   help: [
     ["Server Status", async () => {
       const h = await api.health();
       ui.toast(h.ok ? "Server: online" : "Server: offline", !h.ok);
-    }],
-    ["About msg.mesh...", () => ui.toast("msg.mesh 1.0.8 — secure mesh messenger")],
+    }, "Manage Your Server.png"],
+    ["About msg.mesh...", () => {
+      const d = $("#aboutDialog");
+      if (d && !d.open) d.showModal();
+    }, "Properties.png"],
   ],
 };
 
@@ -901,7 +922,16 @@ document.querySelectorAll(".menu-item[data-menu]").forEach((item) => {
       }
       const row = document.createElement("button");
       row.type = "button";
-      row.textContent = en[0];
+      if (en[2]) {
+        const ic = document.createElement("img");
+        ic.className = "dd-ico";
+        ic.src = "./assets/xp/icons/" + en[2];
+        ic.alt = "";
+        ic.width = 16;
+        ic.height = 16;
+        row.appendChild(ic);
+      }
+      row.appendChild(document.createTextNode(en[0]));
       row.addEventListener("click", (ev) => {
         ev.stopPropagation();
         dd.remove();
@@ -917,6 +947,45 @@ document.addEventListener("click", () => {
   document.querySelectorAll(".menu-dd").forEach((d) => d.remove());
   document.querySelectorAll(".menu-item.open").forEach((x) => x.classList.remove("open"));
 });
+
+/* ---------------- native XP sounds + window activation state ---------------- */
+
+// Native dispatch.cpp plays "menu" when a menu opens and "click" on buttons.
+// Capture phase: the menubar handler stops propagation, so bubbling would
+// never reach this listener for menu titles.
+document.addEventListener("click", (e) => {
+  try {
+    const t = e.target;
+    if (t && t.closest && t.closest(".menu-item[data-menu]")) { playSound("menu"); return; }
+    if (t && t.closest && t.closest("button, .logon-tile, .win-cap")) playSound("click");
+  } catch { /* audio is best-effort */ }
+}, true);
+
+$("#helpBtn")?.addEventListener("click", () => {
+  document.querySelector('.menu-item[data-menu="help"]')?.click();
+});
+
+$("#showTimestamps")?.addEventListener("change", (e) => {
+  $("#messageList")?.classList.toggle("no-ts", !e.target.checked);
+});
+
+$("#aboutOk")?.addEventListener("click", () => $("#aboutDialog")?.close());
+
+// Native XP greys the caption and window body while a dialog owns focus or
+// the window sits in the background (titlebar_inactive/window_body_inactive).
+function syncInactive() {
+  const app = $("#appView");
+  if (!app || app.classList.contains("hidden")) return;
+  let open = false;
+  document.querySelectorAll("dialog").forEach((d) => { if (d.open) open = true; });
+  const focused = typeof document.hasFocus === "function" ? document.hasFocus() : true;
+  app.classList.toggle("inactive", open || !focused);
+}
+document.querySelectorAll("dialog").forEach((d) => {
+  new MutationObserver(syncInactive).observe(d, { attributes: true, attributeFilter: ["open"] });
+});
+window.addEventListener("focus", syncInactive);
+window.addEventListener("blur", syncInactive);
 
 /* ---------------- server settings ---------------- */
 
@@ -998,6 +1067,7 @@ if (window.visualViewport) {
 /* ---------------- boot ---------------- */
 
 async function boot() {
+  playSound("startup");
   ui.renderConnection();
   setMode("login");
   await resolveApiBase();
