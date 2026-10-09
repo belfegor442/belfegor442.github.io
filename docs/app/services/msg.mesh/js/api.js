@@ -156,7 +156,14 @@ async function call(path, data, opts = {}) {
       cache: "no-store",
     });
   } catch (e) {
-    if (e && (e.name === "TimeoutError" || e.name === "AbortError")) {
+    const timedOut = !!(e && (e.name === "TimeoutError" || e.name === "AbortError"));
+    if (!opts.noFailover) {
+      const switched = await failoverBase().catch(() => null);
+      // Connection-level errors never reached the server: safe to replay on
+      // the new base. Timeouts may have been processed: switch but don't replay.
+      if (switched && !timedOut) return call(path, data, { ...opts, noFailover: true });
+    }
+    if (timedOut) {
       throw new ApiError(0, { error: "the msg.mesh server did not respond in time" });
     }
     throw new ApiError(0, { error: "cannot reach the msg.mesh server" });
@@ -168,6 +175,27 @@ async function call(path, data, opts = {}) {
   }
   if (!res.ok) throw new ApiError(res.status, payload);
   return payload;
+}
+
+// Auto-failover for mid-session server death: on a network error, probe the
+// other known candidates and switch to the first that answers. An explicit
+// ?api= pin is never overridden. Concurrent failures share one probe run.
+let failoverInFlight = null;
+export function failoverBase() {
+  if (failoverInFlight) return failoverInFlight;
+  failoverInFlight = (async () => {
+    if (baseFromQuery()) return null;
+    const prev = base;
+    for (const cand of SERVER_CANDIDATES) {
+      if (cand === prev) continue;
+      if (await probe(cand, 3000)) {
+        setApiBase(cand);
+        return cand;
+      }
+    }
+    return null;
+  })().finally(() => { failoverInFlight = null; });
+  return failoverInFlight;
 }
 
 export const api = {

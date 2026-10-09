@@ -1,4 +1,4 @@
-import { wsEndpoint, getToken, api } from "./api.js";
+import { wsEndpoint, getToken, api, failoverBase } from "./api.js";
 import { state, emit, ingest, primeUsers } from "./store.js";
 
 const HEARTBEAT_MS = 30000;   // text frame keeps proxies alive (server discards it)
@@ -101,7 +101,13 @@ function scheduleReconnect() {
   setConnection("reconnecting");
   emit("sync", "RECONNECTING");
   if (attempts >= 2) startPolling();
-  setTimeout(connect, delay);
+  setTimeout(async () => {
+    // The previous base may be the dead server: probe the others first so
+    // the reconnect lands on a live one instead of looping on the same host.
+    const switched = attempts >= 1 ? await failoverBase().catch(() => null) : null;
+    if (switched) attempts = 0;
+    connect();
+  }, delay);
 }
 
 export function connect() {
