@@ -961,7 +961,10 @@ document.addEventListener("click", (e) => {
   } catch { /* audio is best-effort */ }
 }, true);
 
-$("#helpBtn")?.addEventListener("click", () => {
+// stopPropagation: without it the helpBtn event keeps bubbling to the
+// document listener below and closes the dropdown we just opened.
+$("#helpBtn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
   document.querySelector('.menu-item[data-menu="help"]')?.click();
 });
 
