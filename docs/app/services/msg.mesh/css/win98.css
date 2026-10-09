@@ -26,15 +26,15 @@
   --xp-sunken-light:#808080;
   --xp-shadow-in:#808080;
   --xp-shadow-out:#fff;
-  --xp-dark:#000;
+  --xp-dark:#808080;
   --xp-hl:#0a246a;
   --xp-sel:#0a246a;
   --xp-chat-self:#000080;
   --xp-chat-other:#000;
   --xp-chat-ts:#808080;
   --xp-out-bg:transparent;
-  --xp-group:#000080;
-  --xp-header:#c0c0c0;
+  --xp-group:#0a4092;
+  --xp-header:#000080;
   --xp-error:#ff0000;
 }
 [data-theme="win98"] body{background:#d4d0c8}
@@ -154,7 +154,7 @@
 [data-theme="win98"] .dd-sub-arrow{margin-left:auto;font-size:12px;line-height:1}
 [data-theme="win98"] .menu-dd .dd-item.has-sub{padding-left:21px}
 
-/* ---------- toolbar (flat face, white top line, gray shadow bottom) ---------- */
+/* ---------- toolbar (native: toolbar_h=28, buttons bh=toolbar_h-8=20) ---------- */
 [data-theme="win98"] .win-toolbar{
   background:#c0c0c0;
   border-top:1px solid #fff;
@@ -162,6 +162,7 @@
   padding:3px 5px;gap:3px;
 }
 [data-theme="win98"] .tb-btn{
+  height:20px;
   border:1px solid transparent;border-radius:0;
   background:transparent;
   font-size:12px;
@@ -236,24 +237,47 @@
   border-color:#808080 #fff #fff #808080;
 }
 
-/* ---------- sunken / raised frames (Inner_Frame m2 sunken, Inverted m4 raised) ---- */
+/* ---------- sunken / raised frames (native render_messenger_ui: raised =
+   draw_raised_panel = face fill + 1px etched light/#808080; sunken list =
+   Inner_Frame m2 sprite via draw_sunken_box) ---- */
 [data-theme="win98"] .sunken{
   background:#fff;
   border:2px solid transparent;
   border-image:url("../assets/win98/gui/Windows_Inner_Frame.png") 2 fill / 2px;
 }
-[data-theme="win98"] .raised,
-[data-theme="win98"] .contacts-col,
-[data-theme="win98"] .conv-header,
-[data-theme="win98"] .composer-strip{
+[data-theme="win98"] .raised{
   background:#d4d0c8;
   border:4px solid transparent;
   border-image:url("../assets/win98/gui/Windows_Inner_Frame_Inverted.png") 4 fill / 4px;
 }
-[data-theme="win98"] .panel-header{
-  background:#c0c0c0;color:#000;
-  border-bottom:1px solid #808080;
+/* right chat column = one raised panel (draw_raised_panel right_x..) */
+[data-theme="win98"] .chat-col{
+  background:#c0c0c0;
+  border:1px solid;
+  border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
 }
+/* left contacts column = raised panel, 3px content inset (px=gap+3) */
+[data-theme="win98"] .contacts-col{
+  background:#c0c0c0;
+  padding:2px;
+}
+[data-theme="win98"] .contacts-sunken{margin:0}
+/* peer_hdr: hdr_h=22, fill title_bg #000080, white bold 12, no bottom line */
+[data-theme="win98"] .panel-header{
+  height:22px;
+  background:#000080;color:#fff;
+  border-bottom:0;
+}
+/* conv header: head_h=48, fill RGB(245,245,245) + etched frame all sides */
+[data-theme="win98"] .conv-header{
+  background:#f5f5f5;
+  border:1px solid;
+  border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
+}
+/* input strip: etched frame on panel face */
+[data-theme="win98"] .composer-strip{background:#c0c0c0}
+/* 4px face gap under conv header (msg_y = py+head_h+4) */
+[data-theme="win98"] .messages-sunken{margin-top:4px}
 
 /* ---------- client area: solid window face (native fill_background, no wallpaper) ---- */
 [data-theme="win98"] .client-area{background:#d4d0c8}
@@ -276,10 +300,11 @@
 [data-theme="win98"] .unread{border-radius:0}
 
 /* ---------- chat ---------- */
+/* avatar: 36x36 fill title_bg #000080 + etched frame (light top/left) */
 [data-theme="win98"] .conv-avatar,
 [data-theme="win98"] .details-avatar{
   background:#000080;
-  border-color:#000;
+  border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
 }
 [data-theme="win98"] .msg-line.other .who{color:#000}
 [data-theme="win98"] .msg-line .st{color:#808080}
