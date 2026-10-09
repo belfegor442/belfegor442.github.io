@@ -161,13 +161,17 @@ void main() {
   if (uUnlit < 0.5) {
     c.rgb *= (uAmbient * sky + uSunColor * nd);
   } else {
-    // Baked textures still need form: shade them gently with the baked key
-    // light without washing out the painted detail, then lift saturation so
-    // the room reads rich instead of washed out.
-    float shape = 0.62 + 0.24 * hemi + 0.30 * nd;
-    c.rgb *= shape;
+    float up = clamp(n.y, 0.0, 1.0);
+    float shape = 0.30 + 0.30 * hemi + 0.50 * nd;
+    // Split-grade by surface: up-facing floors push to oxblood casino
+    // carpet, the vertical shell falls cool and dark so the pools pop.
+    vec3 floorGrade = vec3(1.20, 0.78, 0.72);
+    vec3 wallGrade  = vec3(0.82, 0.80, 0.86);
+    c.rgb *= mix(wallGrade, floorGrade, smoothstep(0.55, 0.95, up));
+    c.rgb *= shape * mix(vec3(1.0), vec3(1.10, 1.0, 0.84), nd * 0.85);
+    c.rgb = pow(clamp(c.rgb, 0.0, 1.0), vec3(1.28));
     float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-    c.rgb = clamp(mix(vec3(lum), c.rgb, 1.08), 0.0, 1.0);
+    c.rgb = clamp(mix(vec3(lum), c.rgb, 1.15), 0.0, 1.0);
   }
   float fog = smoothstep(uFogRange.x, uFogRange.y, vD);
   gl_FragColor = vec4(mix(c.rgb, uFogColor, fog), c.a);
