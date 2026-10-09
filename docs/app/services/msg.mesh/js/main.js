@@ -29,7 +29,7 @@ function showErr(box, text) {
   box.classList.toggle("hidden", !text);
 }
 
-/* ---------------- auth ---------------- */
+/* ---------------- auth (XP Welcome logon + register dialog) ---------------- */
 
 let authMode = "login";
 
@@ -38,18 +38,49 @@ function setMode(mode) {
   ui.setAuthTab(mode);
 }
 
-$("#authBack")?.addEventListener("click", () => {
-  setMode("login");
-  location.hash = "#/login";
+// Tile selection: known user (password only) vs Other User (username+password).
+$("#tileKnown")?.addEventListener("click", () => {
+  ui.selectLogonTile("login");
+  $("#authUsername").value = lastUsername() || "";
+  $("#authPassword").focus();
+});
+$("#tileOther")?.addEventListener("click", () => {
+  ui.selectLogonTile("other");
+  $("#authUsername").value = "";
+  $("#authPassword").value = "";
+  $("#authUsername").focus();
 });
 
-$("#pwToggle")?.addEventListener("click", () => {
-  const pw = $("#authPassword");
-  const btn = $("#pwToggle");
-  if (!pw || !btn) return;
-  const show = pw.type === "password";
-  pw.type = show ? "text" : "password";
-  btn.textContent = show ? "Hide" : "Show";
+// Register dialog buttons.
+$("#regClose")?.addEventListener("click", () => setMode("login"));
+$("#regBack2")?.addEventListener("click", () => setMode("login"));
+$("#registerDialog")?.addEventListener("close", () => {
+  if (authMode === "register") authMode = "login";
+});
+
+$("#regForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = $("#regUsername2").value.trim();
+  const password = $("#regPassword2").value;
+  const display = $("#regDisplay2").value.trim() || username;
+  const errBox = $("#regError");
+  showErr(errBox, "");
+  if (!username || !password) { showErr(errBox, "Username and password are required."); return; }
+  if (password.length < 8) { showErr(errBox, "Password must be 8-128 characters."); return; }
+  const btn = $("#regSubmit2");
+  btn.disabled = true;
+  try {
+    await api.register(username, password, display);
+    const r = await api.login(username, password);
+    setToken(r.session_token);
+    rememberUsername(username);
+    $("#registerDialog").close();
+    await startSession();
+  } catch (err) {
+    showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Registration failed.");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Caps Lock indicator while password is focused (matches native client).
@@ -63,37 +94,32 @@ $("#authPassword")?.addEventListener("blur", () => $("#capsWarn")?.classList.add
 
 $("#authForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const username = $("#authUsername").value.trim();
+  // If "Other User" tile selected, username comes from #authUsername;
+  // if known tile selected, prefilled from lastUsername.
+  const known = $("#tileKnown")?.classList.contains("sel");
+  const username = known
+    ? ($("#authUsername").value.trim() || lastUsername() || "")
+    : $("#authUsername").value.trim();
   const password = $("#authPassword").value;
   const errBox = $("#authError");
   showErr(errBox, "");
-  authNotice = "";
-  if (!username || !password) { showErr(errBox, "Username and password are required."); return; }
-  if (authMode === "register" && password.length < 8) {
-    showErr(errBox, "Password must be 8-128 characters.");
-    return;
-  }
+  if (!password) { showErr(errBox, "Password is required."); return; }
+  if (!username) { showErr(errBox, "Select a tile and enter your user name."); return; }
   const btn = $("#authSubmit");
   btn.disabled = true;
-  const status = $("#authStatus");
-  if (status) status.textContent = " Contacting server...";
+  const hint = $("#authHint");
+  if (hint) hint.textContent = "Contacting server...";
   try {
-    if (authMode === "register") {
-      const display = $("#authDisplayName").value.trim() || username;
-      await api.register(username, password, display);
-      const r = await api.login(username, password);
-      setToken(r.session_token);
-    } else {
-      const r = await api.login(username, password);
-      setToken(r.session_token);
-    }
+    const r = await api.login(username, password);
+    setToken(r.session_token);
     rememberUsername(username);
     await startSession();
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Sign-in failed.");
-    if (status) status.textContent = authMode === "register" ? " Create Account" : " Sign In";
+    if (hint) hint.textContent = "";
   } finally {
     btn.disabled = false;
+    if (hint && !errBox.textContent) hint.textContent = "";
   }
 });
 
@@ -176,7 +202,12 @@ async function logout() {
   booted = false;
   ui.showAuth("login");
   setMode("login");
-  $("#authUsername").value = lastUsername();
+  const remembered = lastUsername();
+  if (remembered) {
+    $("#authUsername").value = remembered;
+    $("#knownName").textContent = remembered;
+    ui.selectLogonTile("login");
+  }
   location.hash = "#/login";
   ui.toast("Signed out");
 }
@@ -952,8 +983,16 @@ async function boot() {
   ui.renderConnection();
   setMode("login");
   await resolveApiBase();
+  const remembered = lastUsername();
+  if (remembered) {
+    $("#authUsername").value = remembered;
+    $("#knownName").textContent = remembered;
+    ui.selectLogonTile("login");
+  } else {
+    ui.selectLogonTile("other");
+    $("#knownName").textContent = "Sign In";
+  }
   if (!getToken()) {
-    $("#authUsername").value = lastUsername();
     ui.showAuth("login");
     route();
     return;
@@ -968,7 +1007,6 @@ async function boot() {
         : "Cannot reach the msg.mesh server. Check your connection and retry.";
     ui.showAuth("login");
     setMode("login");
-    $("#authUsername").value = lastUsername();
     route();
   }
 }

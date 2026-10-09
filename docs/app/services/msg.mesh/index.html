@@ -18,56 +18,73 @@
 </head>
 <body>
 
-<div id="authView" class="win-auth hidden">
-  <div class="win-frame">
-    <div class="win-titlebar"><span class="win-title-ico">◈</span><span class="win-title" id="authTitleBar">Sign In - msg.mesh</span></div>
-    <div class="win-menubar"><span class="menu-item">File</span><span class="menu-item">Help</span></div>
-    <div class="auth-client">
-      <form class="auth-card" id="authForm" novalidate>
-        <div class="auth-head">
-          <h1 id="authHeading">Sign In</h1>
-          <div class="auth-icon">◈</div>
-        </div>
-        <p class="auth-sub" id="authSub">Log in to the Weird Stuff Server</p>
+<!-- XP Welcome / Logon (full-bleed, mirrors native render_xp_logon_ui) -->
+<div id="authView" class="xp-logon hidden">
+  <img class="logon-bg" src="./assets/xp/login/Background.png" alt="" draggable="false">
+  <form class="logon-root" id="authForm" novalidate>
+    <!-- left brand lockup -->
+    <img class="logon-brand" src="./assets/xp/login/brand.png" alt="msg.mesh" draggable="false">
 
-        <div class="field">
-          <label id="lblUsername">Username</label>
-          <div class="sunken">
-            <input id="authUsername" autocomplete="username" required minlength="3" maxlength="32" spellcheck="false" placeholder="Enter username">
+    <!-- right tile column -->
+    <div class="logon-col">
+      <div class="logon-tile" id="tileKnown" data-mode="login">
+        <img class="logon-avatar" src="./assets/xp/login/avatar.png" alt="" draggable="false">
+        <div class="logon-tile-label" id="knownName">Sign In</div>
+      </div>
+      <div class="logon-tile" id="tileOther" data-mode="other">
+        <div class="logon-other-box"><img src="./assets/xp/icons/User Accounts.png" alt="" draggable="false"></div>
+        <div class="logon-tile-label">Other User</div>
+      </div>
+
+      <!-- fields beside selected tile -->
+      <div class="logon-fields" id="logonFields">
+        <div class="logon-f-row hidden" id="rowUsername">
+          <span class="logon-f-label">User name:</span>
+          <div class="logon-f-box"><input id="authUsername" autocomplete="username" maxlength="32" spellcheck="false" placeholder=""></div>
+        </div>
+        <div class="logon-f-row" id="rowPassword">
+          <span class="logon-f-label">Password:</span>
+          <div class="logon-f-box">
+            <input id="authPassword" type="password" autocomplete="current-password" maxlength="128" placeholder="">
+            <span class="caps-warn hidden" id="capsWarn">Caps Lock is on.</span>
           </div>
+          <button class="logon-arrow" id="authSubmit" type="submit" aria-label="Sign In">
+            <svg viewBox="0 0 20 20" width="14" height="14"><polygon points="4,3 4,17 17,10" fill="#fff"/></svg>
+          </button>
         </div>
-
-        <div class="field reg-only hidden">
-          <label id="lblDisplay">Display name (optional)</label>
-          <div class="sunken"><input id="authDisplayName" autocomplete="nickname" maxlength="64" placeholder="How others see you"></div>
-        </div>
-
-        <div class="field">
-          <div class="field-label-row">
-            <label id="lblPassword">Password</label>
-            <span class="caps-warn hidden" id="capsWarn">CAPS LOCK ON</span>
-          </div>
-          <div class="sunken pw-row">
-            <input id="authPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="Enter password">
-            <button type="button" class="xp-btn pw-toggle" id="pwToggle" tabindex="-1">Show</button>
-          </div>
-        </div>
-
-        <p class="error hidden" id="authError" role="alert"></p>
-
-        <div class="auth-actions">
-          <button type="button" class="xp-btn gray hidden" id="authBack">Back</button>
-          <button class="xp-btn primary" type="submit" id="authSubmit">Sign In</button>
-        </div>
-        <p class="auth-tip">Enter submits &nbsp;|&nbsp; Tab switches fields &nbsp;|&nbsp; Esc goes back</p>
-      </form>
+        <p class="logon-error hidden" id="authError" role="alert"></p>
+        <p class="logon-hint" id="authHint"></p>
+      </div>
     </div>
-    <div class="statusbar"><span class="led" id="authLed"></span><span id="authStatus"> Sign In</span></div>
-  </div>
+
+  </form>
+
+  <!-- Turn off computer (bottom-left) -->
+  <button type="button" class="logon-power" id="powerBtn">
+    <img src="./assets/xp/icons/Power.png" alt="" draggable="false">
+    <span>Turn off computer</span>
+  </button>
 </div>
 
+<!-- Register dialog (native Create Account dialog frame) -->
+<dialog id="registerDialog" class="reg-dialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><span class="win-title">Create Account</span><button class="win-cap close" value="cancel" id="regClose" aria-label="Close"></button></div>
+    <form class="dlg-body" id="regForm">
+      <div class="field"><label>Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
+      <div class="field"><label>Display name (optional)</label><div class="sunken"><input id="regDisplay2" autocomplete="nickname" maxlength="64"></div></div>
+      <div class="field"><label>Password</label><div class="sunken"><input id="regPassword2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div></div>
+      <p class="error hidden" id="regError"></p>
+      <div class="dlg-actions">
+        <button class="xp-btn gray" type="button" id="regBack2">Back</button>
+        <button class="xp-btn primary" type="submit" id="regSubmit2">Create Account</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <div id="appView" class="win-app hidden">
-  <div class="win-titlebar app-titlebar"><span class="win-title-ico">◈</span><span class="win-title">msg.mesh Messenger</span></div>
+  <div class="win-titlebar app-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Windows Messenger.png" alt="" width="16" height="16"><span class="win-title">msg.mesh Messenger</span><span class="win-caps"><span class="win-cap minimize"></span><span class="win-cap maximize"></span><span class="win-cap close"></span></span></div>
 
   <div class="win-menubar" id="menuBar">
     <span class="menu-slot"><span class="menu-item" data-menu="file">File</span></span>
@@ -78,11 +95,11 @@
   </div>
 
   <div class="win-toolbar">
-    <button class="tb-btn" id="newChatBtn"><span class="tb-ico">👤</span>Add Contact</button>
-    <button class="tb-btn" id="sendImBtn"><span class="tb-ico">✉</span>Send IM</button>
-    <button class="tb-btn" id="sendFileBtn"><span class="tb-ico">📎</span>Send File</button>
-    <button class="tb-btn" id="settingsBtn"><span class="tb-ico">⚙</span>Settings</button>
-    <button class="tb-btn" id="profileBtn"><span class="tb-ico">ℹ</span>Profile</button>
+    <button class="tb-btn" id="newChatBtn"><img class="tb-ico" src="./assets/xp/icons/TB Add.png" alt="" width="16" height="16">Add Contact</button>
+    <button class="tb-btn" id="sendImBtn"><img class="tb-ico" src="./assets/xp/icons/TB IM.png" alt="" width="16" height="16">Send IM</button>
+    <button class="tb-btn" id="sendFileBtn"><img class="tb-ico" src="./assets/xp/icons/TB File.png" alt="" width="16" height="16">Send File</button>
+    <button class="tb-btn" id="settingsBtn"><img class="tb-ico" src="./assets/xp/icons/TB Settings.png" alt="" width="16" height="16">Settings</button>
+    <button class="tb-btn" id="profileBtn"><img class="tb-ico" src="./assets/xp/icons/Properties.png" alt="" width="16" height="16">Profile</button>
   </div>
 
   <div class="client-area">

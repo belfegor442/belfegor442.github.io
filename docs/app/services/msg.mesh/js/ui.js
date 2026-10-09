@@ -56,21 +56,30 @@ export function showApp() {
 
 export function setAuthTab(tab) {
   const isReg = tab === "register";
-  document.querySelector(".reg-only")?.classList.toggle("hidden", !isReg);
-  const heading = $("#authHeading");
-  const sub = $("#authSub");
-  const bar = $("#authTitleBar");
-  const status = $("#authStatus");
-  const submit = $("#authSubmit");
-  const back = $("#authBack");
-  if (heading) heading.textContent = isReg ? "Create Account" : "Sign In";
-  if (sub) sub.textContent = isReg ? "Register on the Weird Stuff Server" : "Log in to the Weird Stuff Server";
-  if (bar) bar.textContent = isReg ? "Create Account - msg.mesh" : "Sign In - msg.mesh";
-  if (status) status.textContent = isReg ? " Create Account" : " Sign In";
-  if (submit) submit.textContent = isReg ? "Create" : "Sign In";
-  if (back) back.classList.toggle("hidden", !isReg);
+  const regDlg = $("#registerDialog");
   const err = $("#authError");
   if (err) { err.textContent = ""; err.classList.add("hidden"); }
+  if (isReg && regDlg && !regDlg.open) {
+    regDlg.showModal();
+  } else if (!isReg && regDlg?.open) {
+    regDlg.close();
+  }
+}
+
+export function selectLogonTile(which) {
+  const known = $("#tileKnown");
+  const other = $("#tileOther");
+  const fields = $("#logonFields");
+  const rowU = $("#rowUsername");
+  const isKnown = which === "login";
+  known?.classList.toggle("sel", isKnown);
+  other?.classList.toggle("sel", !isKnown);
+  fields?.classList.add("show");
+  rowU?.classList.toggle("hidden", isKnown);
+  if (isKnown) {
+    const err = $("#authError");
+    if (err) { err.textContent = ""; err.classList.add("hidden"); }
+  }
 }
 
 export function renderProfile() {
