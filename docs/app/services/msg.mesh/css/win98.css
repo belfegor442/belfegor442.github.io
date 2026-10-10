@@ -283,6 +283,10 @@
 [data-theme="win98"] .client-area{background:#d4d0c8}
 
 /* ---------- contacts ---------- */
+[data-theme="win98"] .self-banner{
+  background:#c0c0c0;
+  border-bottom:1px solid #808080;
+}
 [data-theme="win98"] .requests{
   background:#c0c0c0;
   border-bottom:1px solid #808080;

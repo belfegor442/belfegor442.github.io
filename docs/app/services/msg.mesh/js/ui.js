@@ -92,16 +92,39 @@ export function selectLogonTile(which) {
   }
 }
 
+export function applyAvatarPhoto(imgEl, textEl, photo) {
+  if (!imgEl || !textEl) return;
+  if (photo) {
+    imgEl.src = photo;
+    imgEl.classList.remove("hidden");
+    textEl.classList.add("hidden");
+  } else {
+    imgEl.removeAttribute("src");
+    imgEl.classList.add("hidden");
+    textEl.classList.remove("hidden");
+  }
+}
+
 export function renderProfile() {
   const u = state.user;
   if (!u) return;
   const name = u.display_name || u.username || "?";
+  const p = state.profile || {};
+  const inits = p.avatar || initials(name);
   $("#selfName") && ($("#selfName").textContent = name);
   $("#selfHandle") && ($("#selfHandle").textContent = "@" + (u.username || "?"));
-  const pa = $("#profileAvatar");
-  if (pa) pa.textContent = (state.profile && state.profile.avatar) || initials(name);
+  const pt = $("#profileAvatarText");
+  if (pt) pt.textContent = inits;
+  applyAvatarPhoto($("#profileAvatarImg"), pt, p.photo);
   const sl = $("#profileStatusLine");
-  if (sl) sl.textContent = state.profile && state.profile.status ? "- " + state.profile.status : "";
+  if (sl) sl.textContent = p.status ? "- " + p.status : "";
+  const bn = $("#selfBannerName");
+  if (bn) bn.textContent = "Signed in as " + name;
+  const bs = $("#selfBannerStatus");
+  if (bs) bs.textContent = p.status || "";
+  const bt = $("#selfBannerText");
+  if (bt) bt.textContent = inits;
+  applyAvatarPhoto($("#selfBannerImg"), bt, p.photo);
 }
 
 export function renderConnection() {

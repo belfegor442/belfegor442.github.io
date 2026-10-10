@@ -108,6 +108,10 @@
   <div class="client-area">
     <div class="contacts-col" id="contactsCol">
       <div class="panel-header contacts-header">Contacts</div>
+      <div class="self-banner" id="selfBanner">
+        <div class="conv-avatar self-banner-avatar" id="selfBannerAvatar"><span id="selfBannerText">?</span><img class="avatar-photo hidden" id="selfBannerImg" alt=""></div>
+        <div class="self-banner-body"><strong id="selfBannerName">…</strong><small class="hint" id="selfBannerStatus"></small></div>
+      </div>
       <section class="requests hidden" id="requestStrip" aria-label="Friend Requests"></section>
       <div class="sunken contacts-sunken">
         <div class="contact-list" id="conversationList"></div>
@@ -214,7 +218,8 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><span class="win-title">Settings - msg.mesh</span><button class="win-cap close" value="cancel" id="profileClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="profileForm">
-      <div class="profile-id"><div class="conv-avatar" id="profileAvatar">?</div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small><small class="hint" id="profileStatusLine"></small></div></div>
+      <div class="profile-banner hidden" id="profileBannerStrip"><img class="profile-banner-img" id="profileBannerImg" alt=""></div>
+      <div class="profile-id"><div class="conv-avatar" id="profileAvatar"><span id="profileAvatarText">?</span><img class="avatar-photo hidden" id="profileAvatarImg" alt=""></div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small><small class="hint" id="profileStatusLine"></small></div></div>
       <label>THEME</label>
       <div class="theme-row">
         <button type="button" class="xp-btn gray theme-opt" data-theme-opt="winxp">Windows XP</button>
@@ -228,6 +233,20 @@
       <div class="sunken"><input id="profileAbout" maxlength="256" placeholder="About you" autocomplete="off"></div>
       <label>AVATAR</label>
       <div class="sunken"><input id="profileAvatarField" maxlength="2" placeholder="2-letter initials" autocomplete="off"></div>
+      <label>PHOTO</label>
+      <div class="file-row">
+        <button type="button" class="xp-btn gray" id="profilePhotoBrowse">Browse…</button>
+        <button type="button" class="xp-btn gray" id="profilePhotoClear">Clear</button>
+        <span class="hint file-hint" id="profilePhotoName">No photo</span>
+        <input type="file" id="profilePhotoInput" accept="image/*" class="hidden" tabindex="-1">
+      </div>
+      <label>BANNER</label>
+      <div class="file-row">
+        <button type="button" class="xp-btn gray" id="profileBannerBrowse">Browse…</button>
+        <button type="button" class="xp-btn gray" id="profileBannerClear">Clear</button>
+        <span class="hint file-hint" id="profileBannerName">No banner</span>
+        <input type="file" id="profileBannerInput" accept="image/*" class="hidden" tabindex="-1">
+      </div>
       <div class="field"><label class="chk-row"><input type="checkbox" id="showTimestamps" checked><span class="chk-x">x</span> Show timestamps</label></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="profileSave">Save</button></div>
       <div class="server-block">

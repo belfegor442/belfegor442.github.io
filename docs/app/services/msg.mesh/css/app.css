@@ -652,6 +652,16 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .profile-id .conv-avatar{width:44px;height:44px;font-size:18px}
 .profile-id strong{display:block;font-size:14px}
 .profile-id small{color:var(--xp-dim);font-size:11px}
+.profile-banner{display:block;height:72px;overflow:hidden;margin:0 0 12px;background:#0c3091;border:1px solid var(--xp-border)}
+.profile-banner-img{display:block;width:100%;height:100%;object-fit:cover}
+.conv-avatar .avatar-photo{display:block;width:100%;height:100%;object-fit:cover}
+.file-row{display:flex;gap:6px;align-items:center;margin-bottom:2px}
+.file-row .file-hint{flex:1;min-width:0;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.self-banner{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--xp-face);border-bottom:1px solid var(--xp-border)}
+.self-banner-avatar{width:32px;height:32px;font-size:13px;flex:none}
+.self-banner-body{min-width:0;flex:1}
+.self-banner-body strong{display:block;font-size:12px;color:#146428;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.self-banner-body .hint{display:block;padding:0;margin:1px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .server-block{border-top:1px solid var(--xp-border);margin-top:12px;padding-top:10px;text-align:left}
 .server-row{display:flex;gap:6px;margin-top:4px}
 .server-row .sunken{flex:1;min-width:0}

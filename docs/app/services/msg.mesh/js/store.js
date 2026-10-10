@@ -2,7 +2,7 @@ import { api } from "./api.js";
 
 export const state = {
   user: null,            // {user_id, username, display_name, status, ...}
-  profile: { status: "", about: "", avatar: "" }, // native profile.* (display name stays server-side)
+  profile: { status: "", about: "", avatar: "", photo: "", banner: "" }, // native profile.* (display name stays server-side)
   selfNode: "",          // "u73"
   conversations: new Map(), // peerId -> {peer, messages:[], hasMore}
   users: new Map(),      // userId -> {user_id, username, display_name, status}
@@ -27,9 +27,11 @@ export function loadProfile() {
       status: typeof p.status === "string" ? p.status : "",
       about: typeof p.about === "string" ? p.about : "",
       avatar: typeof p.avatar === "string" ? p.avatar : "",
+      photo: typeof p.photo === "string" ? p.photo : "",
+      banner: typeof p.banner === "string" ? p.banner : "",
     };
   } catch {
-    state.profile = { status: "", about: "", avatar: "" };
+    state.profile = { status: "", about: "", avatar: "", photo: "", banner: "" };
   }
   return state.profile;
 }
@@ -39,8 +41,15 @@ export function saveProfile(p) {
     status: String(p.status || ""),
     about: String(p.about || ""),
     avatar: String(p.avatar || ""),
+    photo: String(p.photo || ""),
+    banner: String(p.banner || ""),
   };
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile)); } catch { /* quota */ }
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 loadProfile();

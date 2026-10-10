@@ -602,10 +602,64 @@ function sanitizeProfileValue(v, max) {
   return s.length > max ? s.slice(0, max) : s;
 }
 
+function readImageScaled(file, maxW, maxH, mime, quality) {
+  return new Promise((resolve, reject) => {
+    if (!file || String(file.type || "").indexOf("image/") !== 0) { reject(new Error("Choose an image file.")); return; }
+    if (file.size > 8 * 1024 * 1024) { reject(new Error("Image too large (max 8 MB).")); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL(mime, quality));
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read image.")); };
+    img.src = url;
+  });
+}
+
+let pendingPhoto = "";
+let pendingBanner = "";
+let pendingPhotoName = "";
+let pendingBannerName = "";
+
+function renderPhotoBannerPreview() {
+  const pt = $("#profileAvatarText");
+  if (pt) pt.textContent = selfInitials();
+  ui.applyAvatarPhoto($("#profileAvatarImg"), pt, pendingPhoto);
+  const strip = $("#profileBannerStrip");
+  const bimg = $("#profileBannerImg");
+  if (strip && bimg) {
+    if (pendingBanner) {
+      bimg.src = pendingBanner;
+      strip.classList.remove("hidden");
+    } else {
+      bimg.removeAttribute("src");
+      strip.classList.add("hidden");
+    }
+  }
+  const pn = $("#profilePhotoName");
+  if (pn) pn.textContent = pendingPhoto ? pendingPhotoName || "Photo set" : "No photo";
+  const bn = $("#profileBannerName");
+  if (bn) bn.textContent = pendingBanner ? pendingBannerName || "Banner set" : "No banner";
+}
+
 function renderProfilePreview() {
   const u = state.user;
   if (!u) return;
-  $("#profileAvatar").textContent = selfInitials();
+  renderPhotoBannerPreview();
   $("#profileName").textContent = u.display_name || u.username;
   $("#profileHandle").textContent = "@" + u.username;
   const sl = $("#profileStatusLine");
@@ -616,6 +670,10 @@ function openProfile() {
   const u = state.user;
   if (!u) return;
   loadProfile();
+  pendingPhoto = state.profile.photo || "";
+  pendingBanner = state.profile.banner || "";
+  pendingPhotoName = "";
+  pendingBannerName = "";
   renderProfilePreview();
   $("#profileDisplayName").value = u.display_name || "";
   $("#profileStatusText").value = state.profile.status || "";
@@ -625,6 +683,41 @@ function openProfile() {
   applyServerSettings();
   $("#profileDialog").showModal();
 }
+
+function wireImagePicker(btnId, inputId, clearId, maxW, maxH, mime, quality, apply) {
+  const btn = $(btnId);
+  const input = $(inputId);
+  const clear = $(clearId);
+  btn?.addEventListener("click", () => input.click());
+  clear?.addEventListener("click", () => {
+    apply("", "");
+    showErr($("#profileStatus"), "");
+    renderPhotoBannerPreview();
+  });
+  input?.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    const fname = f ? f.name : "";
+    e.target.value = "";
+    if (!f) return;
+    try {
+      const dataUrl = await readImageScaled(f, maxW, maxH, mime, quality);
+      apply(dataUrl, fname);
+      showErr($("#profileStatus"), "");
+      renderPhotoBannerPreview();
+    } catch (err) {
+      showErr($("#profileStatus"), err.message);
+    }
+  });
+}
+
+wireImagePicker("#profilePhotoBrowse", "#profilePhotoInput", "#profilePhotoClear", 160, 160, "image/png", undefined, (v, n) => {
+  pendingPhoto = v;
+  pendingPhotoName = n || "";
+});
+wireImagePicker("#profileBannerBrowse", "#profileBannerInput", "#profileBannerClear", 600, 160, "image/jpeg", 0.85, (v, n) => {
+  pendingBanner = v;
+  pendingBannerName = n || "";
+});
 
 $("#profileForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -636,7 +729,10 @@ $("#profileForm").addEventListener("submit", async (e) => {
   try {
     const r = await api.usersUpdate(name);
     state.user = normalizeUser(r.user ? { user: r.user, role: state.user.role, tenant_id: state.user.tenant_id } : r);
-    saveProfile({ status, about, avatar });
+    if (!saveProfile({ status, about, avatar, photo: pendingPhoto, banner: pendingBanner })) {
+      showErr($("#profileStatus"), "Profile is too large for browser storage.");
+      return;
+    }
     ui.renderProfile();
     renderProfilePreview();
     showErr($("#profileStatus"), "");
