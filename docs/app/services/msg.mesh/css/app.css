@@ -79,30 +79,46 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
 ::-webkit-scrollbar-button{display:none}
 
 /* ---------- window chrome (real XP sprites from SOURCE_clean.png atlas) ---------- */
+/* semi-transparent sprite edges composite over the wallpaper like native
+   fill_background (wallpaper), never over the dark modal backdrop */
 .win-frame{
   width:min(420px,calc(100vw - 16px));
-  background:var(--xp-bg);
+  background:url("../assets/xp/bliss.jpg") center top/cover no-repeat var(--xp-bg);
   border:6px solid transparent;
   border-top-width:0;
   border-image:url("../assets/xp/sprites/window_body.png") 6 fill / 6px;
   box-shadow:0 8px 40px rgba(0,0,0,.45);
 }
+/* XP titlebar = native draw_winxp_title: draw_9slice(title_bar_active, 6)
+   over fill_background wallpaper (semi-transparent sprite rows composite on
+   bliss, never on the modal backdrop); text Tahoma 14 bold at x+8;
+   caps = h-6 (22px), gap 4, right margin 4 (native btn geometry). */
 .win-titlebar{
+  --tb-sprite:url("../assets/xp/sprites/titlebar_active.png");
   height:28px;
   display:flex;align-items:center;gap:6px;
-  padding:0 3px 0 6px;
-  background:url("../assets/xp/sprites/titlebar_active.png") no-repeat;
-  background-size:100% 100%;
+  padding:0 4px 0 8px;
+  background:
+    var(--tb-sprite) 0 0/6px 6px no-repeat,
+    var(--tb-sprite) 100% 0/6px 6px no-repeat,
+    var(--tb-sprite) 0 100%/6px 6px no-repeat,
+    var(--tb-sprite) 100% 100%/6px 6px no-repeat,
+    var(--tb-sprite) 50% 0/calc(100% - 12px) 6px no-repeat,
+    var(--tb-sprite) 50% 100%/calc(100% - 12px) 6px no-repeat,
+    var(--tb-sprite) 0 50%/6px calc(100% - 12px) no-repeat,
+    var(--tb-sprite) 100% 50%/6px calc(100% - 12px) no-repeat,
+    var(--tb-sprite) 50% 50%/calc(100% - 12px) calc(100% - 12px) no-repeat,
+    url("../assets/xp/bliss.jpg") center top/cover no-repeat;
   color:var(--xp-title-fg);
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-weight:700;font-size:13px;
+  font-weight:700;font-size:14px;
   user-select:none;
 }
 .win-title-ico{width:16px;height:16px;flex:none;image-rendering:auto}
 .win-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:1px 1px 0 rgba(0,0,0,.35)}
-.win-caps{display:flex;gap:2px;flex:none}
+.win-caps{display:flex;gap:4px;flex:none}
 .win-cap{
-  width:21px;height:20px;border:0;border-radius:3px;
+  width:22px;height:22px;border:0;border-radius:0;
   background-color:transparent;
   display:grid;place-items:center;padding:0;
   background-size:100% 100%;
@@ -377,7 +393,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 .win-app{
   display:flex;flex-direction:column;
   height:100vh;height:100dvh;
-  background:var(--xp-bg);
+  background:url("../assets/xp/bliss.jpg") center top/cover no-repeat var(--xp-bg);
   border:6px solid transparent;
   border-top-width:0;
   border-image:url("../assets/xp/sprites/window_body.png") 6 fill / 6px;
@@ -386,7 +402,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
   border-image:url("../assets/xp/sprites/window_body_inactive.png") 6 fill / 6px;
 }
 .win-app.inactive .win-titlebar{
-  background-image:url("../assets/xp/sprites/titlebar_inactive.png");
+  --tb-sprite:url("../assets/xp/sprites/titlebar_inactive.png");
 }
 .client-area{
   flex:1;min-height:0;position:relative;
