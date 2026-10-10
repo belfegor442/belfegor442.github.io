@@ -108,10 +108,7 @@ function navBlockedAt(x, y, r) {
 }
 
 export function blocked(x, y, r = 14) {
-  // Nav queries use a tighter radius than the body: chair rows and table
-  // legs are rasterised cell-by-cell at 16 units, and a full-body query made
-  // every aisle feel one-and-a-half players too narrow.
-  if (navBlockedAt(x, y, Math.max(4, r - 6))) return true;
+  if (navBlockedAt(x, y, r)) return true;
   for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
   return false;
 }
