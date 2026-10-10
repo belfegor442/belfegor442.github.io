@@ -162,9 +162,11 @@
         <div class="details-avatar" id="detailsAvatar">?</div>
         <h2 id="detailsName">Conversation</h2>
         <p id="detailsHandle">@unknown</p>
+        <p class="details-peer-status" id="detailsPeerStatus"></p>
         <div class="detail-row"><span>STATUS</span><strong id="detailsStatus">—</strong></div>
         <div class="detail-row"><span>MESSAGES</span><strong id="detailsMessages">0</strong></div>
         <div class="detail-row"><span>LAST READ BY PEER</span><strong id="detailsRead">—</strong></div>
+        <div class="detail-row hidden" id="detailsAboutRow"><span>ABOUT</span><strong id="detailsAbout">—</strong></div>
         <div class="detail-row contact-actions">
           <span>CONTACT</span>
           <button class="xp-btn gray small" id="addContactBtn">Add Friend</button>
@@ -280,7 +282,6 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <input type="file" id="fileInput" class="hidden" tabindex="-1">
-<input type="file" id="attachInput" class="hidden" tabindex="-1" multiple>
 
 <script type="module" src="./js/main.js"></script>
 </body>

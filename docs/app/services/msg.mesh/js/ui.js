@@ -364,9 +364,23 @@ export function renderDetails() {
   const dh = $("#detailsHandle");
   if (dh) dh.textContent = u ? "@" + u.username : peer;
   const da = $("#detailsAvatar");
-  if (da) da.textContent = initials(label);
+  if (da) da.textContent = u && u.profile && u.profile.avatar ? u.profile.avatar : initials(label);
   const ds = $("#detailsStatus");
   if (ds) ds.textContent = u ? (u.status === "online" ? "Online" : "Offline") : "Device node";
+  // Server-side profile block (migration 018): status text + about.
+  const pst = $("#detailsPeerStatus");
+  if (pst) {
+    const st = u && u.profile ? String(u.profile.status_text || "") : "";
+    pst.textContent = st;
+    pst.classList.toggle("hidden", !st);
+  }
+  const abRow = $("#detailsAboutRow");
+  const ab = $("#detailsAbout");
+  if (abRow && ab) {
+    const about = u && u.profile ? String(u.profile.about || "") : "";
+    ab.textContent = about || "-";
+    abRow.classList.toggle("hidden", !about);
+  }
   const dm = $("#detailsMessages");
   if (dm) dm.textContent = String(c ? c.messages.length : 0);
   const dr = $("#detailsRead");

@@ -120,6 +120,12 @@ export class ApiError extends Error {
 // The handler must be idempotent — parallel calls may trigger it together.
 let onUnauthorized = null;
 export function setOnUnauthorized(fn) { onUnauthorized = fn; }
+// Same signal for non-HTTP callers (the WebSocket auth frame path).
+export function notifyUnauthorized() {
+  if (onUnauthorized) {
+    try { onUnauthorized(); } catch { /* idempotent handler */ }
+  }
+}
 
 const FRIENDLY = {
   0: "Cannot reach the msg.mesh server. Check your connection.",
@@ -217,8 +223,14 @@ export const api = {
   logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true }),
 
   history: (o = {}) => call("/api/v1/mesh/history", { limit: 200, ...o }),
-  send: (receiver_node_id, message_type, payload) =>
-    call("/api/v1/mesh/send", { receiver_node_id, message_type, payload }),
+  // client_msg_id makes retries idempotent: re-sending the same id returns
+  // the original message instead of storing a duplicate.
+  send: (receiver_node_id, message_type, payload, client_msg_id) => {
+    const body = { receiver_node_id, message_type, payload };
+    if (client_msg_id) body.client_msg_id = client_msg_id;
+    return call("/api/v1/mesh/send", body);
+  },
+  meshConversations: () => call("/api/v1/mesh/conversations", {}),
   read: (peer_node_id, last_read_rowid) => {
     const body = {};
     if (peer_node_id) body.peer_node_id = peer_node_id;
@@ -229,7 +241,11 @@ export const api = {
 
   usersSearch: (query) => call("/api/v1/users/search", { query }),
   usersGet: (user_id) => call("/api/v1/users/get", { user_id: Number(user_id) }),
-  usersUpdate: (display_name) => call("/api/v1/users/update", { display_name }),
+  // Accepts an object of fields ({display_name, status_text, about, avatar,
+  // photo, banner}) or a plain display name string (legacy callers).
+  usersUpdate: (fields) =>
+    call("/api/v1/users/update",
+      typeof fields === "string" ? { display_name: fields } : (fields || {})),
 
   friendsList: () => call("/api/v1/friends/list", {}),
   friendRequests: () => call("/api/v1/friends/requests", {}),

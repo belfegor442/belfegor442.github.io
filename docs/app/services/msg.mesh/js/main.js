@@ -1,5 +1,5 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile } from "./store.js";
+import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
@@ -173,6 +173,7 @@ async function startSession() {
   try {
     const w = await api.whoami({ allow401: true });
     state.user = normalizeUser(w);
+    await syncProfileFromServer(w.profile);
   } catch (e) {
     setToken("");
     throw e;
@@ -193,6 +194,37 @@ async function startSession() {
   ui.toast("Signed in as " + (state.user.display_name || state.user.username));
 }
 
+// The server owns the profile (shared with the native client); localStorage
+// only caches it for offline rendering. A legacy local-only profile is
+// migrated to the server once so it stops being device-private.
+async function syncProfileFromServer(serverProfile) {
+  const has = (v) => typeof v === "string" && v.length > 0;
+  const sp = serverProfile || {};
+  const serverHas = has(sp.status_text) || has(sp.about) || has(sp.avatar) || has(sp.photo) || has(sp.banner);
+  if (serverHas) {
+    saveProfile({
+      status: sp.status_text || "",
+      about: sp.about || "",
+      avatar: sp.avatar || "",
+      photo: sp.photo || "",
+      banner: sp.banner || "",
+    });
+    return;
+  }
+  const local = loadProfile();
+  const localHas = local.status || local.about || local.avatar || local.photo || local.banner;
+  if (!localHas) return;
+  try {
+    await api.usersUpdate({
+      status_text: local.status,
+      about: local.about,
+      avatar: local.avatar,
+      photo: local.photo,
+      banner: local.banner,
+    });
+  } catch { /* keep the local cache; retried on next sign-in */ }
+}
+
 async function initialLoad() {
   const sync = $("#syncState");
   if (sync) sync.textContent = "SYNCING";
@@ -211,6 +243,7 @@ async function initialLoad() {
       for (const [peer, rowid] of Object.entries(map.reads)) state.pointers.set(peer, Number(rowid) || 0);
     }
   } catch { /* pointers refresh later */ }
+  await refreshConversations(true);
   await loadFriends().catch(() => null);
   await primeUsers();
   ui.renderAll();
@@ -311,6 +344,9 @@ async function markRead(peer) {
       const curP = state.peerPointers.get(peer) || 0;
       if (r.peer_last_read_rowid > curP) state.peerPointers.set(peer, r.peer_last_read_rowid);
     }
+    const meta = state.convMeta.get(peer);
+    if (meta) meta.unread = 0;
+    refreshConversations();
     ui.renderSidebar();
     if (state.activePeer === peer) ui.renderChatHead();
   } catch { /* pointer retried on next event */ }
@@ -349,17 +385,21 @@ async function sendMessage() {
   };
   if (att) env.attachment = { id: att.id, filename: att.filename, type: att.content_type, size: att.size_bytes };
   const tmp = uid();
-  pushLocal(peer, { id: tmp, text, env, attachment: env.attachment || null });
+  const local = pushLocal(peer, { id: tmp, text, env, attachment: env.attachment || null });
+  // Stable id for retries: the server dedupes sends by client_msg_id, so a
+  // retry after a lost response returns the original message, not a copy.
+  local.clientId = tmp;
   input.value = "";
   setPendingAttachment(null);
   ui.renderMessages();
   ui.renderSidebar();
 
   try {
-    const r = await api.send(peer, "text", JSON.stringify(env));
+    const r = await api.send(peer, "text", JSON.stringify(env), tmp);
     const m = findMessage(peer, tmp);
     if (m && r.message_id) {
       m.id = r.message_id;
+      if (m.rowid == null && typeof r.rowid === "number") m.rowid = r.rowid;
       if (m.sync === "sending") m.sync = "sent";
       ui.renderMessages({ scroll: false });
     }
@@ -376,13 +416,16 @@ async function sendMessage() {
 async function retryMessage(peer, m) {
   m.sync = "sending";
   ui.renderMessages({ scroll: false });
+  const cid = m.clientId || (String(m.id).startsWith("tmp-") ? m.id : "");
   try {
-    const r = await api.send(peer, m.type || "text", JSON.stringify(m.env));
+    const r = await api.send(peer, m.type || "text", JSON.stringify(m.env), cid || undefined);
     if (r.message_id && findMessage(peer, m.id)) {
       const cur = findMessage(peer, m.id);
       cur.id = r.message_id;
+      if (cur.rowid == null && typeof r.rowid === "number") cur.rowid = r.rowid;
       cur.sync = "sent";
       ui.renderMessages({ scroll: false });
+      markRead(peer);
     }
   } catch (e) {
     m.sync = "failed";
@@ -398,6 +441,45 @@ const MAX_FILE = 700 * 1024;
 $("#sendFileBtn")?.addEventListener("click", () => $("#fileInput").click());
 $("#pendingFileCancel")?.addEventListener("click", () => setPendingAttachment(null));
 
+// XHR upload so the pending-file bar can show real byte progress (fetch has
+// no upload progress events). Same endpoint/headers/failure contract as
+// api.upload; falls back to the plain error payload on non-2xx.
+function uploadWithProgress(filename, contentType, b64, size, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", apiBase() + "/api/v1/files/upload");
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.timeout = 60000;
+    const tok = getToken();
+    if (tok) xhr.setRequestHeader("X-Session-Token", tok);
+    if (xhr.upload) {
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (ev.lengthComputable && onProgress) onProgress(ev.loaded, ev.total);
+      });
+    }
+    xhr.onload = () => {
+      let payload = {};
+      try { payload = JSON.parse(xhr.responseText || "{}"); } catch { /* empty body */ }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(payload);
+      } else {
+        // Same session-lost flow as api.call() (api.js onUnauthorized).
+        if (xhr.status === 401) handleSessionLost();
+        reject(new ApiError(xhr.status, payload));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, { error: "cannot reach the msg.mesh server" }));
+    xhr.ontimeout = () => reject(new ApiError(0, { error: "upload timed out" }));
+    xhr.send(JSON.stringify({
+      filename,
+      content_type: contentType,
+      content_base64: b64,
+      size_bytes: size,
+    }));
+  });
+}
+
+let uploadSeq = 0;
 $("#fileInput").addEventListener("change", async () => {
   const file = $("#fileInput").files[0];
   $("#fileInput").value = "";
@@ -406,12 +488,30 @@ $("#fileInput").addEventListener("change", async () => {
     ui.toast(`File too large (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
     return;
   }
+  const seq = ++uploadSeq;
+  const bar = $("#pendingFile");
+  const label = $("#pendingFileName");
+  if (bar) bar.classList.remove("hidden");
+  if (label) label.textContent = file.name + " — 0%";
   try {
     const b64 = await fileToBase64(file);
-    const r = await api.upload(file.name, file.type || "application/octet-stream", b64, file.size);
+    const r = await uploadWithProgress(
+      file.name,
+      file.type || "application/octet-stream",
+      b64,
+      file.size,
+      (loaded, total) => {
+        if (seq === uploadSeq && label && bar && !bar.classList.contains("hidden")) {
+          const pct = Math.round((loaded / total) * 100);
+          label.textContent = file.name + " — " + pct + "%";
+        }
+      }
+    );
+    if (seq !== uploadSeq) return;
     setPendingAttachment({ id: r.attachment_id, filename: r.filename || file.name, content_type: r.content_type || file.type, size_bytes: r.size_bytes ?? file.size });
     ui.toast("Attached " + (r.filename || file.name));
   } catch (e) {
+    if (seq === uploadSeq) setPendingAttachment(null);
     ui.toast("Upload failed: " + friendlyError(e), true);
   }
 });
@@ -669,7 +769,6 @@ function renderProfilePreview() {
 function openProfile() {
   const u = state.user;
   if (!u) return;
-  loadProfile();
   pendingPhoto = state.profile.photo || "";
   pendingBanner = state.profile.banner || "";
   pendingPhotoName = "";
@@ -727,9 +826,25 @@ $("#profileForm").addEventListener("submit", async (e) => {
   const about = sanitizeProfileValue($("#profileAbout").value, 256);
   const avatar = sanitizeProfileValue($("#profileAvatarField").value, 2);
   try {
-    const r = await api.usersUpdate(name);
+    // One server round-trip: the server stores every field and returns the
+    // canonical profile, which we mirror into the local cache.
+    const r = await api.usersUpdate({
+      display_name: name,
+      status_text: status,
+      about,
+      avatar,
+      photo: pendingPhoto,
+      banner: pendingBanner,
+    });
     state.user = normalizeUser(r.user ? { user: r.user, role: state.user.role, tenant_id: state.user.tenant_id } : r);
-    if (!saveProfile({ status, about, avatar, photo: pendingPhoto, banner: pendingBanner })) {
+    const sp = (r.user && r.user.profile) || {};
+    if (!saveProfile({
+      status: typeof sp.status_text === "string" ? sp.status_text : status,
+      about: typeof sp.about === "string" ? sp.about : about,
+      avatar: typeof sp.avatar === "string" ? sp.avatar : avatar,
+      photo: typeof sp.photo === "string" ? sp.photo : pendingPhoto,
+      banner: typeof sp.banner === "string" ? sp.banner : pendingBanner,
+    })) {
       showErr($("#profileStatus"), "Profile is too large for browser storage.");
       return;
     }

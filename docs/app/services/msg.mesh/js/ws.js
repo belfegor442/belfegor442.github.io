@@ -1,5 +1,5 @@
-import { wsEndpoint, getToken, api, failoverBase } from "./api.js";
-import { state, emit, ingest, primeUsers } from "./store.js";
+import { wsEndpoint, getToken, api, failoverBase, notifyUnauthorized } from "./api.js";
+import { state, emit, ingest, primeUsers, refreshConversations } from "./store.js";
 
 const HEARTBEAT_MS = 30000;   // text frame keeps proxies alive (server discards it)
 const POLL_MS = 20000;        // history fallback while the socket is down
@@ -62,6 +62,7 @@ async function resync() {
     const r = await api.history({ limit: 200 });
     ingest(r.items || []);
     await primeUsers();
+    refreshConversations(true);
     emit("conversations");
     emit("messages");
     const ptr = await api.read(null);
@@ -83,6 +84,7 @@ function startPolling() {
       const r = await api.history({ limit: 50 });
       ingest(r.items || []);
       await primeUsers();
+      refreshConversations();
       emit("conversations");
       emit("messages");
       emit("sync", "POLLING");
@@ -119,7 +121,9 @@ export function connect() {
 
   let ws;
   try {
-    ws = new WebSocket(`${wsEndpoint()}?session_token=${encodeURIComponent(getToken())}`);
+    // No credentials in the URL: the token is sent in the first frame
+    // (see onopen), so it never lands in proxy/server logs.
+    ws = new WebSocket(wsEndpoint());
   } catch {
     scheduleReconnect();
     return;
@@ -128,6 +132,9 @@ export function connect() {
 
   ws.onopen = () => {
     attempts = 0;
+    try {
+      ws.send(JSON.stringify({ type: "auth", session_token: getToken() }));
+    } catch { /* onclose follows */ }
     setConnection("online");
     startHeartbeat();
     startWatchdog();
@@ -158,6 +165,20 @@ export function connect() {
         if (data.last_read_rowid > cur) state.peerPointers.set(other, data.last_read_rowid);
       }
       emit("readstate", data);
+    } else if (event === "error" && data) {
+      const code = Number(data.code) || 0;
+      if (code === 401) {
+        // Session rejected during WS auth: stop reconnecting and hand the
+        // session-lost flow to the app (same path as an HTTP 401).
+        closedByUs = true;
+        started = false;
+        stopHeartbeat();
+        stopWatchdog();
+        stopPolling();
+        setConnection("offline");
+        try { ws.close(); } catch { /* already closed */ }
+        notifyUnauthorized();
+      }
     }
   };
 

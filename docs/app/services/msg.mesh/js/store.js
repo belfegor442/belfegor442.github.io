@@ -5,7 +5,8 @@ export const state = {
   profile: { status: "", about: "", avatar: "", photo: "", banner: "" }, // native profile.* (display name stays server-side)
   selfNode: "",          // "u73"
   conversations: new Map(), // peerId -> {peer, messages:[], hasMore}
-  users: new Map(),      // userId -> {user_id, username, display_name, status}
+  convMeta: new Map(),   // peerId -> {unread, last} from /mesh/conversations (server truth beyond the loaded window)
+  users: new Map(),      // userId -> {user_id, username, display_name, status, profile?}
   friends: new Map(),    // userId -> {user_id, friendship_id, created_at}
   requests: new Map(),   // request_id -> {request_id, sender_user_id, receiver_user_id, status}
   pointers: new Map(),   // peerId -> my last-read rowid
@@ -71,6 +72,8 @@ export function resetState() {
   state.user = null;
   state.selfNode = "";
   state.conversations = new Map();
+  state.convMeta = new Map();
+  if (convRefreshTimer) { clearTimeout(convRefreshTimer); convRefreshTimer = null; }
   state.users = new Map();
   state.friends = new Map();
   state.requests = new Map();
@@ -224,13 +227,40 @@ export function conversationOrder() {
   for (const c of state.conversations.values()) {
     seen.add(c.peer);
     const last = c.messages[c.messages.length - 1];
-    rows.push({ peer: c.peer, last, unread: unreadCount(c.peer), count: c.messages.length });
+    const meta = state.convMeta.get(c.peer);
+    // Server unread covers messages older than the loaded window; local
+    // count stays authoritative for anything just ingested.
+    const unread = Math.max(unreadCount(c.peer), meta ? meta.unread : 0);
+    rows.push({ peer: c.peer, last, unread, count: c.messages.length });
+  }
+  // Conversations the server knows but this session has not loaded (older
+  // than the history window) still belong in the sidebar.
+  for (const [peer, meta] of state.convMeta) {
+    if (seen.has(peer) || !meta || !meta.last) continue;
+    const l = meta.last;
+    const env = parseEnvelope(l.payload);
+    rows.push({
+      peer,
+      last: {
+        rowid: l.rowid,
+        id: l.message_id,
+        mine: l.sender_node_id === state.selfNode,
+        text: typeof env.text === "string" ? env.text : "",
+        attachment: env.attachment && env.attachment.id ? env.attachment : null,
+        type: l.message_type || "message",
+        ts: typeof env.ts === "number" ? env.ts : createdMs(l),
+      },
+      unread: meta.unread || 0,
+      count: 0,
+    });
+    seen.add(peer);
   }
   // Friends with no traffic yet still belong in the sidebar.
   for (const f of state.friends.keys()) {
     const peer = "u" + f;
     if (seen.has(peer)) continue;
     rows.push({ peer, last: null, unread: 0, count: 0 });
+    seen.add(peer);
   }
   rows.sort((a, b) => {
     const ar = a.last && a.last.rowid != null ? a.last.rowid : (a.last ? a.last.ts : 0);
@@ -238,6 +268,37 @@ export function conversationOrder() {
     return br - ar;
   });
   return rows;
+}
+
+// Pull sidebar metadata (last message + unread counts) from the server.
+// Debounced so bursts of read/ingest events cost one request; pass
+// true to run immediately (session start, reconnect resync).
+let convRefreshTimer = null;
+export function refreshConversations(immediate = false) {
+  if (convRefreshTimer) {
+    clearTimeout(convRefreshTimer);
+    convRefreshTimer = null;
+  }
+  const run = async () => {
+    if (!state.user) return;
+    try {
+      const r = await api.meshConversations();
+      if (r && Array.isArray(r.conversations)) {
+        const meta = new Map();
+        for (const c of r.conversations) {
+          if (!c || !c.peer) continue;
+          meta.set(c.peer, { unread: Number(c.unread) || 0, last: c.last || null });
+        }
+        state.convMeta = meta;
+        emit("conversations");
+      }
+    } catch { /* offline: keep the last known metadata */ }
+  };
+  if (immediate) return run();
+  convRefreshTimer = setTimeout(() => {
+    convRefreshTimer = null;
+    run();
+  }, 600);
 }
 
 export function peerUser(peer) {
