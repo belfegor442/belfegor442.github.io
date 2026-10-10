@@ -1,4 +1,4 @@
-import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav, KX } from './world.js';
+import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav, KX, KZ } from './world.js';
 import {
   C, mul, perspective, lookAt, trs,
   VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB,
@@ -840,9 +840,9 @@ export class Renderer {
         // Tables only: the glow marks the felts (drawn by the model now).
         // The procedural bar isn't visible in GLB mode, so no stray pool.
         if (o.type !== 'table') continue;
-        const cx = o.x + o.w / 2, cz = o.y + o.h / 2, r = o.w * 0.85;
+        const cx = o.x + o.w / 2, cz = o.y + o.h / 2, rx = o.w * 0.85, rz = o.h * 0.85;
         pushT(GLM, [
-          [cx - r, 3, cz - r], [cx + r, 3, cz - r], [cx + r, 3, cz + r], [cx - r, 3, cz + r]
+          [cx - rx, 3, cz - rz], [cx + rx, 3, cz - rz], [cx + rx, 3, cz + rz], [cx - rx, 3, cz + rz]
         ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       }
     }

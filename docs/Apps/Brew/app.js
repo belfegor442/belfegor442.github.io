@@ -2,7 +2,7 @@
 // different URLs becomes two module instances (nav state in one, seats in the
 // other). Cache busting lives on ./app.js?v=NN in index.html only.
 import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf } from './src/world.js';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf, eject } from './src/world.js';
 import { Host } from './src/state.js';
 import { Net } from './src/net.js';
 import { Renderer } from './src/render.js';
@@ -169,7 +169,7 @@ function startHost() {
 function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
 
 function onHostReady() {
-  const spawn = SPAWNS[0];
+  const spawn = eject(SPAWNS[0].x, SPAWNS[0].y);
   me = entity({
     id: myUid, name: myName, pid: myPid, seed: mySeed, x: spawn.x, y: spawn.y,
     dir: -Math.PI / 2, anim: 'idle', status: 'standing', seat: null,
@@ -289,7 +289,8 @@ function joinPlayer(msg, uid) {
     return;
   }
   if (authority.count() >= MAX_PLAYERS) { sendTo(uid, { t: 'err', code: 'world-full' }); return; }
-  const spawn = SPAWNS[authority.count() % SPAWNS.length];
+  const sp = SPAWNS[authority.count() % SPAWNS.length];
+  const spawn = eject(sp.x, sp.y);
   const p = authority.addPlayer({
     id: uid, name: msg.name, pid: msg.pid, seed: msg.seed,
     x: spawn.x, y: spawn.y, dir: -Math.PI / 2, balance: msg.balance
@@ -441,6 +442,11 @@ function applyStand(msg) {
   const seat = p.seat ? SEAT_BY_ID.get(p.seat) : null;
   if (seat && seat.occupiedBy === msg.uid) seat.occupiedBy = null;
   p.status = 'standing'; p.seat = null; p.anim = 'idle';
+  // The authority ejects the player off the chair geometry; carry the landing
+  // spot so the client doesn't stay frozen inside the seat collider.
+  if (typeof msg.x === 'number' && typeof msg.y === 'number') {
+    p.x = msg.x; p.y = msg.y; p.rx = msg.x; p.ry = msg.y;
+  }
   refreshHud();
   renderPrompt();
 }

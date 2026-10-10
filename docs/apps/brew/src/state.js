@@ -1,5 +1,5 @@
 import { MAX_PLAYERS, SPEED, RADIUS, MOVE_TOLERANCE, PROX, LIMITS, token } from './protocol.js';
-import { SEATS, SEAT_BY_ID, OBJ_BY_ID, move as collide, seatsAt } from './world.js';
+import { SEATS, SEAT_BY_ID, OBJ_BY_ID, move as collide, seatsAt, eject } from './world.js';
 import { Registry } from './activities.js';
 
 const clampAngle = a => (isFinite(a) ? Math.atan2(Math.sin(a), Math.cos(a)) : 0);
@@ -90,8 +90,13 @@ export class Host {
     if (this.activity && this.activity.players.includes(uid)) return { error: 'in-activity' };
     const s = SEAT_BY_ID.get(p.seat);
     if (s && s.occupiedBy === uid) s.occupiedBy = null;
-    p.seat = null; p.status = 'standing'; p.anim = 'idle'; p.dirty = true;
-    return { ok: this.emit('stand', { uid }) };
+    p.seat = null; p.status = 'standing'; p.anim = 'idle';
+    // The seat sits on a chair (nav-blocked): pop to the nearest open cell so
+    // the player doesn't come up frozen inside the furniture.
+    const e = eject(p.x, p.y);
+    p.x = e.x; p.y = e.y;
+    p.dirty = true;
+    return { ok: this.emit('stand', { uid, x: p.x, y: p.y }) };
   }
 
   emote(uid, key) {

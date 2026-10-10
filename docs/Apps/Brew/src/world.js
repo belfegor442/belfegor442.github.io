@@ -1,4 +1,4 @@
-export const MAP = { w: 2472, h: 1180, wall: 36 };
+export const MAP = { w: 2472, h: 1450, wall: 36 };
 
 export const OBJECTS = [
   { id: 'w-n', type: 'wall', x: 0, y: 0, w: MAP.w, h: MAP.wall, solid: true, hgt: 54 },
@@ -40,10 +40,15 @@ export const OBJECTS = [
 // frame now matches the model, so scale the hand-placed x-coordinates by the
 // same factor the GLB scales (MAP.w / 1720) to keep them aligned with it.
 export const KX = MAP.w / 1720;
+// The map got deeper on request (2472x1450); the GLB stretches to fill MAP,
+// so every hand-placed z (and the model-copied felts/stools) scales with
+// MAP.h / 1180 the same way KX handles x. glb objects keep their x untouched.
+export const KZ = MAP.h / 1180;
 for (const o of OBJECTS) {
-  if (o.type === 'wall' || o.glb) continue; // walls span MAP.w; glb objects are already in world coords
-  o.x *= KX;
-  o.w *= KX;
+  if (o.type === 'wall') continue; // walls span MAP.w / MAP.h via MAP constants
+  if (!o.glb) { o.x *= KX; o.w *= KX; }
+  o.y *= KZ;
+  o.h *= KZ;
 }
 
 const TABLES = OBJECTS.filter(o => o.type === 'table');
@@ -73,7 +78,8 @@ export const SEATS = (() => {
     const spots = STOOLS[t.id] || [];
     const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
     spots.forEach((sp, i) => {
-      list.push(seat(t.id + '-' + i, t.id, sp[0], sp[1], facing({ x: sp[0], y: sp[1] }, { x: cx, y: cy })));
+      const sy = sp[1] * KZ;
+      list.push(seat(t.id + '-' + i, t.id, sp[0], sy, facing({ x: sp[0], y: sy }, { x: cx, y: cy })));
     });
   }
   return list;
@@ -85,7 +91,7 @@ export const SPAWNS = [
   { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
   { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
 ];
-for (const s of SPAWNS) s.x *= KX;
+for (const s of SPAWNS) { s.x *= KX; s.y *= KZ; }
 
 const SOLIDS = OBJECTS.filter(o => o.solid);
 export const SEAT_BY_ID = new Map(SEATS.map(s => [s.id, s]));
@@ -179,6 +185,25 @@ export function move(x, y, nx, ny, r = 14) {
     }
   }
   return { x: px, y: py };
+}
+// Model furniture covers most seat anchors and two of the hand spawns, so a
+// player placed there comes up stuck inside a chair. Spiral out to the nearest
+// walkable cell; no-op when the spot is already open (or nav isn't live yet).
+export function eject(x, y, r = 14) {
+  if (!blocked(x, y, r)) return { x, y };
+  const c = nav ? nav.cell : 16;
+  const minX = MAP.wall + r, maxX = MAP.w - MAP.wall - r;
+  const minY = MAP.wall + r, maxY = MAP.h - MAP.wall - r;
+  for (let ring = 1; ring <= 14; ring++) {
+    const rad = ring * c;
+    for (let a = 0; a < 24; a++) {
+      const th = a * Math.PI / 12;
+      const px = x + Math.cos(th) * rad, py = y + Math.sin(th) * rad;
+      if (px < minX || px > maxX || py < minY || py > maxY) continue;
+      if (!blocked(px, py, r)) return { x: px, y: py };
+    }
+  }
+  return { x, y };
 }
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
