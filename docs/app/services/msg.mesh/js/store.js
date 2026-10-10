@@ -2,6 +2,7 @@ import { api } from "./api.js";
 
 export const state = {
   user: null,            // {user_id, username, display_name, status, ...}
+  profile: { status: "", about: "", avatar: "" }, // native profile.* (display name stays server-side)
   selfNode: "",          // "u73"
   conversations: new Map(), // peerId -> {peer, messages:[], hasMore}
   users: new Map(),      // userId -> {user_id, username, display_name, status}
@@ -16,6 +17,33 @@ export const state = {
 };
 
 const listeners = new Map();
+
+const PROFILE_KEY = "msg.mesh.profile";
+
+export function loadProfile() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}") || {};
+    state.profile = {
+      status: typeof p.status === "string" ? p.status : "",
+      about: typeof p.about === "string" ? p.about : "",
+      avatar: typeof p.avatar === "string" ? p.avatar : "",
+    };
+  } catch {
+    state.profile = { status: "", about: "", avatar: "" };
+  }
+  return state.profile;
+}
+
+export function saveProfile(p) {
+  state.profile = {
+    status: String(p.status || ""),
+    about: String(p.about || ""),
+    avatar: String(p.avatar || ""),
+  };
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile)); } catch { /* quota */ }
+}
+
+loadProfile();
 
 export function on(type, fn) {
   if (!listeners.has(type)) listeners.set(type, new Set());

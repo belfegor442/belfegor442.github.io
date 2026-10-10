@@ -99,7 +99,9 @@ export function renderProfile() {
   $("#selfName") && ($("#selfName").textContent = name);
   $("#selfHandle") && ($("#selfHandle").textContent = "@" + (u.username || "?"));
   const pa = $("#profileAvatar");
-  if (pa) pa.textContent = initials(name);
+  if (pa) pa.textContent = (state.profile && state.profile.avatar) || initials(name);
+  const sl = $("#profileStatusLine");
+  if (sl) sl.textContent = state.profile && state.profile.status ? "- " + state.profile.status : "";
 }
 
 export function renderConnection() {

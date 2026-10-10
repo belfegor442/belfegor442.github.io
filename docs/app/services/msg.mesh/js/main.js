@@ -1,5 +1,5 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend } from "./store.js";
+import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
@@ -591,13 +591,36 @@ function peerLabelSafe(peer) {
   return u ? (u.display_name || u.username) : peer;
 }
 
+function selfInitials() {
+  if (state.profile && state.profile.avatar) return state.profile.avatar;
+  const u = state.user;
+  return ui.initials(u ? (u.display_name || u.username) : "");
+}
+
+function sanitizeProfileValue(v, max) {
+  let s = String(v == null ? "" : v).trim().replace(/[\x00-\x1f\x7f]/g, "");
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+function renderProfilePreview() {
+  const u = state.user;
+  if (!u) return;
+  $("#profileAvatar").textContent = selfInitials();
+  $("#profileName").textContent = u.display_name || u.username;
+  $("#profileHandle").textContent = "@" + u.username;
+  const sl = $("#profileStatusLine");
+  if (sl) sl.textContent = state.profile.status ? "- " + state.profile.status : "";
+}
+
 function openProfile() {
   const u = state.user;
   if (!u) return;
-  $("#profileAvatar").textContent = ui.initials(u.display_name || u.username);
-  $("#profileName").textContent = u.display_name || u.username;
-  $("#profileHandle").textContent = "@" + u.username;
+  loadProfile();
+  renderProfilePreview();
   $("#profileDisplayName").value = u.display_name || "";
+  $("#profileStatusText").value = state.profile.status || "";
+  $("#profileAbout").value = state.profile.about || "";
+  $("#profileAvatarField").value = state.profile.avatar || "";
   showErr($("#profileStatus"), "");
   applyServerSettings();
   $("#profileDialog").showModal();
@@ -605,14 +628,17 @@ function openProfile() {
 
 $("#profileForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const name = $("#profileDisplayName").value.trim();
-  if (!name || name.length > 64) { showErr($("#profileStatus"), "Display name must be 1-64 characters."); return; }
+  const name = sanitizeProfileValue($("#profileDisplayName").value, 64);
+  if (!name) { showErr($("#profileStatus"), "Display name must be 1-64 characters."); return; }
+  const status = sanitizeProfileValue($("#profileStatusText").value, 128);
+  const about = sanitizeProfileValue($("#profileAbout").value, 256);
+  const avatar = sanitizeProfileValue($("#profileAvatarField").value, 2);
   try {
     const r = await api.usersUpdate(name);
     state.user = normalizeUser(r.user ? { user: r.user, role: state.user.role, tenant_id: state.user.tenant_id } : r);
+    saveProfile({ status, about, avatar });
     ui.renderProfile();
-    $("#profileName").textContent = state.user.display_name;
-    $("#profileAvatar").textContent = ui.initials(state.user.display_name);
+    renderProfilePreview();
     showErr($("#profileStatus"), "");
     $("#profileDialog").close();
     ui.toast("Profile updated");
