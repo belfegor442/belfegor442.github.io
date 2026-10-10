@@ -79,7 +79,7 @@
 }
 [data-theme="win98"] .win-titlebar{
   height:26px;gap:2px;
-  padding:0 3px;
+  padding:0;
   background:#000080;
   border:3px solid transparent;
   border-image:url("../assets/win98/gui/Window_Header.png") 3 fill / 3px;
@@ -93,7 +93,8 @@
 }
 [data-theme="win98"] .win-title-ico{width:16px;height:16px;margin:0}
 [data-theme="win98"] .win-title{text-shadow:none}
-[data-theme="win98"] .win-caps{gap:0}
+/* native: min_x=w-55, max_x=w-37, close_x=w-19 => 2px gap between all caps */
+[data-theme="win98"] .win-caps{gap:2px}
 [data-theme="win98"] .win-cap{
   width:16px;height:14px;
   border:3px solid transparent;border-radius:0;
@@ -105,7 +106,6 @@
 [data-theme="win98"] .win-cap.close{
   background-image:none;
   border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
-  margin-left:2px;
 }
 [data-theme="win98"] .win-cap:hover{border-image-source:url("../assets/win98/gui/Windows_Button_Focus.png")}
 [data-theme="win98"] .win-cap:active{border-image-source:url("../assets/win98/gui/Windows_Button_Pressed.png")}
