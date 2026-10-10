@@ -1,4 +1,4 @@
-export const MAP = { w: 2472, h: 1450, wall: 36 };
+export const MAP = { w: 2472, h: 1300, wall: 36 };
 
 export const OBJECTS = [
   { id: 'w-n', type: 'wall', x: 0, y: 0, w: MAP.w, h: MAP.wall, solid: true, hgt: 54 },
@@ -40,8 +40,9 @@ export const OBJECTS = [
 // frame now matches the model, so scale the hand-placed x-coordinates by the
 // same factor the GLB scales (MAP.w / 1720) to keep them aligned with it.
 export const KX = MAP.w / 1720;
-// The map got deeper on request (2472x1450); the GLB stretches to fill MAP,
-// so every hand-placed z (and the model-copied felts/stools) scales with
+// The map got deeper on request (2472x1300, a gentle +10% so the stretched
+// GLB doesn't read as squashed); the GLB stretches to fill MAP, so every
+// hand-placed z (and the model-copied felts/stools) scales with
 // MAP.h / 1180 the same way KX handles x. glb objects keep their x untouched.
 export const KZ = MAP.h / 1180;
 for (const o of OBJECTS) {
@@ -188,22 +189,27 @@ export function move(x, y, nx, ny, r = 14) {
 }
 // Model furniture covers most seat anchors and two of the hand spawns, so a
 // player placed there comes up stuck inside a chair. Spiral out to the nearest
-// walkable cell; no-op when the spot is already open (or nav isn't live yet).
+// cell that is not only open but has room to actually step away; no-op when
+// the spot is already open (or nav isn't live yet).
 export function eject(x, y, r = 14) {
   if (!blocked(x, y, r)) return { x, y };
   const c = nav ? nav.cell : 16;
   const minX = MAP.wall + r, maxX = MAP.w - MAP.wall - r;
   const minY = MAP.wall + r, maxY = MAP.h - MAP.wall - r;
+  let first = null;
   for (let ring = 1; ring <= 14; ring++) {
     const rad = ring * c;
     for (let a = 0; a < 24; a++) {
       const th = a * Math.PI / 12;
       const px = x + Math.cos(th) * rad, py = y + Math.sin(th) * rad;
       if (px < minX || px > maxX || py < minY || py > maxY) continue;
-      if (!blocked(px, py, r)) return { x: px, y: py };
+      if (blocked(px, py, r)) continue;
+      if (!first) first = { x: px, y: py };
+      if (!blocked(px + 24, py, r) || !blocked(px - 24, py, r) ||
+          !blocked(px, py + 24, r) || !blocked(px, py - 24, r)) return { x: px, y: py };
     }
   }
-  return { x, y };
+  return first || { x, y };
 }
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
