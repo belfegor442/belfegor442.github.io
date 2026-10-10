@@ -606,6 +606,13 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 .details-body>p{margin:2px 0 16px;font-size:11px;color:var(--xp-dim)}
 .details-body>p.details-peer-status{margin:2px 0 12px;font-style:italic;color:#333}
 #detailsAboutRow strong{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* voice call dialog (WebRTC audio; XP frame) */
+.call-body{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:300px}
+.call-avatar{width:64px;height:64px;margin:4px auto 8px;background:linear-gradient(180deg,#0c3091,#2359b7);color:#fff;font-weight:700;font-size:22px;display:grid;place-items:center;border:1px solid var(--xp-border)}
+.call-status{margin:8px 0 2px;font-size:12px;font-weight:700;text-align:center}
+.call-timer{margin:0 0 8px;font-size:12px;font-family:Consolas,"Courier New",monospace}
+.call-body audio{display:none}
 .detail-row{
   border-top:1px solid var(--xp-border);
   padding:10px 0;text-align:left;

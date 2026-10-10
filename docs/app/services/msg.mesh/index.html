@@ -134,6 +134,7 @@
           <small class="conv-status" id="chatMeta">…</small>
         </div>
         <div class="conv-tools">
+          <button class="icon-btn" id="chatCallBtn" title="Call"><img src="./assets/xp/icons/TB Call.png" alt="" width="16" height="16" draggable="false"></button>
           <button class="icon-btn" id="chatSearchBtn" title="Search"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16" draggable="false"></button>
           <button class="icon-btn" id="chatInfoBtn" title="Details"><img src="./assets/xp/icons/Information.png" alt="" width="16" height="16" draggable="false"></button>
         </div>
@@ -262,6 +263,28 @@
       <button type="button" class="xp-btn gray" id="logoutBtn">Sign Out</button>
       <p class="error" id="profileStatus"></p>
     </form>
+  </div>
+</dialog>
+
+<!-- Voice call dialog (XP frame; WebRTC audio, signaling over the WS relay) -->
+<dialog id="callDialog">
+  <div class="win-frame dlg-frame call-frame">
+    <div class="win-titlebar"><span class="win-title" id="callTitle">Windows Voice Call</span><button class="win-cap close" id="callClose" aria-label="Close"></button></div>
+    <div class="dlg-body call-body">
+      <div class="conv-avatar call-avatar" id="callAvatar">?</div>
+      <strong id="callPeerName">…</strong>
+      <small class="hint" id="callPeerHandle">@…</small>
+      <p class="call-status" id="callStatus">Idle</p>
+      <p class="call-timer hidden" id="callTimer">00:00</p>
+      <audio id="callRemoteAudio" autoplay></audio>
+      <div class="dlg-actions">
+        <button class="xp-btn primary hidden" id="callAcceptBtn" type="button">Accept</button>
+        <button class="xp-btn gray hidden" id="callDeclineBtn" type="button">Decline</button>
+        <button class="xp-btn gray hidden" id="callMuteBtn" type="button">Mute</button>
+        <button class="xp-btn gray hidden" id="callCancelBtn" type="button">Cancel</button>
+        <button class="xp-btn primary hidden" id="callHangupBtn" type="button">Hang Up</button>
+      </div>
+    </div>
   </div>
 </dialog>
 

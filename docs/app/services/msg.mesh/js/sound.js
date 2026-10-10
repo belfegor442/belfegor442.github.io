@@ -10,6 +10,7 @@ const FILES = {
   menu: "menu.wav",
   error: "error.wav",
   notification: "notification.wav",
+  call: "call.wav", // native assets/themes/WinXP/Sounds/call.wav
 };
 
 const BASE = new URL("../assets/xp/sounds/", import.meta.url);
@@ -45,4 +46,28 @@ export function playSound(name) {
     const p = a.play();
     if (p && typeof p.catch === "function") p.catch(() => { /* autoplay blocked */ });
   } catch { /* audio unavailable */ }
+}
+
+// Ringing loop for calls (native call.wav): loops until stopRing(). Both the
+// caller ringback and the callee ring-in use it; autoplay may be blocked
+// before a gesture, the visible call dialog is the real signal either way.
+let ringing = false;
+export function startRing() {
+  if (ringing) return;
+  const a = get("call");
+  if (!a) return;
+  ringing = true;
+  try {
+    a.loop = true;
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && typeof p.catch === "function") p.catch(() => { /* autoplay blocked */ });
+  } catch { /* audio unavailable */ }
+}
+export function stopRing() {
+  if (!ringing) return;
+  ringing = false;
+  const a = get("call");
+  if (!a) return;
+  try { a.pause(); a.currentTime = 0; } catch { /* audio unavailable */ }
 }

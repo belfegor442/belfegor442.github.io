@@ -155,6 +155,9 @@ export function connect() {
         emit("conversations");
         emit("messages", { peer: c[0], item: data });
       }
+    } else if (event === "call.signal" && data) {
+      // Voice call signaling relayed by the server (invite/SDP/ICE/end).
+      emit("call", data);
     } else if (event === "read.state" && data) {
       const reader = data.reader_node_id;
       const other = reader === state.selfNode ? data.peer_node_id : reader;
@@ -243,4 +246,14 @@ export function forceReconnect() {
 
 export function isOpen() {
   return !!socket && socket.readyState === WebSocket.OPEN;
+}
+
+// Raw frame out (call signaling uses this; ping/HTTP paths keep their own).
+export function sendFrame(obj) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+  try {
+    socket.send(JSON.stringify(obj));
+    return true;
+  } catch { /* onclose follows */ }
+  return false;
 }

@@ -5,6 +5,7 @@ import { requestNotificationPermission, notifyIncoming } from "./notifications.j
 import * as ui from "./ui.js";
 import { playSound, primeSound } from "./sound.js";
 import { setTheme } from "./theme.js";
+import * as Call from "./call.js";
 
 const $ = ui.$;
 const esc = ui.esc;
@@ -156,6 +157,7 @@ let booted = false;
 
 function handleSessionLost() {
   if (!getToken()) return;
+  if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   setToken("");
   wsDisconnect();
   resetState();
@@ -187,7 +189,7 @@ async function startSession() {
   await initialLoad();
   wsConnect();
   booted = true;
-  ["message", "click", "menu", "error", "notification"].forEach(primeSound);
+  ["message", "click", "menu", "error", "notification", "call"].forEach(primeSound);
   if (!location.hash || location.hash === "#/") location.hash = "#/";
   route();
   syncInactive();
@@ -258,6 +260,7 @@ function emitFriends() {
 
 async function logout() {
   primeSound("logoff");
+  if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   try { await api.logout(); } catch { /* session may already be gone */ }
   setToken("");
   wsDisconnect();
@@ -556,7 +559,7 @@ function wireDialogClose(sel) {
     });
   });
 }
-wireDialogClose("dialog .win-cap.close");
+wireDialogClose("dialog .win-cap.close:not(#callClose)"); // call✕ routes through dismissCall()
 
 function openNewChat() {
   showErr($("#newChatStatus"), "");
@@ -883,6 +886,99 @@ $("#chatInfoBtn").addEventListener("click", () => $("#details").classList.toggle
 $("#closeDetails").addEventListener("click", () => $("#details").classList.add("hidden"));
 $("#sendBtn").addEventListener("click", () => sendMessage());
 $("#loadOlder").addEventListener("click", loadOlder);
+
+/* ---------------- voice calls (WebRTC + WS signaling relay) ---------------- */
+
+function renderCallState(st) {
+  const dlg = $("#callDialog");
+  if (!dlg) return;
+  if (st.phase === "idle") {
+    if (dlg.open) dlg.close();
+    return;
+  }
+  if (!dlg.open) dlg.showModal();
+  const u = st.peer ? peerUser(st.peer) : null;
+  const name = u ? (u.display_name || u.username) : (st.peer || "");
+  const pn = $("#callPeerName");
+  if (pn) pn.textContent = name;
+  const ph = $("#callPeerHandle");
+  if (ph) ph.textContent = u ? "@" + u.username : "";
+  const av = $("#callAvatar");
+  if (av) av.textContent = u && u.profile && u.profile.avatar ? u.profile.avatar : (name ? name.slice(0, 2).toUpperCase() : "?");
+  const btns = {
+    accept: $("#callAcceptBtn"),
+    decline: $("#callDeclineBtn"),
+    mute: $("#callMuteBtn"),
+    cancel: $("#callCancelBtn"),
+    hangup: $("#callHangupBtn"),
+  };
+  for (const b of Object.values(btns)) if (b) b.classList.add("hidden");
+  const status = $("#callStatus");
+  const timer = $("#callTimer");
+  if (st.phase === "ringing-in") {
+    if (status) status.textContent = "Incoming call…";
+    if (btns.accept) btns.accept.classList.remove("hidden");
+    if (btns.decline) btns.decline.classList.remove("hidden");
+    if (timer) timer.classList.add("hidden");
+  } else if (st.phase === "ringing-out") {
+    if (status) status.textContent = "Ringing…";
+    if (btns.cancel) btns.cancel.classList.remove("hidden");
+    if (timer) timer.classList.add("hidden");
+  } else if (st.phase === "connecting") {
+    if (status) status.textContent = "Connecting…";
+    if (btns.mute) btns.mute.classList.remove("hidden");
+    if (btns.hangup) btns.hangup.classList.remove("hidden");
+    if (timer) timer.classList.add("hidden");
+  } else if (st.phase === "in-call") {
+    const secs = Math.max(0, Math.floor((Date.now() - st.startedAt) / 1000));
+    if (status) status.textContent = st.muted ? "In call (muted)" : "In call";
+    if (timer) {
+      timer.textContent = String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
+      timer.classList.remove("hidden");
+    }
+    if (btns.mute) {
+      btns.mute.textContent = st.muted ? "Unmute" : "Mute";
+      btns.mute.classList.remove("hidden");
+    }
+    if (btns.hangup) btns.hangup.classList.remove("hidden");
+  }
+  const audio = $("#callRemoteAudio");
+  if (audio) {
+    if (st.remoteStream && audio.srcObject !== st.remoteStream) audio.srcObject = st.remoteStream;
+    else if (!st.remoteStream && audio.srcObject) audio.srcObject = null;
+  }
+}
+
+$("#chatCallBtn")?.addEventListener("click", async () => {
+  const peer = state.activePeer;
+  if (!peer) {
+    ui.toast("Open a conversation first", true);
+    return;
+  }
+  const r = await Call.startCall(peer);
+  if (!r.ok) ui.toast("Call failed: " + r.error, true);
+});
+$("#callAcceptBtn")?.addEventListener("click", () => {
+  Call.acceptCall().then((r) => {
+    if (!r.ok && r.error) ui.toast("Call failed: " + r.error, true);
+  });
+});
+$("#callDeclineBtn")?.addEventListener("click", () => Call.declineCall());
+$("#callCancelBtn")?.addEventListener("click", () => Call.cancelCall());
+$("#callHangupBtn")?.addEventListener("click", () => Call.endCall());
+$("#callMuteBtn")?.addEventListener("click", () => Call.toggleMute());
+$("#callClose")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  Call.dismissCall();
+});
+$("#callDialog")?.addEventListener("cancel", (e) => {
+  e.preventDefault(); // ESC routes to the phase-correct teardown
+  Call.dismissCall();
+});
+
+on("callstate", renderCallState);
+on("callinvite", () => renderCallState(Call.callState()));
+on("callnotice", (msg) => ui.toast(msg));
 
 // Composer: Enter sends, Shift+Enter newline; auto-grow via rows (CSP-safe).
 const msgInput = $("#messageInput");
