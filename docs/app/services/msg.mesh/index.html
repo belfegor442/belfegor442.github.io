@@ -135,6 +135,7 @@
         </div>
         <div class="conv-tools">
           <button class="icon-btn" id="chatCallBtn" title="Call"><img src="./assets/xp/icons/TB Call.png" alt="" width="16" height="16" draggable="false"></button>
+          <button class="icon-btn" id="chatVideoBtn" title="Video Call"><img src="./assets/xp/icons/TB Video.png" alt="" width="16" height="16" draggable="false"></button>
           <button class="icon-btn" id="chatSearchBtn" title="Search"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16" draggable="false"></button>
           <button class="icon-btn" id="chatInfoBtn" title="Details"><img src="./assets/xp/icons/Information.png" alt="" width="16" height="16" draggable="false"></button>
         </div>
@@ -266,11 +267,15 @@
   </div>
 </dialog>
 
-<!-- Voice call dialog (XP frame; WebRTC audio, signaling over the WS relay) -->
+<!-- Voice/video call dialog (XP frame; WebRTC media, signaling over the WS relay) -->
 <dialog id="callDialog">
   <div class="win-frame dlg-frame call-frame">
-    <div class="win-titlebar"><span class="win-title" id="callTitle">Windows Voice Call</span><button class="win-cap close" id="callClose" aria-label="Close"></button></div>
+    <div class="win-titlebar"><span class="win-title" id="callTitle">Windows Call</span><button class="win-cap close" id="callClose" aria-label="Close"></button></div>
     <div class="dlg-body call-body">
+      <div class="call-video-stage hidden" id="callVideoStage">
+        <video id="callRemoteVideo" autoplay playsinline></video>
+        <video id="callLocalVideo" autoplay muted playsinline></video>
+      </div>
       <div class="conv-avatar call-avatar" id="callAvatar">?</div>
       <strong id="callPeerName">…</strong>
       <small class="hint" id="callPeerHandle">@…</small>
@@ -281,6 +286,7 @@
         <button class="xp-btn primary hidden" id="callAcceptBtn" type="button">Accept</button>
         <button class="xp-btn gray hidden" id="callDeclineBtn" type="button">Decline</button>
         <button class="xp-btn gray hidden" id="callMuteBtn" type="button">Mute</button>
+        <button class="xp-btn gray hidden" id="callCameraBtn" type="button">Camera Off</button>
         <button class="xp-btn gray hidden" id="callCancelBtn" type="button">Cancel</button>
         <button class="xp-btn primary hidden" id="callHangupBtn" type="button">Hang Up</button>
       </div>

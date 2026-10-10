@@ -899,6 +899,8 @@ function renderCallState(st) {
   if (!dlg.open) dlg.showModal();
   const u = st.peer ? peerUser(st.peer) : null;
   const name = u ? (u.display_name || u.username) : (st.peer || "");
+  const title = $("#callTitle");
+  if (title) title.textContent = st.media === "video" ? "Windows Video Call" : "Windows Voice Call";
   const pn = $("#callPeerName");
   if (pn) pn.textContent = name;
   const ph = $("#callPeerHandle");
@@ -909,29 +911,44 @@ function renderCallState(st) {
     accept: $("#callAcceptBtn"),
     decline: $("#callDeclineBtn"),
     mute: $("#callMuteBtn"),
+    camera: $("#callCameraBtn"),
     cancel: $("#callCancelBtn"),
     hangup: $("#callHangupBtn"),
   };
   for (const b of Object.values(btns)) if (b) b.classList.add("hidden");
   const status = $("#callStatus");
   const timer = $("#callTimer");
+  const live = st.phase === "in-call" || st.phase === "connecting";
+  const videoLive = live && st.media === "video";
+  // video stage: show for video calls once media exists (not while ringing)
+  const stage = $("#callVideoStage");
+  if (stage) stage.classList.toggle("hidden", !videoLive);
+  // avatar: hide while the video stage is visible
+  if (av) av.classList.toggle("hidden", videoLive);
   if (st.phase === "ringing-in") {
-    if (status) status.textContent = "Incoming call…";
+    if (status) status.textContent = st.media === "video" ? "Incoming video call…" : "Incoming call…";
     if (btns.accept) btns.accept.classList.remove("hidden");
     if (btns.decline) btns.decline.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "ringing-out") {
-    if (status) status.textContent = "Ringing…";
+    if (status) status.textContent = st.media === "video" ? "Ringing (video)…" : "Ringing…";
     if (btns.cancel) btns.cancel.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "connecting") {
-    if (status) status.textContent = "Connecting…";
+    if (status) status.textContent = st.media === "video" ? "Connecting video…" : "Connecting…";
     if (btns.mute) btns.mute.classList.remove("hidden");
+    if (videoLive && btns.camera) btns.camera.classList.remove("hidden");
     if (btns.hangup) btns.hangup.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "in-call") {
     const secs = Math.max(0, Math.floor((Date.now() - st.startedAt) / 1000));
-    if (status) status.textContent = st.muted ? "In call (muted)" : "In call";
+    if (status) {
+      const bits = [];
+      bits.push(st.media === "video" ? "Video call" : "In call");
+      if (st.muted) bits.push("muted");
+      if (st.cameraOff) bits.push("camera off");
+      status.textContent = bits.join(" — ");
+    }
     if (timer) {
       timer.textContent = String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
       timer.classList.remove("hidden");
@@ -940,24 +957,41 @@ function renderCallState(st) {
       btns.mute.textContent = st.muted ? "Unmute" : "Mute";
       btns.mute.classList.remove("hidden");
     }
+    if (videoLive && btns.camera) {
+      btns.camera.textContent = st.cameraOff ? "Camera On" : "Camera Off";
+      btns.camera.classList.remove("hidden");
+    }
     if (btns.hangup) btns.hangup.classList.remove("hidden");
   }
+  // media elements: audio always (video calls also carry audio); video when live
   const audio = $("#callRemoteAudio");
   if (audio) {
-    if (st.remoteStream && audio.srcObject !== st.remoteStream) audio.srcObject = st.remoteStream;
-    else if (!st.remoteStream && audio.srcObject) audio.srcObject = null;
+    if (st.remoteStream && st.media !== "video" && audio.srcObject !== st.remoteStream) audio.srcObject = st.remoteStream;
+    else if ((!st.remoteStream || st.media === "video") && audio.srcObject) audio.srcObject = null;
+  }
+  const rv = $("#callRemoteVideo");
+  if (rv) {
+    if (videoLive && st.remoteStream && rv.srcObject !== st.remoteStream) rv.srcObject = st.remoteStream;
+    else if (!videoLive && rv.srcObject) rv.srcObject = null;
+  }
+  const lv = $("#callLocalVideo");
+  if (lv) {
+    if (videoLive && st.localStream && lv.srcObject !== st.localStream) lv.srcObject = st.localStream;
+    else if (!videoLive && lv.srcObject) lv.srcObject = null;
   }
 }
 
-$("#chatCallBtn")?.addEventListener("click", async () => {
+async function startCallUI(kind) {
   const peer = state.activePeer;
   if (!peer) {
     ui.toast("Open a conversation first", true);
     return;
   }
-  const r = await Call.startCall(peer);
+  const r = await Call.startCall(peer, kind);
   if (!r.ok) ui.toast("Call failed: " + r.error, true);
-});
+}
+$("#chatCallBtn")?.addEventListener("click", () => startCallUI("audio"));
+$("#chatVideoBtn")?.addEventListener("click", () => startCallUI("video"));
 $("#callAcceptBtn")?.addEventListener("click", () => {
   Call.acceptCall().then((r) => {
     if (!r.ok && r.error) ui.toast("Call failed: " + r.error, true);
@@ -967,6 +1001,7 @@ $("#callDeclineBtn")?.addEventListener("click", () => Call.declineCall());
 $("#callCancelBtn")?.addEventListener("click", () => Call.cancelCall());
 $("#callHangupBtn")?.addEventListener("click", () => Call.endCall());
 $("#callMuteBtn")?.addEventListener("click", () => Call.toggleMute());
+$("#callCameraBtn")?.addEventListener("click", () => Call.toggleCamera());
 $("#callClose")?.addEventListener("click", (e) => {
   e.preventDefault();
   Call.dismissCall();

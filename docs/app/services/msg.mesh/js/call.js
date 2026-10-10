@@ -1,8 +1,9 @@
-/* Voice calls: WebRTC audio, P2P. The server only relays signaling frames
-   (invite/accept/decline/end + SDP/ICE) over the authenticated WebSocket —
-   voice itself never touches the server, matching the native mesh model
-   (CALL <peer> — LAN voice, PacketType::PeerVoiceFrame reserved P2P).
-   One active call at a time; the state machine drives the XP call dialog. */
+/* Voice/video calls: WebRTC audio (+ video when requested), P2P. The server
+   only relays signaling frames (invite/accept/decline/end + SDP/ICE) over the
+   authenticated WebSocket — media itself never touches the server, matching
+   the native mesh model (CALL <peer> — LAN voice, PacketType::PeerVoiceFrame
+   reserved P2P). The invite carries media:"audio"|"video" so the callee knows
+   whether to open the camera before Accept. One active call at a time. */
 import { state, on, emit } from "./store.js";
 import { sendFrame } from "./ws.js";
 import { startRing, stopRing, playSound } from "./sound.js";
@@ -14,17 +15,19 @@ let callId = null;
 let peer = null;
 let role = null;          // "caller" | "callee"
 let phase = "idle";       // idle | ringing-out | ringing-in | connecting | in-call
+let media = "audio";      // "audio" | "video" (decided at invite time)
 let pc = null;
 let localStream = null;
 let remoteStream = null;
 let muted = false;
+let cameraOff = false;
 let startedAt = 0;
 let ringTimer = null;
 let tickTimer = null;
 let pendingCandidates = [];
 
 export function callState() {
-  return { phase, peer, callId, role, muted, startedAt, remoteStream };
+  return { phase, peer, callId, role, media, muted, cameraOff, startedAt, localStream, remoteStream };
 }
 export function isCallActive() { return phase !== "idle"; }
 export function activePeer() { return peer; }
@@ -67,7 +70,9 @@ function reset() {
   callId = null;
   peer = null;
   role = null;
+  media = "audio";
   muted = false;
+  cameraOff = false;
   startedAt = 0;
   setPhase("idle");
 }
@@ -112,27 +117,34 @@ function flushCandidates() {
     pc.addIceCandidate(c).catch(() => { /* late/duplicate candidate */ });
   }
 }
-async function getMic() {
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+async function getMedia(kind) {
+  const wantVideo = kind === "video";
+  localStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: wantVideo ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } : false,
+  });
   return localStream;
 }
 
-export async function startCall(target) {
+export async function startCall(target, kind) {
   if (phase !== "idle") return { ok: false, error: "another call is already active" };
   if (!target || target === state.selfNode) return { ok: false, error: "invalid call target" };
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return { ok: false, error: "microphone unavailable in this browser" };
+    return { ok: false, error: "camera/microphone unavailable in this browser" };
   }
+  media = kind === "video" ? "video" : "audio";
   try {
-    await getMic();
+    await getMedia(media);
   } catch {
-    return { ok: false, error: "microphone access denied" };
+    reset();
+    return { ok: false, error: media === "video" ? "camera/microphone access denied" : "microphone access denied" };
   }
   peer = target;
   role = "caller";
   callId = newCallId();
   muted = false;
-  if (!sendSignal({ action: "invite", call_id: callId, to: peer })) {
+  cameraOff = false;
+  if (!sendSignal({ action: "invite", call_id: callId, to: peer, media })) {
     reset();
     return { ok: false, error: "not connected to the server" };
   }
@@ -145,17 +157,17 @@ export async function startCall(target) {
 export async function acceptCall() {
   if (phase !== "ringing-in" || !callId || !peer) return { ok: false };
   try {
-    await getMic();
+    await getMedia(media);
   } catch {
     sendSignal({ action: "decline", call_id: callId, to: peer });
     reset();
-    emit("callnotice", "microphone access denied");
-    return { ok: false, error: "microphone access denied" };
+    emit("callnotice", "camera/microphone access denied");
+    return { ok: false, error: "camera/microphone access denied" };
   }
   stopRing();
   clearRingTimer();
   pc = makePc();
-  for (const t of localStream.getAudioTracks()) pc.addTrack(t, localStream);
+  for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
   sendSignal({ action: "accept", call_id: callId, to: peer });
   setPhase("connecting");
   return { ok: true };
@@ -193,6 +205,14 @@ export function toggleMute() {
   return muted;
 }
 
+export function toggleCamera() {
+  if (media !== "video" || !localStream || (phase !== "in-call" && phase !== "connecting")) return cameraOff;
+  cameraOff = !cameraOff;
+  for (const t of localStream.getVideoTracks()) t.enabled = !cameraOff;
+  emit("callstate", callState());
+  return cameraOff;
+}
+
 // Closing the dialog routes to the right teardown for the current phase.
 export function dismissCall() {
   if (phase === "ringing-in") declineCall();
@@ -213,7 +233,9 @@ function onSignal(d) {
     peer = d.from;
     callId = d.call_id;
     role = "callee";
+    media = d.media === "video" ? "video" : "audio";
     muted = false;
+    cameraOff = false;
     setPhase("ringing-in");
     startRing();
     ringTimer = setTimeout(() => {
@@ -235,7 +257,7 @@ function onSignal(d) {
     setPhase("connecting");
     if (!pc) {
       pc = makePc();
-      if (localStream) for (const t of localStream.getAudioTracks()) pc.addTrack(t, localStream);
+      if (localStream) for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
     }
     pc.createOffer()
       .then((offer) => pc.setLocalDescription(offer))
