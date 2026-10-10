@@ -10,14 +10,20 @@ export const OBJECTS = [
   { id: 'rug', type: 'rug', x: 360, y: 330, w: 1000, h: 520, solid: false, hgt: 0 },
   { id: 'neon', type: 'sign', x: 640, y: 6, w: 430, h: 34, solid: false, hgt: 64, label: 'BREW' },
 
-  { id: 'bar', type: 'bar', x: 1190, y: 74, w: 240, h: 80, solid: true, hgt: 48 },
+  // Narrowed so the fallback bar never intersects felt t4 (x from 1908).
+  { id: 'bar', type: 'bar', x: 1190, y: 74, w: 120, h: 80, solid: true, hgt: 48 },
   { id: 'shelf', type: 'shelf', x: 1210, y: 54, w: 240, h: 30, solid: false, hgt: 74 },
 
-  { id: 't1', type: 'table', kind: 'poker', x: 80, y: 180, w: 160, h: 142, solid: true, hgt: 40 },
-  { id: 't2', type: 'table', kind: 'poker', x: 1150, y: 516, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't3', type: 'table', kind: 'poker', x: 80, y: 690, w: 160, h: 142, solid: true, hgt: 40 },
-  { id: 't4', type: 'table', kind: 'poker', x: 965, y: 750, w: 204, h: 142, solid: true, hgt: 40 },
-  { id: 't5', type: 'table', kind: 'poker', x: 80, y: 420, w: 160, h: 170, solid: true, hgt: 42 },
+  // Gameplay tables ARE the lobby.glb furniture: bounds copied from the
+  // model's six poker felts and its roulette counter (glb = model-world
+  // coords, exempt from the KX pass below).
+  { id: 't1', type: 'table', kind: 'poker', x: 1564, y: 111, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 't2', type: 'table', kind: 'poker', x: 1564, y: 484, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 't3', type: 'table', kind: 'poker', x: 1564, y: 857, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 't4', type: 'table', kind: 'poker', x: 1908, y: 111, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 't5', type: 'table', kind: 'poker', x: 1908, y: 484, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 't6', type: 'table', kind: 'poker', x: 1908, y: 857, w: 121, h: 211, solid: true, hgt: 32, glb: true },
+  { id: 'rt', type: 'table', kind: 'roulette', x: 1182, y: 476, w: 109, h: 226, solid: true, hgt: 36, glb: true },
 
   { id: 'plant-1', type: 'plant', x: 74, y: 96, w: 74, h: 74, solid: true, hgt: 62 },
   { id: 'plant-2', type: 'plant', x: 1560, y: 1010, w: 74, h: 74, solid: true, hgt: 62 },
@@ -35,13 +41,12 @@ export const OBJECTS = [
 // same factor the GLB scales (MAP.w / 1720) to keep them aligned with it.
 export const KX = MAP.w / 1720;
 for (const o of OBJECTS) {
-  if (o.type === 'wall') continue; // walls already span MAP.w
+  if (o.type === 'wall' || o.glb) continue; // walls span MAP.w; glb objects are already in world coords
   o.x *= KX;
   o.w *= KX;
 }
 
 const TABLES = OBJECTS.filter(o => o.type === 'table');
-const BAR_STOOLS = 4;
 
 function facing(from, to) { return Math.atan2(to.y - from.y, to.x - from.x); }
 
@@ -49,21 +54,27 @@ function seat(id, table, x, y, dir) {
   return { id, table, x, y, dir, occupiedBy: null };
 }
 
+// Seat anchors are the lobby.glb stools themselves: seven chairs ring each
+// poker felt, six spots ring the roulette counter. Measured from the model
+// (islands.json), model-world coords, facing the table centre.
+const STOOLS = {
+  t1: [[1527, 216], [1543, 285], [1543, 147], [1590, 338], [1590, 94], [1657, 358], [1657, 74]],
+  t2: [[1527, 589], [1543, 658], [1543, 521], [1590, 711], [1590, 467], [1657, 731], [1657, 447]],
+  t3: [[1527, 962], [1543, 1031], [1543, 894], [1590, 1084], [1590, 841], [1657, 1105], [1657, 820]],
+  t4: [[2065, 216], [2050, 285], [2050, 147], [2003, 338], [2003, 94], [1936, 358], [1936, 74]],
+  t5: [[2065, 589], [2050, 658], [2050, 521], [2003, 711], [2003, 467], [1936, 731], [1936, 447]],
+  t6: [[2065, 962], [2050, 1031], [2050, 894], [2003, 1084], [2003, 841], [1936, 1105], [1936, 820]],
+  rt: [[1200, 446], [1272, 446], [1200, 732], [1272, 732], [1152, 589], [1321, 589]]
+};
+
 export const SEATS = (() => {
   const list = [];
   for (const t of TABLES) {
+    const spots = STOOLS[t.id] || [];
     const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
-    list.push(seat(t.id + '-n', t.id, cx, t.y - 30, facing({ x: cx, y: t.y - 30 }, { x: cx, y: cy })));
-    list.push(seat(t.id + '-s', t.id, cx, t.y + t.h + 30, facing({ x: cx, y: t.y + t.h + 30 }, { x: cx, y: cy })));
-    const pad = 30 * KX;
-    list.push(seat(t.id + '-w', t.id, t.x - pad, cy, facing({ x: t.x - pad, y: cy }, { x: cx, y: cy })));
-    list.push(seat(t.id + '-e', t.id, t.x + t.w + pad, cy, facing({ x: t.x + t.w + pad, y: cy }, { x: cx, y: cy })));
-  }
-  const bar = OBJECTS.find(o => o.id === 'bar');
-  for (let i = 0; i < BAR_STOOLS; i++) {
-    const x = bar.x + (40 + i * 56) * KX;
-    const y = bar.y + bar.h + 34;
-    list.push(seat('bar-' + i, null, x, y, facing({ x, y }, { x, y: bar.y + bar.h })));
+    spots.forEach((sp, i) => {
+      list.push(seat(t.id + '-' + i, t.id, sp[0], sp[1], facing({ x: sp[0], y: sp[1] }, { x: cx, y: cy })));
+    });
   }
   return list;
 })();
@@ -122,7 +133,13 @@ function navBlockedAt(x, y, r) {
 
 export function blocked(x, y, r = 14) {
   if (navBlockedAt(x, y, r)) return true;
-  for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
+  // The rectangle solids describe the procedural scene. When the model's nav
+  // grid is live it already rasterises every piece of lobby.glb furniture, so
+  // the rects are skipped — they used to be phantom boxes that matched the
+  // old hand-placed props instead of the actual model.
+  if (!nav) {
+    for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
+  }
   return false;
 }
 export function move(x, y, nx, ny, r = 14) {

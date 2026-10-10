@@ -222,9 +222,9 @@ export class Renderer {
     wg.fillRect(0, 0, 1, 1);
     this.texWhite = this.uploadTexture(wc);
 
-    const back = newMesh(), shell = newMesh(), props = newMesh(), lever = newMesh(), ring = newMesh();
+    const back = newMesh(), shell = newMesh(), props = newMesh(), sw = newMesh(), lever = newMesh(), ring = newMesh();
     const floorT = newTMesh(), signT = newTMesh(), apronT = newTMesh();
-    this.buildWorld(back, shell, props, lever, floorT, signT);
+    this.buildWorld(back, shell, props, sw, lever, floorT, signT);
     pushRing(ring, 0, 0, 0, 11.5, 15, C('#e9c877'), 24);
     // Dark apron around the building so the orbit camera never stares into
     // raw clear color past the walls. Plain wood (no room decals), matching
@@ -237,6 +237,7 @@ export class Renderer {
     this.gpuBack = this.uploadMesh(back, gl.STATIC_DRAW);
     this.gpuShell = this.uploadMesh(shell, gl.STATIC_DRAW);
     this.gpuWorld = this.uploadMesh(props, gl.STATIC_DRAW);
+    this.gpuSw = this.uploadMesh(sw, gl.STATIC_DRAW);
     this.gpuLever = this.uploadMesh(lever, gl.STATIC_DRAW);
     this.gpuRing = this.uploadMesh(ring, gl.STATIC_DRAW);
     this.gpuFloor = this.uploadTexMesh(floorT, gl.STATIC_DRAW);
@@ -479,8 +480,10 @@ export class Renderer {
 
   // back   - dark backdrop plane, drawn under the imported lobby too
   // shell  - procedural rug + perimeter walls, fallback scene only
-  // M      - gameplay props (tables, bar, seats, ...), drawn in both scenes
-  buildWorld(back, shell, M, lever, floorT, signT) {
+  // M      - gameplay props (tables, seats, bar, ...), fallback scene only;
+  //          the model already provides all of that furniture
+  // sw     - light switch box, drawn in both scenes (gameplay interactable)
+  buildWorld(back, shell, M, sw, lever, floorT, signT) {
     const wallC = C('#453424');
     pushQuadLit(back, [
       [-2200, -1.5, -2200], [MAP.w + 2200, -1.5, -2200],
@@ -530,7 +533,7 @@ export class Renderer {
           ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
           break;
         case 'switch':
-          pushBox(M, o.x + KX, 36, cz, 22 * KX, 44, o.h, C('#d8d2c4'));
+          pushBox(sw, o.x + KX, 36, cz, 22 * KX, 44, o.h, C('#d8d2c4'));
           pushBox(lever, o.x + 13 * KX, 50, cz, 6 * KX, 10, o.h - 10, [0.92, 0.92, 0.86]);
           break;
         case 'decor':
@@ -700,8 +703,9 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
-    // The imported lobby is the actual map. The procedural shell (rug, outer
-    // walls) only exists as a fallback; gameplay props are drawn on both.
+    // The imported lobby is the actual map. The procedural shell and props
+    // (tables, seats, bar, plants, sign box) are fallback-only so the model's
+    // own furniture is never doubled; only the light switch rides along.
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useTex();
       this.setTexM(this.mIdent);
@@ -721,8 +725,8 @@ export class Renderer {
       this.bindLit(this.gpuBack);
       gl.drawElements(gl.TRIANGLES, this.gpuBack.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
-      this.bindLit(this.gpuWorld);
-      gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
+      this.bindLit(this.gpuSw);
+      gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
       this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
       this.bindLit(this.gpuLever);
@@ -750,6 +754,9 @@ export class Renderer {
       this.stats.draws++;
       this.bindLit(this.gpuWorld);
       gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+      this.bindLit(this.gpuSw);
+      gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
 
       this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
@@ -830,7 +837,9 @@ export class Renderer {
     }
     if (this.lights) {
       for (const o of OBJECTS) {
-        if (o.type !== 'table' && o.type !== 'bar') continue;
+        // Tables only: the glow marks the felts (drawn by the model now).
+        // The procedural bar isn't visible in GLB mode, so no stray pool.
+        if (o.type !== 'table') continue;
         const cx = o.x + o.w / 2, cz = o.y + o.h / 2, r = o.w * 0.85;
         pushT(GLM, [
           [cx - r, 3, cz - r], [cx + r, 3, cz - r], [cx + r, 3, cz + r], [cx - r, 3, cz + r]
