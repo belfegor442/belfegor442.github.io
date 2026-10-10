@@ -283,6 +283,7 @@ export function buildNav(draws, width, height, cell = 16) {
   const floor = new Float32Array(cols * rows).fill(-1);
   const obs = new Float32Array(cols * rows).fill(-1);
   const FLOOR_MAX = 40;    // only low up-facing surfaces count as ground
+  const OBS_MIN = 10;      // trim/skirting below this is not worth blocking
   const STEP = 24;         // anything this much above the floor blocks
   const TALL = 110;        // skip the ceiling (~124+) and anything hung high
 
@@ -323,7 +324,11 @@ export function buildNav(draws, width, height, cell = 16) {
         if (pass === 0) {
           if (!flat || yAvg > FLOOR_MAX) continue;
         } else {
-          if (yAvg <= FLOOR_MAX || yAvg > TALL) continue;
+          // Obstacles: anything standing 10..110 above the floor, including
+          // the flat tops. Previously only >40 counted, so low furniture
+          // (roulette table, counters, chair seats) had no collider and the
+          // player walked straight through it.
+          if (yAvg <= OBS_MIN || yAvg > TALL) continue;
         }
         let x0 = Math.floor(Math.min(a[0], b[0], c[0]) / cell);
         let x1 = Math.floor(Math.max(a[0], b[0], c[0]) / cell);

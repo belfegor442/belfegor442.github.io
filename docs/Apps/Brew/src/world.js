@@ -130,29 +130,26 @@ export function move(x, y, nx, ny, r = 14) {
   let py = y;
   if (!blocked(px, ny, r)) py = ny;
   if (stuck && px === x && py === y && !blocked(nx, ny, r)) { px = nx; py = ny; }
-  if (!stuck) {
-    // Scrape past furniture: if the full body is blocked, slide through the
-    // gap at skin width instead of dead-stopping against every chair.
-    if (px === x && !blocked(nx, y, tight)) px = nx;
-    if (py === y && !blocked(px, ny, tight)) py = ny;
-    // Corner slide: fully stuck against an obstacle but the floor beside it
-    // is open — drift around it in the travel direction instead of stopping.
-    if (px === x && py === y && (nx !== x || ny !== y)) {
-      const dx = nx - x, dy = ny - y;
-      const len = Math.hypot(dx, dy) || 1;
-      const tx = -dy / len, ty = dx / len; // tangent
-      for (const off of [6, 12, 20, 30]) {
-        if (!blocked(x + tx * off + dx, y + ty * off + dy, tight)) {
-          px = x + tx * off + dx; py = y + ty * off + dy; break;
-        }
-        if (!blocked(x - tx * off + dx, y - ty * off + dy, tight)) {
-          px = x - tx * off + dx; py = y - ty * off + dy; break;
-        }
+  // Scrape: when the full body doesn't fit, try again at skin width so the
+  // player hugs furniture instead of dead-stopping one cell away from it.
+  if (px === x && !blocked(nx, y, tight)) px = nx;
+  if (py === y && !blocked(px, ny, tight)) py = ny;
+  // Corner slide: fully stuck against an obstacle but the floor beside it
+  // is open — drift around it in the travel direction instead of stopping.
+  // Runs in both the free and stuck states; stalling inside a chair row
+  // (nav materialised under the player) is exactly when it is needed.
+  if (px === x && py === y && (nx !== x || ny !== y)) {
+    const dx = nx - x, dy = ny - y;
+    const len = Math.hypot(dx, dy) || 1;
+    const tx = -dy / len, ty = dx / len; // tangent
+    for (const off of [6, 12, 20, 30]) {
+      if (!blocked(x + tx * off + dx, y + ty * off + dy, tight)) {
+        px = x + tx * off + dx; py = y + ty * off + dy; break;
+      }
+      if (!blocked(x - tx * off + dx, y - ty * off + dy, tight)) {
+        px = x - tx * off + dx; py = y - ty * off + dy; break;
       }
     }
-  } else if (px === x && py === y) {
-    if (!blocked(nx, y, tight)) px = nx;
-    if (!blocked(px, ny, tight)) py = ny;
   }
   return { x: px, y: py };
 }
