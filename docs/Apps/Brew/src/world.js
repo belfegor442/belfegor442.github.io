@@ -1,4 +1,4 @@
-export const MAP = { w: 1720, h: 1180, wall: 36 };
+export const MAP = { w: 2472, h: 1180, wall: 36 };
 
 export const OBJECTS = [
   { id: 'w-n', type: 'wall', x: 0, y: 0, w: MAP.w, h: MAP.wall, solid: true, hgt: 54 },
@@ -29,6 +29,17 @@ export const OBJECTS = [
   { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' }
 ];
 
+// lobby.glb is 2.1:1 native; the old 1720-wide frame forced it into 1.46:1
+// and squashed every side-to-side aisle 30% — the "super narrow" lobby. The
+// frame now matches the model, so scale the hand-placed x-coordinates by the
+// same factor the GLB scales (MAP.w / 1720) to keep them aligned with it.
+export const KX = MAP.w / 1720;
+for (const o of OBJECTS) {
+  if (o.type === 'wall') continue; // walls already span MAP.w
+  o.x *= KX;
+  o.w *= KX;
+}
+
 const TABLES = OBJECTS.filter(o => o.type === 'table');
 const BAR_STOOLS = 4;
 
@@ -44,12 +55,13 @@ export const SEATS = (() => {
     const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
     list.push(seat(t.id + '-n', t.id, cx, t.y - 30, facing({ x: cx, y: t.y - 30 }, { x: cx, y: cy })));
     list.push(seat(t.id + '-s', t.id, cx, t.y + t.h + 30, facing({ x: cx, y: t.y + t.h + 30 }, { x: cx, y: cy })));
-    list.push(seat(t.id + '-w', t.id, t.x - 30, cy, facing({ x: t.x - 30, y: cy }, { x: cx, y: cy })));
-    list.push(seat(t.id + '-e', t.id, t.x + t.w + 30, cy, facing({ x: t.x + t.w + 30, y: cy }, { x: cx, y: cy })));
+    const pad = 30 * KX;
+    list.push(seat(t.id + '-w', t.id, t.x - pad, cy, facing({ x: t.x - pad, y: cy }, { x: cx, y: cy })));
+    list.push(seat(t.id + '-e', t.id, t.x + t.w + pad, cy, facing({ x: t.x + t.w + pad, y: cy }, { x: cx, y: cy })));
   }
   const bar = OBJECTS.find(o => o.id === 'bar');
   for (let i = 0; i < BAR_STOOLS; i++) {
-    const x = bar.x + 40 + i * 56;
+    const x = bar.x + (40 + i * 56) * KX;
     const y = bar.y + bar.h + 34;
     list.push(seat('bar-' + i, null, x, y, facing({ x, y }, { x, y: bar.y + bar.h })));
   }
@@ -62,6 +74,7 @@ export const SPAWNS = [
   { x: 1300, y: 1100 }, { x: 1560, y: 1110 }, { x: 1300, y: 940 },
   { x: 1580, y: 940 }, { x: 1600, y: 600 }, { x: 1600, y: 300 }
 ];
+for (const s of SPAWNS) s.x *= KX;
 
 const SOLIDS = OBJECTS.filter(o => o.solid);
 export const SEAT_BY_ID = new Map(SEATS.map(s => [s.id, s]));

@@ -1,4 +1,4 @@
-import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav } from './world.js';
+import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav, KX } from './world.js';
 import {
   C, mul, perspective, lookAt, trs,
   VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB,
@@ -493,14 +493,14 @@ export class Renderer {
         case 'rug':
           // The central social area must exist visually as well as in the world data.
           pushBox(shell, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
-          pushBox(shell, cx, 0.85, cz, o.w - 18, 0.18, o.h - 18, C('#245b47'));
+          pushBox(shell, cx, 0.85, cz, o.w - 18 * KX, 0.18, o.h - 18, C('#245b47'));
           break;
         case 'wall':
           pushBox(shell, cx, 0, cz, o.w, o.hgt, o.h, wallC);
           break;
         case 'table':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#6b4526'));
-          pushDisc(M, cx, o.hgt + 0.6, cz, o.w / 2 - 18, o.h / 2 - 16, C('#0e4a34'));
+          pushDisc(M, cx, o.hgt + 0.6, cz, o.w / 2 - 18 * KX, o.h / 2 - 16, C('#0e4a34'));
           break;
         case 'bar':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#3d2a1c'));
@@ -509,8 +509,8 @@ export class Renderer {
         case 'shelf': {
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#241a12'));
           for (let i = 0; i < 12; i++) {
-            const bx = o.x + 12 + i * 34 + 8;
-            pushBox(M, bx, 8, o.y + o.h - 2, 14, o.hgt - 16, 6, C(BOTTLES[i % 4]));
+            const bx = o.x + (12 + i * 34 + 8) * KX;
+            pushBox(M, bx, 8, o.y + o.h - 2, 14 * KX, o.hgt - 16, 6, C(BOTTLES[i % 4]));
           }
           break;
         }
@@ -530,8 +530,8 @@ export class Renderer {
           ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
           break;
         case 'switch':
-          pushBox(M, 47, 36, cz, 22, 44, o.h, C('#d8d2c4'));
-          pushBox(lever, 59, 50, cz, 6, 10, o.h - 10, [0.92, 0.92, 0.86]);
+          pushBox(M, o.x + KX, 36, cz, 22 * KX, 44, o.h, C('#d8d2c4'));
+          pushBox(lever, o.x + 13 * KX, 50, cz, 6 * KX, 10, o.h - 10, [0.92, 0.92, 0.86]);
           break;
         case 'decor':
           pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#2a2118'));
