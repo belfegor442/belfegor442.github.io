@@ -20,11 +20,26 @@
 </head>
 <body>
 
-<!-- XP Welcome / Logon (full-bleed, mirrors native render_xp_logon_ui) -->
+<!-- XP Welcome / Logon (full-bleed, mirrors native render_xp_logon_ui).
+     Under [data-theme=win98] the same form is restyled as the classic
+     Windows 98 "Log On to Windows" dialog (teal desktop, centered box). -->
 <div id="authView" class="xp-logon hidden">
   <img class="logon-bg" src="./assets/xp/login/Background.png" alt="" draggable="false">
   <form class="logon-root" id="authForm" novalidate>
-    <!-- left brand lockup -->
+    <!-- Win98 classic logon chrome (display:none unless data-theme=win98) -->
+    <div class="w98-logon-titlebar" aria-hidden="true">
+      <span class="w98-logon-title">Welcome to msg.mesh</span>
+      <span class="w98-logon-caps">
+        <span class="win-cap w98-help">?</span>
+        <span class="win-cap close"></span>
+      </span>
+    </div>
+    <div class="w98-logon-head" aria-hidden="true">
+      <img class="w98-logon-key" src="./assets/xp/icons/Key.png" alt="" draggable="false">
+      <p class="w98-logon-text">Type a user name and password to log on to msg.mesh</p>
+    </div>
+
+    <!-- left brand lockup (XP only) -->
     <img class="logon-brand" src="./assets/xp/login/brand.png" alt="msg.mesh" draggable="false">
 
     <!-- right tile column -->
@@ -41,11 +56,11 @@
       <!-- fields beside selected tile -->
       <div class="logon-fields" id="logonFields">
         <div class="logon-f-row hidden" id="rowUsername">
-          <span class="logon-f-label">User name:</span>
+          <span class="logon-f-label"><u>U</u>ser name:</span>
           <div class="logon-f-box"><input id="authUsername" autocomplete="username" maxlength="32" spellcheck="false" placeholder=""></div>
         </div>
         <div class="logon-f-row" id="rowPassword">
-          <span class="logon-f-label">Password:</span>
+          <span class="logon-f-label"><u>P</u>assword:</span>
           <div class="logon-f-box">
             <input id="authPassword" type="password" autocomplete="current-password" maxlength="128" placeholder="">
             <span class="caps-warn hidden" id="capsWarn">Caps Lock is on.</span>
@@ -56,6 +71,8 @@
         </div>
         <p class="logon-error hidden" id="authError" role="alert"></p>
         <p class="logon-hint" id="authHint"></p>
+        <!-- Win98 classic Cancel (display:none unless data-theme=win98) -->
+        <button type="button" id="w98CancelBtn">Cancel</button>
       </div>
     </div>
 

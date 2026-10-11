@@ -102,6 +102,14 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   }
 });
 
+// Win98 classic logon Cancel: clear both fields and return focus to user name.
+$("#w98CancelBtn")?.addEventListener("click", () => {
+  $("#authUsername").value = "";
+  $("#authPassword").value = "";
+  showErr($("#authError"), "");
+  $("#authUsername").focus();
+});
+
 // Caps Lock indicator while password is focused (matches native client).
 $("#authPassword")?.addEventListener("keydown", (e) => {
   const warn = $("#capsWarn");

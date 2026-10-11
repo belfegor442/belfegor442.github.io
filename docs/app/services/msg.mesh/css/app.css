@@ -341,6 +341,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:1px dott
   color:#fff;text-shadow:1px 1px 0 rgba(0,0,0,.55);
 }
 .logon-add:hover span{color:#ffeca0}
+/* win98 classic logon chrome — hidden by default, shown by win98.css */
+.w98-logon-titlebar,.w98-logon-head,#w98CancelBtn{display:none}
+.logon-f-label u{text-decoration:none}
 .caps-warn{
   position:absolute;right:8px;top:50%;transform:translateY(-50%);
   font-size:11px;color:#c89600;font-weight:700;

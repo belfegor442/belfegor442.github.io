@@ -42,8 +42,9 @@ export function currentTheme() {
 }
 
 function applyToImg(el) {
-  // Native draw_xp_logon_background is unconditional: the logon screen stays
-  // XP regardless of theme.
+  // The logon screen IS themed (classic win98 dialog via CSS), but its icons
+  // intentionally keep the XP art — the golden Key.png matches the real
+  // classic logon key; the 16px win98 map would look wrong at 32px.
   if (el.closest && el.closest("#authView")) return;
   if (!el.dataset.icon) {
     const src = el.getAttribute("src") || "";
