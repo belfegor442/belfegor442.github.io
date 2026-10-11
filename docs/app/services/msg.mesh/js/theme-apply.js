@@ -5,7 +5,8 @@
 (function () {
   try {
     var t = localStorage.getItem("msg.mesh.theme");
-    document.documentElement.setAttribute("data-theme", t === "win98" ? "win98" : "winxp");
+    var v = (t === "win98" || t === "north") ? t : "winxp";
+    document.documentElement.setAttribute("data-theme", v);
   } catch (e) {
     document.documentElement.setAttribute("data-theme", "winxp");
   }

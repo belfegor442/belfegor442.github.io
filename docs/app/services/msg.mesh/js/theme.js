@@ -38,7 +38,8 @@ const W98 = {
 };
 
 export function currentTheme() {
-  return document.documentElement.getAttribute("data-theme") === "win98" ? "win98" : "winxp";
+  const t = document.documentElement.getAttribute("data-theme");
+  return t === "win98" ? "win98" : t === "north" ? "north" : "winxp";
 }
 
 function applyToImg(el) {
@@ -91,7 +92,7 @@ function updateThemeOpts() {
 }
 
 export function setTheme(name) {
-  const v = name === "win98" ? "win98" : "winxp";
+  const v = name === "win98" ? "win98" : name === "north" ? "north" : "winxp";
   document.documentElement.setAttribute("data-theme", v);
   try { localStorage.setItem(KEY, v); } catch { /* private mode */ }
   sweep(document.body);

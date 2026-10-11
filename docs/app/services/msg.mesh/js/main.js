@@ -1294,6 +1294,7 @@ const menuActions = {
     ["Theme", null, null, [
       ["Windows XP", () => setTheme("winxp"), "Theme.png"],
       ["Windows 98", () => setTheme("win98"), "Theme.png"],
+      ["North Assembly", () => setTheme("north"), "Theme.png"],
     ]],
     ["-", null],
     ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }, "Login Question.png"],
