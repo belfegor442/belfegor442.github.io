@@ -363,8 +363,26 @@ export function renderDetails() {
   if (dn) dn.textContent = label;
   const dh = $("#detailsHandle");
   if (dh) dh.textContent = u ? "@" + u.username : peer;
-  const da = $("#detailsAvatar");
-  if (da) da.textContent = u && u.profile && u.profile.avatar ? u.profile.avatar : initials(label);
+  const photo = u && u.profile ? String(u.profile.photo || "") : "";
+  const avatarChar = u && u.profile && u.profile.avatar ? u.profile.avatar : initials(label);
+  const dat = $("#detailsAvatar");
+  if (dat) dat.textContent = avatarChar;
+  applyAvatarPhoto($("#detailsAvatarImg"), dat, photo);
+  const bb = $("#detailsBanner");
+  if (bb) {
+    const bimg = $("#detailsBannerImg");
+    const btxt = $("#detailsBannerText");
+    if (btxt) btxt.textContent = avatarChar;
+    if (photo && bimg) {
+      bimg.src = photo;
+      bimg.classList.remove("hidden");
+      if (btxt) btxt.classList.add("hidden");
+      bb.classList.remove("hidden");
+    } else {
+      if (bimg) { bimg.removeAttribute("src"); bimg.classList.add("hidden"); }
+      bb.classList.add("hidden");
+    }
+  }
   const ds = $("#detailsStatus");
   if (ds) ds.textContent = u ? (u.status === "online" ? "Online" : "Offline") : "Device node";
   // Server-side profile block (migration 018): status text + about.

@@ -178,7 +178,14 @@
         <button class="win-cap close" id="closeDetails" aria-label="Close">✕</button>
       </div>
       <div class="details-body">
-        <div class="details-avatar" id="detailsAvatar">?</div>
+        <div class="details-banner hidden" id="detailsBanner">
+          <img id="detailsBannerImg" alt="" class="hidden">
+          <span id="detailsBannerText">?</span>
+        </div>
+        <div class="details-avatar" id="detailsAvatarWrap">
+          <img id="detailsAvatarImg" alt="" class="hidden">
+          <span id="detailsAvatar">?</span>
+        </div>
         <h2 id="detailsName">Conversation</h2>
         <p id="detailsHandle">@unknown</p>
         <p class="details-peer-status" id="detailsPeerStatus"></p>
