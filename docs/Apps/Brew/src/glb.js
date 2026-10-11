@@ -274,6 +274,66 @@ export function stripCeiling(draws, minH = 118) {
   return dropped;
 }
 
+// Inverse of a 3x4 affine matrix (column-major), null when singular.
+function invAffine(m) {
+  const a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9],
+    g = m[2], h = m[6], i = m[10];
+  const A = e * i - f * h, B = f * g - d * i, C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  if (Math.abs(det) < 1e-12) return null;
+  const id = 1 / det;
+  const r00 = A * id, r01 = (c * h - b * i) * id, r02 = (b * f - c * e) * id;
+  const r10 = B * id, r11 = (a * i - c * g) * id, r12 = (c * d - a * f) * id;
+  const r20 = C * id, r21 = (b * g - a * h) * id, r22 = (a * e - b * d) * id;
+  const o = new Float32Array(16);
+  o[0] = r00; o[1] = r10; o[2] = r20;
+  o[4] = r01; o[5] = r11; o[6] = r21;
+  o[8] = r02; o[9] = r12; o[10] = r22;
+  o[12] = -(r00 * m[12] + r01 * m[13] + r02 * m[14]);
+  o[13] = -(r10 * m[12] + r11 * m[13] + r12 * m[14]);
+  o[14] = -(r20 * m[12] + r21 * m[13] + r22 * m[14]);
+  o[15] = 1;
+  return o;
+}
+
+// The plan axes scale ~2.4x to fill MAP while Y stays native, so the slot
+// cabinets (authored at a 0.6 front ratio) land on screen as squat boxes.
+// Stretch them about their feet on the placed geometry. Must run before
+// stripCeiling and buildNav so the ceiling pass and collision see the result.
+export function stretchMachines(draws, ky, mapW, mapH) {
+  let touched = 0;
+  for (const d of draws) {
+    const pos = d.pos, m = d.matrix;
+    let ax = 1e9, ay = 1e9, az = 1e9, bx = -1e9, by = -1e9, bz = -1e9;
+    for (let v = 0; v < pos.length; v += 3) {
+      const x = m[0] * pos[v] + m[4] * pos[v + 1] + m[8] * pos[v + 2] + m[12];
+      const y = m[1] * pos[v] + m[5] * pos[v + 1] + m[9] * pos[v + 2] + m[13];
+      const z = m[2] * pos[v] + m[6] * pos[v + 1] + m[10] * pos[v + 2] + m[14];
+      if (x < ax) ax = x; if (x > bx) bx = x;
+      if (y < ay) ay = y; if (y > by) by = y;
+      if (z < az) az = z; if (z > bz) bz = z;
+    }
+    // Machine banks: textured strips hugging a wall, waist-high, longer than
+    // two thirds of the map (the furniture draw below is 50+ tall, shell far
+    // wider, so this picks out the cabinet banks only).
+    if (!(bx - ax > mapW * 0.15 && bx - ax < mapW * 0.2 &&
+      by - ay < 40 && bz - az > mapH * 0.65 && (ay + by) / 2 < 50)) continue;
+    const im = invAffine(m);
+    if (!im) continue;
+    const feet = ay;
+    for (let v = 0; v < pos.length; v += 3) {
+      const wx = m[0] * pos[v] + m[4] * pos[v + 1] + m[8] * pos[v + 2] + m[12];
+      const wy = feet + (m[1] * pos[v] + m[5] * pos[v + 1] + m[9] * pos[v + 2] + m[13] - feet) * ky;
+      const wz = m[2] * pos[v] + m[6] * pos[v + 1] + m[10] * pos[v + 2] + m[14];
+      pos[v] = im[0] * wx + im[4] * wy + im[8] * wz + im[12];
+      pos[v + 1] = im[1] * wx + im[5] * wy + im[9] * wz + im[13];
+      pos[v + 2] = im[2] * wx + im[6] * wy + im[10] * wz + im[14];
+    }
+    touched++;
+  }
+  return touched;
+}
+
 // Rasterise the world triangles into a coarse height grid. The lobby IS the
 // map: cells with no floor, or with furniture/walls standing on the floor,
 // become colliders instead of the old hand-placed rectangles.

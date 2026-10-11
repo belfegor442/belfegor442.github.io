@@ -5,7 +5,7 @@ import {
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
-import { loadGLB, buildNav, stripCeiling, genNormals } from './glb.js';
+import { loadGLB, buildNav, stripCeiling, genNormals, stretchMachines } from './glb.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -298,6 +298,7 @@ export class Renderer {
         min: [mnx + place[12], mny + place[13], mnz + place[14]],
         max: [mxx + place[12], mxy + place[13], mxz + place[14]]
       };
+      const mach = stretchMachines(world.draws, 2, MAP.w, MAP.h);
       const noRoof = stripCeiling(world.draws);
       this.glbReady = true;
       // Nav is derived from the full geometry (collision stays identical to
@@ -319,7 +320,8 @@ export class Renderer {
         this.glbWorld.blend.length + ' blend, box=' +
         world.bounds.min.map(v => Math.round(v)).join(',') + '..' +
         world.bounds.max.map(v => Math.round(v)).join(',') +
-        ', nav ' + nav.open + '/' + nav.total + ' open cells, roof tris ' + noRoof);
+        ', nav ' + nav.open + '/' + nav.total + ' open cells, roof tris ' + noRoof +
+        ', mach x' + mach);
     } catch (e) {
       this.glbReady = false;
       console.warn('[glb] world load failed, procedural fallback:', e && e.message);
