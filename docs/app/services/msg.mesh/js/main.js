@@ -912,7 +912,7 @@ function renderCallState(st) {
     if (dlg.open) dlg.close();
     return;
   }
-  if (!dlg.open) dlg.showModal();
+  if (!dlg.open) dlg.show();
   const u = st.peer ? peerUser(st.peer) : null;
   const name = u ? (u.display_name || u.username) : (st.peer || "");
   const title = $("#callTitle");
@@ -1026,6 +1026,41 @@ $("#callDialog")?.addEventListener("cancel", (e) => {
   e.preventDefault(); // ESC routes to the phase-correct teardown
   Call.dismissCall();
 });
+// Non-modal dialogs do not receive the "cancel" event on ESC — handle it globally.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !Call.isCallActive()) return;
+  if (e.key === "Escape" && $("#callDialog")?.open) {
+    e.preventDefault();
+    Call.dismissCall();
+  }
+});
+
+// Drag the floating call window by its titlebar (pointer events, works on touch).
+(() => {
+  const frame = document.querySelector("#callDialog .call-frame");
+  const bar = frame && frame.querySelector(".win-titlebar");
+  if (!frame || !bar) return;
+  let dragging = false, ox = 0, oy = 0;
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return; // don't drag from the close button
+    dragging = true;
+    const r = frame.getBoundingClientRect();
+    ox = e.clientX - r.left;
+    oy = e.clientY - r.top;
+    frame.style.right = "auto";
+    frame.style.bottom = "auto";
+    bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const x = Math.max(0, Math.min(window.innerWidth - frame.offsetWidth, e.clientX - ox));
+    const y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - oy));
+    frame.style.left = x + "px";
+    frame.style.top = y + "px";
+  });
+  bar.addEventListener("pointerup", () => { dragging = false; });
+  bar.addEventListener("pointercancel", () => { dragging = false; });
+})();
 
 on("callstate", renderCallState);
 on("callinvite", () => renderCallState(Call.callState()));

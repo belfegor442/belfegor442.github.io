@@ -624,7 +624,21 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 #detailsAboutRow strong{white-space:pre-wrap;overflow-wrap:anywhere}
 
 /* voice/video call dialog (WebRTC media; XP frame) */
-.call-body{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:300px}
+#callDialog{
+  /* non-modal floating window: clicks pass through to the app behind */
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;
+  z-index:55;
+  margin:0;padding:0;border:0;background:transparent;
+}
+#callDialog::backdrop{background:transparent}
+#callDialog .call-frame{
+  pointer-events:auto;
+  position:absolute;top:52px;right:12px;
+  margin:0;
+  box-shadow:0 8px 32px rgba(0,0,0,.45);
+}
+.call-body{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:280px}
 .call-avatar{width:64px;height:64px;margin:4px auto 8px;background:linear-gradient(180deg,#0c3091,#2359b7);color:#fff;font-weight:700;font-size:22px;display:grid;place-items:center;border:1px solid var(--xp-border)}
 .call-avatar.hidden{display:none}
 .call-status{margin:8px 0 2px;font-size:12px;font-weight:700;text-align:center}
@@ -769,6 +783,8 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
   .send-btn{min-height:32px}
   .xp-btn{min-height:32px}
   .dlg-frame{width:100%;height:100%;max-height:100%}
+  /* call window: keep it a floating compact card on mobile too (not full-screen) */
+  #callDialog .call-frame{width:min(340px,calc(100vw - 16px));height:auto;top:auto;bottom:calc(48px + env(safe-area-inset-bottom));right:8px;left:auto}
   .dlg-body{max-height:calc(100dvh - 34px);padding-bottom:calc(12px + env(safe-area-inset-bottom))}
   .user-results,.search-results{max-height:none;flex:1;min-height:80px}
 }
