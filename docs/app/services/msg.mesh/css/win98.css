@@ -384,8 +384,8 @@
 [data-theme="win98"] .toast.error{color:#ff0000}
 
 /* ---------- classic "Log On to Windows" logon (teal desktop + centered box) ----
-   Sized to the reference dialog: ~860px wide, big Tahoma text, lavender sunken
-   fields, large OK/Cancel stacked right, heavy soft drop shadow on teal. */
+   Sized to the reference dialog: ~86% viewport width, big Tahoma text, lavender
+   sunken fields, large OK/Cancel stacked right, heavy soft drop shadow on teal. */
 [data-theme="win98"] .xp-logon{background:#008080}
 [data-theme="win98"] .xp-logon .logon-bg{display:none}
 [data-theme="win98"] .xp-logon .logon-brand,
@@ -394,7 +394,7 @@
   position:absolute;
   left:50%;top:46%;right:auto;bottom:auto;
   transform:translate(-50%,-50%);
-  width:min(860px,94vw);
+  width:min(1040px,88vw);
   display:flex;flex-direction:column;align-items:stretch;gap:0;
   padding:0;
   background:#d4d0c8;
@@ -402,59 +402,59 @@
   border-image:url("../assets/win98/gui/Window_Base.png") 3 fill / 3px;
   box-shadow:0 16px 52px rgba(0,0,0,.6),0 4px 14px rgba(0,0,0,.4);
 }
-/* titlebar: navy header sprite, bold 15px, big ? + X caps */
+/* titlebar: navy header sprite, bold 18px, big ? + X caps */
 [data-theme="win98"] .w98-logon-titlebar{
   display:flex;align-items:center;justify-content:space-between;
-  height:36px;padding:0 4px 0 10px;
+  height:42px;padding:0 5px 0 12px;
   background:#000080;
   border:3px solid transparent;
   border-image:url("../assets/win98/gui/Window_Header.png") 3 fill / 3px;
   color:#fff;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-weight:700;font-size:16px;
+  font-weight:700;font-size:18px;
 }
 [data-theme="win98"] .w98-logon-title{text-shadow:none}
 [data-theme="win98"] .w98-logon-caps{display:flex;gap:3px}
-[data-theme="win98"] .w98-logon-caps .win-cap{width:26px;height:24px}
+[data-theme="win98"] .w98-logon-caps .win-cap{width:30px;height:28px}
 [data-theme="win98"] .w98-logon-caps .win-cap.w98-help{
   display:grid;place-items:center;
-  font:bold 16px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
+  font:bold 18px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
 }
 [data-theme="win98"] .w98-logon-caps .win-cap.w98-help::before,
 [data-theme="win98"] .w98-logon-caps .win-cap.w98-help::after{display:none}
-[data-theme="win98"] .w98-logon-caps .win-cap.close::before{left:3px;top:8px;width:13px;height:2px}
-[data-theme="win98"] .w98-logon-caps .win-cap.close::after{left:3px;top:8px;width:13px;height:2px}
+[data-theme="win98"] .w98-logon-caps .win-cap.close::before{left:5px;top:10px;width:16px;height:2px}
+[data-theme="win98"] .w98-logon-caps .win-cap.close::after{left:5px;top:10px;width:16px;height:2px}
 /* key icon + instruction line */
 [data-theme="win98"] .w98-logon-head{
-  display:flex;align-items:center;gap:20px;
-  padding:22px 28px 0;
+  display:flex;align-items:center;gap:24px;
+  padding:26px 32px 0;
 }
-[data-theme="win98"] .w98-logon-key{width:68px;height:68px;flex:none}
+[data-theme="win98"] .w98-logon-key{width:84px;height:84px;flex:none}
 [data-theme="win98"] .w98-logon-text{
   margin:0;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-size:18px;line-height:1.3;color:#000;
+  font-size:21px;line-height:1.3;color:#000;
 }
 /* field column: right-aligned labels + lavender sunken boxes, big buttons right */
 [data-theme="win98"] .xp-logon .logon-col{
   position:relative;
   display:block;width:auto;gap:0;
-  padding:22px 14px 44px 28px;
+  padding:26px 18px 36px 32px;
 }
 [data-theme="win98"] .xp-logon .logon-fields{
   position:static;transform:none;width:auto;
   display:block;
-  padding-right:220px;
+  padding-right:260px;
 }
 [data-theme="win98"] #authView #rowUsername{display:flex!important}
 [data-theme="win98"] .xp-logon .logon-f-row{
-  display:flex;flex-direction:row;align-items:center;gap:16px;
-  margin-bottom:18px;
+  display:flex;flex-direction:row;align-items:center;gap:18px;
+  margin-bottom:20px;
 }
 [data-theme="win98"] .xp-logon .logon-f-label{
-  width:170px;flex:none;text-align:right;
+  width:200px;flex:none;text-align:right;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-size:16px;color:#000;text-shadow:none;
+  font-size:19px;color:#000;text-shadow:none;
 }
 [data-theme="win98"] .xp-logon .logon-f-label u{text-decoration:underline}
 [data-theme="win98"] .xp-logon .logon-f-box{
@@ -462,11 +462,11 @@
   background:#e6e9f7;
   border:2px solid transparent;
   border-image:url("../assets/win98/gui/Windows_Inner_Frame.png") 2 / 2px;
-  height:40px;
+  height:48px;
 }
 [data-theme="win98"] .xp-logon .logon-f-box input{
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-size:18px;padding:0 8px;
+  font-size:20px;padding:0 10px;
 }
 [data-theme="win98"] .xp-logon .logon-f-box:focus-within{
   outline:1px dotted #000;outline-offset:-4px;
@@ -474,20 +474,20 @@
 [data-theme="win98"] .xp-logon .logon-error{
   color:#a00000;text-shadow:none;margin:2px 0 0;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-size:13px;
+  font-size:14px;
 }
 [data-theme="win98"] .xp-logon .logon-hint{
   color:#404040;text-shadow:none;margin:2px 0 0;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
-  font-size:13px;
+  font-size:14px;
 }
 /* OK (#authSubmit, reused arrow button) + Cancel stacked at right.
-   Tops relative to .logon-col padding box: username row starts at the 22px
-   col padding-top; OK centers on it (22 + (40-42)/2 = 21), Cancel one row
-   + 18px gap lower (21 + 40 + 18 = 79). */
+   Tops relative to .logon-col padding box: username row starts at the 26px
+   col padding-top; OK centers on it (26 + (48-48)/2 = 26), Cancel one row
+   + 20px gap lower (26 + 48 + 20 = 94). */
 [data-theme="win98"] .xp-logon .logon-arrow{
-  position:absolute;right:14px;top:21px;
-  width:148px;height:42px;
+  position:absolute;right:18px;top:26px;
+  width:200px;height:48px;
   background:#d4d0c8;
   border:3px solid transparent;border-radius:0;
   border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
@@ -503,16 +503,16 @@
 [data-theme="win98"] .xp-logon .logon-arrow svg{display:none}
 [data-theme="win98"] .xp-logon .logon-arrow::after{
   content:"OK";
-  font:400 15px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
+  font:400 17px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
 }
 [data-theme="win98"] #w98CancelBtn{
   display:block;
-  position:absolute;right:14px;top:79px;
-  width:148px;height:42px;
+  position:absolute;right:18px;top:94px;
+  width:200px;height:48px;
   background:#d4d0c8;
   border:3px solid transparent;border-radius:0;
   border-image:url("../assets/win98/gui/Windows_Button.png") 3 fill / 3px;
-  font:400 15px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
+  font:400 17px/1 "Tahoma","Segoe UI",Verdana,sans-serif;color:#000;
   padding:0;cursor:pointer;
 }
 [data-theme="win98"] #w98CancelBtn:hover{
