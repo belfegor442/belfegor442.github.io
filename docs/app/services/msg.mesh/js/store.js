@@ -55,6 +55,11 @@ export function saveProfile(p) {
 
 loadProfile();
 
+export function clearProfileCache() {
+  state.profile = { status: "", about: "", avatar: "", photo: "", banner: "" };
+  try { localStorage.removeItem(PROFILE_KEY); } catch { /* private mode */ }
+}
+
 export function on(type, fn) {
   if (!listeners.has(type)) listeners.set(type, new Set());
   listeners.get(type).add(fn);

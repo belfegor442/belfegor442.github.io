@@ -1,5 +1,5 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations } from "./store.js";
+import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
@@ -169,6 +169,7 @@ function handleSessionLost() {
   setToken("");
   wsDisconnect();
   resetState();
+  clearProfileCache();
   booted = false;
   authNotice = "Session expired — please sign in again.";
   ui.showAuth("login");
@@ -273,6 +274,7 @@ async function logout() {
   setToken("");
   wsDisconnect();
   resetState();
+  clearProfileCache(); // do not leave PII/photo on shared device after sign-out
   booted = false;
   ui.showAuth("login");
   setMode("login");
@@ -542,15 +544,17 @@ async function openAttachment(attachmentId, filename) {
     const bin = atob(r.content_base64 || "");
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // Security: always force save-to-disk via <a download>. Never window.open(blob)
+    // — blob URLs inherit the app origin and a hostile file (e.g. text/html with
+    // script) could execute in our origin and steal the session token.
     const blob = new Blob([bytes], { type: r.content_type || "application/octet-stream" });
     const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank");
-    if (!win) {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = r.filename || filename || "attachment";
-      a.click();
-    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = r.filename || filename || "attachment";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     ui.toast("Download failed: " + friendlyError(e), true);
@@ -870,7 +874,7 @@ $("#profileForm").addEventListener("submit", async (e) => {
     ui.toast("Profile updated");
     ui.renderMessages({ scroll: false });
   } catch (err) {
-    showErr($("#profileStatus"), err.message);
+    showErr($("#profileStatus"), friendlyError(err));
   }
 });
 
@@ -1420,6 +1424,11 @@ $("#serverApply").addEventListener("click", async () => {
   let value = (input.value || "").trim().replace(/\/+$/, "");
   if (!value) { hint.textContent = "Enter a server URL, e.g. https://host"; return; }
   if (!/^https?:\/\//.test(value)) value = "https://" + value;
+  // Security: only accept https:// (or localhost for dev). Reject cleartext http.
+  if (!api.isAllowedBase(value)) {
+    hint.textContent = "Only HTTPS servers are allowed (or localhost for development).";
+    return;
+  }
   hint.textContent = "Checking server…";
   const btn = $("#serverApply");
   btn.disabled = true;

@@ -27,6 +27,7 @@ function safeRemove(key) {
 let base = "";
 
 export function apiBase() { return base; }
+export { isHttpsUrl, isLocalhost, isAllowedBase };
 
 export function setApiBase(next) {
   base = String(next || "").replace(/\/+$/, "");
@@ -37,6 +38,22 @@ export function setApiBase(next) {
 function baseFromQuery() {
   const q = new URLSearchParams(location.search).get("api");
   return q ? q.replace(/\/+$/, "") : "";
+}
+
+function isHttpsUrl(u) {
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === "https:";
+  } catch { return false; }
+}
+function isLocalhost(u) {
+  try {
+    const parsed = new URL(u);
+    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1";
+  } catch { return false; }
+}
+function isAllowedBase(u) {
+  return isHttpsUrl(u) || isLocalhost(u);
 }
 
 export function wsEndpoint() {
@@ -70,6 +87,7 @@ async function probe(url, timeoutMs = 10000) {
 // Never assumes localhost or any single host.
 export async function resolveApiBase(candidate) {
   if (candidate) {
+    if (!isAllowedBase(candidate)) return null;
     if (await probe(candidate)) {
       setApiBase(candidate);
       return candidate;
@@ -78,12 +96,19 @@ export async function resolveApiBase(candidate) {
   }
   const fromQuery = baseFromQuery();
   if (fromQuery) {
-    setApiBase(fromQuery);
-    return fromQuery;
+    // ?api= is attacker-influenceable (shared link): never trust it without
+    // an HTTPS/localhost check AND a live /health probe before persisting.
+    if (!isAllowedBase(fromQuery)) {
+      // fall through to stored/candidates instead of honouring a poisoned base
+    } else if (await probe(fromQuery)) {
+      setApiBase(fromQuery);
+      return fromQuery;
+    }
+    // dead or rejected query base: do NOT persist, fall through
   }
   const stored = safeGet(API_BASE_KEY);
   const order = [];
-  if (stored) order.push(stored);
+  if (stored && isAllowedBase(stored)) order.push(stored);
   for (const c of SERVER_CANDIDATES) if (!order.includes(c)) order.push(c);
 
   for (const candidate of order) {
@@ -96,12 +121,12 @@ export async function resolveApiBase(candidate) {
   // real "server unreachable" state instead of guessing forever.
   // But if the stored URL was tried and failed, drop it so next load
   // starts fresh with the candidate list (avoids pinning a dead server).
-  if (stored && !SERVER_CANDIDATES.includes(stored)) {
-    // custom user URL — keep it (they chose it explicitly)
+  if (stored && !SERVER_CANDIDATES.includes(stored) && isAllowedBase(stored)) {
+    // custom user URL — keep it (they chose it explicitly via validated flow)
   } else {
     safeRemove(API_BASE_KEY);
   }
-  setApiBase(stored || DEFAULT_API);
+  setApiBase((stored && isAllowedBase(stored) && !SERVER_CANDIDATES.includes(stored)) ? stored : DEFAULT_API);
   return base;
 }
 

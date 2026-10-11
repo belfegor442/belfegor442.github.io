@@ -92,9 +92,13 @@ export function selectLogonTile(which) {
   }
 }
 
+export function isSafeImageDataUrl(url) {
+  return typeof url === "string" && /^data:image\/(png|jpeg|jpg|webp|gif);base64,/.test(url) && url.length < 10 * 1024 * 1024;
+}
+
 export function applyAvatarPhoto(imgEl, textEl, photo) {
   if (!imgEl || !textEl) return;
-  if (photo) {
+  if (photo && isSafeImageDataUrl(photo)) {
     imgEl.src = photo;
     imgEl.classList.remove("hidden");
     textEl.classList.add("hidden");
@@ -373,7 +377,7 @@ export function renderDetails() {
     const bimg = $("#detailsBannerImg");
     const btxt = $("#detailsBannerText");
     if (btxt) btxt.textContent = avatarChar;
-    if (photo && bimg) {
+    if (photo && bimg && isSafeImageDataUrl(photo)) {
       bimg.src = photo;
       bimg.classList.remove("hidden");
       if (btxt) btxt.classList.add("hidden");

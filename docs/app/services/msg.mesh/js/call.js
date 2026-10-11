@@ -4,7 +4,7 @@
    the native mesh model (CALL <peer> — LAN voice, PacketType::PeerVoiceFrame
    reserved P2P). The invite carries media:"audio"|"video" so the callee knows
    whether to open the camera before Accept. One active call at a time. */
-import { state, on, emit } from "./store.js";
+import { state, on, emit, isFriend } from "./store.js";
 import { sendFrame } from "./ws.js";
 import { startRing, stopRing, playSound } from "./sound.js";
 
@@ -230,6 +230,13 @@ function onSignal(d) {
       if (d.call_id && d.from) sendSignal({ action: "decline", call_id: d.call_id, to: d.from });
       return;
     }
+    // Security: only accept invites from users on the friends list.
+    // d.from is "u<id>"; decline silently otherwise (anti-harassment).
+    const inviterId = /^u(\d+)$/.exec(String(d.from));
+    if (!inviterId || !isFriend(inviterId[1])) {
+      if (d.call_id && d.from) sendSignal({ action: "decline", call_id: d.call_id, to: d.from });
+      return;
+    }
     peer = d.from;
     callId = d.call_id;
     role = "callee";
@@ -293,7 +300,7 @@ function onSignal(d) {
     if (pc.remoteDescription && d.candidate) {
       pc.addIceCandidate(d.candidate).catch(() => { /* late/duplicate candidate */ });
     } else if (d.candidate) {
-      pendingCandidates.push(d.candidate);
+      if (pendingCandidates.length < 50) pendingCandidates.push(d.candidate);
     } else if (pc.remoteDescription) {
       pc.addIceCandidate(null).catch(() => { /* end marker already implied */ });
     }
