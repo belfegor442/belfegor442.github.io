@@ -790,8 +790,12 @@ function openProfile() {
   $("#profileAbout").value = state.profile.about || "";
   $("#profileAvatarField").value = state.profile.avatar || "";
   showErr($("#profileStatus"), "");
-  applyServerSettings();
   $("#profileDialog").showModal();
+}
+
+function openSettings() {
+  applyServerSettings();
+  $("#settingsDialog").showModal();
 }
 
 function wireImagePicker(btnId, inputId, clearId, maxW, maxH, mime, quality, apply) {
@@ -871,7 +875,7 @@ $("#profileForm").addEventListener("submit", async (e) => {
 });
 
 $("#logoutBtn").addEventListener("click", () => {
-  $("#profileDialog").close();
+  $("#settingsDialog").close();
   logout();
 });
 
@@ -881,7 +885,7 @@ $("#newChatBtn").addEventListener("click", openNewChat);
 $("#startBtn")?.addEventListener("click", openNewChat);
 $("#sendImBtn")?.addEventListener("click", openNewChat);
 $("#chatSearchBtn").addEventListener("click", openSearch);
-$("#settingsBtn")?.addEventListener("click", openProfile);
+$("#settingsBtn")?.addEventListener("click", openSettings);
 $("#profileBtn").addEventListener("click", openProfile);
 $("#backBtn").addEventListener("click", () => {
   $("#chatPanel").classList.remove("mobile-open");
@@ -1245,7 +1249,7 @@ const menuActions = {
   file: [
     ["Open Messenger", () => { location.hash = "#/"; }, "Windows Messenger.png"],
     ["-", null],
-    ["Settings...", openProfile, "Control Panel.png"],
+    ["Settings...", openSettings, "Control Panel.png"],
     // Native File menu has a Theme submenu; web ships the two themes it
     // implements (XP Luna + Windows 98).
     ["Theme", null, null, [
