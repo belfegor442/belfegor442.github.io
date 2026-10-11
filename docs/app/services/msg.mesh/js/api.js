@@ -5,9 +5,11 @@ const LAST_USER_KEY = "msg.mesh.lastUser";
 // Known production endpoints, probed in order until one answers /health.
 // The primary server may be offline; the client must not stay dead because
 // of it — every candidate speaking the msg.mesh protocol is equivalent.
+// belfegor442-pc is the live server (Tailscale Funnel, publicly reachable);
+// pene is a secondary node that may be offline.
 const SERVER_CANDIDATES = [
-  "https://pene.tail026d9a.ts.net",
   "https://belfegor442-pc.tail026d9a.ts.net",
+  "https://pene.tail026d9a.ts.net",
 ];
 
 const DEFAULT_API = SERVER_CANDIDATES[0];
@@ -41,7 +43,7 @@ export function wsEndpoint() {
   return apiBase().replace(/^http/, "ws") + "/ws";
 }
 
-async function probe(url, timeoutMs = 4000) {
+async function probe(url, timeoutMs = 10000) {
   const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
@@ -92,6 +94,13 @@ export async function resolveApiBase(candidate) {
   }
   // Nothing answered: keep the remembered/primary URL so the UI can show a
   // real "server unreachable" state instead of guessing forever.
+  // But if the stored URL was tried and failed, drop it so next load
+  // starts fresh with the candidate list (avoids pinning a dead server).
+  if (stored && !SERVER_CANDIDATES.includes(stored)) {
+    // custom user URL — keep it (they chose it explicitly)
+  } else {
+    safeRemove(API_BASE_KEY);
+  }
   setApiBase(stored || DEFAULT_API);
   return base;
 }
