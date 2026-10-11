@@ -331,6 +331,9 @@
 [data-theme="north"] .file-row{
   background:#0f172a;border:1px solid #334155;border-radius:8px;color:#cbd5e1;
 }
+[data-theme="north"] .picker-row{
+  background:transparent;border:0;padding:0;margin-bottom:4px;
+}
 
 /* dialogs */
 [data-theme="north"] dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
@@ -391,6 +394,7 @@
 /* empty state */
 [data-theme="north"] .empty-state h1{color:#f1f5f9;text-shadow:none;font-family:"Segoe UI","Inter",system-ui,sans-serif}
 [data-theme="north"] .empty-state p{color:#94a3b8;text-shadow:none}
+[data-theme="north"] .empty-state .empty-hint{color:#64748b;text-shadow:none}
 [data-theme="north"] .empty-state .mesh-mark{filter:drop-shadow(0 4px 12px rgba(56,189,248,.3))}
 
 /* toasts */

@@ -23,7 +23,7 @@
   --xp-title-fg:#fff;
   --xp-accent:#3366cc;
   --xp-accent-dark:#1a5cc8;
-  --xp-menu:#eae df2;
+  --xp-menu:#eaedf2;
   --xp-menu-bg:#eaedf2;
   --xp-toolbar-a:#eaedf2;
   --xp-toolbar-b:#d4dbe4;
@@ -167,7 +167,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
 .dd-item.has-sub{justify-content:space-between;padding-left:21px}
 .dd-sub-arrow{margin-left:auto;font-size:12px;line-height:1;opacity:.85}
 .win-toolbar{
-  display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;
+  display:flex;gap:4px;flex-wrap:wrap;
   padding:4px 6px;
   background:linear-gradient(180deg,var(--xp-toolbar-a) 0%,var(--xp-toolbar-b) 100%);
   border-bottom:1px solid var(--xp-toolbar-line);
@@ -190,8 +190,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   background:linear-gradient(180deg,var(--xp-face) 0%,#c8d0dc 100%);
   border-top:1px solid var(--xp-border);
   font-size:11px;color:var(--xp-text);
+  min-width:0;overflow:hidden;
 }
-.status-right{margin-left:auto;color:var(--xp-dim);white-space:nowrap}
+.status-right{margin-left:auto;color:var(--xp-dim);white-space:nowrap;flex:none}
 .led{width:11px;height:11px;border-radius:50%;flex:none;background:var(--xp-offline);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
 .led.on{background:#50af28;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2),0 0 6px rgba(80,175,40,.55)}
 .led.warn{background:#d2ae3c}
@@ -217,7 +218,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
 }
 .xp-btn.gray:hover{background:linear-gradient(180deg,#fff 0%,#e6f0fc 48%,#e6f0fc 52%,#d8e8fa 100%);border-color:#2858a0}
 .xp-btn.gray:active{background:#d0d0d0}
-.xp-btn.small{height:24px;padding:0 12px;font-size:11px;width:100%;margin-top:6px}
+.xp-btn.small{height:24px;padding:0 12px;font-size:11px;width:auto;margin-top:0}
 .icon-btn{
   width:28px;height:28px;border:1px solid transparent;border-radius:3px;
   background:transparent;font-size:15px;color:#333;
@@ -372,6 +373,10 @@ dialog .win-cap.close{
   background-image:url("../assets/xp/sprites/btn_close.png");
   color:transparent;font-size:0;
 }
+/* app titlebar caps are decorative window chrome (browser owns real
+   minimize/maximize/close) — kill pointer events so they don't fake actions */
+.app-caps .win-cap{pointer-events:none;cursor:default}
+.app-caps .win-cap:hover{filter:none}
 .field{margin-bottom:12px}
 .theme-row{display:flex;gap:6px;flex-wrap:wrap}
 .theme-opt{flex:1;min-width:110px}
@@ -593,6 +598,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
   width:86px;flex:none;height:34px;border-radius:3px;
   font-weight:700;letter-spacing:.03em;
 }
+.send-btn:disabled{opacity:.5;cursor:default;filter:grayscale(.4)}
 .pending-file{
   display:flex;align-items:center;gap:8px;
   margin-bottom:6px;padding:5px 10px;
@@ -664,7 +670,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 .call-status{margin:8px 0 2px;font-size:12px;font-weight:700;text-align:center}
 .call-timer{margin:0 0 8px;font-size:12px;font-family:Consolas,"Courier New",monospace}
 .call-body audio{display:none}
-.call-video-stage{position:relative;width:320px;height:240px;margin:4px 0 8px;background:#000;border:2px solid var(--xp-border,#7f9db9);overflow:hidden}
+.call-video-stage{position:relative;width:min(320px,100%);max-width:320px;height:auto;aspect-ratio:4/3;margin:4px 0 8px;background:#000;border:2px solid var(--xp-border,#7f9db9);overflow:hidden}
 .call-video-stage.hidden{display:none}
 .call-video-stage>video#callRemoteVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 .call-video-stage>video#callLocalVideo{position:absolute;right:6px;bottom:6px;width:80px;height:60px;object-fit:cover;border:1px solid #fff;background:#111;z-index:2}
@@ -681,6 +687,9 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
   padding:6px 8px;font-size:11px;
 }
 .file-row img{width:16px;height:16px;flex:none}
+/* profile photo/banner pickers — separate from .file-row shared-file cards */
+.picker-row{display:flex;gap:6px;align-items:center;margin-bottom:2px;flex-wrap:wrap}
+.picker-row .file-hint{flex:1;min-width:80px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 
 /* dialogs */
 dialog{
@@ -788,16 +797,22 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 }
 .empty-state h1{margin:0 0 6px;font-size:16px;color:#fff;text-shadow:2px 2px 0 rgba(24,34,92,.55)}
 .empty-state p{margin:0 0 16px;font-size:12px;max-width:320px;line-height:1.5;color:#fff;text-shadow:1px 1px 0 rgba(24,34,92,.75)}
+.empty-state .empty-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.empty-state .empty-hint{margin:14px 0 0;font-size:10px;color:rgba(255,255,255,.75);text-shadow:1px 1px 0 rgba(24,34,92,.6)}
 
 /* mobile layout */
 @media(max-width:900px){
-  .details-panel{display:flex!important}
+  /* details-panel keeps display:flex from base; .hidden still wins via
+     display:none!important — do NOT force flex here or hidden state breaks */
 }
 @media(max-width:650px){
   .back-btn{display:grid;place-items:center}
   .win-toolbar{padding:4px 6px}
   .tb-btn{height:34px;padding:0 10px;font-size:11.5px}
-  .statusbar{height:calc(26px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+  .statusbar{height:calc(26px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);gap:6px;font-size:10px}
+  /* compact: hide the long app-name line, keep LED + counts only */
+  .statusbar>span:not(.status-right):not(.led){display:none}
+  .status-right{font-size:10px}
   .win-titlebar{padding-top:env(safe-area-inset-top);height:calc(30px + env(safe-area-inset-top))}
   .composer-sunken textarea{min-height:36px}
   .send-btn{min-height:36px}
@@ -810,6 +825,9 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
   .conv-header{height:48px;padding:0 8px;gap:8px}
   .conv-avatar{width:36px;height:36px}
   .message-list{padding:6px 8px 8px}
+  /* P2: call video stage never exceeds its frame on tiny viewports */
+  .call-video-stage{width:100%;max-width:100%}
+  .call-body{min-width:0}
 }
 @media(min-width:651px){
   .chat-col{

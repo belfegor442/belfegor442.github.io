@@ -335,6 +335,7 @@ function openChat(peer, opts = {}) {
   if (mu) refreshUser(Number(mu[1])).then(() => ui.renderChatHead()).catch(() => null);
   markRead(peer);
   if (opts.jumpRowid) jumpTo(opts.jumpRowid);
+  syncSendEnabled();
 }
 
 window.addEventListener("hashchange", route);
@@ -372,14 +373,16 @@ let pendingAttachment = null;
 function setPendingAttachment(att) {
   pendingAttachment = att;
   const bar = $("#pendingFile");
-  if (!bar) return;
-  if (att) {
-    bar.classList.remove("hidden");
-    $("#pendingFileName").innerHTML = '<img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"> ' + esc(att.filename);
-  } else {
-    bar.classList.add("hidden");
-    $("#pendingFileName").textContent = "";
+  if (bar) {
+    if (att) {
+      bar.classList.remove("hidden");
+      $("#pendingFileName").innerHTML = '<img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"> ' + esc(att.filename);
+    } else {
+      bar.classList.add("hidden");
+      $("#pendingFileName").textContent = "";
+    }
   }
+  syncSendEnabled();
 }
 
 async function sendMessage() {
@@ -887,6 +890,7 @@ $("#logoutBtn").addEventListener("click", () => {
 
 $("#newChatBtn").addEventListener("click", openNewChat);
 $("#startBtn")?.addEventListener("click", openNewChat);
+$("#emptyAddBtn")?.addEventListener("click", openNewChat);
 $("#sendImBtn")?.addEventListener("click", openNewChat);
 $("#chatSearchBtn").addEventListener("click", openSearch);
 $("#settingsBtn")?.addEventListener("click", openSettings);
@@ -1077,7 +1081,14 @@ msgInput?.addEventListener("keydown", (e) => {
 msgInput?.addEventListener("input", () => {
   const lines = Math.min(msgInput.value.split("\n").length, 5);
   msgInput.rows = Math.max(1, lines);
+  syncSendEnabled();
 });
+function syncSendEnabled() {
+  const send = $("#sendBtn");
+  if (!send) return;
+  const hasText = !!(msgInput && msgInput.value.trim());
+  send.disabled = !(hasText || pendingAttachment);
+}
 
 $("#conversationList").addEventListener("click", (e) => {
   const row = e.target.closest(".contact-row");

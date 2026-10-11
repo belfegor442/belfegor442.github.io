@@ -304,7 +304,6 @@
   padding:4px 8px 4px 16px;
 }
 [data-theme="win98"] .contact-row.active{background:#0a246a;color:#fff;box-shadow:inset 3px 0 0 #fff}
-[data-theme="win98"] .contact-row.active{background:#0a246a;color:#fff}
 [data-theme="win98"] .contact-row.active .contact-time,
 [data-theme="win98"] .contact-row.active .contact-preview,
 [data-theme="win98"] .contact-row.active .msg-type-label{color:#d8e8ff}
@@ -343,13 +342,18 @@
 /* ---------- empty state (flat face, no Bliss shadows) ---------- */
 [data-theme="win98"] .empty-state h1,
 [data-theme="win98"] .empty-state p{color:#000;text-shadow:none}
+[data-theme="win98"] .empty-state .empty-hint{color:#404040;text-shadow:none}
 [data-theme="win98"] .empty-state .mesh-mark{filter:none}
 
 /* ---------- details panel ---------- */
 [data-theme="win98"] .detail-row{border-color:#808080}
-[data-theme="win98"] .file-row{
+[data-theme="win98"] .file-row,
+[data-theme="win98"] .picker-row{
   background:#fff;
   border-color:#808080;color:#000;
+}
+[data-theme="win98"] .picker-row{
+  border:1px solid #808080;padding:4px 6px;margin-bottom:4px;
 }
 
 /* ---------- dialogs ---------- */
@@ -559,4 +563,67 @@
   }
   [data-theme="win98"] .tb-btn{height:32px}
   [data-theme="win98"] .xp-btn{min-height:32px}
+  /* P1: logon becomes a stacked flow layout — no absolute OK/Cancel, no
+     200px label column, no 260px right reserve. Fields and buttons stack
+     vertically full-width so nothing overflows a 320px viewport. */
+  [data-theme="win98"] .xp-logon .logon-root{
+    position:absolute;
+    left:0;top:0;right:0;bottom:0;
+    transform:none;
+    width:100%;
+    height:100%;
+    overflow-y:auto;
+    border:0;
+    box-shadow:none;
+  }
+  [data-theme="win98"] .w98-logon-titlebar{
+    height:32px;padding:0 4px 0 10px;
+    font-size:13px;
+    position:sticky;top:0;z-index:2;
+  }
+  [data-theme="win98"] .w98-logon-caps .win-cap{width:22px;height:20px}
+  [data-theme="win98"] .w98-logon-caps .win-cap.close::before{left:3px;top:8px;width:12px;height:2px}
+  [data-theme="win98"] .w98-logon-caps .win-cap.close::after{left:3px;top:8px;width:12px;height:2px}
+  [data-theme="win98"] .w98-logon-head{
+    flex-direction:column;align-items:flex-start;gap:10px;
+    padding:14px 16px 0;
+  }
+  [data-theme="win98"] .w98-logon-key{width:48px;height:48px}
+  [data-theme="win98"] .w98-logon-text{font-size:14px}
+  [data-theme="win98"] .xp-logon .logon-col{
+    display:flex;flex-direction:column;
+    padding:14px 16px 24px;
+  }
+  [data-theme="win98"] .xp-logon .logon-fields{
+    position:static;transform:none;width:auto;
+    display:flex;flex-direction:column;gap:0;
+    padding-right:0;
+  }
+  [data-theme="win98"] #authView #rowUsername{display:flex!important}
+  [data-theme="win98"] .xp-logon .logon-f-row{
+    display:flex;flex-direction:column;align-items:stretch;gap:4px;
+    margin-bottom:12px;
+  }
+  [data-theme="win98"] .xp-logon .logon-f-label{
+    width:auto;text-align:left;font-size:13px;
+  }
+  [data-theme="win98"] .xp-logon .logon-f-box{height:40px}
+  [data-theme="win98"] .xp-logon .logon-f-box input{font-size:16px}
+  /* buttons join the flow: full-width, stacked, static */
+  [data-theme="win98"] .xp-logon .logon-arrow{
+    position:static;
+    width:100%;height:44px;
+    margin-top:4px;
+  }
+  [data-theme="win98"] #w98CancelBtn{
+    position:static;
+    width:100%;height:44px;
+    margin-top:10px;
+  }
+  [data-theme="win98"] .xp-logon .logon-error,
+  [data-theme="win98"] .xp-logon .logon-hint{font-size:12px}
+  [data-theme="win98"] .xp-logon .logon-add{
+    position:static;transform:none;
+    align-self:center;margin-top:16px;
+  }
 }
