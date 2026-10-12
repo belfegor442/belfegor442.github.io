@@ -60,7 +60,12 @@ export function wsEndpoint() {
   return apiBase().replace(/^http/, "ws") + "/ws";
 }
 
-async function probe(url, timeoutMs = 10000) {
+// Cheap liveness check for the current base (login screen auto-retry).
+export async function pingServer(timeoutMs = 5000) {
+  return probe(apiBase(), timeoutMs);
+}
+
+async function probe(url, timeoutMs = 5000) {
   const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
@@ -111,11 +116,13 @@ export async function resolveApiBase(candidate) {
   if (stored && isAllowedBase(stored)) order.push(stored);
   for (const c of SERVER_CANDIDATES) if (!order.includes(c)) order.push(c);
 
-  for (const candidate of order) {
-    if (await probe(candidate)) {
-      setApiBase(candidate);
-      return candidate;
-    }
+  // Probe every candidate in parallel: a dead server costs one timeout
+  // instead of one timeout per candidate (was up to ~30s of dead air).
+  const hits = await Promise.all(order.map((c) => probe(c, 5000)));
+  const idx = hits.indexOf(true);
+  if (idx >= 0) {
+    setApiBase(order[idx]);
+    return order[idx];
   }
   // Nothing answered: keep the remembered/primary URL so the UI can show a
   // real "server unreachable" state instead of guessing forever.

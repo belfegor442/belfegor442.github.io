@@ -97,6 +97,9 @@ $("#regForm")?.addEventListener("submit", async (e) => {
     playSound("logon");
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Registration failed.");
+    if (!(err instanceof ApiError) || err.status === 0 || err.status === 502 || err.status === 503) {
+      startServerWatch();
+    }
     playSound("error");
   } finally {
     btn.disabled = false;
@@ -152,8 +155,11 @@ $("#authForm").addEventListener("submit", async (e) => {
     playSound("logon");
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Sign-in failed.");
-    playSound("error");
     if (hint) hint.textContent = "";
+    if (!(err instanceof ApiError) || err.status === 0 || err.status === 502 || err.status === 503) {
+      startServerWatch();
+    }
+    playSound("error");
   } finally {
     btn.disabled = false;
     if (hint && !errBox.textContent) hint.textContent = "";
@@ -192,6 +198,7 @@ async function startSession() {
   }
   state.selfNode = "u" + state.user.user_id;
   booted = false;
+  stopServerWatch();
   ui.showApp();
   ui.renderProfile();
   applyServerSettings();
@@ -1903,6 +1910,39 @@ if (window.visualViewport) {
   });
 }
 
+/* ---------------- server availability watch ---------------- */
+let serverWatchTimer = 0;
+
+function stopServerWatch() {
+  if (serverWatchTimer) {
+    clearInterval(serverWatchTimer);
+    serverWatchTimer = 0;
+  }
+}
+
+// Login/register/boot failed at the network level: re-probe the candidate
+// servers every few seconds so the screen heals itself when one comes back
+// (the funnel/host may have been rebooting) — no manual page reload needed.
+function startServerWatch() {
+  if (serverWatchTimer) return;
+  const hint = $("#authHint");
+  if (hint && !hint.textContent) hint.textContent = "Server unreachable — retrying automatically...";
+  serverWatchTimer = setInterval(async () => {
+    if (!serverWatchTimer) return;
+    try {
+      await resolveApiBase(); // re-probe all candidates, repoint if one is healthy
+      const h = await api.health();
+      if (!h.ok) return;
+      stopServerWatch();
+      authNotice = "";
+      showErr($("#authError"), "");
+      if (hint) hint.textContent = "Server is back online — sign in to continue.";
+      ui.toast("Server is back online");
+      playSound("message");
+    } catch { /* next tick */ }
+  }, 8000);
+}
+
 /* ---------------- boot ---------------- */
 
 async function boot() {
@@ -1928,10 +1968,11 @@ async function boot() {
     await startSession();
   } catch (e) {
     setToken("");
-    authNotice =
-      e instanceof ApiError && e.status === 401
-        ? "Session expired — please sign in again."
-        : "Cannot reach the msg.mesh server. Check your connection and retry.";
+    const netDown = !(e instanceof ApiError) || e.status === 0 || e.status === 502 || e.status === 503;
+    authNotice = e instanceof ApiError && e.status === 401
+      ? "Session expired — please sign in again."
+      : "Cannot reach the msg.mesh server. Check your connection and retry.";
+    if (netDown) startServerWatch();
     ui.showAuth("login");
     setMode("login");
     route();
