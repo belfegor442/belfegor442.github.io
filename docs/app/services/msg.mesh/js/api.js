@@ -168,6 +168,12 @@ export function notifyUnauthorized() {
   }
 }
 
+// Fired after a successful mid-session failover so the WebSocket layer can
+// drop its (dead) socket and reconnect against the new base immediately,
+// instead of waiting for the watchdog to notice the half-open connection.
+let onServerSwitch = null;
+export function setOnServerSwitch(fn) { onServerSwitch = fn; }
+
 const FRIENDLY = {
   0: "Cannot reach the msg.mesh server. Check your connection.",
   401: "Your session is no longer valid. Please sign in again.",
@@ -237,6 +243,9 @@ export function failoverBase() {
       if (cand === prev) continue;
       if (await probe(cand, 3000)) {
         setApiBase(cand);
+        if (onServerSwitch) {
+          try { onServerSwitch(cand, prev); } catch { /* optional hook */ }
+        }
         return cand;
       }
     }

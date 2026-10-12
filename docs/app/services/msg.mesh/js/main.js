@@ -1,6 +1,6 @@
-import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, lastUsername, rememberUsername } from "./api.js";
+import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
 import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache } from "./store.js";
-import { connect as wsConnect, disconnect as wsDisconnect } from "./ws.js";
+import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
 import { playSound, primeSound } from "./sound.js";
@@ -186,6 +186,10 @@ function handleSessionLost() {
   else location.hash = "#/login";
 }
 setOnUnauthorized(handleSessionLost);
+// Mid-session node failover: the old socket points at the dead node, so drop
+// it now and reconnect against the base we just switched to (ws.js would
+// otherwise wait for the 30s x2 watchdog to notice the half-open connection).
+setOnServerSwitch(() => { try { wsForceReconnect(); } catch { /* reconnect loop continues */ } });
 
 async function startSession() {
   try {
