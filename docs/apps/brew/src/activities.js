@@ -155,6 +155,44 @@ register('highlow', {
 
 const RPS_BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
 
+register('dice', {
+  label: 'DICE ROLL',
+  minPlayers: 2,
+  maxPlayers: 2,
+  prompt: 'ROLL — HIGHEST TOTAL TAKES THE POT',
+  pickInfo: () => 'Two dice each · equal totals push',
+  choices: [{ v: 'roll', label: 'ROLL', cls: 'red' }],
+  resultLabel: act => String(act.result || '').toUpperCase(),
+  validate(host, act) {
+    if (act.players.length !== 2) return 'need-two-players';
+    for (const id of act.players) {
+      const p = host.players.get(id);
+      if (!p) return 'unknown-player';
+      if (p.balance < 1) return 'no-balance';
+    }
+    return null;
+  },
+  input(host, act, uid, payload) {
+    if (readPick(payload) !== 'roll') return { error: 'bad-pick' };
+    if (act.inputs[uid]) return { error: 'already-picked' };
+    act.inputs[uid] = 'roll';
+    const ids = act.players;
+    if (!ids.every(id => act.inputs[id])) return {};
+    const roll = () => 1 + Math.floor(Math.random() * 6);
+    const totals = {};
+    for (const id of ids) totals[id] = roll() + roll();
+    act.data.totals = totals;
+    const [a, b] = ids.map(id => totals[id]);
+    let winners = [], losers = [];
+    if (a !== b) {
+      const w = totals[ids[0]] > totals[ids[1]] ? ids[0] : ids[1];
+      winners = [w];
+      losers = ids.filter(id => id !== w);
+    }
+    return finish(act, a + ' vs ' + b, transfer(host, act, winners, losers));
+  }
+});
+
 register('rps', {
   label: 'ROCK PAPER SCISSORS',
   minPlayers: 2,

@@ -64,6 +64,7 @@ export class Input {
     if (c === 'KeyF') { e.preventDefault(); this.emit('activity'); return; }
     if (c === 'KeyC') { e.preventDefault(); this.emit('camtoggle'); return; }
     if (c === 'KeyV') { e.preventDefault(); this.emit('fp'); return; }
+    if (c === 'KeyH') { e.preventDefault(); this.emit('help'); return; }
     if (/^Digit[1-5]$/.test(c)) { this.emit('emote', ['wave', 'laugh', 'clap', 'dance', 'think'][+c.slice(5) - 1]); return; }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(c)) e.preventDefault();
     this.keys.add(c);
@@ -87,8 +88,14 @@ export class Input {
     x = Math.max(-1, Math.min(1, x));
     y = Math.max(-1, Math.min(1, y));
     if (x && y) { const inv = Math.SQRT1_2; x *= inv; y *= inv; }
-    if (this.touchAxis.active) { x = this.touchAxis.x; y = this.touchAxis.y; }
-    return { x, y, sprint: k.has('ShiftLeft') || k.has('ShiftRight') };
+    let sprint = k.has('ShiftLeft') || k.has('ShiftRight');
+    if (this.touchAxis.active) {
+      x = this.touchAxis.x;
+      y = this.touchAxis.y;
+      // Shoving the stick to the rim runs.
+      if (Math.hypot(x, y) > 0.92) sprint = true;
+    }
+    return { x, y, sprint };
   }
 
   arrows() {

@@ -2,7 +2,8 @@
 // different URLs becomes two module instances (nav state in one, seats in the
 // other). Cache busting lives on ./app.js?v=NN in index.html only.
 import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf, eject } from './src/world.js';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf, eject, getNav } from './src/world.js';
+import { findPath } from './src/path.js';
 import { Host } from './src/state.js';
 import { Net } from './src/net.js';
 import { Renderer } from './src/render.js';
@@ -648,6 +649,7 @@ input.on('chat', () => ui.focusChat());
 input.on('interact', interact);
 input.on('activity', startActivity);
 input.on('emote', key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); });
+input.on('help', toggleHelp);
   input.on('camtoggle', () => {
     const on = renderer.toggleFreeCam();
     ui.toast(on ? 'FREE CAM — drag: orbit · wheel: zoom · arrows: pan · C: follow' : 'FOLLOW CAM');
@@ -656,6 +658,77 @@ input.on('emote', key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase()
     const on = renderer.toggleFP();
     ui.toast(on ? 'FIRST PERSON — drag: look · WASD: move · V: exit' : 'FOLLOW CAM');
   });
+
+function toggleHelp() {
+  const el = document.getElementById('helpPanel');
+  if (el) el.classList.toggle('hidden');
+}
+document.getElementById('helpBtn')?.addEventListener('click', toggleHelp);
+document.getElementById('helpClose')?.addEventListener('click', toggleHelp);
+
+// --- click / tap to move -------------------------------------------------
+// A tap on the floor paths there over the nav grid; tapping a free stool or
+// the light switch walks over and fires interact on arrival. Any manual
+// movement input cancels the route.
+let movePath = null;
+let pathAction = null;
+let pathStuckT = 0;
+const pathLast = { x: 0, y: 0 };
+
+function startPath(tx, ty, action) {
+  const p = findPath(getNav(), me.x, me.y, tx, ty, RADIUS);
+  if (!p || !p.length) {
+    if (action) ui.toast('No route over there.');
+    return;
+  }
+  movePath = p;
+  pathAction = action || null;
+  pathStuckT = 0;
+  pathLast.x = me.x;
+  pathLast.y = me.y;
+}
+
+function onPathArrive() {
+  const act = pathAction;
+  pathAction = null;
+  if (act !== 'interact' || !me) return;
+  const seat = nearestSeat(me.x, me.y, PROX.interact);
+  const sw = insideInteract(me.x, me.y, PROX.interact);
+  if ((seat && !seat.occupiedBy) || sw) interact();
+}
+
+function handleWorldClick(clientX, clientY) {
+  if (!me || me.status !== 'standing' || input.typing() || !input.enabled) return;
+  const rect = canvas.getBoundingClientRect();
+  const g = renderer.screenToGround(clientX - rect.left, clientY - rect.top);
+  if (!g) return;
+  const x = Math.max(MAP.wall + RADIUS, Math.min(MAP.w - MAP.wall - RADIUS, g.x));
+  const y = Math.max(MAP.wall + RADIUS, Math.min(MAP.h - MAP.wall - RADIUS, g.z));
+  let action = null;
+  const seat = nearestSeat(x, y, 64);
+  if (seat && !seat.occupiedBy) action = 'interact';
+  if (!action) {
+    for (const o of OBJECTS) {
+      if (o.type !== 'switch') continue;
+      if (Math.hypot(o.x + o.w / 2 - x, o.y + o.h / 2 - y) < 64) { action = 'interact'; break; }
+    }
+  }
+  startPath(x, y, action);
+}
+
+let clickDown = null;
+canvas.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  clickDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+});
+canvas.addEventListener('pointerup', e => {
+  const d = clickDown;
+  clickDown = null;
+  if (!d || e.button !== 0 || e.target !== canvas) return;
+  if (performance.now() - d.t > 450) return;
+  if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 9) return;
+  handleWorldClick(e.clientX, e.clientY);
+});
 
 ui.bind({
   enter,
@@ -701,12 +774,42 @@ function frame(now) {
   }
   if (me && input.enabled && me.status === 'standing' && !input.typing()) {
     const a = input.axis(renderer.freeCam);
+    const manual = Math.hypot(a.x, a.y) > 0.02;
+    if (manual && movePath) { movePath = null; pathAction = null; }
     // Movement is camera-relative: W/joystick-up always means "towards the camera target".
     const yaw = renderer.orbit.yaw;
     const sy = Math.sin(yaw), cy = Math.cos(yaw);
-    const wx = cy * a.x + sy * a.y;
-    const wy = -sy * a.x + cy * a.y;
-    const moving = Math.hypot(wx, wy) > 0.02;
+    let wx = 0, wy = 0;
+    let moving = false;
+    if (manual) {
+      wx = cy * a.x + sy * a.y;
+      wy = -sy * a.x + cy * a.y;
+      moving = Math.hypot(wx, wy) > 0.02;
+    } else if (movePath && movePath.length) {
+      while (movePath.length &&
+        Math.hypot(movePath[0].x - me.x, movePath[0].y - me.y) < 16) movePath.shift();
+      if (!movePath.length) {
+        movePath = null;
+        onPathArrive();
+      } else {
+        const wp = movePath[0];
+        const dx = wp.x - me.x, dy = wp.y - me.y;
+        const d = Math.hypot(dx, dy) || 1;
+        wx = dx / d; wy = dy / d;
+        moving = true;
+        pathStuckT += dt;
+        if (pathStuckT > 0.7) {
+          if (Math.hypot(me.x - pathLast.x, me.y - pathLast.y) < 8) {
+            movePath = null;
+            pathAction = null;
+          }
+          pathStuckT = 0;
+          pathLast.x = me.x;
+          pathLast.y = me.y;
+        }
+      }
+    }
+    renderer.sprint = moving && !!a.sprint;
     const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
     const accel = moving ? 2600 : 2200;
     const targetX = moving ? wx * targetSpeed : 0;
@@ -729,6 +832,9 @@ function frame(now) {
     if (isHost && authority) authority.applyMove(me.id, { x: me.x, y: me.y, dir: me.dir, anim: me.anim }, Date.now());
   } else {
     motion.x = motion.y = 0;
+    movePath = null;
+    pathAction = null;
+    renderer.sprint = false;
   }
 
   for (const p of players.values()) {

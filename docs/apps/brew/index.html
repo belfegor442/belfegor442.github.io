@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-brew-build="24">
+<html lang="en" data-brew-build="25">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="BREW — a browser-based 2.5D multiplayer social arcade world by North Assembly.">
 <title>BREW — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
-<link rel="stylesheet" href="./style.css?v=24">
+<link rel="stylesheet" href="./style.css?v=25">
 </head>
 <body class="world">
 <canvas id="world"></canvas>
@@ -23,6 +23,7 @@
       <button id="shareBtn" class="mini">SHARE</button>
     </div>
     <div class="hud-actions">
+      <button id="helpBtn" class="mini" title="Controls (H)">?</button>
       <button id="skinBtn" class="mini">SKIN</button>
       <button id="sndBtn" class="mini">SOUND ON</button>
       <button id="leaveBtn" class="mini">LEAVE</button>
@@ -64,6 +65,24 @@
     <span class="k">SKIN</span>
     <div id="skinPickGame" class="skin-pick"></div>
   </div>
+  <div id="helpPanel" class="help-panel hidden">
+    <span class="k">CONTROLS</span>
+    <div class="help-grid">
+      <b>WASD · ARROWS</b><i>MOVE</i>
+      <b>SHIFT</b><i>SPRINT</i>
+      <b>CLICK / TAP FLOOR</b><i>WALK THERE</i>
+      <b>CLICK STOOL</b><i>WALK &amp; SIT</i>
+      <b>E · Q</b><i>SIT · STAND · LIGHTS</i>
+      <b>F</b><i>START A GAME AT THE TABLE</i>
+      <b>1 – 5</b><i>EMOTES</i>
+      <b>C</b><i>FREE CAMERA</i>
+      <b>V</b><i>FIRST PERSON</i>
+      <b>ENTER</b><i>CHAT</i>
+      <b>DRAG · WHEEL</b><i>ORBIT · ZOOM</i>
+      <b>H · ?</b><i>THIS PANEL</i>
+    </div>
+    <button id="helpClose" class="mini">CLOSE</button>
+  </div>
   <div id="toast" class="toast hidden"></div>
 </div>
 
@@ -76,7 +95,7 @@
       <span class="bulbs"></span>
     </div>
     <div class="entry-tags">
-      <span>COINFLIP</span><span>SLOTS</span><span>HIGH·LOW</span><span>RPS</span><span>ROULETTE</span><span>POKER</span>
+      <span>COINFLIP</span><span>SLOTS</span><span>HIGH·LOW</span><span>RPS</span><span>ROULETTE</span><span>POKER</span><span>DICE</span>
     </div>
     <div class="entry-body">
       <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
@@ -90,6 +109,6 @@
 </div>
 
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-<script type="module" src="./app.js?v=24"></script>
+<script type="module" src="./app.js?v=25"></script>
 </body>
 </html>

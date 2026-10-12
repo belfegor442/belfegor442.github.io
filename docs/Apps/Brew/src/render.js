@@ -105,6 +105,9 @@ export class Renderer {
     this.freeCam = false;
     this.fp = false;
     this.fpPitch = 0;
+    this.sprint = false;
+    this._sk = 0;
+    this._ray = null;
     this._drag = null;
     this._pts = new Map();
     this._pinch = 0;
@@ -733,6 +736,39 @@ export class Renderer {
     return { x: sx, y: sy };
   }
 
+  // Store the camera basis for this frame so clicks can be unprojected to the
+  // floor (click/tap-to-move).
+  setRay(ox, oy, oz, txx, tyy, tzz, fovy, aspect) {
+    let fx = txx - ox, fy = tyy - oy, fz = tzz - oz;
+    let l = Math.hypot(fx, fy, fz) || 1;
+    fx /= l; fy /= l; fz /= l;
+    // right = fwd x up(0,1,0)
+    let rx = -fz, ry = 0, rz = fx;
+    l = Math.hypot(rx, ry, rz) || 1;
+    rx /= l; ry /= l; rz /= l;
+    // up = right x fwd
+    const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;
+    this._ray = { ox, oy, oz, fx, fy, fz, rx, ry, rz, ux, uy, uz, tan: Math.tan(fovy / 2), aspect };
+  }
+
+  // Intersect the view ray through (x, y) with the floor plane y=0.
+  screenToGround(x, y) {
+    const r = this._ray;
+    if (!r) return null;
+    const ndcX = (x / Math.max(1, this.vw)) * 2 - 1;
+    const ndcY = 1 - (y / Math.max(1, this.vh)) * 2;
+    const tx = ndcX * r.tan * r.aspect, ty = ndcY * r.tan;
+    let dx = r.fx + r.rx * tx + r.ux * ty;
+    let dy = r.fy + r.ry * tx + r.uy * ty;
+    let dz = r.fz + r.rz * tx + r.uz * ty;
+    const l = Math.hypot(dx, dy, dz) || 1;
+    dx /= l; dy /= l; dz /= l;
+    if (dy > -0.02) return null;
+    const t = -r.oy / dy;
+    if (t <= 0 || t > 7000) return null;
+    return { x: r.ox + dx * t, z: r.oz + dz * t };
+  }
+
   draw(me, players, activity, dt) {
     this.stats.frames++;
     const list = Array.isArray(players) ? players.slice() : [...players];
@@ -758,12 +794,15 @@ export class Renderer {
     const gl = this.gl;
     const def = this.lights ? this.litDef : this.nightDef;
     const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+    // Sprint opens the view slightly (eased in/out) for a sense of speed.
+    this._sk += ((this.sprint ? 1 : 0) - this._sk) * Math.min(1, (dt || 0.016) * 7);
     // Keep the horizontal view wide on portrait/narrow screens so the whole
     // room fits instead of a thin slice; desktop keeps the classic 45° vFOV.
     const BASE_FOV = Math.PI / 4, HREF = 1.6;
-    const fovy = aspect < HREF
+    const baseFov = aspect < HREF
       ? Math.min(1.4, 2 * Math.atan(Math.tan(BASE_FOV / 2) * HREF / Math.max(0.4, aspect)))
       : BASE_FOV;
+    const fovy = baseFov * (1 + 0.07 * this._sk);
     perspective(this.mProj, fovy, aspect, 5, 9000);
     const orb = this.camOrbit;
     // Fog scales with zoom: fixed range drowned distant views in haze, so
@@ -783,16 +822,41 @@ export class Renderer {
       const ex = px, ey = 32 + bob, ez = pz;
       const cp = Math.cos(this.fpPitch), sp = Math.sin(this.fpPitch);
       this.eye.x = ex; this.eye.y = ey; this.eye.z = ez;
-      lookAt(this.mView, ex, ey, ez,
-        ex - Math.sin(o.yaw) * cp * 100, ey + sp * 100, ez - Math.cos(o.yaw) * cp * 100);
+      const lx = ex - Math.sin(o.yaw) * cp * 100, ly = ey + sp * 100, lz = ez - Math.cos(o.yaw) * cp * 100;
+      lookAt(this.mView, ex, ey, ez, lx, ly, lz);
+      this.setRay(ex, ey, ez, lx, ly, lz, fovy, aspect);
     } else {
       const o = this.orbit;
       const cp = Math.cos(o.pitch), sp = Math.sin(o.pitch);
-      const ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist;
-      const ey = sp * o.dist;
-      const ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist;
+      let ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist;
+      let ey = Math.max(14, sp * o.dist);
+      let ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist;
+      // A low eye inside a wall or furniture pulls in toward the target
+      // (converging on the free spot the player stands in). High eyes are
+      // above everything and may sit outside the walls — that is the
+      // intended over-the-top overview. The eye is tested as a point
+      // against exact solids: the nav grid is cell-quantised and would
+      // over-reject the open strip beside any wall.
+      if (ey < 64) {
+        const eyeBlocked = (x, z) => {
+          if (x < MAP.wall + 3 || x > MAP.w - MAP.wall - 3 ||
+            z < MAP.wall + 3 || z > MAP.h - MAP.wall - 3) return true;
+          for (const ob of OBJECTS) {
+            if (ob.solid && x > ob.x && x < ob.x + ob.w && z > ob.y && z < ob.y + ob.h) return true;
+          }
+          return false;
+        };
+        let f = 1;
+        while (f >= 0.04 && eyeBlocked(ex, ez)) {
+          f *= 0.85;
+          ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist * f;
+          ey = Math.max(8, sp * o.dist * f);
+          ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist * f;
+        }
+      }
       this.eye.x = ex; this.eye.y = ey; this.eye.z = ez;
       lookAt(this.mView, ex, ey, ez, this.cam.x, 0, this.cam.z);
+      this.setRay(ex, ey, ez, this.cam.x, 0, this.cam.z, fovy, aspect);
     }
     mul(this.mVP, this.mProj, this.mView);
 
@@ -1183,6 +1247,29 @@ export class Renderer {
         o.stroke();
       }
       o.globalAlpha = 1;
+
+      // Same affordance ring over the light switch when it is in reach.
+      const sw = OBJ_BY_ID.get('lights');
+      if (sw && me.status !== 'seated') {
+        const sx0 = sw.x + sw.w / 2, sz0 = sw.y + sw.h / 2;
+        const sd = Math.hypot(sx0 - meX, sz0 - meZ);
+        if (sd <= 58) {
+          const c1 = this.sp(sx0, 40, sz0);
+          const e1 = this.sp(sx0 + 17, 40, sz0);
+          if (c1 && e1) {
+            const r = Math.hypot(e1.x - c1.x, e1.y - c1.y);
+            if (r >= 2 && r <= 300) {
+              o.globalAlpha = 0.18 + (1 - sd / 58) * 0.4 + Math.sin(this.time * 3) * 0.05;
+              o.strokeStyle = 'rgba(233,200,119,.9)';
+              o.lineWidth = 1.5;
+              o.beginPath();
+              o.arc(c1.x, c1.y, r, 0, Math.PI * 2);
+              o.stroke();
+              o.globalAlpha = 1;
+            }
+          }
+        }
+      }
     }
 
     for (const p of list) {

@@ -101,6 +101,16 @@ button{font:inherit;cursor:pointer;border-radius:0}
 }
 .skin-panel .k{display:block;color:var(--gold-dim);font-size:9px;font-weight:700;letter-spacing:.24em;margin-bottom:8px}
 
+.help-panel{
+  position:absolute;top:74px;left:16px;min-width:300px;max-width:min(92vw,420px);
+  background:var(--panel-2);border:1px solid var(--line);
+  padding:12px 14px;box-shadow:0 10px 26px rgba(0,0,0,.5)
+}
+.help-panel .k{display:block;color:var(--gold-dim);font-size:9px;font-weight:700;letter-spacing:.24em;margin-bottom:10px}
+.help-grid{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:10px;letter-spacing:.08em;margin-bottom:12px}
+.help-grid b{color:var(--gold);font-weight:700;white-space:nowrap}
+.help-grid i{color:var(--muted);font-style:normal}
+
 .chatbox{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);padding:0;box-shadow:0 10px 26px rgba(0,0,0,.5)}
 .chatlog{height:108px;overflow:auto;font-size:12px;line-height:1.5;padding:10px 12px}
 .chatlog .line{color:var(--muted);word-break:break-word;letter-spacing:.02em}
