@@ -321,10 +321,12 @@ export class Renderer {
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.055, 0.043, 0.035], fogRange: [1150, 3300]
     };
+    // Night reads as a warm, well-kept casino — brighter amber-neutral
+    // ambient and a light warm haze instead of a dark blue-violet gloom.
     this.nightDef = {
-      amb: [0.11, 0.12, 0.20], sun: [0.10, 0.11, 0.22],
+      amb: [0.175, 0.155, 0.175], sun: [0.14, 0.135, 0.20],
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
-      fog: [0.016, 0.015, 0.028], fogRange: [700, 2500]
+      fog: [0.040, 0.034, 0.038], fogRange: [1150, 3300]
     };
     this.initShadowMap();
     if (this.useImportedWorld) this.loadGLBAssets();
@@ -418,7 +420,7 @@ export class Renderer {
     const P = this.pGLB;
     if (!P.u.uLightPos) return;
     const gl = this.gl;
-    const night = this.lights ? 1 : 1.75;
+    const night = this.lights ? 1 : 1.95;
     const list = LIGHTS.map(l => {
       const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
       return { l, d: dx * dx + dy * dy + dz * dz };
@@ -802,7 +804,7 @@ export class Renderer {
     const baseFov = aspect < HREF
       ? Math.min(1.4, 2 * Math.atan(Math.tan(BASE_FOV / 2) * HREF / Math.max(0.4, aspect)))
       : BASE_FOV;
-    const fovy = baseFov * (1 + 0.07 * this._sk);
+    const fovy = baseFov * (1 + 0.03 * this._sk);
     perspective(this.mProj, fovy, aspect, 5, 9000);
     const orb = this.camOrbit;
     // Fog scales with zoom: fixed range drowned distant views in haze, so
@@ -831,26 +833,35 @@ export class Renderer {
       let ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist;
       let ey = Math.max(14, sp * o.dist);
       let ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist;
-      // A low eye inside a wall or furniture pulls in toward the target
-      // (converging on the free spot the player stands in). High eyes are
-      // above everything and may sit outside the walls — that is the
-      // intended over-the-top overview. The eye is tested as a point
-      // against exact solids: the nav grid is cell-quantised and would
-      // over-reject the open strip beside any wall.
-      if (ey < 64) {
+      // A low eye inside a wall, furniture or the roof-beam band pulls in
+      // toward the target (converging on the free spot the player stands
+      // in). High eyes are above everything and may sit outside the walls —
+      // that is the intended over-the-top overview. The eye is tested as a
+      // point: the nav grid is cell-quantised and would over-reject the
+      // open strip beside any wall, and an eye parked inside a beam renders
+      // its top edge-on as a giant brown wall.
+      if (ey < 150) {
         const eyeBlocked = (x, z) => {
           if (x < MAP.wall + 3 || x > MAP.w - MAP.wall - 3 ||
             z < MAP.wall + 3 || z > MAP.h - MAP.wall - 3) return true;
+          if (ey >= 123 && ey <= 149) {
+            for (const bz of [170, 430, 730, 1030]) if (Math.abs(z - bz) <= 13) return true;
+            if (Math.abs(x - 600) <= 10 || Math.abs(x - 1500) <= 10) return true;
+            if (z < 46 || z > MAP.h - 46) return true;
+          }
           for (const ob of OBJECTS) {
             if (ob.solid && x > ob.x && x < ob.x + ob.w && z > ob.y && z < ob.y + ob.h) return true;
           }
           return false;
         };
         let f = 1;
-        while (f >= 0.04 && eyeBlocked(ex, ez)) {
-          f *= 0.85;
+        while (f >= 0.05 && eyeBlocked(ex, ez)) {
+          f *= 0.92;
           ex = this.cam.x + Math.sin(o.yaw) * cp * o.dist * f;
-          ey = Math.max(8, sp * o.dist * f);
+          // never drop to floor level while pulling in: a camera parked at
+          // ankle height inside a corner reads as a horror tunnel. 44 keeps
+          // a normal third-person look even in the worst squeeze.
+          ey = Math.max(44, sp * o.dist * f);
           ez = this.cam.z + Math.cos(o.yaw) * cp * o.dist * f;
         }
       }

@@ -674,6 +674,9 @@ let movePath = null;
 let pathAction = null;
 let pathStuckT = 0;
 const pathLast = { x: 0, y: 0 };
+// Steering direction while pathing: lerped toward the next waypoint so the
+// avatar arcs through corners instead of snapping 90° like a robot.
+const moveSteer = { x: 0, y: 0 };
 
 function startPath(tx, ty, action) {
   const p = findPath(getNav(), me.x, me.y, tx, ty, RADIUS);
@@ -686,6 +689,15 @@ function startPath(tx, ty, action) {
   pathStuckT = 0;
   pathLast.x = me.x;
   pathLast.y = me.y;
+  const fx = tx - me.x, fy = ty - me.y;
+  const fl = Math.hypot(fx, fy);
+  if (fl > 2) {
+    moveSteer.x = fx / fl;
+    moveSteer.y = fy / fl;
+  } else {
+    moveSteer.x = Math.cos(me.dir);
+    moveSteer.y = Math.sin(me.dir);
+  }
 }
 
 function onPathArrive() {
@@ -784,10 +796,12 @@ function frame(now) {
     if (manual) {
       wx = cy * a.x + sy * a.y;
       wy = -sy * a.x + cy * a.y;
+      moveSteer.x = wx;
+      moveSteer.y = wy;
       moving = Math.hypot(wx, wy) > 0.02;
     } else if (movePath && movePath.length) {
       while (movePath.length &&
-        Math.hypot(movePath[0].x - me.x, movePath[0].y - me.y) < 16) movePath.shift();
+        Math.hypot(movePath[0].x - me.x, movePath[0].y - me.y) < 22) movePath.shift();
       if (!movePath.length) {
         movePath = null;
         onPathArrive();
@@ -795,7 +809,14 @@ function frame(now) {
         const wp = movePath[0];
         const dx = wp.x - me.x, dy = wp.y - me.y;
         const d = Math.hypot(dx, dy) || 1;
-        wx = dx / d; wy = dy / d;
+        // ease the steering vector toward the waypoint so direction changes
+        // blend into arcs; normalise after the lerp to keep speed constant
+        const k = Math.min(1, dt * 7);
+        moveSteer.x += (dx / d - moveSteer.x) * k;
+        moveSteer.y += (dy / d - moveSteer.y) * k;
+        const sl = Math.hypot(moveSteer.x, moveSteer.y) || 1;
+        wx = moveSteer.x / sl;
+        wy = moveSteer.y / sl;
         moving = true;
         pathStuckT += dt;
         if (pathStuckT > 0.7) {
@@ -811,7 +832,9 @@ function frame(now) {
     }
     renderer.sprint = moving && !!a.sprint;
     const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
-    const accel = moving ? 2600 : 2200;
+    // pathing accelerates gently so the walk reads natural; manual input
+    // stays responsive
+    const accel = moving ? (manual ? 2600 : 1600) : 2200;
     const targetX = moving ? wx * targetSpeed : 0;
     const targetY = moving ? wy * targetSpeed : 0;
     const blend = Math.min(1, accel * dt / Math.max(targetSpeed, 1));
