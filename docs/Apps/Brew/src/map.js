@@ -8,7 +8,8 @@ const tableRects = OBJECTS.filter(o => o.type === 'table');
 const MAT_ORDER = [
   'carpet', 'tile', 'woodFloor', 'woodDark', 'woodWarm', 'beam', 'brick',
   'plaster', 'brass', 'leather', 'felt', 'rug', 'steel', 'glass', 'neon',
-  'wheel', 'slotFace', 'sign'
+  'wheel', 'slotFace', 'sign', 'dance', 'bulb', 'chipR', 'chipB',
+  'posterA', 'posterB', 'nightSky'
 ];
 
 function stadium(b, name, cx, cz, w, d, y0, h, opts) {
@@ -25,6 +26,11 @@ function pokerTable(b, t) {
   b.cyl('woodWarm', cx, 0, cz, 20, 16, 8, 16, { tile: 24 });
   stadium(b, 'woodWarm', cx, cz, w + 6, d + 6, 26, 4, { tile: 30, localUV: true });
   stadium(b, 'felt', cx, cz, w - 10, d - 14, 30, 2.4, { tile: 22, localUV: true });
+  chipStack(b, 'chipR', cx - 22, cz - 30, 4);
+  chipStack(b, 'chipB', cx + 24, cz - 26, 3);
+  chipStack(b, 'chipR', cx + 18, cz + 34, 5);
+  cardDeck(b, cx - 6, cz + 4, 0.4);
+  cardDeck(b, cx + 8, cz - 8, -0.3);
   for (const s of SEATS) {
     if (s.table !== t.id) continue;
     stool(b, s.x, s.y, s.dir);
@@ -38,6 +44,18 @@ function stool(b, x, z, dir) {
   b.cyl('leather', x, 20, z, 11, 10.5, 5, 14, { tile: 12 });
 }
 
+function chipStack(b, mat, x, z, n, y0) {
+  const y = y0 == null ? 32.4 : y0;
+  for (let i = 0; i < n; i++) {
+    b.cyl(mat, x, y + i * 1.6, z, 4.6, 4.6, 1.6, 10, { tile: 8 });
+  }
+}
+
+function cardDeck(b, x, z, rot) {
+  b.box('plaster', x, 31.8, z, 7, 1.6, 10, { tile: 6, rot, localUV: true });
+  b.box('plaster', x + 0.6, 33.4, z + 0.4, 7, 1.6, 10, { tile: 6, rot, localUV: true });
+}
+
 function rouletteTable(b, t, wheelTex) {
   const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
   const w = t.w, d = t.h;
@@ -48,6 +66,10 @@ function rouletteTable(b, t, wheelTex) {
   b.cyl('brass', cx, 40, cz, 26, 28, 3.5, 26, { tile: 12 });
   b.disc(wheelTex, cx, 43.6, cz, 25, 25, 26, { tile: 50 });
   b.cyl('brass', cx, 43.6, cz, 3, 2.2, 8, 10, { tile: 8 });
+  chipStack(b, 'chipB', cx - 40, cz - 80, 4, 36.4);
+  chipStack(b, 'chipR', cx + 40, cz - 76, 3, 36.4);
+  chipStack(b, 'chipB', cx - 38, cz + 82, 5, 36.4);
+  chipStack(b, 'chipR', cx + 42, cz + 78, 3, 36.4);
   for (const s of SEATS) {
     if (s.table !== t.id) continue;
     stool(b, s.x, s.y, s.dir);
@@ -137,9 +159,136 @@ function hangingLamp(b, x, z, drop) {
   b.cyl('neon', x, top - drop - 17.5, z, 6.5, 6.5, 1.5, 12, { tile: 6 });
 }
 
+// dir: +1 = wall at low z/x, fixture points into the room (+); -1 = opposite.
+// axis: 'z' = wall runs along x (north/south), 'x' = wall runs along z (east/west).
+// Pass the wall's inner face coordinate as x or z.
+function sconce(b, x, z, dir, axis) {
+  if (axis === 'x') {
+    b.box('brass', x + dir * 7, 100, z, 14, 3, 3, { tile: 8, localUV: true });
+    b.box('bulb', x + dir * 16, 92, z, 5, 13, 5, { tile: 8, localUV: true });
+  } else {
+    b.box('brass', x, 100, z + dir * 7, 3, 3, 14, { tile: 8, localUV: true });
+    b.box('bulb', x, 92, z + dir * 16, 5, 13, 5, { tile: 8, localUV: true });
+  }
+}
+
+// facePZ: art faces +z (mount on the north wall); otherwise faces -z (south wall).
+function poster(b, x, z, y, w, h, mat, facePZ) {
+  b.box('woodDark', x, y, z, w + 10, h + 10, 5, { tile: 18, localUV: true });
+  const zq = facePZ ? z + 3.2 : z - 3.2;
+  if (facePZ) {
+    b.quad(mat, [
+      [x - w / 2, y - h / 2, zq], [x + w / 2, y - h / 2, zq],
+      [x + w / 2, y + h / 2, zq], [x - w / 2, y + h / 2, zq]
+    ], [[0, 1], [1, 1], [1, 0], [0, 0]]);
+  } else {
+    b.quad(mat, [
+      [x + w / 2, y - h / 2, zq], [x - w / 2, y - h / 2, zq],
+      [x - w / 2, y + h / 2, zq], [x + w / 2, y + h / 2, zq]
+    ], [[0, 1], [1, 1], [1, 0], [0, 0]]);
+  }
+}
+
+// facePX: art faces +x (west wall); otherwise faces -x (east wall).
+function posterX(b, x, z, y, w, h, mat, facePX) {
+  b.box('woodDark', x, y, z, 5, h + 10, w + 10, { tile: 18, localUV: true });
+  const xq = facePX ? x + 3.2 : x - 3.2;
+  if (facePX) {
+    b.quad(mat, [
+      [xq, y - h / 2, z + w / 2], [xq, y - h / 2, z - w / 2],
+      [xq, y + h / 2, z - w / 2], [xq, y + h / 2, z + w / 2]
+    ], [[0, 1], [1, 1], [1, 0], [0, 0]]);
+  } else {
+    b.quad(mat, [
+      [xq, y - h / 2, z - w / 2], [xq, y - h / 2, z + w / 2],
+      [xq, y + h / 2, z + w / 2], [xq, y + h / 2, z - w / 2]
+    ], [[0, 1], [1, 1], [1, 0], [0, 0]]);
+  }
+}
+
+function cctv(b, x, z, dirX, dirZ) {
+  b.box('steel', x, 138, z, 10, 6, 6, { tile: 6, localUV: true });
+  b.box('steel', x + dirX * 8, 134, z + dirZ * 8, 7, 5, 12, { tile: 6, localUV: true });
+  b.cyl('glass', x + dirX * 13, 132, z + dirZ * 13, 2.2, 2.2, 3, 8, { tile: 4 });
+}
+
+function velvetRope(b, x0, x1, z) {
+  for (const x of [x0, x1]) {
+    b.cyl('brass', x, 0, z, 5, 4, 30, 10, { tile: 10 });
+    b.ellipsoid('brass', x, 32, z, 4, 4, 4, 3, 8);
+  }
+  const n = 4, sag = 9;
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n, t1 = (i + 1) / n;
+    const xa = x0 + (x1 - x0) * t0, xb = x0 + (x1 - x0) * t1;
+    const ya = 28 - Math.sin(Math.PI * t0) * sag;
+    const yb = 28 - Math.sin(Math.PI * t1) * sag;
+    const mx = (xa + xb) / 2, my = (ya + yb) / 2;
+    const len = Math.hypot(xb - xa, yb - ya);
+    const rot = Math.atan2(yb - ya, xb - xa);
+    b.box('leather', mx, my, z, len, 4.5, 4.5, { tile: 8, rot: 0, localUV: true });
+    void rot;
+  }
+}
+
+// Festoon bulbs on a sagging line; kept at y>=114 so nav (TALL=110) ignores them.
+function stringLights(b, x0, x1, z, yEnd, sag) {
+  const n = Math.max(4, Math.round((x1 - x0) / 56));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = x0 + (x1 - x0) * t;
+    const y = yEnd - Math.sin(Math.PI * t) * sag;
+    b.box('bulb', x, y, z, 3.4, 4.4, 3.4, { tile: 6, localUV: true });
+    if (i < n) {
+      const t2 = (i + 0.5) / n;
+      const y2 = yEnd - Math.sin(Math.PI * t2) * sag;
+      const xm = x0 + (x1 - x0) * t2;
+      const ym = (y + y2) / 2;
+      b.box('steel', xm, ym + 1.5, z, (x1 - x0) / n, 1, 1, { tile: 8, localUV: true });
+    }
+  }
+}
+
+function cocktailTable(b, x, z) {
+  b.cyl('brass', x, 0, z, 9, 7, 21, 12, { tile: 10 });
+  b.cyl('woodWarm', x, 21, z, 19, 18, 3.5, 16, { tile: 14 });
+  b.cyl('brass', x, 24.5, z, 20, 19, 1.2, 16, { tile: 10 });
+  stool(b, x + 30, z, 0);
+  stool(b, x - 30, z, 0);
+  b.cyl('glass', x + 6, 25.7, z - 4, 2.2, 1.8, 7, 7, { tile: 5 });
+  b.cyl('glass', x - 7, 25.7, z + 5, 2.2, 1.8, 7, 7, { tile: 5 });
+}
+
+function danceFloor(b) {
+  const x0 = 560, x1 = 1000, z0 = 900, z1 = 1220;
+  const u = (x1 - x0) / 40, v = (z1 - z0) / 40;
+  b.quad('dance', [
+    [x0, 0.32, z0], [x0, 0.32, z1], [x1, 0.32, z1], [x1, 0.32, z0]
+  ], [[0, 0], [0, v], [u, v], [u, 0]]);
+  b.box('brass', (x0 + x1) / 2, 0.5, z0 - 3, x1 - x0 + 12, 1, 6, { tile: 20, localUV: true });
+  b.box('brass', (x0 + x1) / 2, 0.5, z1 + 3, x1 - x0 + 12, 1, 6, { tile: 20, localUV: true });
+  b.box('brass', x0 - 3, 0.5, (z0 + z1) / 2, 6, 1, z1 - z0, { tile: 20, localUV: true });
+  b.box('brass', x1 + 3, 0.5, (z0 + z1) / 2, 6, 1, z1 - z0, { tile: 20, localUV: true });
+  speaker(b, 585, 1238);
+  speaker(b, 975, 1238);
+  b.box('neon', (x0 + x1) / 2, 22, 1262, x1 - x0 - 60, 3.5, 2, { tile: 40, localUV: true });
+}
+
+function speaker(b, x, z) {
+  b.box('steel', x, 26, z, 26, 52, 20, { tile: 20, localUV: true });
+  b.cyl('steel', x, 14, z + 10.5, 8, 8, 1.5, 14, { tile: 8 });
+  b.cyl('steel', x, 34, z + 10.5, 5.5, 5.5, 1.5, 12, { tile: 6 });
+  b.box('woodDark', x, 1.5, z, 30, 3, 24, { tile: 12, localUV: true });
+}
+
 function windowFrame(b, x0, x1, y0, y1, zFace, dir) {
   const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   b.box('woodDark', cx, cy, zFace + dir * 3, w + 14, h + 14, 6, { tile: 20, localUV: true });
+  const nu = w / 260, nv = h / 170;
+  b.quad('nightSky', [
+    [x0, y0, zFace + dir * 6.4], [x1, y0, zFace + dir * 6.4],
+    [x1, y1, zFace + dir * 6.4], [x0, y1, zFace + dir * 6.4]
+  ], [[0, 0], [nu, 0], [nu, nv], [0, nv]], dir < 0);
   b.quad('glass', [
     [x0, y0, zFace + dir * 7], [x1, y0, zFace + dir * 7],
     [x1, y1, zFace + dir * 7], [x0, y1, zFace + dir * 7]
@@ -289,6 +438,39 @@ function buildShell(b) {
   for (let i = 0; i < 4; i++) {
     b.cyl('brass', coat.x + 22 + i * 34, 52, coat.y + coat.h / 2 + 12, 2, 2, 8, 6, { tile: 6 });
   }
+
+  // Wall decor: sconces + framed posters + one CCTV, all on the room-facing
+  // side of the brick (inner faces: z=36 / z=H-T, x=36 / x=W-T).
+  sconce(b, 820, T, 1, 'z');
+  sconce(b, 1520, T, 1, 'z');
+  sconce(b, 2050, T, 1, 'z');
+  sconce(b, 820, H - T, -1, 'z');
+  sconce(b, 1520, H - T, -1, 'z');
+  sconce(b, 2050, H - T, -1, 'z');
+  sconce(b, T, 680, 1, 'x');
+  sconce(b, T, 1040, 1, 'x');
+  sconce(b, W - T, 220, -1, 'x');
+  sconce(b, W - T, 650, -1, 'x');
+  sconce(b, W - T, 1080, -1, 'x');
+
+  poster(b, 1250, T + 3, 84, 70, 92, 'posterB', true);
+  poster(b, 1550, T + 3, 84, 70, 92, 'posterA', true);
+  poster(b, 1850, T + 3, 84, 70, 92, 'posterB', true);
+  poster(b, 1650, H - T - 3, 84, 70, 92, 'posterA', false);
+  poster(b, 2150, H - T - 3, 84, 70, 92, 'posterB', false);
+  posterX(b, T + 3, 220, 84, 70, 92, 'posterA', true);
+  posterX(b, T + 3, 620, 84, 70, 92, 'posterB', true);
+  posterX(b, W - T - 3, 980, 84, 70, 92, 'posterA', false);
+  posterX(b, W - T - 3, 1180, 84, 70, 92, 'posterB', false);
+
+  cctv(b, 90, T + 6, 0.5, 1);
+
+  // Festoon bulb lines sag between the roof beams (y>=114 keeps nav clear).
+  stringLights(b, 100, 2370, 340, 126, 10);
+  stringLights(b, 100, 2370, 760, 126, 10);
+  stringLights(b, 100, 2370, 1120, 126, 10);
+
+  velvetRope(b, 330, 470, 1150);
 }
 
 export const LIGHTS = (() => {
@@ -296,24 +478,27 @@ export const LIGHTS = (() => {
   for (const t of tableRects) {
     const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
     if (t.kind === 'roulette') {
-      list.push({ x: cx, y: 84, z: cz, r: 300, col: [1.0, 0.86, 0.6], int: 1.15 });
+      list.push({ x: cx, y: 84, z: cz, r: 300, col: [1.0, 0.86, 0.6], int: 0.95 });
     } else {
-      list.push({ x: cx, y: 86, z: cz, r: 250, col: [1.0, 0.82, 0.55], int: 1.0 });
+      list.push({ x: cx, y: 86, z: cz, r: 250, col: [1.0, 0.82, 0.55], int: 0.85 });
     }
   }
   const bar = OBJ('bar');
-  list.push({ x: bar.x + bar.w / 2, y: 70, z: bar.y + bar.h / 2, r: 260, col: [1.0, 0.78, 0.5], int: 1.0 });
+  list.push({ x: bar.x + bar.w / 2, y: 70, z: bar.y + bar.h / 2, r: 260, col: [1.0, 0.78, 0.5], int: 0.9 });
   const sh = OBJ('shelf');
-  list.push({ x: sh.x + sh.w / 2, y: 78, z: sh.y + sh.h / 2, r: 300, col: [1.0, 0.72, 0.42], int: 0.8 });
-  list.push({ x: 1228, y: 40, z: 40, r: 340, col: [1.0, 0.30, 0.55], int: 1.25 });
-  list.push({ x: 86, y: 46, z: 320, r: 300, col: [0.45, 0.95, 0.85], int: 0.9 });
-  list.push({ x: 86, y: 46, z: 640, r: 300, col: [0.45, 0.95, 0.85], int: 0.9 });
-  list.push({ x: 86, y: 46, z: 960, r: 300, col: [0.45, 0.95, 0.85], int: 0.9 });
-  list.push({ x: 400, y: 70, z: 1210, r: 320, col: [0.72, 0.82, 1.0], int: 0.9 });
-  list.push({ x: 760, y: 90, z: 640, r: 340, col: [1.0, 0.80, 0.58], int: 0.55 });
-  list.push({ x: 1796, y: 110, z: 200, r: 280, col: [1.0, 0.84, 0.6], int: 0.7 });
-  list.push({ x: 2200, y: 90, z: 660, r: 320, col: [1.0, 0.80, 0.55], int: 0.5 });
-  list.push({ x: 130, y: 80, z: 120, r: 260, col: [1.0, 0.78, 0.5], int: 0.5 });
+  list.push({ x: sh.x + sh.w / 2, y: 78, z: sh.y + sh.h / 2, r: 300, col: [1.0, 0.72, 0.42], int: 0.7 });
+  list.push({ x: 1228, y: 40, z: 40, r: 340, col: [1.0, 0.30, 0.55], int: 1.1 });
+  list.push({ x: 86, y: 46, z: 320, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
+  list.push({ x: 86, y: 46, z: 640, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
+  list.push({ x: 86, y: 46, z: 960, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
+  list.push({ x: 400, y: 60, z: 1160, r: 300, col: [0.72, 0.82, 1.0], int: 0.75 });
+  list.push({ x: 760, y: 90, z: 640, r: 340, col: [1.0, 0.80, 0.58], int: 0.5 });
+  list.push({ x: 1796, y: 110, z: 200, r: 280, col: [1.0, 0.84, 0.6], int: 0.6 });
+  list.push({ x: 2200, y: 90, z: 660, r: 320, col: [1.0, 0.80, 0.55], int: 0.45 });
+  list.push({ x: 130, y: 80, z: 120, r: 260, col: [1.0, 0.78, 0.5], int: 0.45 });
+  list.push({ x: 700, y: 36, z: 1000, r: 320, col: [0.45, 0.95, 0.9], int: 0.75 });
+  list.push({ x: 880, y: 36, z: 1140, r: 280, col: [1.0, 0.45, 0.7], int: 0.6 });
+  list.push({ x: 520, y: 70, z: 500, r: 280, col: [1.0, 0.78, 0.5], int: 0.5 });
   return list;
 })();
 
@@ -328,6 +513,10 @@ function buildContent(b) {
   plant(b, 106, 106, 1.2);
   plant(b, 2242, 1113, 1.1);
   plant(b, 112, 1119, 1.0);
+  plant(b, 110, 690, 1.0);
+  plant(b, 1080, 110, 1.1);
+  plant(b, 1130, 1190, 0.9);
+  plant(b, 2350, 180, 1.0);
   column(b, 2084, 330);
   column(b, 2176, 1014);
   for (const t of tableRects) {
@@ -346,6 +535,12 @@ function buildContent(b) {
   b.box('woodDark', 2280, 20, 120, 120, 40, 44, { tile: 26, localUV: true });
   b.box('woodWarm', 2280, 40, 120, 128, 5, 50, { tile: 20, localUV: true });
   b.box('woodDark', 200, 20, 1230, 90, 40, 40, { tile: 22, localUV: true });
+  danceFloor(b);
+  cocktailTable(b, 520, 320);
+  cocktailTable(b, 520, 680);
+  cocktailTable(b, 1060, 1140);
+  cocktailTable(b, 1720, 1140);
+  cocktailTable(b, 2300, 640);
 }
 
 const EXPLICIT = { wheel: 1, slotFace: 1, sign: 1 };

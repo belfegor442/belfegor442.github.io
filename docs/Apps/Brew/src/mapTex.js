@@ -149,7 +149,6 @@ function carpet(size) {
   const g = a.getContext('2d');
   const base = rgb('#3d1018');
   shade(g, size, (u, v) => {
-    const p = Math.min(u, v) * 8;
     const w = fbm(u * 6, v * 6, 11, 4);
     let c = mix(base, rgb('#521a24'), w * 0.55);
     const dm = Math.sin(u * Math.PI * 4) * Math.sin(v * Math.PI * 4);
@@ -159,8 +158,6 @@ function carpet(size) {
     c = mix(c, rgb('#7a2a2c'), Math.pow(1 - ring, 14) * 0.5);
     const wear = fbm(u * 3 + 11, v * 3, 23, 3);
     c = mix(c, rgb('#2a0b10'), Math.max(0, wear - 0.55) * 1.1);
-    const border = Math.min(u, v, 1 - u, 1 - v);
-    if (border < 0.02) c = mix(c, rgb('#8a6a2e'), 1 - border / 0.02);
     return c;
   });
   grain(g, size, 0.1, 7);
@@ -457,6 +454,186 @@ function neon(size) {
   };
 }
 
+function dance(size) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  const n = 4;
+  shade(g, size, (u, v) => {
+    const tx = Math.floor(u * n), ty = Math.floor(v * n);
+    const lx = u * n - tx, ly = v * n - ty;
+    const gold = (tx + ty) % 2 === 0;
+    const tint = 0.92 + hash2(tx, ty, 9) * 0.16;
+    let c = gold ? rgb('#9a7434') : rgb('#1a6a68');
+    c = [c[0] * tint, c[1] * tint, c[2] * tint];
+    const edge = Math.min(lx, 1 - lx, ly, 1 - ly);
+    if (edge < 0.06) c = mix(c, [0.05, 0.05, 0.06], 0.8 * (1 - edge / 0.06));
+    const spec = fbm(u * 20, v * 20, 15, 2);
+    c = mix(c, [c[0] * 1.25, c[1] * 1.25, c[2] * 1.2], spec * 0.25);
+    return c;
+  });
+  grain(g, size, 0.05, 19);
+  const h = gray(size, (u, v) => {
+    const gx = (u * n) % 1, gy = (v * n) % 1;
+    const edge = Math.min(gx, 1 - gx, gy, 1 - gy);
+    return edge < 0.07 ? 0.3 : 0.62;
+  });
+  return {
+    albedo: packMetal(a, 0),
+    normal: packRough(heightToNormal(h, 2.2), 0.35),
+    emissive: [0.22, 0.2, 0.12]
+  };
+}
+
+function bulb(size) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, size, size);
+  shade(g, size, (u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5);
+    const glow = Math.pow(Math.max(0, 1 - d * 2.4), 0.55);
+    return mix(rgb('#241406'), rgb('#ffd98a'), glow);
+  });
+  return {
+    albedo: a,
+    normal: packRough(cv(size), 0.5),
+    unlit: true,
+    emissive: [2.1, 1.55, 0.75]
+  };
+}
+
+function chip(size, hexCol) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  const col = rgb(hexCol);
+  g.fillStyle = '#0c0c10';
+  g.fillRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2, r = size * 0.46;
+  g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.fillStyle = `rgb(${(col[0] * 255) | 0},${(col[1] * 255) | 0},${(col[2] * 255) | 0})`;
+  g.fill();
+  for (let i = 0; i < 8; i++) {
+    const t0 = (i / 8) * Math.PI * 2 + 0.12, t1 = ((i + 1) / 8) * Math.PI * 2 - 0.12;
+    g.beginPath();
+    g.arc(cx, cy, r * 0.9, t0, t1);
+    g.arc(cx, cy, r * 0.62, t1, t0, true);
+    g.closePath();
+    g.fillStyle = '#efe6d2';
+    g.fill();
+  }
+  g.beginPath(); g.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
+  g.fillStyle = `rgb(${(col[0] * 210) | 0},${(col[1] * 210) | 0},${(col[2] * 210) | 0})`;
+  g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.5)';
+  g.lineWidth = 2;
+  g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+  return {
+    albedo: packMetal(a, 0),
+    normal: packRough(cv(size), 0.55)
+  };
+}
+
+function poster(size, kind) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  if (kind === 'card') {
+    g.fillStyle = '#4a1018';
+    g.fillRect(0, 0, size, size);
+    g.strokeStyle = '#c9a45c';
+    g.lineWidth = 4;
+    g.strokeRect(7, 7, size - 14, size - 14);
+    g.lineWidth = 1.5;
+    g.strokeRect(13, 13, size - 26, size - 26);
+    const drawSuit = (x, y, s, color) => {
+      g.fillStyle = color;
+      g.beginPath();
+      if (s === 'S') {
+        g.moveTo(x, y - 22); g.bezierCurveTo(x + 20, y - 6, x + 14, y + 10, x, y + 2);
+        g.bezierCurveTo(x - 14, y + 10, x - 20, y - 6, x, y - 22);
+        g.moveTo(x, y + 2); g.lineTo(x - 8, y + 16); g.lineTo(x + 8, y + 16);
+      } else {
+        g.moveTo(x, y + 18); g.bezierCurveTo(x - 26, y - 4, x - 14, y - 22, x, y - 8);
+        g.bezierCurveTo(x + 14, y - 22, x + 26, y - 4, x, y + 18);
+      }
+      g.fill();
+    };
+    drawSuit(44, 50, 'S', '#1a1016');
+    drawSuit(84, 50, 'H', '#c03038');
+    g.fillStyle = '#e8d8b0';
+    g.font = '900 15px Arial';
+    g.textAlign = 'center';
+    g.fillText('CARD NIGHT', size / 2, 96);
+    g.font = '8px Arial';
+    g.fillStyle = '#c9a45c';
+    g.fillText('EVERY NIGHT · 21:00', size / 2, 110);
+  } else {
+    g.fillStyle = '#12202a';
+    g.fillRect(0, 0, size, size);
+    g.strokeStyle = '#c9a45c';
+    g.lineWidth = 3;
+    g.strokeRect(8, 8, size - 16, size - 16);
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = i % 2 ? '#1a3040' : '#0e1c26';
+      g.fillRect(16, 18 + i * 18, size - 32, 14);
+    }
+    g.fillStyle = '#ffd98a';
+    g.font = '900 26px Arial';
+    g.textAlign = 'center';
+    g.shadowColor = '#ff2f7a';
+    g.shadowBlur = 8;
+    g.fillText('BREW', size / 2, 56);
+    g.shadowBlur = 0;
+    g.font = '800 9px Arial';
+    g.fillStyle = '#e8d8b0';
+    g.fillText('HOUSE OF ODDS', size / 2, 86);
+    g.fillStyle = '#c9a45c';
+    g.fillText('EST. 2026', size / 2, 104);
+  }
+  grain(g, size, 0.05, 63);
+  return {
+    albedo: packMetal(a, 0),
+    normal: packRough(cv(size), 0.85),
+    emissive: [0.38, 0.36, 0.3]
+  };
+}
+
+function nightSky(size) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, '#060a14');
+  grad.addColorStop(0.55, '#101c30');
+  grad.addColorStop(1, '#1e3048');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 7; i++) {
+    const bw = 18 + hash2(i, 3, 5) * 26;
+    const bh = 40 + hash2(i, 9, 7) * 90;
+    const bx = hash2(i, 1, 3) * (size - bw);
+    g.fillStyle = 'rgba(4,6,12,.9)';
+    g.fillRect(bx, size - bh, bw, bh);
+    for (let wy = size - bh + 6; wy < size - 6; wy += 9) {
+      for (let wx = bx + 4; wx < bx + bw - 4; wx += 8) {
+        if (hash2(wx | 0, wy | 0, 11) > 0.55) {
+          g.fillStyle = hash2(wx | 0, wy | 0, 13) > 0.7 ? '#ffd98a' : '#8aa8c8';
+          g.fillRect(wx, wy, 3, 4);
+        }
+      }
+    }
+  }
+  for (let i = 0; i < 40; i++) {
+    const x = hash2(i, 7, 21) * size, y = hash2(i, 11, 23) * size * 0.5;
+    g.fillStyle = `rgba(255,255,255,${0.3 + hash2(i, 1, 29) * 0.5})`;
+    g.fillRect(x, y, 1.2, 1.2);
+  }
+  return {
+    albedo: a,
+    normal: packRough(cv(size), 0.5),
+    unlit: true,
+    emissive: [0.85, 0.9, 1.05]
+  };
+}
+
 function wood(size, seed, dark) {
   return planks(size, seed, dark
     ? [rgb('#2a1a10'), rgb('#4a2e18'), rgb('#160d07'), rgb('#0d0805')]
@@ -478,7 +655,14 @@ const BUILD = {
   rug: () => rug(256),
   steel: () => steel(128),
   glass: () => glass(128),
-  neon: () => neon(64)
+  neon: () => neon(64),
+  dance: () => dance(128),
+  bulb: () => bulb(32),
+  chipR: () => chip(64, '#a02830'),
+  chipB: () => chip(64, '#2848a0'),
+  posterA: () => poster(128, 'card'),
+  posterB: () => poster(128, 'ad'),
+  nightSky: () => nightSky(256)
 };
 
 export function material(name) {
