@@ -29,6 +29,19 @@ export function perspective(out, fovy, aspect, near, far) {
   return out;
 }
 
+export function ortho(out, l, r, b, t, near, far) {
+  const lr = 1 / (l - r), bt = 1 / (b - t), nf = 1 / (near - far);
+  out.fill(0);
+  out[0] = -2 * lr;
+  out[5] = -2 * bt;
+  out[10] = 2 * nf;
+  out[12] = (l + r) * lr;
+  out[13] = (t + b) * bt;
+  out[14] = (far + near) * nf;
+  out[15] = 1;
+  return out;
+}
+
 export function lookAt(out, ex, ey, ez, cx, cy, cz) {
   let zx = ex - cx, zy = ey - cy, zz = ez - cz;
   let l = Math.hypot(zx, zy, zz) || 1;
@@ -123,25 +136,162 @@ void main() {
 export const VS_GLB = `
 attribute vec3 aPos;
 attribute vec3 aNrm;
+attribute vec3 aTan;
 attribute vec2 aUV;
 uniform mat4 uVP;
 uniform mat4 uM;
 uniform mat3 uN;
 uniform vec3 uCam;
 varying vec3 vN;
+varying vec3 vT;
+varying vec3 vW;
 varying vec2 vUV;
 varying float vD;
 void main() {
   vec4 w = uM * vec4(aPos, 1.0);
+  vW = w.xyz;
   vN = uN * aNrm;
+  vT = uN * aTan;
   vUV = aUV;
   vD = length(w.xyz - uCam);
   gl_Position = uVP * w;
 }`;
 
 export const FS_GLB = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec3 vN;
+varying vec3 vT;
+varying vec3 vW;
+varying vec2 vUV;
+varying float vD;
+uniform sampler2D uTex;
+uniform sampler2D uNrmTex;
+uniform sampler2D uShadowTex;
+uniform mat4 uShadowMat;
+uniform vec4 uTint;
+uniform float uUnlit;
+uniform float uHasNrm;
+uniform float uShadowOn;
+uniform vec2 uShadowTexel;
+uniform vec2 uFogRange;
+uniform vec3 uCam;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform vec3 uAmbient;
+uniform vec3 uFogColor;
+uniform vec3 uEmissive;
+uniform vec4 uLightPos[8];
+uniform vec3 uLightCol[8];
+uniform float uLightCount;
+uniform float uExposure;
+
+vec3 aces(vec3 x) {
+  const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+void main() {
+  vec4 tex = texture2D(uTex, vUV) * uTint;
+  vec3 albedo = tex.rgb;
+  float metal = tex.a;
+  vec3 N = normalize(vN);
+  float rough = 0.7;
+  if (uHasNrm > 0.5) {
+    vec4 n4 = texture2D(uNrmTex, vUV);
+    vec3 nm = n4.xyz * 2.0 - 1.0;
+    vec3 T = normalize(vT - N * dot(N, vT));
+    vec3 B = cross(N, T);
+    N = normalize(mat3(T, B, N) * nm);
+    rough = max(n4.a, 0.04);
+  }
+  vec3 V = normalize(uCam - vW);
+  float hemi = N.y * 0.5 + 0.5;
+  vec3 sky = mix(vec3(0.72, 0.68, 0.66), vec3(1.0, 0.98, 0.92), hemi);
+  vec3 lit;
+  if (uUnlit > 0.5) {
+    float up = clamp(N.y, 0.0, 1.0);
+    float nd = max(dot(N, -uSunDir), 0.0);
+    float shape = 0.30 + 0.30 * hemi + 0.50 * nd;
+    vec3 floorGrade = vec3(1.20, 0.78, 0.72);
+    vec3 wallGrade = vec3(0.82, 0.80, 0.86);
+    lit = albedo * mix(wallGrade, floorGrade, smoothstep(0.55, 0.95, up));
+    lit *= shape * mix(vec3(1.0), vec3(1.10, 1.0, 0.84), nd * 0.85);
+    lit = pow(clamp(lit, 0.0, 1.0), vec3(1.28));
+    float l = dot(lit, vec3(0.299, 0.587, 0.114));
+    lit = clamp(mix(vec3(l), lit, 1.15), 0.0, 1.0);
+    lit += albedo * uEmissive;
+  } else {
+    float shadow = 1.0;
+    if (uShadowOn > 0.5) {
+      vec4 sc = uShadowMat * vec4(vW, 1.0);
+      vec3 s = sc.xyz / sc.w;
+      s = s * 0.5 + 0.5;
+      if (s.z > 0.0 && s.z < 1.0 && s.x > 0.0 && s.x < 1.0 && s.y > 0.0 && s.y < 1.0) {
+        float bias = 0.0022;
+        float sum = 0.0;
+        for (int i = -1; i <= 1; i++) {
+          for (int j = -1; j <= 1; j++) {
+            vec2 o = vec2(float(i), float(j)) * uShadowTexel;
+            float dep = texture2D(uShadowTex, s.xy + o).r;
+            sum += (s.z - bias > dep) ? 0.15 : 1.0;
+          }
+        }
+        shadow = sum / 9.0;
+      }
+    }
+    float ndl = max(dot(N, -uSunDir), 0.0);
+    vec3 diff = uSunColor * ndl * shadow;
+    vec3 spec = vec3(0.0);
+    float gloss = mix(140.0, 6.0, rough);
+    float F0 = mix(0.045, 0.9, metal);
+    for (int i = 0; i < 8; i++) {
+      if (float(i) >= uLightCount) break;
+      vec3 Ld = uLightPos[i].xyz - vW;
+      float d2 = dot(Ld, Ld);
+      float R = uLightPos[i].w;
+      float att = 1.0 / (1.0 + d2 / (R * R));
+      att *= clamp(1.0 - d2 / (R * R * 4.0), 0.0, 1.0);
+      vec3 L = Ld * inversesqrt(max(d2, 1e-4));
+      float nl = max(dot(N, L), 0.0);
+      if (nl <= 0.0) continue;
+      vec3 H = normalize(L + V);
+      float nh = max(dot(N, H), 0.0);
+      float specW = pow(nh, gloss) * (gloss * 0.03 + 0.08);
+      float fres = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+      vec3 lc = uLightCol[i] * att * nl;
+      diff += lc * (1.0 - metal * 0.85);
+      spec += lc * specW * fres * mix(1.6, 0.5, rough);
+    }
+    lit = albedo * (uAmbient * sky + diff) + spec + albedo * uEmissive;
+    lit *= uExposure;
+  }
+  float fog = smoothstep(uFogRange.x, uFogRange.y, length(vW - uCam));
+  vec3 outc = mix(lit, uFogColor, fog);
+  if (uUnlit < 0.5) outc = aces(outc);
+  gl_FragColor = vec4(outc, tex.a);
+}`;
+
+export const VS_SHADOW = `
+attribute vec3 aPos;
+uniform mat4 uM;
+uniform mat4 uLightVP;
+void main() {
+  gl_Position = uLightVP * uM * vec4(aPos, 1.0);
+}`;
+
+export const FS_SHADOW = `
+precision mediump float;
+void main() {}`;
+
+export const FS_GLB_SIMPLE = `
 precision mediump float;
 varying vec3 vN;
+varying vec3 vT;
+varying vec3 vW;
 varying vec2 vUV;
 varying float vD;
 uniform sampler2D uTex;
@@ -152,6 +302,7 @@ uniform vec3 uSunColor;
 uniform vec3 uAmbient;
 uniform vec3 uFogColor;
 uniform vec2 uFogRange;
+uniform vec3 uCam;
 void main() {
   vec4 c = texture2D(uTex, vUV) * uTint;
   vec3 n = normalize(vN + vec3(0.0, 1e-4, 0.0));
@@ -163,8 +314,6 @@ void main() {
   } else {
     float up = clamp(n.y, 0.0, 1.0);
     float shape = 0.30 + 0.30 * hemi + 0.50 * nd;
-    // Split-grade by surface: up-facing floors push to oxblood casino
-    // carpet, the vertical shell falls cool and dark so the pools pop.
     vec3 floorGrade = vec3(1.20, 0.78, 0.72);
     vec3 wallGrade  = vec3(0.82, 0.80, 0.86);
     c.rgb *= mix(wallGrade, floorGrade, smoothstep(0.55, 0.95, up));
@@ -173,7 +322,7 @@ void main() {
     float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
     c.rgb = clamp(mix(vec3(lum), c.rgb, 1.15), 0.0, 1.0);
   }
-  float fog = smoothstep(uFogRange.x, uFogRange.y, vD);
+  float fog = smoothstep(uFogRange.x, uFogRange.y, length(vW - uCam));
   gl_FragColor = vec4(mix(c.rgb, uFogColor, fog), c.a);
 }`;
 

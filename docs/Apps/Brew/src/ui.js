@@ -1,4 +1,5 @@
 import { Registry } from './activities.js';
+import { SKINS } from './skins.js';
 
 const $ = s => document.querySelector(s);
 const SUITS = ['♠', '♥', '♦', '♣'];
@@ -37,6 +38,10 @@ export class UI {
     $('#sndBtn').onclick = () => handlers.sound(!this.soundOn);
     $('#leaveBtn').onclick = () => handlers.leave();
     $('#shareBtn').onclick = () => handlers.share();
+    this.buildSkinPick($('#skinPick'), id => handlers.skin(id));
+    this.buildSkinPick($('#skinPickGame'), id => handlers.skin(id));
+    const skinBtn = $('#skinBtn');
+    if (skinBtn) skinBtn.onclick = () => this.skinPanel(!this._skinOpen);
     document.querySelectorAll('#emotes [data-emote]').forEach(b => {
       b.onclick = () => handlers.emote(b.dataset.emote);
     });
@@ -52,6 +57,27 @@ export class UI {
     });
     const label = $('#stakeVal');
     if (label) label.textContent = v;
+  }
+
+  buildSkinPick(el, cb) {
+    if (!el) return;
+    el.innerHTML = SKINS.map(s =>
+      '<button type="button" data-skin="' + s.id + '">' + s.name + '</button>').join('');
+    el.querySelectorAll('[data-skin]').forEach(b => {
+      b.onclick = () => cb(b.dataset.skin);
+    });
+  }
+
+  skin(id) {
+    document.querySelectorAll('[data-skin]').forEach(b => {
+      b.classList.toggle('on', b.dataset.skin === id);
+    });
+  }
+
+  skinPanel(show) {
+    this._skinOpen = !!show;
+    const el = $('#skinPanel');
+    if (el) el.classList.toggle('hidden', !show);
   }
 
   stakeBar(show) {

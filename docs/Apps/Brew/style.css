@@ -85,6 +85,22 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .emotes button:active,.stakebar button:active{transform:translateY(2px);box-shadow:none}
 .stakebar button.on{background:var(--gold);color:#14100a;border-color:var(--gold)}
 
+.skin-pick{display:flex;gap:6px;flex-wrap:wrap}
+.skin-pick button{
+  background:var(--panel);border:1px solid var(--line);color:var(--muted);
+  font-size:10px;font-weight:700;letter-spacing:.12em;padding:10px 12px;
+  box-shadow:0 2px 0 rgba(0,0,0,.55)
+}
+.skin-pick button:hover{color:var(--gold);border-color:var(--gold)}
+.skin-pick button:active{transform:translateY(2px);box-shadow:none}
+.skin-pick button.on{background:var(--gold);color:#14100a;border-color:var(--gold)}
+.skin-panel{
+  position:absolute;top:74px;left:16px;min-width:220px;
+  background:var(--panel-2);border:1px solid var(--line);
+  padding:10px 12px;box-shadow:0 10px 26px rgba(0,0,0,.5)
+}
+.skin-panel .k{display:block;color:var(--gold-dim);font-size:9px;font-weight:700;letter-spacing:.24em;margin-bottom:8px}
+
 .chatbox{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);padding:0;box-shadow:0 10px 26px rgba(0,0,0,.5)}
 .chatlog{height:108px;overflow:auto;font-size:12px;line-height:1.5;padding:10px 12px}
 .chatlog .line{color:var(--muted);word-break:break-word;letter-spacing:.02em}

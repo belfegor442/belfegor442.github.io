@@ -1,4 +1,4 @@
-import { mul } from './renderGeo.js';
+﻿import { mul } from './renderGeo.js';
 
 const COMP = {
   5120: { arr: Int8Array, size: 1 },
@@ -157,6 +157,77 @@ export async function loadGLB(url, opts = {}) {
   const scene = scenes[json.scene || 0] || scenes[0] || { nodes: [] };
   const ident = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
+  // Skinned meshes (rigged Sketchfab exports) carry JOINTS_0/WEIGHTS_0 and
+  // ignore their node transforms; the rest pose lives in jointWorld*IBM. Bake
+  // that pose into static vertices so a plain matrix draw renders correctly.
+  const nodeWorld = new Array(nodes.length);
+  const walkWM = (idx, parent) => {
+    const n = nodes[idx];
+    if (!n) return;
+    const wm = mul(new Float32Array(16), parent, nodeMatrix(n));
+    nodeWorld[idx] = wm;
+    for (const c of n.children || []) walkWM(c, wm);
+  };
+  for (const r of scene.nodes || []) walkWM(r, ident);
+  const skinMats = (json.skins || []).map(s => {
+    const ibm = s.inverseBindMatrices != null ? accArray(json, bin, s.inverseBindMatrices) : null;
+    if (!ibm) return null;
+    return s.joints.map((j, i) => {
+      const jw = nodeWorld[j] || ident;
+      const ib = new Float32Array(16);
+      for (let k = 0; k < 16; k++) ib[k] = ibm[i * 16 + k];
+      return mul(new Float32Array(16), jw, ib);
+    });
+  });
+  const mergeBounds = arr => {
+    for (let i = 0; i < arr.length; i += 3) {
+      if (arr[i] < min[0]) min[0] = arr[i];
+      if (arr[i + 1] < min[1]) min[1] = arr[i + 1];
+      if (arr[i + 2] < min[2]) min[2] = arr[i + 2];
+      if (arr[i] > max[0]) max[0] = arr[i];
+      if (arr[i + 1] > max[1]) max[1] = arr[i + 1];
+      if (arr[i + 2] > max[2]) max[2] = arr[i + 2];
+    }
+  };
+  const bakeSkin = (draw, prim, skinIdx) => {
+    const mats = skinMats[skinIdx];
+    if (!mats || !prim.attributes.JOINTS_0 || !prim.attributes.WEIGHTS_0) return false;
+    const joints = accArray(json, bin, prim.attributes.JOINTS_0);
+    const weights = accArray(json, bin, prim.attributes.WEIGHTS_0);
+    if (!joints || !weights) return false;
+    const vc = draw.pos.length / 3;
+    const npos = new Float32Array(draw.pos.length);
+    const nnrm = draw.nrm ? new Float32Array(draw.nrm.length) : null;
+    for (let v = 0; v < vc; v++) {
+      let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = weights[v * 4 + k];
+        if (!w) continue;
+        const M = mats[joints[v * 4 + k]];
+        if (!M) continue;
+        const x = draw.pos[v * 3], y = draw.pos[v * 3 + 1], z = draw.pos[v * 3 + 2];
+        px += w * (M[0] * x + M[4] * y + M[8] * z + M[12]);
+        py += w * (M[1] * x + M[5] * y + M[9] * z + M[13]);
+        pz += w * (M[2] * x + M[6] * y + M[10] * z + M[14]);
+        if (nnrm) {
+          const ox = draw.nrm[v * 3], oy = draw.nrm[v * 3 + 1], oz = draw.nrm[v * 3 + 2];
+          nx += w * (M[0] * ox + M[4] * oy + M[8] * oz);
+          ny += w * (M[1] * ox + M[5] * oy + M[9] * oz);
+          nz += w * (M[2] * ox + M[6] * oy + M[10] * oz);
+        }
+      }
+      npos[v * 3] = px; npos[v * 3 + 1] = py; npos[v * 3 + 2] = pz;
+      if (nnrm) {
+        const l = Math.hypot(nx, ny, nz) || 1;
+        nnrm[v * 3] = nx / l; nnrm[v * 3 + 1] = ny / l; nnrm[v * 3 + 2] = nz / l;
+      }
+    }
+    draw.pos = npos;
+    if (nnrm) draw.nrm = nnrm;
+    draw.matrix = ident;
+    return true;
+  };
+
   const visit = (idx, parent) => {
     const n = nodes[idx];
     if (!n) return;
@@ -170,7 +241,8 @@ export async function loadGLB(url, opts = {}) {
         const pos = accArray(json, bin, posA);
         if (!pos) continue;
         const pa = json.accessors[posA];
-        if (pa.min && pa.max) {
+        const skinned = n.skin != null && skinMats[n.skin];
+        if (!skinned && pa.min && pa.max) {
           const tb = transformBounds(pa.min, pa.max, wm);
           for (let i = 0; i < 3; i++) {
             if (tb.min[i] < min[i]) min[i] = tb.min[i];
@@ -178,7 +250,7 @@ export async function loadGLB(url, opts = {}) {
           }
         }
         const idxArr = p.indices != null ? accArray(json, bin, p.indices) : null;
-        draws.push({
+        const draw = {
           mode,
           pos,
           nrm: p.attributes.NORMAL != null ? accArray(json, bin, p.attributes.NORMAL) : null,
@@ -186,7 +258,9 @@ export async function loadGLB(url, opts = {}) {
           idx: idxArr,
           mat: p.material != null && materials[p.material] ? p.material : -1,
           matrix: wm
-        });
+        };
+        if (skinned && bakeSkin(draw, p, n.skin)) mergeBounds(draw.pos);
+        draws.push(draw);
       }
     }
     for (const c of n.children || []) visit(c, wm);
@@ -204,139 +278,9 @@ export async function loadGLB(url, opts = {}) {
   };
 }
 
-// The lobby exports carry no NORMAL attribute, which leaves the shader with a
-// zero normal and makes lit shading impossible. Build smooth per-vertex normals
-// by accumulating face normals onto shared vertices (model space, the draw
-// matrix and its inverse-transpose take care of the rest).
-export function genNormals(draws) {
-  let made = 0;
-  for (const d of draws) {
-    if (d.nrm || !d.pos || !d.idx) continue;
-    const pos = d.pos, idx = d.idx;
-    const nrm = new Float32Array(pos.length);
-    for (let t = 0; t + 2 < idx.length; t += 3) {
-      const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
-      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
-      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
-      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      if (!isFinite(nx) || !isFinite(ny) || !isFinite(nz)) continue;
-      for (const o of [a, b, c]) { nrm[o] += nx; nrm[o + 1] += ny; nrm[o + 2] += nz; }
-    }
-    for (let v = 0; v < nrm.length; v += 3) {
-      const l = Math.hypot(nrm[v], nrm[v + 1], nrm[v + 2]);
-      if (l > 1e-8) { nrm[v] /= l; nrm[v + 1] /= l; nrm[v + 2] /= l; }
-      else { nrm[v] = 0; nrm[v + 1] = 1; nrm[v + 2] = 0; }
-    }
-    d.nrm = nrm;
-    made++;
-  }
-  return made;
-}
-
-// Drop the ceiling (and everything bolted to it) so the interior is visible
-// from the orbit camera, which sits above the building. Height is evaluated in
-// world space through each draw's matrix (node transforms included). A triangle
-// is dropped only when ALL of its vertices reach above minH: walls, door frames
-// and furniture touch the floor (their triangles reach down to y=0), so only
-// the roof plane, ducts and light rigs are removed.
-export function stripCeiling(draws, minH = 118) {
-  let dropped = 0;
-  for (const d of draws) {
-    const pos = d.pos, idx = d.idx, m = d.matrix;
-    const wy = v => m[1] * pos[v * 3] + m[5] * pos[v * 3 + 1] + m[9] * pos[v * 3 + 2] + m[13];
-    const before = dropped;
-    const keep = [];
-    const remap = new Map();
-    const npos = [], nnrm = [], nuv = [];
-    for (let t = 0; t < idx.length; t += 3) {
-      const a = idx[t], b = idx[t + 1], c = idx[t + 2];
-      const ya = wy(a), yb = wy(b), yc = wy(c);
-      const mn = ya < yb ? (ya < yc ? ya : yc) : (yb < yc ? yb : yc);
-      if (mn >= minH) { dropped++; continue; }
-      for (const v of [a, b, c]) {
-        let nv = remap.get(v);
-        if (nv === undefined) {
-          nv = npos.length / 3;
-          remap.set(v, nv);
-          npos.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
-          if (d.nrm) nnrm.push(d.nrm[v * 3], d.nrm[v * 3 + 1], d.nrm[v * 3 + 2]);
-          if (d.uv) nuv.push(d.uv[v * 2], d.uv[v * 2 + 1]);
-        }
-        keep.push(nv);
-      }
-    }
-    if (dropped === before) continue;
-    d.pos = new Float32Array(npos);
-    if (d.nrm) d.nrm = new Float32Array(nnrm);
-    if (d.uv) d.uv = new Float32Array(nuv);
-    d.idx = new (idx.constructor)(keep);
-  }
-  return dropped;
-}
-
-// Inverse of a 3x4 affine matrix (column-major), null when singular.
-function invAffine(m) {
-  const a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9],
-    g = m[2], h = m[6], i = m[10];
-  const A = e * i - f * h, B = f * g - d * i, C = d * h - e * g;
-  const det = a * A + b * B + c * C;
-  if (Math.abs(det) < 1e-12) return null;
-  const id = 1 / det;
-  const r00 = A * id, r01 = (c * h - b * i) * id, r02 = (b * f - c * e) * id;
-  const r10 = B * id, r11 = (a * i - c * g) * id, r12 = (c * d - a * f) * id;
-  const r20 = C * id, r21 = (b * g - a * h) * id, r22 = (a * e - b * d) * id;
-  const o = new Float32Array(16);
-  o[0] = r00; o[1] = r10; o[2] = r20;
-  o[4] = r01; o[5] = r11; o[6] = r21;
-  o[8] = r02; o[9] = r12; o[10] = r22;
-  o[12] = -(r00 * m[12] + r01 * m[13] + r02 * m[14]);
-  o[13] = -(r10 * m[12] + r11 * m[13] + r12 * m[14]);
-  o[14] = -(r20 * m[12] + r21 * m[13] + r22 * m[14]);
-  o[15] = 1;
-  return o;
-}
-
-// The plan axes scale ~2.4x to fill MAP while Y stays native, so the slot
-// cabinets (authored at a 0.6 front ratio) land on screen as squat boxes.
-// Stretch them about their feet on the placed geometry. Must run before
-// stripCeiling and buildNav so the ceiling pass and collision see the result.
-export function stretchMachines(draws, ky, mapW, mapH) {
-  let touched = 0;
-  for (const d of draws) {
-    const pos = d.pos, m = d.matrix;
-    let ax = 1e9, ay = 1e9, az = 1e9, bx = -1e9, by = -1e9, bz = -1e9;
-    for (let v = 0; v < pos.length; v += 3) {
-      const x = m[0] * pos[v] + m[4] * pos[v + 1] + m[8] * pos[v + 2] + m[12];
-      const y = m[1] * pos[v] + m[5] * pos[v + 1] + m[9] * pos[v + 2] + m[13];
-      const z = m[2] * pos[v] + m[6] * pos[v + 1] + m[10] * pos[v + 2] + m[14];
-      if (x < ax) ax = x; if (x > bx) bx = x;
-      if (y < ay) ay = y; if (y > by) by = y;
-      if (z < az) az = z; if (z > bz) bz = z;
-    }
-    // Machine banks: textured strips hugging a wall, waist-high, longer than
-    // two thirds of the map (the furniture draw below is 50+ tall, shell far
-    // wider, so this picks out the cabinet banks only).
-    if (!(bx - ax > mapW * 0.15 && bx - ax < mapW * 0.2 &&
-      by - ay < 40 && bz - az > mapH * 0.65 && (ay + by) / 2 < 50)) continue;
-    const im = invAffine(m);
-    if (!im) continue;
-    const feet = ay;
-    for (let v = 0; v < pos.length; v += 3) {
-      const wx = m[0] * pos[v] + m[4] * pos[v + 1] + m[8] * pos[v + 2] + m[12];
-      const wy = feet + (m[1] * pos[v] + m[5] * pos[v + 1] + m[9] * pos[v + 2] + m[13] - feet) * ky;
-      const wz = m[2] * pos[v] + m[6] * pos[v + 1] + m[10] * pos[v + 2] + m[14];
-      pos[v] = im[0] * wx + im[4] * wy + im[8] * wz + im[12];
-      pos[v + 1] = im[1] * wx + im[5] * wy + im[9] * wz + im[13];
-      pos[v + 2] = im[2] * wx + im[6] * wy + im[10] * wz + im[14];
-    }
-    touched++;
-  }
-  return touched;
-}
-
-// Rasterise the world triangles into a coarse height grid. The lobby IS the
-// map: cells with no floor, or with furniture/walls standing on the floor,
-// become colliders instead of the old hand-placed rectangles.
+// Rasterise the map triangles into a coarse height grid. The map IS the
+// collision: cells with no floor, or with furniture/walls standing on the
+// floor, become colliders instead of hand-placed rectangles.
 export function buildNav(draws, width, height, cell = 16) {
   const cols = Math.max(1, Math.ceil(width / cell));
   const rows = Math.max(1, Math.ceil(height / cell));

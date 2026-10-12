@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-brew-build="20">
+<html lang="en" data-brew-build="21">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="BREW — a browser-based 2.5D multiplayer social arcade world by North Assembly.">
 <title>BREW — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
-<link rel="stylesheet" href="./style.css?v=20">
+<link rel="stylesheet" href="./style.css?v=21">
 </head>
 <body class="world">
 <canvas id="world"></canvas>
@@ -23,6 +23,7 @@
       <button id="shareBtn" class="mini">SHARE</button>
     </div>
     <div class="hud-actions">
+      <button id="skinBtn" class="mini">SKIN</button>
       <button id="sndBtn" class="mini">SOUND ON</button>
       <button id="leaveBtn" class="mini">LEAVE</button>
     </div>
@@ -59,6 +60,10 @@
   </div>
 
   <div id="activityPanel" class="activity hidden"></div>
+  <div id="skinPanel" class="skin-panel hidden">
+    <span class="k">SKIN</span>
+    <div id="skinPickGame" class="skin-pick"></div>
+  </div>
   <div id="toast" class="toast hidden"></div>
 </div>
 
@@ -76,6 +81,7 @@
     <div class="entry-body">
       <label class="field"><span>YOUR NAME</span><input id="nameInput" maxlength="12" placeholder="PLAYER" autocomplete="nickname"></label>
       <label class="field"><span>WORLD CODE <em>OPTIONAL · EMPTY = NEW WORLD</em></span><input id="codeInput" maxlength="6" placeholder="A7F29" autocomplete="off"></label>
+      <div class="field"><span>SKIN</span><div id="skinPick" class="skin-pick"></div></div>
       <button id="enterBtn" class="primary" type="button">ENTER THE WORLD</button>
       <p id="entryStatus" class="status">Ready.</p>
     </div>
@@ -84,6 +90,6 @@
 </div>
 
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-<script type="module" src="./app.js?v=20"></script>
+<script type="module" src="./app.js?v=21"></script>
 </body>
 </html>

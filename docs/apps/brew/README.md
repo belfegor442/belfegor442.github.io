@@ -12,7 +12,12 @@ This folder currently contains **two builds**:
 The MQTT build renders in real 3D: perspective camera, vertex-lit geometry, fog,
 shadows and additive light pools — all hand-written WebGL (no three.js), with an
 overlay 2D canvas for Minecraft-style nametags (bundled `Assets/vhs-gothic.ttf`
-pixel font, hard drop shadow, no pill), chat bubbles and seat rings.
+pixel font, hard drop shadow, no pill), chat bubbles and seat rings. The pub
+geometry is generated in code (`src/map.js` + `src/mapTex.js`); the only GLBs
+loaded are player skins from the `src/skins.js` catalogue (default
+`Assets/gbl/Player/steve.skin.glb`, plus `Assets/player/homerball.glb`,
+`franco.glb` and `big.yahu.glb` — picked on the entry screen or with the in-game
+SKIN button, synced over the wire, auto-fitted to the same world height).
 
 The rest of this README describes the **server-authoritative build** (`server/`, `client/`, `shared/`).
 

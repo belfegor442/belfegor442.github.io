@@ -9,6 +9,7 @@ import { Renderer } from './src/render.js';
 import { Input } from './src/input.js';
 import { UI } from './src/ui.js';
 import { Registry, kinds as activityKinds } from './src/activities.js';
+import { DEFAULT_SKIN, normalizeSkin } from './src/skins.js';
 
 const BROKERS = (() => {
   try {
@@ -41,6 +42,7 @@ let myUid = token(8);
 let myName = 'PLAYER';
 let myPid = '----';
 let mySeed = 0;
+let mySkin = DEFAULT_SKIN;
 let balance = 1000;
 let isHost = false;
 let hosting = false;
@@ -72,6 +74,8 @@ try {
   const s = localStorage.getItem('brew.seed');
   if (s != null) mySeed = Number(s) % 6;
   else { mySeed = Math.floor(Math.random() * 6); localStorage.setItem('brew.seed', String(mySeed)); }
+  const sk = localStorage.getItem('brew.skin');
+  if (sk != null) mySkin = normalizeSkin(sk);
   const b = localStorage.getItem('brew.balance');
   if (b != null) balance = Math.max(0, Number(b));
   sndOn = localStorage.getItem('brew.sound') !== '0';
@@ -102,7 +106,7 @@ function T() { return topics(room); }
 
 function serialize(p) {
   return {
-    id: p.id, name: p.name, pid: p.pid, seed: p.seed, x: p.x, y: p.y, dir: p.dir,
+    id: p.id, name: p.name, pid: p.pid, seed: p.seed, skin: p.skin, x: p.x, y: p.y, dir: p.dir,
     anim: p.anim, status: p.status, seat: p.seat, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
   };
 }
@@ -131,7 +135,7 @@ function broadcast(msg) { net.publish(T().s, msg); }
 
 function publishPresence(on) {
   if (!net || !T()) return;
-  net.publish(T().p(myUid), { t: 'presence', on: on ? 1 : 0, name: myName, pid: myPid, seed: mySeed }, { retain: true, qos: 0 });
+  net.publish(T().p(myUid), { t: 'presence', on: on ? 1 : 0, name: myName, pid: myPid, seed: mySeed, skin: mySkin }, { retain: true, qos: 0 });
 }
 function presenceWill() {
   return { topic: T().p(myUid), payload: '{"t":"presence","on":0}', retain: true, qos: 0 };
@@ -140,7 +144,7 @@ function presenceWill() {
 function rejoin() {
   if (isHost || !welcomed) return false;
   publishPresence(true);
-  sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, skin: mySkin, balance });
   return true;
 }
 
@@ -171,7 +175,7 @@ function setTouchControls(on) { const el = document.getElementById('touchControl
 function onHostReady() {
   const spawn = eject(SPAWNS[0].x, SPAWNS[0].y);
   me = entity({
-    id: myUid, name: myName, pid: myPid, seed: mySeed, x: spawn.x, y: spawn.y,
+    id: myUid, name: myName, pid: myPid, seed: mySeed, skin: mySkin, x: spawn.x, y: spawn.y,
     dir: -Math.PI / 2, anim: 'idle', status: 'standing', seat: null,
     emote: null, emoteAt: 0, balance
   });
@@ -202,7 +206,7 @@ function startGuest(code) {
 function guestHelloLoop() {
   clearTimeout(gTimer);
   if (welcomed || isHost) return;
-  if (net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, balance });
+  if (net.up) sendHost({ t: 'hello', name: myName, pid: myPid, seed: mySeed, skin: mySkin, balance });
   gTries++;
   if (welcomed) return;
   if (gTries > MAX_HELLO) {
@@ -267,6 +271,7 @@ function handleHost(msg) {
     case 'sit': reply(uid, authority.sit(uid, msg.seat)); break;
     case 'stand': reply(uid, authority.stand(uid)); break;
     case 'emote': reply(uid, authority.emote(uid, msg.key)); break;
+    case 'skin': reply(uid, authority.applySkin(uid, msg.skin)); break;
     case 'chat': reply(uid, authority.chat(uid, msg.text)); break;
     case 'obj': reply(uid, authority.objectState(uid, msg.id, msg.val)); break;
     case 'activity.start': reply(uid, authority.startActivity(msg.kind, uid, { stake: msg.stake })); break;
@@ -292,7 +297,7 @@ function joinPlayer(msg, uid) {
   const sp = SPAWNS[authority.count() % SPAWNS.length];
   const spawn = eject(sp.x, sp.y);
   const p = authority.addPlayer({
-    id: uid, name: msg.name, pid: msg.pid, seed: msg.seed,
+    id: uid, name: msg.name, pid: msg.pid, seed: msg.seed, skin: msg.skin,
     x: spawn.x, y: spawn.y, dir: -Math.PI / 2, balance: msg.balance
   });
   if (!p) { sendTo(uid, { t: 'err', code: 'name-taken' }); return; }
@@ -343,6 +348,7 @@ function handleClient(msg) {
     case 'sit': applySit(msg); break;
     case 'stand': applyStand(msg); break;
     case 'emote': applyEmote(msg); break;
+    case 'skin': { const sp = players.get(msg.uid); if (sp) sp.skin = msg.skin; break; }
     case 'chat': applyChat(msg); break;
     case 'obj': objects[msg.id] = msg.val; renderer.lights = objects.lights; break;
     case 'activity.start': applyActivityStart(msg); break;
@@ -412,6 +418,7 @@ function applySnap(msg) {
     if (s.seat !== undefined) p.seat = s.seat;
     if (s.name) p.name = s.name;
     if (s.balance != null) p.balance = s.balance;
+    if (s.skin) p.skin = s.skin;
     if (s.emote) { p.emote = s.emote; p.emoteAt = s.emoteAt; }
   }
 }
@@ -604,6 +611,21 @@ function say(text) {
   sendHost({ t: 'chat', text });
 }
 
+function setSkin(id) {
+  const next = normalizeSkin(id);
+  if (next === mySkin) { ui.skinPanel(false); return; }
+  mySkin = next;
+  try { localStorage.setItem('brew.skin', mySkin); } catch (e) {}
+  ui.skin(mySkin);
+  ui.skinPanel(false);
+  if (me) {
+    me.skin = mySkin;
+    sendHost({ t: 'skin', skin: mySkin });
+  } else {
+    renderer.ensureSkin(mySkin);
+  }
+}
+
 function refreshHud() {
   ui.world(room, players.size, MAX_PLAYERS);
   ui.roster(players.values(), myUid);
@@ -645,6 +667,7 @@ ui.bind({
   },
   emote: key => { if (me) sendHost({ t: 'emote', key: key.toUpperCase() }); },
   stake: v => { nextStake = v; ui.stake(v); },
+  skin: setSkin,
   say
 });
 
@@ -753,6 +776,7 @@ ui.setSound(sndOn);
 ui.setName(savedName);
 ui.setPid(myPid);
 ui.stake(nextStake);
+ui.skin(mySkin);
 preloadSnd();
 if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');

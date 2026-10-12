@@ -1,11 +1,13 @@
-import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav, KX, KZ } from './world.js';
+import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav } from './world.js';
 import {
-  C, mul, perspective, lookAt, trs,
-  VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB,
-  newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
-  pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
+  C, mul, perspective, lookAt, trs, ortho,
+  VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB, FS_GLB_SIMPLE, VS_SHADOW, FS_SHADOW,
+  newMesh, newTMesh, pushBox, pushEllip,
+  pushRing, pushQuadLit, pushT, buildFloor, dotTexture
 } from './renderGeo.js';
-import { loadGLB, buildNav, stripCeiling, genNormals, stretchMachines } from './glb.js';
+import { loadGLB, buildNav } from './glb.js';
+import { buildBrewMap, LIGHTS } from './map.js';
+import { SKINS, SKIN_BY_ID, DEFAULT_SKIN, normalizeSkin, TARGET_H } from './skins.js';
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
@@ -20,15 +22,12 @@ const PALETTE = [
   { body: '#f0e6d2', trim: '#fffaf0', hair: '#8a6a3a' }
 ];
 
-const BOTTLES = ['#c2373f', '#d98a1f', '#2f8f5b', '#8b5bd6'];
-
-// The lobby ships baked, unlit textures that render darker than the play
-// field expects: lift them without touching lit geometry or the player skin.
-const GLB_EXPOSURE = 1.5;
+// Keep the emissive/unlit boost neutral; the generated map authors its own albedo.
+const GLB_EXPOSURE = 1.0;
 
 // Inverse-transpose of the upper-left 3x3 of a column-major mat4, into a
-// 9-float column-major mat3. Correct normals under the lobby's non-uniform
-// (anisotropic) world scale, which a plain mat3(uM) would skew.
+// 9-float column-major mat3. Correct normals under non-uniform (anisotropic)
+// world scale, which a plain mat3(uM) would skew.
 function nrmMat3(m, out) {
   const a = m[0], b = m[4], c = m[8];
   const d = m[1], e = m[5], f = m[9];
@@ -39,6 +38,47 @@ function nrmMat3(m, out) {
   out[0] = A * id; out[1] = (c * h - b * i) * id; out[2] = (b * f - c * e) * id;
   out[3] = B * id; out[4] = (a * i - c * g) * id; out[5] = (c * d - a * f) * id;
   out[6] = Cc * id; out[7] = (b * g - a * h) * id; out[8] = (a * e - b * d) * id;
+}
+
+// Fit a loaded player skin into world units: reorient (rotX/yaw), scale so the
+// height matches classic steve (32), center on X/Z and plant the feet on y=0.
+// Applied once at upload time as a single matrix on every draw node.
+function fitPlayerMatrix(b, def) {
+  const yaw = def.yaw || 0, rx = def.rotX || 0;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  // R = Ry(yaw) * Rx(rx), column-major.
+  const R = new Float32Array(16);
+  R[0] = cy; R[1] = 0; R[2] = -sy;
+  R[4] = sy * sx; R[5] = cx; R[6] = cy * sx;
+  R[8] = sy * cx; R[9] = -sx; R[10] = cy * cx;
+  R[15] = 1;
+  // Rotated bounds from the 8 corners.
+  let mnx = Infinity, mny = Infinity, mnz = Infinity;
+  let mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    const x = (i & 1) ? b.max[0] : b.min[0];
+    const y = (i & 2) ? b.max[1] : b.min[1];
+    const z = (i & 4) ? b.max[2] : b.min[2];
+    const px = R[0] * x + R[4] * y + R[8] * z;
+    const py = R[1] * x + R[5] * y + R[9] * z;
+    const pz = R[2] * x + R[6] * y + R[10] * z;
+    if (px < mnx) mnx = px; if (px > mxx) mxx = px;
+    if (py < mny) mny = py; if (py > mxy) mxy = py;
+    if (pz < mnz) mnz = pz; if (pz > mxz) mxz = pz;
+  }
+  const h = mxy - mny || 1;
+  let s = (def.height || TARGET_H) / h;
+  if (def.scale) s *= def.scale;
+  const M = new Float32Array(16);
+  M[0] = s * R[0]; M[1] = s * R[1]; M[2] = s * R[2];
+  M[4] = s * R[4]; M[5] = s * R[5]; M[6] = s * R[6];
+  M[8] = s * R[8]; M[9] = s * R[9]; M[10] = s * R[10];
+  M[12] = -s * (mnx + mxx) / 2;
+  M[13] = -s * mny;
+  M[14] = -s * (mnz + mxz) / 2;
+  M[15] = 1;
+  return M;
 }
 
 export class Renderer {
@@ -78,6 +118,9 @@ export class Renderer {
     this.mIdent = new Float32Array(16);
     this.mIdent[0] = this.mIdent[5] = this.mIdent[10] = this.mIdent[15] = 1;
     this.mScratch = new Float32Array(16);
+    this.playerSkins = new Map();
+    this.skinPromises = new Map();
+    this.skinFailed = new Set();
     this.enabledAttrs = new Set();
     this.buildOverlay();
     this.bindCamera();
@@ -193,28 +236,42 @@ export class Renderer {
     this.pTex = this.makeProgram(VS_TEX, FS_TEX, ['aPos', 'aUV'], ['uVP', 'uM', 'uTex', 'uTint']);
     gl.useProgram(this.pTex.prog);
     gl.uniform1i(this.pTex.u.uTex, 0);
-    this.pGLB = this.makeProgram(VS_GLB, FS_GLB, ['aPos', 'aNrm', 'aUV'],
-      ['uVP', 'uM', 'uN', 'uCam', 'uTex', 'uTint', 'uUnlit', 'uSunDir', 'uSunColor', 'uAmbient', 'uFogColor', 'uFogRange']);
+    this.pGLB = this.makeProgram(VS_GLB, FS_GLB, ['aPos', 'aNrm', 'aTan', 'aUV'],
+      ['uVP', 'uM', 'uN', 'uCam', 'uTex', 'uNrmTex', 'uShadowTex', 'uShadowMat', 'uTint',
+        'uUnlit', 'uHasNrm', 'uShadowOn', 'uShadowTexel', 'uSunDir', 'uSunColor', 'uAmbient',
+        'uFogColor', 'uFogRange', 'uEmissive', 'uLightPos', 'uLightCol', 'uLightCount', 'uExposure']);
+    if (!this.pGLB.ok) {
+      console.warn('[gl] advanced GLB shader failed, using simple lighting');
+      this.pGLB = this.makeProgram(VS_GLB, FS_GLB_SIMPLE, ['aPos', 'aNrm', 'aTan', 'aUV'],
+        ['uVP', 'uM', 'uN', 'uCam', 'uTex', 'uTint', 'uUnlit', 'uSunDir', 'uSunColor',
+          'uAmbient', 'uFogColor', 'uFogRange']);
+    }
     gl.useProgram(this.pGLB.prog);
     gl.uniform1i(this.pGLB.u.uTex, 0);
+    if (this.pGLB.u.uNrmTex) gl.uniform1i(this.pGLB.u.uNrmTex, 1);
+    if (this.pGLB.u.uShadowTex) gl.uniform1i(this.pGLB.u.uShadowTex, 2);
+    this.pShadow = this.makeProgram(VS_SHADOW, FS_SHADOW, ['aPos'], ['uM', 'uLightVP']);
     this.isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
     this.uintIdx = this.isGL2 || !!gl.getExtension('OES_element_index_uint');
     this.glbWorld = null;
     this.glbPlayer = null;
-    // lobby.glb is the authoritative Brew world. The procedural scene is fallback-only.
+    this.mapReady = false;
     this.useImportedWorld = true;
     this.glbReady = false;
     this.glbWorldAlpha = null;
     this.mScratch2 = new Float32Array(16);
     this.mN3 = new Float32Array(9);
+    this.lightPosArr = new Float32Array(32);
+    this.lightColArr = new Float32Array(24);
+    this.mLightVP = new Float32Array(16);
+    this.mLightView = new Float32Array(16);
+    this.mLightProj = new Float32Array(16);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.disable(gl.CULL_FACE);
 
-    this.texFloor = this.uploadTexture(buildFloor());
     this.texApron = this.uploadTexture(buildFloor(false));
     this.texDot = this.uploadTexture(dotTexture());
-    this.texSign = this.uploadTexture(signTexture('BREW'));
     const wc = document.createElement('canvas');
     wc.width = wc.height = 1;
     const wg = wc.getContext('2d');
@@ -222,9 +279,17 @@ export class Renderer {
     wg.fillRect(0, 0, 1, 1);
     this.texWhite = this.uploadTexture(wc);
 
-    const back = newMesh(), shell = newMesh(), props = newMesh(), sw = newMesh(), lever = newMesh(), ring = newMesh();
-    const floorT = newTMesh(), signT = newTMesh(), apronT = newTMesh();
-    this.buildWorld(back, shell, props, sw, lever, floorT, signT);
+    const back = newMesh(), sw = newMesh(), lever = newMesh(), ring = newMesh();
+    const apronT = newTMesh();
+    pushQuadLit(back, [
+      [-2200, -1.5, -2200], [MAP.w + 2200, -1.5, -2200],
+      [MAP.w + 2200, -1.5, MAP.h + 2200], [-2200, -1.5, MAP.h + 2200]
+    ], [0.05, 0.042, 0.034]);
+    const switchObj = OBJECTS.find(o => o.type === 'switch');
+    if (switchObj) {
+      pushBox(sw, switchObj.x + 6, 36, switchObj.y + switchObj.h / 2, 10, 44, 22, C('#d8d2c4'));
+      pushBox(lever, switchObj.x + 10, 50, switchObj.y + switchObj.h / 2, 5, 10, 8, [0.92, 0.92, 0.86]);
+    }
     pushRing(ring, 0, 0, 0, 11.5, 15, C('#e9c877'), 24);
     // Dark apron around the building so the orbit camera never stares into
     // raw clear color past the walls. Plain wood (no room decals), matching
@@ -235,13 +300,9 @@ export class Renderer {
     ], [[0, 0], [4, 0], [4, 4], [0, 4]]);
 
     this.gpuBack = this.uploadMesh(back, gl.STATIC_DRAW);
-    this.gpuShell = this.uploadMesh(shell, gl.STATIC_DRAW);
-    this.gpuWorld = this.uploadMesh(props, gl.STATIC_DRAW);
     this.gpuSw = this.uploadMesh(sw, gl.STATIC_DRAW);
     this.gpuLever = this.uploadMesh(lever, gl.STATIC_DRAW);
     this.gpuRing = this.uploadMesh(ring, gl.STATIC_DRAW);
-    this.gpuFloor = this.uploadTexMesh(floorT, gl.STATIC_DRAW);
-    this.gpuSign = this.uploadTexMesh(signT, gl.STATIC_DRAW);
     this.gpuApron = this.uploadTexMesh(apronT, gl.STATIC_DRAW);
 
     this.meshPlayers = newMesh();
@@ -253,92 +314,200 @@ export class Renderer {
 
     const n = Math.hypot(0.45, 1, 0.35);
     this.litDef = {
-      amb: [0.44, 0.42, 0.46], sun: [0.92, 0.86, 0.74],
+      amb: [0.34, 0.33, 0.38], sun: [0.86, 0.80, 0.70],
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.055, 0.043, 0.035], fogRange: [1150, 3300]
     };
     this.nightDef = {
-      amb: [0.15, 0.17, 0.30], sun: [0.20, 0.22, 0.38],
+      amb: [0.13, 0.15, 0.27], sun: [0.16, 0.18, 0.32],
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
       fog: [0.016, 0.024, 0.055], fogRange: [850, 2900]
     };
+    this.initShadowMap();
     if (this.useImportedWorld) this.loadGLBAssets();
+  }
+
+  initShadowMap() {
+    const gl = this.gl;
+    this.shadowSize = 2048;
+    let ok = false;
+    if (this.isGL2) {
+      try {
+        this.shadowTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, this.shadowSize, this.shadowSize, 0,
+          gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this.shadowFbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowTex, 0);
+        if (typeof gl.drawBuffers === 'function') gl.drawBuffers([gl.NONE]);
+        gl.readBuffer && gl.readBuffer(gl.NONE);
+        ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      } catch (e) { ok = false; }
+    } else {
+      const ext = gl.getExtension('WEBGL_depth_texture');
+      if (ext) {
+        try {
+          this.shadowTex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, this.shadowSize, this.shadowSize, 0,
+            gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          this.shadowFbo = gl.createFramebuffer();
+          gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowTex, 0);
+          ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+        } catch (e) { ok = false; }
+      }
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.shadowOk = ok;
+    if (!ok) {
+      this.shadowFbo = null;
+      this.shadowTex = null;
+      console.warn('[gl] shadow map unavailable on this device');
+    }
+  }
+
+  renderShadowPass() {
+    if (!this.shadowOk || !this.glbWorld) return;
+    const gl = this.gl;
+    const def = this.lights ? this.litDef : this.nightDef;
+    const dir = def.sunDir;
+    const cx = MAP.w / 2, cz = MAP.h / 2;
+    const dist = 1700;
+    const ex = cx - dir[0] * dist, ey = -dir[1] * dist, ez = cz - dir[2] * dist;
+    lookAt(this.mLightView, ex, ey, ez, cx, 40, cz);
+    ortho(this.mLightProj, -1650, 1650, -1150, 1450, 200, dist + 2400);
+    mul(this.mLightVP, this.mLightProj, this.mLightView);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo);
+    gl.viewport(0, 0, this.shadowSize, this.shadowSize);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(2.0, 4.0);
+    const P = this.pShadow;
+    gl.useProgram(P.prog);
+    gl.uniformMatrix4fv(P.u.uLightVP, false, this.mLightVP);
+    for (const g of this.glbWorld.opaque) {
+      gl.uniformMatrix4fv(P.u.uM, false, g.matrix);
+      this.bindAttrs(set => {
+        set(P.a.aPos, g.pos, 3);
+      });
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.idx);
+      gl.drawElements(gl.TRIANGLES, g.count, g.type, 0);
+    }
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  uploadLights(def) {
+    const P = this.pGLB;
+    if (!P.u.uLightPos) return;
+    const gl = this.gl;
+    const night = this.lights ? 1 : 1.6;
+    const list = LIGHTS.map(l => {
+      const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
+      return { l, d: dx * dx + dy * dy + dz * dz };
+    }).sort((a, b) => a.d - b.d).slice(0, 8);
+    for (let i = 0; i < 8; i++) {
+      const rec = list[i];
+      if (rec) {
+        const l = rec.l;
+        this.lightPosArr[i * 4] = l.x;
+        this.lightPosArr[i * 4 + 1] = l.y;
+        this.lightPosArr[i * 4 + 2] = l.z;
+        this.lightPosArr[i * 4 + 3] = l.r;
+        this.lightColArr[i * 3] = l.col[0] * l.int * night;
+        this.lightColArr[i * 3 + 1] = l.col[1] * l.int * night;
+        this.lightColArr[i * 3 + 2] = l.col[2] * l.int * night;
+      } else {
+        this.lightPosArr[i * 4 + 3] = 0;
+        this.lightColArr[i * 3] = this.lightColArr[i * 3 + 1] = this.lightColArr[i * 3 + 2] = 0;
+      }
+    }
+    gl.uniform4fv(P.u.uLightPos, this.lightPosArr);
+    gl.uniform3fv(P.u.uLightCol, this.lightColArr);
+    gl.uniform1f(P.u.uLightCount, list.length);
+    gl.uniform1f(P.u.uExposure, 1.22);
+    gl.uniform3f(P.u.uEmissive, 0, 0, 0);
+    if (P.u.uShadowOn) {
+      if (this.shadowOk && this.shadowTex) {
+        gl.uniform1f(P.u.uShadowOn, 1);
+        gl.uniform2f(P.u.uShadowTexel, 1 / this.shadowSize, 1 / this.shadowSize);
+        gl.uniformMatrix4fv(P.u.uShadowMat, false, this.mLightVP);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
+        gl.activeTexture(gl.TEXTURE0);
+      } else {
+        gl.uniform1f(P.u.uShadowOn, 0);
+      }
+    }
+    void def;
   }
 
   async loadGLBAssets() {
     try {
-      const world = await loadGLB('./Assets/gbl/world/lobby.glb');
-      const b = world.bounds;
-      // The lobby IS the map: rotate so its long axis follows MAP.w, scale it
-      // to fill the play field (heights stay native so furniture keeps its
-      // size relative to the 32-unit player) and rest the floor on y = 0.
-      const dx = b.max[0] - b.min[0], dz = b.max[2] - b.min[2];
-      const sx = MAP.w / dz, sz = MAP.h / dx;
-      const place = new Float32Array(16);
-      place[0] = 0; place[1] = 0; place[2] = -sz;   // raw +X -> world -Z
-      place[4] = 0; place[5] = 1; place[6] = 0;
-      place[8] = sx; place[9] = 0; place[10] = 0;   // raw +Z -> world +X
-      place[15] = 1;
-      let mnx = 1e9, mny = 1e9, mnz = 1e9, mxx = -1e9, mxy = -1e9, mxz = -1e9;
-      for (const px of [b.min[0], b.max[0]]) {
-        for (const py of [b.min[1], b.max[1]]) {
-          for (const pz of [b.min[2], b.max[2]]) {
-            const X = sx * pz, Y = py, Z = -sz * px;
-            if (X < mnx) mnx = X; if (X > mxx) mxx = X;
-            if (Y < mny) mny = Y; if (Y > mxy) mxy = Y;
-            if (Z < mnz) mnz = Z; if (Z > mxz) mxz = Z;
-          }
-        }
-      }
-      place[12] = MAP.w / 2 - (mnx + mxx) / 2;
-      place[13] = -mny;
-      place[14] = MAP.h / 2 - (mnz + mxz) / 2;
-      for (const d of world.draws) d.matrix = mul(new Float32Array(16), place, d.matrix);
-      world.bounds = {
-        min: [mnx + place[12], mny + place[13], mnz + place[14]],
-        max: [mxx + place[12], mxy + place[13], mxz + place[14]]
-      };
-      const mach = stretchMachines(world.draws, 2, MAP.w, MAP.h);
-      const noRoof = stripCeiling(world.draws);
-      this.glbReady = true;
-      // Nav is derived from the full geometry (collision stays identical to
-      // the reference floor plan) before the render-only cleanup below.
+      const world = await buildBrewMap();
       const nav = buildNav(world.draws, MAP.w, MAP.h);
       setNav(nav);
       this.nav = nav;
-      genNormals(world.draws);
-      // The export also ships a huge untextured pure-black shell that only
-      // peeks through as black patches over the floor. It carries no visible
-      // furniture (couches and walls live in the textured draws), so drop it
-      // from the render list.
-      world.draws = world.draws.filter(d => {
-        const m = d.mat >= 0 ? world.materials[d.mat] : null;
-        return !(m && m.tex < 0 && m.unlit && (m.base[0] + m.base[1] + m.base[2]) < 0.06);
-      });
       this.glbWorld = this.uploadGLB(world);
-      console.log('[glb] world ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
+      this.mapReady = true;
+      this.glbReady = true;
+      const b = world.bounds;
+      console.log('[map] brew ready: ' + this.glbWorld.opaque.length + ' opaque, ' +
         this.glbWorld.blend.length + ' blend, box=' +
-        world.bounds.min.map(v => Math.round(v)).join(',') + '..' +
-        world.bounds.max.map(v => Math.round(v)).join(',') +
-        ', nav ' + nav.open + '/' + nav.total + ' open cells, roof tris ' + noRoof +
-        ', mach x' + mach);
+        b.min.map(v => Math.round(v)).join(',') + '..' +
+        b.max.map(v => Math.round(v)).join(',') +
+        ', nav ' + nav.open + '/' + nav.total + ' open cells, ' +
+        LIGHTS.length + ' lights');
     } catch (e) {
       this.glbReady = false;
-      console.warn('[glb] world load failed, procedural fallback:', e && e.message);
+      this.mapReady = false;
+      console.warn('[map] map build failed, procedural fallback:', e && e.message);
+      if (e && e.stack) console.warn(e.stack);
     }
-    try {
-      const player = await loadGLB('./Assets/gbl/Player/steve.skin.glb');
-      const pb = player.bounds;
-      const shift = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
-        -(pb.min[0] + pb.max[0]) / 2, -pb.min[1], -(pb.min[2] + pb.max[2]) / 2, 1]);
-      this.glbPlayer = this.uploadGLB(player);
-      for (const g of this.glbPlayer.opaque) g.matrix = mul(new Float32Array(16), shift, g.matrix);
-      for (const g of this.glbPlayer.blend) g.matrix = mul(new Float32Array(16), shift, g.matrix);
-      console.log('[glb] player ready: height=' + (pb.max[1] - pb.min[1]).toFixed(1) +
-        ' draws=' + (this.glbPlayer.opaque.length + this.glbPlayer.blend.length));
-    } catch (e) {
-      console.warn('[glb] player load failed, procedural fallback:', e && e.message);
-    }
+    await this.ensureSkin(DEFAULT_SKIN);
+  }
+
+  // Lazy-load + upload one skin from the catalogue. Resolves with the uploaded
+  // model (or null on failure); concurrent callers share one in-flight load.
+  ensureSkin(id) {
+    id = normalizeSkin(id);
+    const cached = this.playerSkins.get(id);
+    if (cached) return Promise.resolve(cached);
+    if (this.skinPromises.has(id)) return this.skinPromises.get(id);
+    if (this.skinFailed.has(id)) return Promise.resolve(null);
+    const def = SKIN_BY_ID.get(id);
+    if (!def) return Promise.resolve(null);
+    const pr = loadGLB(def.url).then(glb => {
+      const fit = fitPlayerMatrix(glb.bounds, def);
+      for (const g of glb.draws) g.matrix = mul(new Float32Array(16), fit, g.matrix);
+      const up = this.uploadGLB(glb);
+      this.playerSkins.set(id, up);
+      this.skinPromises.delete(id);
+      if (id === DEFAULT_SKIN) this.glbPlayer = up;
+      console.log('[glb] skin ' + id + ' ready: draws=' + (up.opaque.length + up.blend.length));
+      return up;
+    }).catch(e => {
+      this.skinPromises.delete(id);
+      this.skinFailed.add(id);
+      console.warn('[glb] skin ' + id + ' load failed:', e && e.message);
+      return null;
+    });
+    this.skinPromises.set(id, pr);
+    return pr;
   }
 
   uploadGLB(glb) {
@@ -349,10 +518,10 @@ export class Renderer {
       if (!d.idx || !d.idx.length) continue;
       const m = d.mat >= 0 ? glb.materials[d.mat] : null;
       const gpu = {
-        pos: this.gbuf(d.pos), nrm: this.gbuf(d.nrm), uv: this.gbuf(d.uv),
+        pos: this.gbuf(d.pos), nrm: this.gbuf(d.nrm), tan: this.gbuf(d.tan), uv: this.gbuf(d.uv),
         idx: gl.createBuffer(), count: d.idx.length,
         type: d.idx instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT,
-        matrix: d.matrix, mat: m, tex: null
+        matrix: d.matrix, mat: m, tex: null, nrmTex: null
       };
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gpu.idx);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, d.idx, gl.STATIC_DRAW);
@@ -362,6 +531,13 @@ export class Renderer {
           texCache.set(m.tex, this.uploadGLBTexture(glb.images[m.tex], glb.samplers[m.smp] || {}));
         }
         gpu.tex = texCache.get(m.tex);
+      }
+      if (m && m.nrm != null && m.nrm >= 0 && glb.images[m.nrm]) {
+        const key = 'n' + m.nrm;
+        if (!texCache.has(key)) {
+          texCache.set(key, this.uploadGLBTexture(glb.images[m.nrm], glb.samplers[m.nrmSmp] || {}));
+        }
+        gpu.nrmTex = texCache.get(key);
       }
       if (m && m.blend) out.blend.push(gpu);
       else out.opaque.push(gpu);
@@ -392,10 +568,14 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
     const pot = v => v > 0 && (v & (v - 1)) === 0;
     const wrap = w => (w === 33071 ? gl.CLAMP_TO_EDGE : w === 33648 ? gl.MIRRORED_REPEAT : gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap(smp.wrapS));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap(smp.wrapT));
+    // WebGL1 makes NPOT textures incomplete under REPEAT/MIPMAP: clamp them.
+    const isPot = pot(bitmap.width) && pot(bitmap.height);
+    const ws = isPot ? wrap(smp.wrapS) : gl.CLAMP_TO_EDGE;
+    const wt = isPot ? wrap(smp.wrapT) : gl.CLAMP_TO_EDGE;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, ws);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wt);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, smp.magFilter === 9728 ? gl.NEAREST : gl.LINEAR);
-    if (pot(bitmap.width) && pot(bitmap.height)) {
+    if (isPot) {
       gl.generateMipmap(gl.TEXTURE_2D);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, smp.minFilter === 9984 || smp.minFilter === 9985 ? gl.NEAREST : gl.LINEAR_MIPMAP_LINEAR);
     } else {
@@ -420,13 +600,14 @@ export class Renderer {
     gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc));
     gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    const ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+    if (!ok) {
       console.error('program link failed:', gl.getProgramInfoLog(prog));
     }
     const u = {}, a = {};
     for (const nm of uniforms) u[nm] = gl.getUniformLocation(prog, nm);
     for (const nm of attribs) a[nm] = gl.getAttribLocation(prog, nm);
-    return { prog, u, a };
+    return { prog, u, a, ok };
   }
 
   uploadTexture(source) {
@@ -478,88 +659,6 @@ export class Renderer {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gpu.idx);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(mesh.idx), usage);
     gpu.count = mesh.idx.length;
-  }
-
-  // back   - dark backdrop plane, drawn under the imported lobby too
-  // shell  - procedural rug + perimeter walls, fallback scene only
-  // M      - gameplay props (tables, seats, bar, ...), fallback scene only;
-  //          the model already provides all of that furniture
-  // sw     - light switch box, drawn in both scenes (gameplay interactable)
-  buildWorld(back, shell, M, sw, lever, floorT, signT) {
-    const wallC = C('#453424');
-    pushQuadLit(back, [
-      [-2200, -1.5, -2200], [MAP.w + 2200, -1.5, -2200],
-      [MAP.w + 2200, -1.5, MAP.h + 2200], [-2200, -1.5, MAP.h + 2200]
-    ], [0.05, 0.042, 0.034]);
-
-    for (const o of OBJECTS) {
-      const cx = o.x + o.w / 2, cz = o.y + o.h / 2;
-      switch (o.type) {
-        case 'rug':
-          // The central social area must exist visually as well as in the world data.
-          pushBox(shell, cx, 0.4, cz, o.w, 0.8, o.h, C('#173f32'));
-          pushBox(shell, cx, 0.85, cz, o.w - 18 * KX, 0.18, o.h - 18, C('#245b47'));
-          break;
-        case 'wall':
-          pushBox(shell, cx, 0, cz, o.w, o.hgt, o.h, wallC);
-          break;
-        case 'table':
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#6b4526'));
-          pushDisc(M, cx, o.hgt + 0.6, cz, o.w / 2 - 18 * KX, o.h / 2 - 16, C('#0e4a34'));
-          break;
-        case 'bar':
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#3d2a1c'));
-          pushBox(M, cx, o.hgt, cz, o.w, 6, o.h, C('#c9a15c'));
-          break;
-        case 'shelf': {
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#241a12'));
-          for (let i = 0; i < 12; i++) {
-            const bx = o.x + (12 + i * 34 + 8) * KX;
-            pushBox(M, bx, 8, o.y + o.h - 2, 14 * KX, o.hgt - 16, 6, C(BOTTLES[i % 4]));
-          }
-          break;
-        }
-        case 'column':
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#3a3128'));
-          break;
-        case 'plant':
-          pushBox(M, cx, 0, cz, o.w - 16, 26, o.h - 20, C('#6b4a2a'));
-          pushEllip(M, cx, 44, cz, 26, 15, 26, C('#1f6b40'), 4, 9);
-          pushEllip(M, cx, 58, cz, 17, 13, 17, C('#2f9a58'), 4, 9);
-          break;
-        case 'sign':
-          pushBox(M, cx, 6, o.y + o.h / 2, o.w, 46, o.h, C('#1a120c'));
-          pushT(signT, [
-            [o.x, 6, o.y + o.h + 1], [o.x + o.w, 6, o.y + o.h + 1],
-            [o.x + o.w, 52, o.y + o.h + 1], [o.x, 52, o.y + o.h + 1]
-          ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-          break;
-        case 'switch':
-          pushBox(sw, o.x + KX, 36, cz, 22 * KX, 44, o.h, C('#d8d2c4'));
-          pushBox(lever, o.x + 13 * KX, 50, cz, 6 * KX, 10, o.h - 10, [0.92, 0.92, 0.86]);
-          break;
-        case 'decor':
-          pushBox(M, cx, 0, cz, o.w, o.hgt, o.h, C('#2a2118'));
-          break;
-      }
-    }
-
-    for (const sd of SEATS) {
-      const ry = Math.PI / 2 - sd.dir;
-      const c = Math.cos(ry), s = Math.sin(ry);
-      if (sd.table) {
-        pushBox(M, sd.x, 0, sd.y, 24, 14, 24, C('#5b3620'), c, s);
-        pushBox(M, sd.x, 14, sd.y, 26, 6, 26, C('#7a4a2a'), c, s);
-        pushBox(M, sd.x - s * 12, 20, sd.y - c * 12, 26, 16, 4, C('#5b3620'), c, s);
-      } else {
-        pushCyl(M, sd.x, 0, sd.y, 4, 15, C('#5a5a5a'), 8);
-        pushCyl(M, sd.x, 15, sd.y, 15, 5, C('#8a8a8a'), 12);
-      }
-    }
-
-    pushT(floorT, [
-      [0, 0, 0], [MAP.w, 0, 0], [MAP.w, 0, MAP.h], [0, 0, MAP.h]
-    ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }
 
   pushPlayer(M, p) {
@@ -705,28 +804,37 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
-    // The imported lobby is the actual map. The procedural shell and props
-    // (tables, seats, bar, plants, sign box) are fallback-only so the model's
-    // own furniture is never doubled; only the light switch rides along.
+    // Shadow map first (own FBO), then the generated map geometry.
+    this.renderShadowPass();
+
+    // The generated map is the world. Only the light switch rides along as
+    // separate lit geometry.
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
+      // Backdrop only: no depth write, so the huge quads can't z-lose to the
+      // near carpet (spawn FP was a black wedge of apron).
       this.useTex();
       this.setTexM(this.mIdent);
       this.setTexTint(0.24, 0.20, 0.16, 1);
+      gl.depthMask(false);
       this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
 
       this.useGLB(def);
+      this.uploadLights(def);
+      gl.depthMask(true);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
-      this.glErr('lobbyOpaque');
+      this.glErr('mapOpaque');
 
       this.useLit();
       this.setLitM(this.mIdent);
       this.setLitTint(1, 1, 1);
       this.setLitLighting(def);
+      gl.depthMask(false);
       this.bindLit(this.gpuBack);
       gl.drawElements(gl.TRIANGLES, this.gpuBack.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
+      gl.depthMask(true);
       this.bindLit(this.gpuSw);
       gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -734,14 +842,14 @@ export class Renderer {
       this.bindLit(this.gpuLever);
       gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
-      this.glErr('glbProps');
+      this.glErr('mapProps');
     } else {
-      // Emergency fallback only while lobby.glb cannot be loaded.
+      // Emergency fallback while the generated map is being built.
       this.useTex();
       this.setTexM(this.mIdent);
-      this.setTexTint(1, 1, 1, 1);
-      this.bindTex(this.gpuFloor, this.texFloor);
-      gl.drawElements(gl.TRIANGLES, this.gpuFloor.count, gl.UNSIGNED_SHORT, 0);
+      this.setTexTint(0.24, 0.20, 0.16, 1);
+      this.bindTex(this.gpuApron, this.texApron);
+      gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
 
       this.useLit();
@@ -750,12 +858,6 @@ export class Renderer {
       this.setLitLighting(def);
       this.bindLit(this.gpuBack);
       gl.drawElements(gl.TRIANGLES, this.gpuBack.count, gl.UNSIGNED_SHORT, 0);
-      this.stats.draws++;
-      this.bindLit(this.gpuShell);
-      gl.drawElements(gl.TRIANGLES, this.gpuShell.count, gl.UNSIGNED_SHORT, 0);
-      this.stats.draws++;
-      this.bindLit(this.gpuWorld);
-      gl.drawElements(gl.TRIANGLES, this.gpuWorld.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
       this.bindLit(this.gpuSw);
       gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
@@ -768,10 +870,18 @@ export class Renderer {
       this.glErr('procWorld');
     }
 
-    if (this.glbReady && this.glbPlayer && this.glbPlayer.opaque.length) {
+    const procPlayers = [];
+    if (this.glbReady && (this.glbPlayer || this.playerSkins.size)) {
       this.useGLB(def);
       for (const p of list) {
         if (this.fp && me && p.id === me.id) continue;
+        const sid = normalizeSkin(p.skin);
+        let mdl = this.playerSkins.get(sid);
+        if (!mdl) {
+          this.ensureSkin(sid);
+          mdl = this.glbPlayer;
+        }
+        if (!mdl || !mdl.opaque.length) { procPlayers.push(p); continue; }
         const px = p.rx != null ? p.rx : p.x;
         const pz = p.ry != null ? p.ry : p.y;
         const seated = p.status === 'seated' || p.anim === 'sit';
@@ -780,19 +890,20 @@ export class Renderer {
         const phase = this.time * 11 + (p.id.charCodeAt(0) || 0);
         const bob = walking ? Math.abs(Math.sin(phase)) * 1.2 : 0;
         trs(this.mScratch, px, bob, pz, ry, 1, 1, 1);
-        for (const g of this.glbPlayer.opaque) {
+        for (const g of mdl.opaque) {
           mul(this.mScratch2, this.mScratch, g.matrix);
           this.drawGLBD(g, this.mScratch2);
         }
       }
     } else {
-
+      for (const p of list) {
+        if (this.fp && me && p.id === me.id) continue;
+        procPlayers.push(p);
+      }
+    }
     const M = this.meshPlayers;
     M.pos.length = 0; M.nrm.length = 0; M.col.length = 0; M.idx.length = 0;
-    for (const p of list) {
-      if (this.fp && me && p.id === me.id) continue;
-      this.pushPlayer(M, p);
-    }
+    for (const p of procPlayers) this.pushPlayer(M, p);
     if (M.idx.length) {
       this.fillMesh(this.gpuPlayers, M, gl.DYNAMIC_DRAW);
       this.useLit();
@@ -801,8 +912,6 @@ export class Renderer {
       this.bindLit(this.gpuPlayers);
       gl.drawElements(gl.TRIANGLES, this.gpuPlayers.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
-    }
-
     }
 
     this.glErr('players');
@@ -855,7 +964,7 @@ export class Renderer {
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       this.useGLB(def);
       for (const g of this.glbWorld.blend) this.drawGLBD(g);
-      this.glErr('lobbyBlend');
+      this.glErr('mapBlend');
     }
     this.useTex();
     this.setTexM(this.mIdent);
@@ -869,13 +978,6 @@ export class Renderer {
       this.stats.draws++;
       this.glErr('shadows');
     }
-
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    if (this.lights) this.setTexTint(1.0, 0.86, 0.5, 1);
-    else this.setTexTint(1.0, 0.47, 0.7, 1);
-    this.bindTex(this.gpuSign, this.texSign);
-    gl.drawElements(gl.TRIANGLES, this.gpuSign.count, gl.UNSIGNED_SHORT, 0);
-    this.stats.draws++;
 
     if (GLM.idx.length) {
       this.fillTexMesh(this.gpuGlows, GLM, gl.DYNAMIC_DRAW);
@@ -938,11 +1040,26 @@ export class Renderer {
       gl.uniform4f(P.u.uTint, mat.base[0] * k, mat.base[1] * k, mat.base[2] * k, mat.base[3]);
     } else gl.uniform4f(P.u.uTint, 1, 1, 1, 1);
     gl.uniform1f(P.u.uUnlit, mat && mat.unlit ? 1 : 0);
+    if (P.u.uEmissive) {
+      const e = mat && mat.emissive;
+      gl.uniform3f(P.u.uEmissive, e ? e[0] : 0, e ? e[1] : 0, e ? e[2] : 0);
+    }
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, g.tex || this.texWhite);
+    if (P.u.uHasNrm) {
+      if (g.nrmTex) {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, g.nrmTex);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1f(P.u.uHasNrm, 1);
+      } else {
+        gl.uniform1f(P.u.uHasNrm, 0);
+      }
+    }
     this.bindAttrs(set => {
       set(P.a.aPos, g.pos, 3);
       set(P.a.aNrm, g.nrm, 3);
+      set(P.a.aTan, g.tan, 3);
       set(P.a.aUV, g.uv, 2);
     });
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.idx);

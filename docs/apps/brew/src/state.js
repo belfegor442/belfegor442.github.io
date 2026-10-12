@@ -1,6 +1,7 @@
 import { MAX_PLAYERS, SPEED, RADIUS, MOVE_TOLERANCE, PROX, LIMITS, token } from './protocol.js';
 import { SEATS, SEAT_BY_ID, OBJ_BY_ID, move as collide, seatsAt, eject } from './world.js';
 import { Registry } from './activities.js';
+import { normalizeSkin } from './skins.js';
 
 const clampAngle = a => (isFinite(a) ? Math.atan2(Math.sin(a), Math.cos(a)) : 0);
 const clean = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
@@ -26,6 +27,7 @@ export class Host {
       name: clean(info.name, LIMITS.name) || 'PLAYER',
       pid: clean(info.pid, LIMITS.pid).toUpperCase() || '----',
       seed: (Number(info.seed) || 0) % 6,
+      skin: normalizeSkin(info.skin),
       x: info.x, y: info.y, dir: info.dir || 0, anim: 'idle',
       status: 'standing', seat: null, emote: null, emoteAt: 0,
       balance: Math.max(0, Math.min(100000, Number(info.balance) || 1000)),
@@ -104,6 +106,15 @@ export class Host {
     if (!p) return { error: 'unknown-player' };
     p.emote = clean(key, 24); p.emoteAt = Date.now(); p.dirty = true;
     return { ok: this.emit('emote', { uid, key: p.emote, at: p.emoteAt }) };
+  }
+
+  applySkin(uid, skin) {
+    const p = this.players.get(uid);
+    if (!p) return { error: 'unknown-player' };
+    const id = normalizeSkin(skin);
+    if (p.skin === id) return null;
+    p.skin = id; p.dirty = true;
+    return { ok: this.emit('skin', { uid, skin: id }) };
   }
 
   chat(uid, text) {
@@ -217,7 +228,7 @@ export class Host {
   snapshot() {
     return {
       players: [...this.players.values()].map(p => ({
-        id: p.id, name: p.name, pid: p.pid, seed: p.seed, x: p.x, y: p.y, dir: p.dir,
+        id: p.id, name: p.name, pid: p.pid, seed: p.seed, skin: p.skin, x: p.x, y: p.y, dir: p.dir,
         anim: p.anim, status: p.status, seat: p.seat, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
       })),
       seats: [...this.occupancyEntries()],
@@ -233,7 +244,7 @@ export class Host {
   dirtyPlayers() {
     const list = [...this.players.values()].filter(p => p.dirty).map(p => ({
       id: p.id, x: p.x, y: p.y, dir: p.dir, anim: p.anim, status: p.status, seat: p.seat,
-      name: p.name, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
+      name: p.name, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance, skin: p.skin
     }));
     for (const p of this.players.values()) p.dirty = false;
     return list;

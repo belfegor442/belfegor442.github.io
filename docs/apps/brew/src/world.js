@@ -14,9 +14,9 @@ export const OBJECTS = [
   { id: 'bar', type: 'bar', x: 1190, y: 74, w: 120, h: 80, solid: true, hgt: 48 },
   { id: 'shelf', type: 'shelf', x: 1210, y: 54, w: 240, h: 30, solid: false, hgt: 74 },
 
-  // Gameplay tables ARE the lobby.glb furniture: bounds copied from the
-  // model's six poker felts and its roulette counter (glb = model-world
-  // coords, exempt from the KX pass below).
+  // Gameplay tables sit at the original model-world felts (six poker tables
+  // and a roulette counter). glb:true = coordinates already in map space,
+  // exempt from the KX pass below.
   { id: 't1', type: 'table', kind: 'poker', x: 1564, y: 111, w: 121, h: 211, solid: true, hgt: 32, glb: true },
   { id: 't2', type: 'table', kind: 'poker', x: 1564, y: 484, w: 121, h: 211, solid: true, hgt: 32, glb: true },
   { id: 't3', type: 'table', kind: 'poker', x: 1564, y: 857, w: 121, h: 211, solid: true, hgt: 32, glb: true },
@@ -35,13 +35,11 @@ export const OBJECTS = [
   { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' }
 ];
 
-// lobby.glb is 2.1:1 native; the old 1720-wide frame forced it into 1.46:1
-// and squashed every side-to-side aisle 30% — the "super narrow" lobby. The
-// frame now matches the model, so scale the hand-placed x-coordinates by the
-// same factor the GLB scales (MAP.w / 1720) to keep them aligned with it.
+// The map frame is 2.1:1 (2472x1300); the old 1720-wide frame forced that
+// aspect into 1.46:1 and squashed every side-to-side aisle 30%. Scale the
+// hand-placed x-coordinates by MAP.w / 1720 so they keep the same layout.
 export const KX = MAP.w / 1720;
-// The map got deeper on request (2472x1300, a gentle +10% so the stretched
-// GLB doesn't read as squashed); the GLB stretches to fill MAP, so every
+// The map got deeper on request (2472x1300, a gentle +10%); every
 // hand-placed z (and the model-copied felts/stools) scales with
 // MAP.h / 1180 the same way KX handles x. glb objects keep their x untouched.
 export const KZ = MAP.h / 1180;
@@ -60,9 +58,9 @@ function seat(id, table, x, y, dir) {
   return { id, table, x, y, dir, occupiedBy: null };
 }
 
-// Seat anchors are the lobby.glb stools themselves: seven chairs ring each
-// poker felt, six spots ring the roulette counter. Measured from the model
-// (islands.json), model-world coords, facing the table centre.
+// Seat anchors are the stools around each table: seven chairs ring each
+// poker felt, six spots ring the roulette counter, model-world coords,
+// facing the table centre.
 const STOOLS = {
   t1: [[1527, 216], [1543, 285], [1543, 147], [1590, 338], [1590, 94], [1657, 358], [1657, 74]],
   t2: [[1527, 589], [1543, 658], [1543, 521], [1590, 711], [1590, 467], [1657, 731], [1657, 447]],
@@ -117,9 +115,9 @@ function circleHitsRect(x, y, r, rect) {
   return dx * dx + dy * dy < r * r;
 }
 
-// Collision grid rasterised from lobby.glb: the model is the map. While the
-// GLB is still loading (or failed) nav stays null and only the rectangle
-// solids above are used, exactly like before.
+// Collision grid rasterised from the map geometry. While the map is still
+// building (or failed) nav stays null and only the rectangle solids above
+// are used.
 let nav = null;
 export function setNav(n) { nav = n; }
 export function getNav() { return nav; }
@@ -140,10 +138,9 @@ function navBlockedAt(x, y, r) {
 
 export function blocked(x, y, r = 14) {
   if (navBlockedAt(x, y, r)) return true;
-  // The rectangle solids describe the procedural scene. When the model's nav
-  // grid is live it already rasterises every piece of lobby.glb furniture, so
-  // the rects are skipped — they used to be phantom boxes that matched the
-  // old hand-placed props instead of the actual model.
+  // The rectangle solids describe the procedural scene. When the map's nav
+  // grid is live it already rasterises every piece of map furniture, so
+  // the rects are skipped.
   if (!nav) {
     for (const s of SOLIDS) if (circleHitsRect(x, y, r, s)) return true;
   }
