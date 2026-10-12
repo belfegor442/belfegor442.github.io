@@ -660,3 +660,16 @@
 }
 [data-theme="win98"] .emoji-cell:hover{background:#000080;color:#fff;border-color:#000080}
 [data-theme="win98"] .att-chip .att-img{background:#fff;border:1px solid #808080}
+[data-theme="win98"] .gif-search{
+  background:#fff;color:#000;border:2px solid;
+  border-color:#808080 #fff #fff #808080;
+}
+[data-theme="win98"] .gif-cat{
+  background:#fff;color:#000;
+  border:1px solid;
+  border-color:#fff #808080 #808080 #fff;
+}
+[data-theme="win98"] .gif-cat:hover{background:#fff;border-color:#000080;box-shadow:none}
+[data-theme="win98"] .gif-cell{border-color:#808080;background:#fff}
+[data-theme="win98"] .gif-cell:hover{border-color:#000080;box-shadow:none}
+[data-theme="win98"] .gif-status{color:#000}

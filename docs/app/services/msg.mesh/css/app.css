@@ -921,3 +921,37 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .led.on{animation:ledPulse 2.2s ease-in-out infinite}
 @keyframes markFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 .empty-state .mesh-mark{animation:markFloat 3.4s ease-in-out infinite}
+
+/* online GIF search pane */
+.gif-pane{display:flex;flex-direction:column;gap:6px}
+.gif-pane.hidden{display:none}
+.gif-search{
+  width:100%;height:24px;padding:2px 6px;font-size:11px;font-family:inherit;
+  color:#12141a;background:#fff;
+  border:1px solid;border-color:var(--xp-dark) var(--xp-shadow-out) var(--xp-shadow-out) var(--xp-dark);
+}
+.gif-search:focus{outline:1px dotted #000;outline-offset:-2px}
+.gif-results{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+  max-height:214px;overflow:auto;padding:2px;
+}
+.gif-cell{
+  padding:0;line-height:0;aspect-ratio:1/1;overflow:hidden;
+  border:1px solid var(--xp-border);background:#e6edf7;
+}
+.gif-cell:hover{border-color:var(--xp-accent);box-shadow:inset 0 0 0 1px var(--xp-accent)}
+.gif-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.gif-cat{
+  position:relative;padding:0;line-height:0;aspect-ratio:1/1;overflow:hidden;
+  border:1px solid var(--xp-border);background:#e6edf7;
+}
+.gif-cat:hover{border-color:var(--xp-accent);box-shadow:inset 0 0 0 1px var(--xp-accent)}
+.gif-cat img{width:100%;height:100%;object-fit:cover;display:block}
+.gif-cat-label{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:2px 4px;font-size:10px;line-height:1.3;color:#fff;text-align:left;
+  background:rgba(0,0,0,.55);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.gif-status{font-size:11px;color:#1a3a6a;min-height:20px;padding:2px}
+.gif-status.hidden{display:none}

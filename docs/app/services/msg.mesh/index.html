@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="msg.mesh">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https: wss: ws: http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://static.klipy.com https://media.tenor.com https://images-ext-1.discordapp.net; connect-src 'self' https: wss: ws: http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests">
 <title>msg.mesh — North Assembly</title>
 <link rel="icon" href="../../../icon.jpg">
 <link rel="apple-touch-icon" href="../../../icon.jpg">
@@ -180,9 +180,15 @@
           <div class="emoji-tabs" role="tablist">
             <button class="emoji-tab active" id="emojiTabFaces" type="button" role="tab" aria-selected="true">Emoticons</button>
             <button class="emoji-tab" id="emojiTabGifs" type="button" role="tab" aria-selected="false">Stickers</button>
+            <button class="emoji-tab" id="emojiTabGifSearch" type="button" role="tab" aria-selected="false">GIFs</button>
           </div>
           <div class="emoji-grid emote-grid" id="emojiFaces" role="tabpanel"></div>
           <div class="emoji-grid sticker-grid hidden" id="emojiStickers" role="tabpanel"></div>
+          <div class="gif-pane hidden" id="gifPane" role="tabpanel">
+            <input type="search" id="gifSearch" class="gif-search" placeholder="Search GIFs..." autocomplete="off" aria-label="Search GIFs">
+            <div class="gif-results" id="gifGrid"></div>
+            <div class="gif-status hidden" id="gifStatus" aria-live="polite"></div>
+          </div>
         </div>
       </div>
     </div>

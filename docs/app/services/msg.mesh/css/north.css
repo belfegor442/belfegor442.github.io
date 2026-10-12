@@ -489,3 +489,14 @@
 [data-theme="north"] .emoji-btn{border-radius:8px}
 [data-theme="north"] .att-chip .att-img{background:#0f172a;border:1px solid #334155}
 [data-theme="north"] .emoji-panel .emoji-cell:hover{color:inherit}
+[data-theme="north"] .gif-search{
+  background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;
+}
+[data-theme="north"] .gif-search::placeholder{color:#64748b}
+[data-theme="north"] .gif-cat{
+  border:1px solid #334155;border-radius:8px;background:#0f172a;
+}
+[data-theme="north"] .gif-cat:hover{border-color:#0ea5e9;box-shadow:none}
+[data-theme="north"] .gif-cell{border:1px solid #334155;border-radius:8px;background:#0f172a}
+[data-theme="north"] .gif-cell:hover{border-color:#0ea5e9;box-shadow:none}
+[data-theme="north"] .gif-status{color:#94a3b8}
