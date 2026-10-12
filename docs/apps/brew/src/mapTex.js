@@ -155,7 +155,9 @@ function carpet(size) {
     const damask = Math.pow(Math.abs(dm), 3) * (0.5 + 0.5 * fbm(u * 14, v * 14, 5, 3));
     c = mix(c, rgb('#6b2430'), damask * 0.55);
     const ring = Math.abs(Math.sin((Math.hypot(u - 0.5, v - 0.5)) * Math.PI * 9));
-    c = mix(c, rgb('#7a2a2c'), Math.pow(1 - ring, 14) * 0.5);
+    c = mix(c, rgb('#b8904a'), Math.pow(1 - ring, 10) * 0.6);
+    const fleck = hash2(Math.floor(u * 24), Math.floor(v * 24), 91);
+    if (fleck > 0.985) c = mix(c, rgb('#c9a45c'), 0.5);
     const wear = fbm(u * 3 + 11, v * 3, 23, 3);
     c = mix(c, rgb('#2a0b10'), Math.max(0, wear - 0.55) * 1.1);
     return c;
@@ -660,6 +662,116 @@ function wood(size, seed, dark) {
     : [rgb('#5a3a1e'), rgb('#8a5a2e'), rgb('#3a2410'), rgb('#1e1408')], dark ? 0.42 : 0.5);
 }
 
+// Soft radial darkening decal for the blend batch: fakes the contact shadow
+// / ambient occlusion the sun shadow map can't resolve under furniture.
+function aoBlob(size) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  shade(g, size, (u, v) => {
+    const d = Math.hypot(u - 0.5, v - 0.5) * 2;
+    return [0.01, 0.008, 0.01, Math.pow(Math.max(0, 1 - d), 1.7) * 0.6];
+  });
+  return {
+    albedo: a,
+    normal: packRough(cv(size), 0.9),
+    blend: true
+  };
+}
+
+// Light pooling on the floor: v=0 is the wall side where the spill is
+// strongest, fading as it reaches into the room. Emissive so it still glows
+// when the room lights are off.
+function floorSpillTex(size, hex, peak, glow) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  const c = rgb(hex);
+  shade(g, size, (u, v) => {
+    const eu = Math.min(u, 1 - u);
+    const soft = eu < 0.16 ? eu / 0.16 : 1;
+    const alpha = Math.pow(Math.max(0, 1 - v), 1.5) * peak * soft;
+    return [c[0], c[1], c[2], alpha];
+  });
+  return {
+    albedo: a,
+    normal: packRough(cv(size), 0.9),
+    blend: true,
+    emissive: [c[0] * glow, c[1] * glow, c[2] * glow]
+  };
+}
+
+// Roulette betting layout (numbers 0-36 + the thirds row) for the felt quad
+// laid over the roulette counter.
+function wheelFelt(size) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  shade(g, size, (u, v) => {
+    const fib = fbm(u * 50, v * 50, 37, 3);
+    return mix(rgb('#0d3d2a'), rgb('#15583a'), fib);
+  });
+  grain(g, size, 0.04, 71);
+  const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+  const gx0 = 0.16, gx1 = 0.88, gy0 = 0.18, gy1 = 0.74;
+  const cols = 12, rows = 3;
+  const cw = ((gx1 - gx0) / cols) * size, ch = ((gy1 - gy0) / rows) * size;
+  const gx = gx0 * size, gy = gy0 * size;
+  const gwx = (gx1 - gx0) * size, ghy = (gy1 - gy0) * size;
+  for (let n = 1; n <= 36; n++) {
+    const col = Math.floor((n - 1) / 3);
+    const row = (n - 1) % 3;
+    const x = gx + col * cw, y = gy + row * ch;
+    g.fillStyle = RED.has(n) ? 'rgba(140,30,36,.88)' : 'rgba(18,20,26,.88)';
+    g.fillRect(x, y, cw, ch);
+  }
+  const zw = cw * 0.75;
+  g.fillStyle = 'rgba(14,84,54,.92)';
+  g.fillRect(gx - zw, gy, zw, ch * 3);
+  g.font = `700 ${Math.round(size * 0.05)}px Arial`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (let n = 1; n <= 36; n++) {
+    const col = Math.floor((n - 1) / 3);
+    const row = (n - 1) % 3;
+    g.fillStyle = '#e8d8b0';
+    g.fillText(String(n), gx + col * cw + cw / 2, gy + row * ch + ch / 2);
+  }
+  g.fillStyle = '#e8d8b0';
+  g.fillText('0', gx - zw / 2, gy + ch * 1.5);
+  // thirds row (2 to 1) under the numbers
+  const ty = gy + ghy + 0.015 * size, th = 0.09 * size;
+  for (let i = 0; i < 3; i++) {
+    const x = gx + i * (gwx / 3);
+    g.fillStyle = 'rgba(18,20,26,.8)';
+    g.fillRect(x, ty, gwx / 3, th);
+  }
+  g.font = `700 ${Math.round(size * 0.038)}px Arial`;
+  g.fillStyle = '#c9a45c';
+  g.fillText('2 TO 1', gx + gwx / 6, ty + th / 2);
+  g.fillText('2 TO 1', gx + gwx / 2, ty + th / 2);
+  g.fillText('2 TO 1', gx + gwx * 5 / 6, ty + th / 2);
+  g.strokeStyle = '#c9a45c';
+  g.lineWidth = Math.max(1.5, size * 0.011);
+  g.strokeRect(gx - zw, gy, gwx + zw, ghy + 0.015 * size + th);
+  g.beginPath();
+  for (let i = 1; i < cols; i++) {
+    const x = gx + i * cw;
+    g.moveTo(x, gy);
+    g.lineTo(x, gy + ghy);
+  }
+  for (let i = 1; i < rows; i++) {
+    const y = gy + i * ch;
+    g.moveTo(gx, y);
+    g.lineTo(gx + gwx, y);
+  }
+  g.strokeStyle = 'rgba(201,164,92,.55)';
+  g.lineWidth = 1;
+  g.stroke();
+  const hFelt = gray(size, (u, v) => 0.5 + fbm(u * 60, v * 60, 23, 3) * 0.5);
+  return {
+    albedo: packMetal(a, 0),
+    normal: packRough(heightToNormal(hFelt, 1.4), 0.94)
+  };
+}
+
 const BUILD = {
   carpet: () => carpet(256),
   tile: () => tile(256),
@@ -683,6 +795,10 @@ const BUILD = {
   posterA: () => poster(128, 'card'),
   posterB: () => poster(128, 'ad'),
   nightSky: () => nightSky(256),
+  aoBlob: () => aoBlob(64),
+  moonSpill: () => floorSpillTex(64, '#6a8cc8', 0.5, 0.5),
+  neonSpill: () => floorSpillTex(64, '#ff3c6e', 0.45, 0.55),
+  wheelFelt: () => wheelFelt(256),
   spot: () => spotCone(64, '#ffe8b4', 0.52, [0.58, 0.48, 0.32]),
   spotTeal: () => spotCone(64, '#66ffe0', 0.28, [0.26, 0.48, 0.44])
 };

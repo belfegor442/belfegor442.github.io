@@ -9,7 +9,8 @@ const MAT_ORDER = [
   'carpet', 'tile', 'woodFloor', 'woodDark', 'woodWarm', 'beam', 'brick',
   'plaster', 'brass', 'leather', 'felt', 'rug', 'steel', 'glass', 'neon',
   'wheel', 'slotFace', 'sign', 'dance', 'bulb', 'chipR', 'chipB',
-  'posterA', 'posterB', 'nightSky', 'spot', 'spotTeal'
+  'posterA', 'posterB', 'nightSky', 'aoBlob', 'moonSpill', 'neonSpill',
+  'wheelFelt', 'spot', 'spotTeal'
 ];
 
 function stadium(b, name, cx, cz, w, d, y0, h, opts) {
@@ -19,18 +20,62 @@ function stadium(b, name, cx, cz, w, d, y0, h, opts) {
   b.cyl(name, cx, y0, cz - half, r, r, h, 18, opts);
 }
 
+// Soft contact-shadow / AO decal on the floor under a piece of furniture.
+// Blend material, so nav and the shadow pass both ignore it.
+function blob(b, cx, cz, rx, rz) {
+  b.quad('aoBlob', [
+    [cx - rx, 0.42, cz - rz], [cx - rx, 0.42, cz + rz],
+    [cx + rx, 0.42, cz + rz], [cx + rx, 0.42, cz - rz]
+  ], [[0, 0], [0, 1], [1, 1], [1, 0]]);
+}
+
+// Pooled light on the floor under a window or the neon sign. v=0 edge sits
+// on the wall (strongest) and the gradient fades into the room.
+function floorSpill(b, mat, x0, x1, zWall, d, into) {
+  const zRoom = zWall + into * d;
+  if (into > 0) {
+    b.quad(mat, [
+      [x0, 0.5, zWall], [x0, 0.5, zRoom], [x1, 0.5, zRoom], [x1, 0.5, zWall]
+    ], [[0, 0], [0, 1], [1, 1], [1, 0]]);
+  } else {
+    b.quad(mat, [
+      [x0, 0.5, zRoom], [x0, 0.5, zWall], [x1, 0.5, zWall], [x1, 0.5, zRoom]
+    ], [[0, 1], [0, 0], [1, 0], [1, 1]]);
+  }
+}
+
+// Framed plaster panel on a north/south wall (zFace = inner face, dir into
+// the room) or an east/west wall (xFace).
+function panelZ(b, cx, zFace, dir, w, h) {
+  b.box('woodWarm', cx, 66, zFace + dir * 3, w + 12, h + 12, 6, { tile: 20, localUV: true });
+  b.box('plaster', cx, 66, zFace + dir * 5.5, w, h, 3, { tile: 26, localUV: true });
+}
+function panelX(b, xFace, cz, dir, w, h) {
+  b.box('woodWarm', xFace + dir * 3, 66, cz, 6, h + 12, w + 12, { tile: 20, localUV: true });
+  b.box('plaster', xFace + dir * 5.5, 66, cz, 3, h, w, { tile: 26, localUV: true });
+}
+
 function pokerTable(b, t) {
   const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
   const w = t.w, d = t.h;
+  blob(b, cx, cz, w / 2 + 48, d / 2 + 48);
   stadium(b, 'woodDark', cx, cz, w, d, 0, 26, { tile: 40, localUV: true });
   b.cyl('woodWarm', cx, 0, cz, 20, 16, 8, 16, { tile: 24 });
   stadium(b, 'woodWarm', cx, cz, w + 6, d + 6, 26, 4, { tile: 30, localUV: true });
+  // Padded leather armrest rail wrapping the rim, like a real casino felt.
+  stadium(b, 'leather', cx, cz, w + 8, d + 8, 26.5, 4.2, { tile: 30, localUV: true });
   stadium(b, 'felt', cx, cz, w - 10, d - 14, 30, 2.4, { tile: 22, localUV: true });
   chipStack(b, 'chipR', cx - 22, cz - 30, 4);
   chipStack(b, 'chipB', cx + 24, cz - 26, 3);
   chipStack(b, 'chipR', cx + 18, cz + 34, 5);
   cardDeck(b, cx - 6, cz + 4, 0.4);
   cardDeck(b, cx + 8, cz - 8, -0.3);
+  // Dealer props: card shoe, button and two glasses on the felt.
+  b.box('woodDark', cx + 30, 33.4, cz + 62, 14, 3.2, 20, { tile: 10, localUV: true });
+  b.box('brass', cx + 30, 35.2, cz + 62, 10, 1.2, 4, { tile: 6, localUV: true });
+  b.disc('plaster', cx - 34, 32.6, cz - 70, 5, 5, 12, { tile: 10 });
+  b.cyl('glass', cx + 40, 32.4, cz - 52, 3, 2.4, 8, 8, { tile: 6 });
+  b.cyl('glass', cx - 44, 32.4, cz + 48, 3, 2.4, 8, 8, { tile: 6 });
   for (const s of SEATS) {
     if (s.table !== t.id) continue;
     stool(b, s.x, s.y, s.dir);
@@ -39,6 +84,7 @@ function pokerTable(b, t) {
 
 function stool(b, x, z, dir) {
   void dir;
+  blob(b, x, z, 15, 15);
   b.cyl('steel', x, 0, z, 12, 10, 2, 12, { tile: 10 });
   b.cyl('steel', x, 2, z, 3.2, 3.2, 18, 8, { tile: 8 });
   b.cyl('leather', x, 20, z, 11, 10.5, 5, 14, { tile: 12 });
@@ -59,9 +105,24 @@ function cardDeck(b, x, z, rot) {
 function rouletteTable(b, t, wheelTex) {
   const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
   const w = t.w, d = t.h;
+  blob(b, cx, cz, w / 2 + 34, d / 2 + 34);
   stadium(b, 'woodDark', cx, cz, w, d, 0, 30, { tile: 40, localUV: true });
   stadium(b, 'woodWarm', cx, cz, w + 6, d + 6, 30, 4, { tile: 30, localUV: true });
+  stadium(b, 'leather', cx, cz, w + 8, d + 8, 30.5, 4.2, { tile: 30, localUV: true });
   stadium(b, 'felt', cx, cz, w - 12, d - 16, 34, 2, { tile: 20, localUV: true });
+  // Printed betting layout on the felt, one band at each end flanking the
+  // wheel (the wheel base covers the middle). Numbers march along z.
+  {
+    const fw = (w - 16) / 2, fz = (d - 20) / 2;
+    b.quad('wheelFelt', [
+      [cx - fw, 36.15, cz - fz], [cx - fw, 36.15, cz - 28],
+      [cx + fw, 36.15, cz - 28], [cx + fw, 36.15, cz - fz]
+    ], [[0, 0], [0, 1], [1, 1], [1, 0]]);
+    b.quad('wheelFelt', [
+      [cx - fw, 36.15, cz + 28], [cx - fw, 36.15, cz + fz],
+      [cx + fw, 36.15, cz + fz], [cx + fw, 36.15, cz + 28]
+    ], [[0, 0], [0, 1], [1, 1], [1, 0]]);
+  }
   b.cyl('woodDark', cx, 36, cz, 30, 32, 4, 24, { tile: 16 });
   b.cyl('brass', cx, 40, cz, 26, 28, 3.5, 26, { tile: 12 });
   b.disc(wheelTex, cx, 43.6, cz, 25, 25, 26, { tile: 50 });
@@ -70,6 +131,7 @@ function rouletteTable(b, t, wheelTex) {
   chipStack(b, 'chipR', cx + 40, cz - 76, 3, 36.4);
   chipStack(b, 'chipB', cx - 38, cz + 82, 5, 36.4);
   chipStack(b, 'chipR', cx + 42, cz + 78, 3, 36.4);
+  b.cyl('glass', cx + 28, 36.1, cz + 96, 3, 2.4, 8, 8, { tile: 6 });
   for (const s of SEATS) {
     if (s.table !== t.id) continue;
     stool(b, s.x, s.y, s.dir);
@@ -77,6 +139,7 @@ function rouletteTable(b, t, wheelTex) {
 }
 
 function slotBank(b, z0) {
+  blob(b, 76, z0 + 52, 42, 46);
   for (let i = 0; i < 3; i++) {
     const z = z0 + i * 52;
     b.box('steel', 68, 26, z, 44, 52, 46, { tile: 26, localUV: true });
@@ -111,6 +174,7 @@ function shelfUnit(b, x0, x1, z) {
 function barCounter(b) {
   const o = OBJ('bar');
   const cx = o.x + o.w / 2, cz = o.y + o.h / 2;
+  blob(b, cx, cz + 6, o.w / 2 + 26, o.h / 2 + 30);
   b.box('woodDark', cx, 22, cz - 6, o.w, 44, o.h - 20, { tile: 30, localUV: true });
   b.box('woodWarm', cx, 44, cz - 6, o.w + 10, 6, o.h - 12, { tile: 24, localUV: true });
   b.box('brass', cx, 10, cz + o.h / 2 - 12, o.w + 12, 3, 3, { tile: 12, localUV: true });
@@ -120,9 +184,27 @@ function barCounter(b) {
   const sh = OBJ('shelf');
   shelfUnit(b, sh.x, sh.x + sh.w, sh.y + sh.h / 2);
   b.box('steel', cx + 40, 50, cz + 24, 46, 6, 26, { tile: 16, localUV: true });
+  // Twin brass beer taps on the counter top.
+  for (const tx of [cx - 34, cx - 14]) {
+    b.cyl('brass', tx, 47, cz - 2, 3.5, 3.5, 16, 10, { tile: 8 });
+    b.box('leather', tx, 65, cz - 8, 3, 9, 8, { tile: 6, localUV: true });
+    b.cyl('brass', tx, 52, cz + 1.5, 1.6, 1.6, 6, 8, { tile: 4 });
+  }
+  // Cocktail glasses waiting on the counter.
+  b.cyl('glass', cx + 18, 47, cz - 8, 3, 2.2, 9, 8, { tile: 6 });
+  b.cyl('glass', cx + 30, 47, cz + 2, 3, 2.2, 9, 8, { tile: 6 });
+  // Hanging stemware rack under the back shelf.
+  const shc = sh.x + sh.w / 2, shz = sh.y + sh.h / 2;
+  b.box('brass', shc, 58, shz + 8, sh.w - 30, 1.6, 1.6, { tile: 8, localUV: true });
+  for (let i = 0; i < 9; i++) {
+    const gx = sh.x + 24 + i * 26;
+    if (gx > sh.x + sh.w - 18) break;
+    b.cyl('glass', gx, 48, shz + 8, 1.2, 3.4, 9, 7, { tile: 5 });
+  }
 }
 
 function armchair(b, x, z, rot) {
+  blob(b, x, z, 32, 32);
   b.box('leather', x, 9, z, 40, 18, 40, { tile: 22, rot, localUV: true });
   const c = Math.cos(rot), s = Math.sin(rot);
   b.box('leather', x - s * 16, 18, z - c * 16, 40, 22, 8, { tile: 20, rot, localUV: true });
@@ -132,6 +214,7 @@ function armchair(b, x, z, rot) {
 }
 
 function sofa(b, x, z, rot, len) {
+  blob(b, x, z, len / 2 + 12, 34);
   b.box('leather', x, 10, z, len, 20, 38, { tile: 24, rot, localUV: true });
   const c = Math.cos(rot), s = Math.sin(rot);
   b.box('leather', x - s * 15, 20, z - c * 15, len, 24, 9, { tile: 22, rot, localUV: true });
@@ -140,6 +223,7 @@ function sofa(b, x, z, rot, len) {
 
 function plant(b, x, z, scale) {
   const s = scale || 1;
+  blob(b, x, z, 26 * s, 26 * s);
   b.cyl('woodDark', x, 0, z, 14 * s, 12 * s, 16 * s, 10, { tile: 14 });
   b.ellipsoid('felt', x, 30 * s, z, 18 * s, 16 * s, 18 * s, 4, 8);
   b.ellipsoid('felt', x, 44 * s, z, 12 * s, 12 * s, 12 * s, 4, 8);
@@ -147,6 +231,7 @@ function plant(b, x, z, scale) {
 }
 
 function column(b, x, z) {
+  blob(b, x, z, 46, 46);
   b.box('brick', x, 75, z, 54, 150, 54, { tile: 54, localUV: true });
   b.box('woodWarm', x, 6, z, 62, 12, 62, { tile: 24, localUV: true });
   b.box('woodWarm', x, 144, z, 62, 12, 62, { tile: 24, localUV: true });
@@ -157,6 +242,22 @@ function hangingLamp(b, x, z, drop) {
   b.cyl('steel', x, top - drop, z, 1.2, 1.2, drop, 6, { tile: 6 });
   b.cyl('steel', x, top - drop - 16, z, 16, 7, 16, 14, { tile: 12 });
   b.cyl('neon', x, top - drop - 17.5, z, 6.5, 6.5, 1.5, 12, { tile: 6 });
+}
+
+// Brass ring chandelier over the entrance foyer. Everything stays at
+// y >= 111 so the nav grid (TALL=110) treats it as hung-high and walkable.
+function chandelier(b, x, z) {
+  const y = 124;
+  b.cyl('brass', x, y, z, 1.8, 1.8, 12, 8, { tile: 6 });
+  b.cyl('brass', x, y - 3.5, z, 25, 25, 3, 20, { tile: 16, bottom: true });
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    const bx = x + Math.cos(a) * 21, bz = z + Math.sin(a) * 21;
+    b.cyl('brass', bx, y - 8, bz, 1.2, 1.2, 5, 6, { tile: 4 });
+    b.ellipsoid('bulb', bx, y - 9.5, bz, 2.6, 3.2, 2.6, 4, 8);
+  }
+  b.ellipsoid('bulb', x, y - 9, z, 3.5, 3.5, 3.5, 4, 8);
+  spotBeam(b, 'spot', x, z, 4, 112, 70, 16);
 }
 
 // Hazy down-light cone under a hanging lamp or over the dance floor. Blend
@@ -256,6 +357,7 @@ function stringLights(b, x0, x1, z, yEnd, sag) {
 }
 
 function cocktailTable(b, x, z) {
+  blob(b, x, z, 34, 28);
   b.cyl('brass', x, 0, z, 9, 7, 21, 12, { tile: 10 });
   b.cyl('woodWarm', x, 21, z, 19, 18, 3.5, 16, { tile: 14 });
   b.cyl('brass', x, 24.5, z, 20, 19, 1.2, 16, { tile: 10 });
@@ -283,6 +385,7 @@ function danceFloor(b) {
 }
 
 function speaker(b, x, z) {
+  blob(b, x, z + 4, 22, 20);
   b.box('steel', x, 26, z, 26, 52, 20, { tile: 20, localUV: true });
   b.cyl('steel', x, 14, z + 10.5, 8, 8, 1.5, 14, { tile: 8 });
   b.cyl('steel', x, 34, z + 10.5, 5.5, 5.5, 1.5, 12, { tile: 6 });
@@ -479,6 +582,24 @@ function buildShell(b) {
   stringLights(b, 100, 2370, 1120, 126, 10);
 
   velvetRope(b, 330, 470, 1150);
+
+  // Walk-off mat just inside the entrance door.
+  b.box('woodDark', 400, 0.22, 1246, 150, 0.34, 36, { tile: 40, localUV: true });
+
+  // Moonlight pooling on the floor under each window, and the neon sign's
+  // pink wash by the entrance.
+  floorSpill(b, 'moonSpill', 440, 690, T + 6, 150, 1);
+  floorSpill(b, 'moonSpill', 2150, 2350, T + 6, 140, 1);
+  floorSpill(b, 'moonSpill', 440, 690, H - T - 6, 140, -1);
+  floorSpill(b, 'neonSpill', 670, 1040, T + 8, 110, 1);
+
+  // Framed plaster panels break up the long bare brick walls.
+  panelX(b, W - T, 420, -1, 170, 64);
+  panelX(b, W - T, 860, -1, 170, 64);
+  panelX(b, W - T, 1190, -1, 110, 64);
+  panelX(b, T, 880, 1, 130, 64);
+  panelX(b, T, 1200, 1, 110, 64);
+  panelZ(b, 1120, H - T, -1, 220, 64);
 }
 
 export const LIGHTS = (() => {
@@ -507,6 +628,7 @@ export const LIGHTS = (() => {
   list.push({ x: 700, y: 36, z: 1000, r: 320, col: [0.45, 0.95, 0.9], int: 0.9 });
   list.push({ x: 880, y: 36, z: 1140, r: 280, col: [1.0, 0.45, 0.7], int: 0.7 });
   list.push({ x: 520, y: 70, z: 500, r: 280, col: [1.0, 0.78, 0.5], int: 0.45 });
+  list.push({ x: 400, y: 118, z: 1080, r: 320, col: [1.0, 0.82, 0.56], int: 0.7 });
   return list;
 })();
 
@@ -550,6 +672,7 @@ function buildContent(b) {
   b.box('woodDark', 2280, 20, 120, 120, 40, 44, { tile: 26, localUV: true });
   b.box('woodWarm', 2280, 40, 120, 128, 5, 50, { tile: 20, localUV: true });
   b.box('woodDark', 200, 20, 1230, 90, 40, 40, { tile: 22, localUV: true });
+  chandelier(b, 400, 1080);
   danceFloor(b);
   cocktailTable(b, 520, 320);
   cocktailTable(b, 520, 680);
