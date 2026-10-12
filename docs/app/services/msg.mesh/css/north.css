@@ -500,3 +500,16 @@
 [data-theme="north"] .gif-cell{border:1px solid #334155;border-radius:8px;background:#0f172a}
 [data-theme="north"] .gif-cell:hover{border-color:#0ea5e9;box-shadow:none}
 [data-theme="north"] .gif-status{color:#94a3b8}
+[data-theme="north"] .char-count{color:#94a3b8}
+[data-theme="north"] .char-count.warn{color:#fbbf24}
+[data-theme="north"] .char-count.danger{color:#f87171}
+[data-theme="north"] .new-msgs-pill{
+  background:#0ea5e9;border:1px solid #38bdf8;border-radius:999px;
+  color:#0f172a;font-weight:700;
+}
+[data-theme="north"] .new-msgs-pill:hover{background:#38bdf8}
+[data-theme="north"] .ctx-menu{
+  background:#111827;border:1px solid #334155;border-radius:10px;
+}
+[data-theme="north"] .ctx-menu button{color:#e2e8f0;border-radius:6px}
+[data-theme="north"] .ctx-menu button:hover{background:#0ea5e9;color:#0f172a}

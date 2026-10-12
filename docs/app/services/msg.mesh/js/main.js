@@ -1085,14 +1085,105 @@ msgInput?.addEventListener("keydown", (e) => {
 msgInput?.addEventListener("input", () => {
   const lines = Math.min(msgInput.value.split("\n").length, 5);
   msgInput.rows = Math.max(1, lines);
+  updateCharCount();
   syncSendEnabled();
 });
 function syncSendEnabled() {
   const send = $("#sendBtn");
+  updateCharCount();
   if (!send) return;
   const hasText = !!(msgInput && msgInput.value.trim());
   send.disabled = !(hasText || pendingAttachment);
 }
+// Character budget: quiet until the last 500, amber then red near the cap
+// (the textarea's maxlength=4000 is the hard stop).
+function updateCharCount() {
+  const el = $("#charCount");
+  if (!el || !msgInput) return;
+  const len = msgInput.value.length;
+  const show = len >= 3500;
+  el.classList.toggle("hidden", !show);
+  if (!show) return;
+  el.textContent = len + "/4000";
+  el.classList.toggle("warn", len < 3900);
+  el.classList.toggle("danger", len >= 3900);
+}
+
+/* ---------------- new messages pill + smart scroll ---------------- */
+const newMsgsPill = $("#newMsgsPill");
+const messagesWrap = $("#messages");
+newMsgsPill?.addEventListener("click", () => {
+  if (messagesWrap) messagesWrap.scrollTop = messagesWrap.scrollHeight;
+  newMsgsPill.classList.add("hidden");
+});
+messagesWrap?.addEventListener("scroll", () => {
+  if (!newMsgsPill) return;
+  const atBottom = messagesWrap.scrollHeight - messagesWrap.scrollTop - messagesWrap.clientHeight < 60;
+  if (atBottom) newMsgsPill.classList.add("hidden");
+});
+
+/* ---------------- copy message (context menu) ---------------- */
+const ctxMenu = $("#ctxMenu");
+let ctxText = "";
+function hideCtxMenu() {
+  ctxMenu?.classList.add("hidden");
+}
+function messagePlainText(line) {
+  const body = line?.querySelector(".body");
+  if (!body) return "";
+  const clone = body.cloneNode(true);
+  // native emoticons render as <img alt=":eNNN:"> — keep the token on copy
+  clone.querySelectorAll("img.emote").forEach((img) => {
+    img.replaceWith(document.createTextNode(img.getAttribute("alt") || ""));
+  });
+  return (clone.textContent || "").trim();
+}
+$("#messageList")?.addEventListener("contextmenu", (e) => {
+  const line = e.target.closest(".msg-line");
+  if (!line) return;
+  e.preventDefault();
+  let text = messagePlainText(line);
+  if (!text) {
+    const chip = line.querySelector("[data-attname]");
+    text = (chip && chip.getAttribute("data-attname")) || "";
+  }
+  if (!text || !ctxMenu) return;
+  ctxText = text;
+  ctxMenu.classList.remove("hidden");
+  const mw = ctxMenu.offsetWidth;
+  const mh = ctxMenu.offsetHeight;
+  ctxMenu.style.left = Math.max(2, Math.min(e.clientX, window.innerWidth - mw - 4)) + "px";
+  ctxMenu.style.top = Math.max(2, Math.min(e.clientY, window.innerHeight - mh - 4)) + "px";
+});
+ctxMenu?.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  if (!e.target.closest("#ctxCopy")) return;
+  hideCtxMenu();
+  try {
+    await navigator.clipboard.writeText(ctxText);
+    ui.toast("Message copied");
+  } catch {
+    // fallback for contexts without the async clipboard API
+    const ta = document.createElement("textarea");
+    ta.value = ctxText;
+    ta.className = "ctx-ghost";
+    ta.setAttribute("readonly", "");
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      ui.toast("Message copied");
+    } catch {
+      ui.toast("Copy failed", true);
+    }
+    ta.remove();
+  }
+});
+document.addEventListener("click", hideCtxMenu);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") hideCtxMenu();
+});
+document.addEventListener("scroll", hideCtxMenu, true);
 
 /* ---------------- emoticon / sticker picker ---------------- */
 const STICKERS = ["wink", "surprise", "cry", "party", "thumbsup", "wave", "heart", "coffee", "smile"];
@@ -1439,7 +1530,9 @@ on("messages", (detail) => {
     });
   }
   if (!detail || detail.peer === state.activePeer) {
-    ui.renderMessages();
+    // "auto": stay pinned when already at the bottom; otherwise the user
+    // keeps their reading position and gets the "new messages" pill.
+    ui.renderMessages({ scroll: "auto" });
     if (detail && detail.peer) markRead(detail.peer);
     if (state.activePeer) ui.renderChatHead();
   }

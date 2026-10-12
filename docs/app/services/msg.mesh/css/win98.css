@@ -673,3 +673,18 @@
 [data-theme="win98"] .gif-cell{border-color:#808080;background:#fff}
 [data-theme="win98"] .gif-cell:hover{border-color:#000080;box-shadow:none}
 [data-theme="win98"] .gif-status{color:#000}
+[data-theme="win98"] .char-count{color:#000}
+[data-theme="win98"] .char-count.warn{color:#806000}
+[data-theme="win98"] .char-count.danger{color:#ff0000}
+[data-theme="win98"] .new-msgs-pill{
+  background:#c0c0c0;color:#000;
+  border:1px solid;
+  border-color:#fff #808080 #808080 #fff;
+}
+[data-theme="win98"] .new-msgs-pill:hover{background:#000080;color:#fff}
+[data-theme="win98"] .ctx-menu{
+  background:#c0c0c0;border:2px solid;
+  border-color:#fff #808080 #808080 #fff;
+}
+[data-theme="win98"] .ctx-menu button{color:#000}
+[data-theme="win98"] .ctx-menu button:hover{background:#000080;color:#fff}

@@ -166,6 +166,7 @@
       <div class="messages-sunken sunken" id="messages">
         <button class="load-older hidden" id="loadOlder">Load older messages</button>
         <div id="messageList" class="message-list"></div>
+        <button class="new-msgs-pill hidden" id="newMsgsPill" type="button">↓ New messages</button>
       </div>
       <div class="composer-strip">
         <div class="pending-file hidden" id="pendingFile"><span id="pendingFileName"></span><button type="button" id="pendingFileCancel">×</button></div>
@@ -174,6 +175,7 @@
           <div class="sunken composer-sunken">
             <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Type a message... (Shift+Enter = newline)" autocomplete="off"></textarea>
           </div>
+          <span class="char-count hidden" id="charCount" aria-live="polite"></span>
           <button class="xp-btn primary send-btn" type="button" id="sendBtn">Send</button>
         </div>
         <div class="emoji-panel hidden" id="emojiPanel" role="dialog" aria-label="Emoticons and stickers">
@@ -364,6 +366,9 @@
 </dialog>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="ctx-menu hidden" id="ctxMenu" role="menu">
+  <button type="button" id="ctxCopy" role="menuitem">Copy message</button>
+</div>
 <input type="file" id="fileInput" class="hidden" tabindex="-1">
 
 <script type="module" src="./js/main.js"></script>

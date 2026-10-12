@@ -365,7 +365,8 @@ function messageLineHtml(m, peer) {
   if (m.sync === "sending") cls.push("pending");
   if (m.sync === "failed") cls.push("failed");
   const rid = m.rowid != null && Number.isFinite(Number(m.rowid)) ? Number(m.rowid) : "";
-  return `<div class="${cls.join(" ")}" data-id="${esc(m.id)}" data-rowid="${rid}">
+  const retryHint = m.sync === "failed" ? ' title="Send failed — click to retry"' : "";
+  return `<div class="${cls.join(" ")}" data-id="${esc(m.id)}" data-rowid="${rid}"${retryHint}>
     <span class="ts">${esc(fmtTime(new Date(m.ts)))}</span><span class="who">${esc(who)}:</span><span class="body">${body}</span>${st ? `<span class="st">${esc(st)}</span>` : ""}${att}
   </div>`;
 }
@@ -381,9 +382,12 @@ export function renderMessages(opts = {}) {
   if (!c || !c.messages.length) {
     box.innerHTML = '<div class="list-empty">No messages yet. Say hello!</div>';
     $("#loadOlder")?.classList.add("hidden");
+    $("#newMsgsPill")?.classList.add("hidden");
     return;
   }
 
+  // capture before the re-render: the new content grows the scroller
+  const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 60;
   let html = "";
   let lastDay = "";
   for (const m of c.messages) {
@@ -398,7 +402,15 @@ export function renderMessages(opts = {}) {
   $("#loadOlder")?.classList.toggle("hidden", !c.hasMore);
   hydrateAttImages(box);
 
-  if (opts.scroll !== false) wrap.scrollTop = wrap.scrollHeight;
+  // scroll: default/true = pin to bottom (send / open chat); "auto" = pin only
+  // when the user was already at the bottom, otherwise offer the pill; false =
+  // caller manages scroll position (load older).
+  if (opts.scroll === "auto") {
+    if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+    else $("#newMsgsPill")?.classList.remove("hidden");
+  } else if (opts.scroll !== false) {
+    wrap.scrollTop = wrap.scrollHeight;
+  }
 }
 
 export function renderChatHead() {

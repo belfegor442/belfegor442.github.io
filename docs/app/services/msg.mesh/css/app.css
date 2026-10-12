@@ -955,3 +955,45 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 }
 .gif-status{font-size:11px;color:#1a3a6a;min-height:20px;padding:2px}
 .gif-status.hidden{display:none}
+
+/* composer character budget (quiet until the last 500) */
+.char-count{
+  flex:none;min-width:52px;text-align:center;align-self:center;
+  font-size:11px;color:#1a3a6a;user-select:none;
+}
+.char-count.hidden{display:none}
+.char-count.warn{color:#a08020;font-weight:700}
+.char-count.danger{color:#b42828;font-weight:700}
+
+/* "new messages" pill — sticky inside the scroller */
+.new-msgs-pill{
+  display:block;width:max-content;margin:4px auto 6px;
+  position:sticky;bottom:6px;z-index:5;
+  border:1px solid var(--xp-border);
+  background:linear-gradient(180deg,#fff,#e8e8e8);
+  font-size:11px;color:#1a3a6a;padding:3px 10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.new-msgs-pill.hidden{display:none}
+.new-msgs-pill:hover{background:#dcebfc;border-color:var(--xp-accent)}
+
+/* right-click message menu */
+.ctx-menu{
+  position:fixed;z-index:70;min-width:160px;
+  background:var(--xp-face);
+  border:1px solid;
+  border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
+  box-shadow:0 4px 14px rgba(0,0,0,.35);padding:2px;
+}
+.ctx-menu.hidden{display:none}
+.ctx-menu button{
+  display:block;width:100%;text-align:left;
+  border:1px solid transparent;background:transparent;
+  font-size:12px;padding:5px 12px;color:#1a3a6a;font-family:inherit;
+}
+.ctx-menu button:hover{background:#000080;color:#fff;border-color:#000080}
+.ctx-ghost{position:fixed;left:-9999px;top:0}
+
+/* failed messages read as clickable retry targets */
+.msg-line.failed{cursor:pointer}
+.msg-line.failed:hover .st{text-decoration:underline}
