@@ -146,9 +146,20 @@ export class Renderer {
     c.addEventListener('contextmenu', e => e.preventDefault());
     c.addEventListener('pointerdown', e => {
       if (e.button !== 0 && e.button !== 2) return;
+      // While the pointer is locked in first person the mousemove handler
+      // owns the look; drags stay reserved for the unlocked orbit view.
+      if (document.pointerLockElement === c) return;
       this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this._drag = { x: e.clientX, y: e.clientY };
       try { c.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    });
+    // First-person mouse look: with the pointer locked the view follows the
+    // raw mouse movement - no button, no dragging, ever.
+    c.addEventListener('mousemove', e => {
+      if (!this.fp || document.pointerLockElement !== c) return;
+      this.orbit.yaw -= e.movementX * 0.003;
+      this.fpPitch = Math.max(-1.1, Math.min(0.75, this.fpPitch - e.movementY * 0.0025));
+      this._dragEndAt = performance.now();
     });
     c.addEventListener('pointermove', e => {
       if (!this._pts.has(e.pointerId)) return;
@@ -219,8 +230,13 @@ export class Renderer {
       this.freeCam = false;
       this._prevPitch = this.orbit.pitch;
       this.fpPitch = Math.max(-1.1, Math.min(0.75, 1.0 - this.orbit.pitch));
+      try {
+        const p = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* noop */ }
     } else {
       this.orbit.pitch = Math.max(0.55, Math.min(1.35, this._prevPitch || 0.85));
+      try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { /* noop */ }
     }
     return this.fp;
   }

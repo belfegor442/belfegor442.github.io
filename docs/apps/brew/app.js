@@ -656,7 +656,12 @@ input.on('help', toggleHelp);
   });
   input.on('fp', () => {
     const on = renderer.toggleFP();
-    ui.toast(on ? 'FIRST PERSON — drag: look · WASD: move · V: exit' : 'FOLLOW CAM');
+    ui.toast(on ? 'FIRST PERSON — mouse: look · WASD: move · click: walk · V: exit' : 'FOLLOW CAM');
+  });
+  input.on('escape', () => {
+    if (renderer.fp) { renderer.toggleFP(); ui.toast('FOLLOW CAM'); return; }
+    const hp = document.getElementById('helpPanel');
+    if (hp && !hp.classList.contains('hidden')) toggleHelp();
   });
 
 function toggleHelp() {
@@ -739,6 +744,11 @@ canvas.addEventListener('pointerup', e => {
   clickDown = null;
   if (!d || e.button !== 0 || e.target !== canvas) return;
   if (performance.now() - d.t > 450) return;
+  // Locked first person has no cursor: click walks toward the crosshair.
+  if (renderer.fp && document.pointerLockElement === canvas) {
+    handleWorldClick(renderer.vw / 2, renderer.vh / 2);
+    return;
+  }
   // Mouse needs a rock-steady click so tiny camera nudges never issue a walk
   // order; touch taps keep a friendlier radius.
   const tol = d.pe === 'mouse' ? 4 : 10;
