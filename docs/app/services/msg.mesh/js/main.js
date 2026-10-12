@@ -1929,23 +1929,55 @@ function stopServerWatch() {
 // Login/register/boot failed at the network level: re-probe the candidate
 // servers every few seconds so the screen heals itself when one comes back
 // (the funnel/host may have been rebooting) — no manual page reload needed.
-function startServerWatch() {
-  if (serverWatchTimer) return;
+let serverWatchTries = 0;
+
+// Append a one-click probe to the unreachable note: opening /health in a new
+// tab shows plain JSON when the user's network reaches the server, or the
+// browser's own network error when it does not — separates "my app is broken"
+// from "my network cannot reach the funnel" without any support round-trip.
+function appendWatchDiag(box) {
+  if (!box) return;
+  const a = document.createElement("a");
+  a.href = (apiBase() || "") + "/health";
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.textContent = " (open server status)";
+  box.appendChild(a);
+}
+
+function bumpWatchNote() {
+  serverWatchTries += 1;
+  const text = `Server unreachable — retrying automatically... (try ${serverWatchTries})`;
   const hint = $("#authHint");
-  if (hint && !hint.textContent) hint.textContent = "Server unreachable — retrying automatically...";
   const regDlg = $("#registerDialog");
+  if (hint && !regDlg?.open && (!hint.textContent || hint.textContent.startsWith("Server unreachable"))) {
+    hint.textContent = text;
+    appendWatchDiag(hint);
+  }
   if (regDlg?.open) {
     const regErr = $("#regError");
-    showErr(regErr, "Server unreachable — retrying automatically...");
-    regErr?.classList.remove("error");
-    regErr?.classList.add("note");
+    if (regErr) {
+      regErr.classList.remove("error");
+      regErr.classList.add("note");
+      regErr.textContent = text;
+      regErr.classList.remove("hidden");
+      appendWatchDiag(regErr);
+    }
   }
+}
+
+function startServerWatch() {
+  if (serverWatchTimer) return;
+  serverWatchTries = 0;
+  const hint = $("#authHint");
+  const regDlg = $("#registerDialog");
+  if (regDlg?.open || (hint && !hint.textContent)) bumpWatchNote();
   serverWatchTimer = setInterval(async () => {
     if (!serverWatchTimer) return;
     try {
       await resolveApiBase(); // re-probe all candidates, repoint if one is healthy
       const h = await api.health();
-      if (!h.ok) return;
+      if (!h.ok) { bumpWatchNote(); return; }
       stopServerWatch();
       authNotice = "";
       showErr($("#authError"), "");
@@ -1962,7 +1994,7 @@ function startServerWatch() {
       }
       ui.toast("Server is back online");
       playSound("message");
-    } catch { /* next tick */ }
+    } catch { bumpWatchNote(); }
   }, 8000);
 }
 
