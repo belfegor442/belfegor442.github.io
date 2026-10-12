@@ -116,6 +116,7 @@ export class Renderer {
     this.fogNow = [1150, 3300];
     this.glErrs = {};
     try { this.glDbg = /[?&]gldebug/.test(location.search); } catch (e) { this.glDbg = false; }
+    try { this.lockDisabled = /[?&]nolock\b/.test(location.search); } catch (e) { this.lockDisabled = false; }
     this.stats = { frames: 0, draws: 0, gl: !!this.gl };
     this.mProj = new Float32Array(16);
     this.mView = new Float32Array(16);
@@ -154,11 +155,18 @@ export class Renderer {
       try { c.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
     });
     // First-person mouse look: with the pointer locked the view follows the
-    // raw mouse movement - no button, no dragging, ever.
+    // raw mouse movement - no button, no dragging, ever. In orbit mode a
+    // locked pointer does the same (yaw + pitch), so the cursor never has to
+    // travel across the screen just to turn the camera.
     c.addEventListener('mousemove', e => {
-      if (!this.fp || document.pointerLockElement !== c) return;
-      this.orbit.yaw -= e.movementX * 0.003;
-      this.fpPitch = Math.max(-1.1, Math.min(0.75, this.fpPitch - e.movementY * 0.0025));
+      if (document.pointerLockElement !== c) return;
+      if (this.fp) {
+        this.orbit.yaw -= e.movementX * 0.003;
+        this.fpPitch = Math.max(-1.1, Math.min(0.75, this.fpPitch - e.movementY * 0.0025));
+      } else {
+        this.orbit.yaw -= e.movementX * 0.003;
+        this.orbit.pitch = Math.max(0.2, Math.min(1.35, this.orbit.pitch + e.movementY * 0.0025));
+      }
       this._dragEndAt = performance.now();
     });
     c.addEventListener('pointermove', e => {
@@ -235,8 +243,8 @@ export class Renderer {
         if (p && p.catch) p.catch(() => {});
       } catch (e) { /* noop */ }
     } else {
+      // Keep the pointer captured: the orbit view keeps relative mouse look.
       this.orbit.pitch = Math.max(0.55, Math.min(1.35, this._prevPitch || 0.85));
-      try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { /* noop */ }
     }
     return this.fp;
   }
@@ -1335,6 +1343,16 @@ export class Renderer {
           o.globalAlpha = 1;
         }
       }
+    }
+
+    // Crosshair dot while the mouse is captured (locked look, both views).
+    if (typeof document !== 'undefined' && document.pointerLockElement === this.canvas) {
+      o.globalAlpha = 0.7;
+      o.fillStyle = '#e9c877';
+      o.beginPath();
+      o.arc(this.vw / 2, this.vh / 2, 2.5, 0, Math.PI * 2);
+      o.fill();
+      o.globalAlpha = 1;
     }
 
     for (const p of list) {
