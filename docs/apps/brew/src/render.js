@@ -84,7 +84,10 @@ function fitPlayerMatrix(b, def) {
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    const opts = { antialias: true, alpha: false, depth: true, powerPreference: 'high-performance' };
+    // Hi-DPI canvases are already supersampled by the dpr backing store, so
+    // MSAA there is pure fill cost with no visible gain; plain 1x displays
+    // keep it for clean silhouettes.
+    const opts = { antialias: (window.devicePixelRatio || 1) < 1.5, alpha: false, depth: true, powerPreference: 'high-performance' };
     this.gl = canvas.getContext('webgl2', opts) || canvas.getContext('webgl', opts) ||
       canvas.getContext('experimental-webgl', opts);
     this.anisoExt = this.gl && (this.gl.getExtension('EXT_texture_filter_anisotropic') ||
@@ -389,6 +392,7 @@ export class Renderer {
   initShadowMap() {
     const gl = this.gl;
     this.shadowSize = 2048;
+    this.shadowBaked = false;
     let ok = false;
     if (this.isGL2) {
       try {
@@ -436,7 +440,7 @@ export class Renderer {
   }
 
   renderShadowPass() {
-    if (!this.shadowOk || !this.glbWorld) return;
+    if (!this.shadowOk || !this.glbWorld || this.shadowBaked) return;
     const gl = this.gl;
     const def = this.lights ? this.litDef : this.nightDef;
     const dir = def.sunDir;
@@ -468,6 +472,10 @@ export class Renderer {
     gl.disable(gl.POLYGON_OFFSET_FILL);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    // The sun and the world are both static (day/night only changes colors
+    // and intensities, never sunDir or geometry), so the depth map is baked
+    // once and every later frame just samples it.
+    this.shadowBaked = true;
   }
 
   uploadLights(def) {
@@ -953,7 +961,15 @@ export class Renderer {
       this.useGLB(def);
       this.uploadLights(def);
       gl.depthMask(true);
+      // Opaque world geometry is closed (boxes/cylinders/discs/ellipsoids all
+      // wound CCW-outward since the mapGeom fix) so backfaces are pure waste:
+      // culling them here roughly halves fragment work. Blend draws and
+      // player models keep culling off (single-sided atmospheric quads,
+      // imported skins of unknown winding).
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
       for (const g of this.glbWorld.opaque) this.drawGLBD(g);
+      gl.disable(gl.CULL_FACE);
       this.glErr('mapOpaque');
 
       this.useLit();

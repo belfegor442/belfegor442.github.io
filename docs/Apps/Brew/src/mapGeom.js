@@ -107,7 +107,7 @@ export class Builder {
     }
     for (let i = 0; i < seg; i++) {
       const t = base + i * 2;
-      b.idx.push(t, t + 2, t + 3, t, t + 3, t + 1);
+      b.idx.push(t, t + 3, t + 2, t, t + 1, t + 3);
     }
     if (opts.top !== false && rTop > 0.01) {
       const cb = b.pos.length / 3;
@@ -117,7 +117,7 @@ export class Builder {
         pushVert(b, x + Math.cos(a) * rTop, y + h, z + Math.sin(a) * rTop, 0, 1, 0,
           0.5 + Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5);
       }
-      for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 1 + i, cb + 2 + i);
+      for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 2 + i, cb + 1 + i);
     }
     if (opts.bottom && rBot > 0.01) {
       const cb = b.pos.length / 3;
@@ -127,7 +127,7 @@ export class Builder {
         pushVert(b, x + Math.cos(a) * rBot, y, z + Math.sin(a) * rBot, 0, -1, 0,
           0.5 + Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5);
       }
-      for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 2 + i, cb + 1 + i);
+      for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 1 + i, cb + 2 + i);
     }
   }
 
@@ -140,7 +140,7 @@ export class Builder {
       pushVert(b, x + Math.cos(a) * rx, y, z + Math.sin(a) * rz, 0, 1, 0,
         0.5 + Math.cos(a) * rx / (opts.tile || 64), 0.5 + Math.sin(a) * rz / (opts.tile || 64));
     }
-    for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 1 + i, cb + 2 + i);
+    for (let i = 0; i < seg; i++) b.idx.push(cb, cb + 2 + i, cb + 1 + i);
   }
 
   ellipsoid(name, x, y, z, rx, ry, rz, lat = 5, lon = 10, opts = {}) {
@@ -162,7 +162,7 @@ export class Builder {
       for (let j = 0; j < lon; j++) {
         const a = start + i * (lon + 1) + j;
         const t = a + lon + 1;
-        b.idx.push(a, t, t + 1, a, t + 1, a + 1);
+        b.idx.push(a, t + 1, t, a, a + 1, t + 1);
       }
     }
     void opts;
@@ -183,8 +183,8 @@ export class Builder {
     }
     for (let i = 0; i < seg; i++) {
       const t = base + i * 4;
-      b.idx.push(t, t + 4, t + 5, t, t + 5, t + 1);
-      b.idx.push(t + 2, t + 3, t + 7, t + 2, t + 7, t + 6);
+      b.idx.push(t, t + 5, t + 4, t, t + 1, t + 5);
+      b.idx.push(t + 2, t + 7, t + 3, t + 2, t + 6, t + 7);
     }
     const cap = b.pos.length / 3;
     for (let i = 0; i <= seg; i++) {
@@ -196,7 +196,7 @@ export class Builder {
     }
     for (let i = 0; i < seg; i++) {
       const t = cap + i * 2;
-      b.idx.push(t, t + 1, t + 3, t, t + 3, t + 2);
+      b.idx.push(t, t + 3, t + 1, t, t + 2, t + 3);
     }
   }
 
