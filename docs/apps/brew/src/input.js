@@ -15,7 +15,7 @@ export class Input {
     const root = document.getElementById('joystick');
     const knob = root && root.querySelector('span');
     if (!root || !knob) return;
-    const radius = 42;
+    const radius = 48;
     const update = e => {
       const r = root.getBoundingClientRect();
       const dx = e.clientX - (r.left + r.width / 2);
@@ -24,9 +24,16 @@ export class Input {
       const k = Math.min(1, radius / d);
       const x = dx * k, y = dy * k;
       knob.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-      this.touchAxis.x = x / radius;
-      this.touchAxis.y = y / radius;
-      this.touchAxis.active = true;
+      // dead zone so the tiniest touch never walks; rescale so full push
+      // still reaches 1.0 and reads as an analog stick
+      let nx = x / radius, ny = y / radius;
+      const mag = Math.hypot(nx, ny);
+      const DZ = 0.14;
+      const res = mag > 0.001 ? Math.max(0, (mag - DZ) / (1 - DZ)) : 0;
+      const s = mag > 0.001 ? Math.min(1, res / mag) : 0;
+      this.touchAxis.x = nx * s;
+      this.touchAxis.y = ny * s;
+      this.touchAxis.active = res > 0;
     };
     const stop = e => {
       try { root.releasePointerCapture(e.pointerId); } catch (_) {}
@@ -92,8 +99,8 @@ export class Input {
     if (this.touchAxis.active) {
       x = this.touchAxis.x;
       y = this.touchAxis.y;
-      // Shoving the stick to the rim runs.
-      if (Math.hypot(x, y) > 0.92) sprint = true;
+      // Shoving the stick all the way to the rim runs - deliberately.
+      if (Math.hypot(x, y) > 0.97) sprint = true;
     }
     return { x, y, sprint };
   }

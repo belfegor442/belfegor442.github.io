@@ -689,6 +689,7 @@ function startPath(tx, ty, action) {
   pathStuckT = 0;
   pathLast.x = me.x;
   pathLast.y = me.y;
+  renderer.pathMark = { x: tx, y: ty, at: Date.now() };
   const fx = tx - me.x, fy = ty - me.y;
   const fl = Math.hypot(fx, fy);
   if (fl > 2) {
@@ -731,14 +732,17 @@ function handleWorldClick(clientX, clientY) {
 let clickDown = null;
 canvas.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  clickDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+  clickDown = { x: e.clientX, y: e.clientY, t: performance.now(), pe: e.pointerType };
 });
 canvas.addEventListener('pointerup', e => {
   const d = clickDown;
   clickDown = null;
   if (!d || e.button !== 0 || e.target !== canvas) return;
   if (performance.now() - d.t > 450) return;
-  if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 9) return;
+  // Mouse needs a rock-steady click so tiny camera nudges never issue a walk
+  // order; touch taps keep a friendlier radius.
+  const tol = d.pe === 'mouse' ? 4 : 10;
+  if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > tol) return;
   handleWorldClick(e.clientX, e.clientY);
 });
 
@@ -811,7 +815,7 @@ function frame(now) {
         const d = Math.hypot(dx, dy) || 1;
         // ease the steering vector toward the waypoint so direction changes
         // blend into arcs; normalise after the lerp to keep speed constant
-        const k = Math.min(1, dt * 7);
+        const k = Math.min(1, dt * 10);
         moveSteer.x += (dx / d - moveSteer.x) * k;
         moveSteer.y += (dy / d - moveSteer.y) * k;
         const sl = Math.hypot(moveSteer.x, moveSteer.y) || 1;
@@ -831,10 +835,11 @@ function frame(now) {
       }
     }
     renderer.sprint = moving && !!a.sprint;
+    if (moving) renderer.autoFollow(wx, wy, true, manual, dt);
     const targetSpeed = SPEED * (a.sprint ? 1.45 : 1);
-    // pathing accelerates gently so the walk reads natural; manual input
-    // stays responsive
-    const accel = moving ? (manual ? 2600 : 1600) : 2200;
+    // near-instant response; pathing direction still blends through the
+    // steering lerp so corners arc instead of snapping
+    const accel = moving ? (manual ? 5200 : 3200) : 4200;
     const targetX = moving ? wx * targetSpeed : 0;
     const targetY = moving ? wy * targetSpeed : 0;
     const blend = Math.min(1, accel * dt / Math.max(targetSpeed, 1));

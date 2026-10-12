@@ -109,6 +109,8 @@ export class Renderer {
     this._sk = 0;
     this._ray = null;
     this._drag = null;
+    this._dragEndAt = 0;
+    this.pathMark = null;
     this._pts = new Map();
     this._pinch = 0;
     this.fogNow = [1150, 3300];
@@ -172,6 +174,7 @@ export class Renderer {
       } else {
         this.orbit.pitch = Math.max(0.2, Math.min(1.35, this.orbit.pitch + (e.clientY - d.y) * 0.006));
       }
+      this._dragEndAt = performance.now();
       d.x = e.clientX; d.y = e.clientY;
     });
     const stop = e => {
@@ -186,6 +189,21 @@ export class Renderer {
       e.preventDefault();
       this.orbit.dist = Math.max(350, Math.min(4800, this.orbit.dist * Math.exp(e.deltaY * 0.0012)));
     }, { passive: false });
+  }
+
+  // Ease the orbit yaw so the camera trails behind the avatar while it
+  // travels: full follow for pathing, forward-ish only for manual input so
+  // strafing and backpedaling never wrestle the camera around. User drags
+  // win: follow stays paused while rotating and for 1.5s after.
+  autoFollow(wx, wy, moving, manual, dt) {
+    if (!moving || this.freeCam || this.fp || this._drag) return;
+    if (performance.now() - this._dragEndAt < 1500) return;
+    const sy = Math.sin(this.orbit.yaw), cy = Math.cos(this.orbit.yaw);
+    const fwd = -(wx * sy + wy * cy);
+    if (manual && fwd < 0.35) return;
+    const want = Math.atan2(-wx, -wy);
+    const d = Math.atan2(Math.sin(want - this.orbit.yaw), Math.cos(want - this.orbit.yaw));
+    this.orbit.yaw += d * Math.min(1, dt * 2.5);
   }
 
   toggleFreeCam() {
@@ -1279,6 +1297,26 @@ export class Renderer {
               o.globalAlpha = 1;
             }
           }
+        }
+      }
+    }
+
+    // Destination ping for click-to-move so walk orders read clearly.
+    const pm = this.pathMark;
+    if (pm && now - pm.at < 1600) {
+      const age = (now - pm.at) / 1600;
+      const c1 = this.sp(pm.x, 2, pm.y);
+      const e1 = this.sp(pm.x + 12, 2, pm.y);
+      if (c1 && e1) {
+        const r = Math.hypot(e1.x - c1.x, e1.y - c1.y);
+        if (r >= 2 && r <= 300) {
+          o.globalAlpha = (1 - age) * 0.9;
+          o.strokeStyle = '#e9c877';
+          o.lineWidth = 2;
+          o.beginPath();
+          o.arc(c1.x, c1.y, r * (0.6 + age * 1.6), 0, Math.PI * 2);
+          o.stroke();
+          o.globalAlpha = 1;
         }
       }
     }
