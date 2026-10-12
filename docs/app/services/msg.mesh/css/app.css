@@ -476,6 +476,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
   display:grid;place-items:center;border-radius:9px;
 }
 .contact-preview{display:block;font-size:11px;color:#6d6d6d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.contact-preview .emote{width:14px;height:14px;vertical-align:-3px;margin:0 1px}
 
 /* requests strip */
 .requests{padding:4px;display:grid;gap:4px;background:var(--xp-face);flex:none;border-bottom:1px solid var(--xp-border)}
@@ -866,6 +867,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 }
 .emoji-grid.hidden{display:none}
 .sticker-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+.emote-grid{grid-template-columns:repeat(9,1fr);max-height:238px}
 .emoji-cell{
   border:1px solid transparent;background:transparent;
   font-size:18px;line-height:1;padding:4px 0;
@@ -873,8 +875,17 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 }
 .emoji-cell:hover{border-color:var(--xp-border);background:#e8f0fc}
 .emoji-cell:active{background:#d0e2fa}
+.emote-cell{min-height:32px}
+.emote-cell img{width:24px;height:24px;display:block;margin:auto}
 .sticker-cell{min-height:56px}
 .sticker-cell img{width:44px;height:44px;object-fit:contain;display:block}
+
+/* inline native emoticon (:eNNN:) in message text */
+.emote{
+  width:19px;height:19px;
+  vertical-align:-4px;margin:0 1px;
+  display:inline-block;
+}
 
 /* inline image attachment thumbnail (stays inside the clickable att-chip) */
 .att-img-chip{flex-direction:column;align-items:flex-start;gap:4px;max-width:min(250px,72vw)}

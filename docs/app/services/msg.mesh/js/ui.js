@@ -1,6 +1,7 @@
 import { state, conversationOrder, peerLabel, peerUser, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 import { playSound } from "./sound.js";
 import { api } from "./api.js";
+import { emoteFile } from "./emoticons.js";
 
 export const $ = (s) => document.querySelector(s);
 
@@ -218,7 +219,7 @@ function contactRowHtml(r, active) {
     <span class="dot ${m.online ? "on" : ""}"></span>
     <span class="contact-name-wrap contact-name-flex">
       <span class="contact-name">${esc(m.label)}</span>
-      ${m.preview ? `<span class="contact-preview">${esc(m.preview)}</span>` : ""}
+      ${m.preview ? `<span class="contact-preview">${emoteTokens(esc(emotes(m.preview)))}</span>` : ""}
     </span>
     <span class="contact-time">${esc(m.time)}</span>
     ${r.unread ? `<span class="unread">${r.unread > 99 ? "99+" : r.unread}</span>` : ""}
@@ -300,6 +301,17 @@ function emotes(t) {
   return String(t).replace(EMOTE_RE, (m) => EMOTE_LOOKUP.get(m) || m);
 }
 
+/* Native emoticon tokens (:eNNN:) -> inline <img>. Runs AFTER esc() so the
+   injected markup survives (tokens contain no escapable characters, so they
+   pass through esc untouched). Unknown ids stay as literal text. */
+function emoteTokens(html) {
+  return html.replace(/:e(\d{3}):/g, (m, id) => {
+    const file = emoteFile(id);
+    if (!file) return m;
+    return `<img class="emote" src="./assets/xp/emoticons/${file}" alt="${m}" title="${m}">`;
+  });
+}
+
 function isImageAtt(att) {
   if (!att) return false;
   if ((att.type || "").startsWith("image/")) return true;
@@ -347,7 +359,7 @@ function messageLineHtml(m, peer) {
       : `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"><span>${meta}</span></a>`;
   }
   const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
-  const body = m.text ? esc(emotes(m.text)) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
+  const body = m.text ? emoteTokens(esc(emotes(m.text))) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
   const st = statusGlyph(m, peer);
   const cls = ["msg-line", m.mine ? "mine" : "other"];
   if (m.sync === "sending") cls.push("pending");

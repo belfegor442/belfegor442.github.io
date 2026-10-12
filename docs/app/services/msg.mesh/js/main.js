@@ -6,6 +6,7 @@ import * as ui from "./ui.js";
 import { playSound, primeSound } from "./sound.js";
 import { setTheme } from "./theme.js";
 import * as Call from "./call.js";
+import { EMOTICONS } from "./emoticons.js";
 
 const $ = ui.$;
 const esc = ui.esc;
@@ -1094,16 +1095,6 @@ function syncSendEnabled() {
 }
 
 /* ---------------- emoticon / sticker picker ---------------- */
-const FACE_EMOJI = [
-  "😀", "😃", "😄", "😁", "😂", "🤣", "😊", "😍", "😘", "😜",
-  "🤪", "😎", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁",
-  "😣", "😖", "😫", "😩", "😢", "😭", "😤", "😠", "😡", "🤯",
-  "😳", "🥵", "🥶", "😱", "😨", "😰", "🤗", "🤔", "🤭", "🤫",
-  "😶", "😐", "😑", "😬", "🙄", "😴", "🤤", "😮", "🤐", "😷",
-  "😇", "🤡", "😈", "👋", "🤝", "👍", "👎", "👌", "✌️", "🤞",
-  "🤙", "🙏", "💪", "👏", "🙌", "❤️", "💔", "💯", "🔥", "✨",
-  "🎉", "🎁", "🎂", "☕", "🌻", "🌹", "🍀", "⭐", "🌙", "🌈",
-];
 const STICKERS = ["wink", "surprise", "cry", "party", "thumbsup", "wave", "heart", "coffee", "smile"];
 const STICKER_LABELS = {
   wink: "Wink", surprise: "Surprised", cry: "Crying", party: "Party",
@@ -1158,12 +1149,21 @@ async function insertSticker(name) {
 }
 
 if (emojiPanel) {
-  for (const ch of FACE_EMOJI) {
+  // Native 19x19 emoticon art (Themes/emoticons): click inserts the :eNNN:
+  // token, ui.js renders it back as an inline <img class="emote">.
+  for (const file of EMOTICONS) {
+    const id = file.split(".")[0];
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "emoji-cell";
-    b.textContent = ch;
-    b.addEventListener("click", () => insertAtCursor(ch));
+    b.className = "emoji-cell emote-cell";
+    b.title = ":e" + id + ":";
+    const img = document.createElement("img");
+    img.src = "./assets/xp/emoticons/" + file;
+    img.alt = ":e" + id + ":";
+    img.loading = "lazy";
+    img.draggable = false;
+    b.appendChild(img);
+    b.addEventListener("click", () => insertAtCursor(":e" + id + ":"));
     emojiFacesBox.appendChild(b);
   }
   for (const name of STICKERS) {
