@@ -51,7 +51,7 @@ let net = null;
 let authority = null;
 let activity = null;
 let myHand = null;
-let objects = { lights: true };
+let objects = { lights: false };
 let hostSeen = false;
 let welcomed = false;
 let welcomeN = 0;
@@ -366,7 +366,7 @@ function applyWelcome(msg) {
   clearTimeout(gTimer);
   room = msg.room || room;
   myUid = msg.uid;
-  objects = msg.obj || { lights: true };
+  objects = msg.obj || { lights: false };
   renderer.lights = objects.lights;
   balance = msg.balance;
   players.clear();

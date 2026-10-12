@@ -95,7 +95,7 @@ export class Renderer {
       console.error('WebGL unavailable');
       this.fctx = canvas.getContext('2d');
     }
-    this.lights = true;
+    this.lights = false;
     this.time = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.cam = { x: MAP.w / 2, z: MAP.h / 2 };
@@ -319,9 +319,9 @@ export class Renderer {
       fog: [0.055, 0.043, 0.035], fogRange: [1150, 3300]
     };
     this.nightDef = {
-      amb: [0.13, 0.15, 0.27], sun: [0.16, 0.18, 0.32],
+      amb: [0.11, 0.12, 0.20], sun: [0.10, 0.11, 0.22],
       sunDir: [-0.45 / n, -1 / n, -0.35 / n],
-      fog: [0.016, 0.024, 0.055], fogRange: [850, 2900]
+      fog: [0.016, 0.015, 0.028], fogRange: [700, 2500]
     };
     this.initShadowMap();
     if (this.useImportedWorld) this.loadGLBAssets();
@@ -415,7 +415,7 @@ export class Renderer {
     const P = this.pGLB;
     if (!P.u.uLightPos) return;
     const gl = this.gl;
-    const night = this.lights ? 1 : 1.6;
+    const night = this.lights ? 1 : 1.75;
     const list = LIGHTS.map(l => {
       const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
       return { l, d: dx * dx + dy * dy + dz * dz };
@@ -459,7 +459,8 @@ export class Renderer {
   async loadGLBAssets() {
     try {
       const world = await buildBrewMap();
-      const nav = buildNav(world.draws, MAP.w, MAP.h);
+      const nav = buildNav(world.draws.filter(d => !world.materials[d.mat].blend),
+        MAP.w, MAP.h);
       setNav(nav);
       this.nav = nav;
       this.glbWorld = this.uploadGLB(world);
@@ -946,16 +947,14 @@ export class Renderer {
         ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       }
     }
-    if (this.lights) {
-      for (const o of OBJECTS) {
-        // Tables only: the glow marks the felts (drawn by the model now).
-        // The procedural bar isn't visible in GLB mode, so no stray pool.
-        if (o.type !== 'table') continue;
-        const cx = o.x + o.w / 2, cz = o.y + o.h / 2, rx = o.w * 0.85, rz = o.h * 0.85;
-        pushT(GLM, [
-          [cx - rx, 3, cz - rz], [cx + rx, 3, cz - rz], [cx + rx, 3, cz + rz], [cx - rx, 3, cz + rz]
-        ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      }
+    for (const o of OBJECTS) {
+      // Tables only: the glow marks the felts (drawn by the model now).
+      // The procedural bar isn't visible in GLB mode, so no stray pool.
+      if (o.type !== 'table') continue;
+      const cx = o.x + o.w / 2, cz = o.y + o.h / 2, rx = o.w * 0.85, rz = o.h * 0.85;
+      pushT(GLM, [
+        [cx - rx, 3, cz - rz], [cx + rx, 3, cz - rz], [cx + rx, 3, cz + rz], [cx - rx, 3, cz + rz]
+      ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
     }
 
     gl.enable(gl.BLEND);
@@ -983,7 +982,7 @@ export class Renderer {
       this.fillTexMesh(this.gpuGlows, GLM, gl.DYNAMIC_DRAW);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
       if (this.lights) this.setTexTint(1.0, 0.84, 0.55, 0.62);
-      else this.setTexTint(1.0, 0.8, 0.4, 0.45);
+      else this.setTexTint(1.0, 0.76, 0.40, 0.55);
       this.bindTex(this.gpuGlows, this.texDot);
       gl.drawElements(gl.TRIANGLES, this.gpuGlows.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;

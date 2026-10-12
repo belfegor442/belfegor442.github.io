@@ -502,6 +502,26 @@ function bulb(size) {
   };
 }
 
+// Volumetric beam haze for the blend batch. Canvas y=0 (top) maps to cone
+// bottom (uv v=0) so the alpha ramps up toward the lamp.
+function spotCone(size, hexCol, peak, emissive) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  const c = rgb(hexCol);
+  shade(g, size, (u, v) => {
+    const edge = Math.min(u, 1 - u);
+    const soft = edge < 0.08 ? edge / 0.08 : 1;
+    const alpha = Math.pow(v, 1.7) * peak * soft;
+    return [c[0], c[1], c[2], alpha];
+  });
+  return {
+    albedo: a,
+    normal: packRough(cv(size), 0.5),
+    blend: true,
+    emissive
+  };
+}
+
 function chip(size, hexCol) {
   const a = cv(size);
   const g = a.getContext('2d');
@@ -662,7 +682,9 @@ const BUILD = {
   chipB: () => chip(64, '#2848a0'),
   posterA: () => poster(128, 'card'),
   posterB: () => poster(128, 'ad'),
-  nightSky: () => nightSky(256)
+  nightSky: () => nightSky(256),
+  spot: () => spotCone(64, '#ffe8b4', 0.52, [0.58, 0.48, 0.32]),
+  spotTeal: () => spotCone(64, '#66ffe0', 0.28, [0.26, 0.48, 0.44])
 };
 
 export function material(name) {

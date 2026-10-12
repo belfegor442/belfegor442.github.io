@@ -9,7 +9,7 @@ const MAT_ORDER = [
   'carpet', 'tile', 'woodFloor', 'woodDark', 'woodWarm', 'beam', 'brick',
   'plaster', 'brass', 'leather', 'felt', 'rug', 'steel', 'glass', 'neon',
   'wheel', 'slotFace', 'sign', 'dance', 'bulb', 'chipR', 'chipB',
-  'posterA', 'posterB', 'nightSky'
+  'posterA', 'posterB', 'nightSky', 'spot', 'spotTeal'
 ];
 
 function stadium(b, name, cx, cz, w, d, y0, h, opts) {
@@ -159,6 +159,12 @@ function hangingLamp(b, x, z, drop) {
   b.cyl('neon', x, top - drop - 17.5, z, 6.5, 6.5, 1.5, 12, { tile: 6 });
 }
 
+// Hazy down-light cone under a hanging lamp or over the dance floor. Blend
+// material (filtered out of nav) so it never blocks movement.
+function spotBeam(b, mat, x, z, yBot, yTop, rBot, rTop) {
+  b.cyl(mat, x, yBot, z, rBot, rTop, yTop - yBot, 16, { tile: yTop - yBot, top: false });
+}
+
 // dir: +1 = wall at low z/x, fixture points into the room (+); -1 = opposite.
 // axis: 'z' = wall runs along x (north/south), 'x' = wall runs along z (east/west).
 // Pass the wall's inner face coordinate as x or z.
@@ -272,6 +278,8 @@ function danceFloor(b) {
   speaker(b, 585, 1238);
   speaker(b, 975, 1238);
   b.box('neon', (x0 + x1) / 2, 22, 1262, x1 - x0 - 60, 3.5, 2, { tile: 40, localUV: true });
+  spotBeam(b, 'spotTeal', 660, 1000, 3, 112, 95, 30);
+  spotBeam(b, 'spotTeal', 900, 1120, 3, 112, 95, 30);
 }
 
 function speaker(b, x, z) {
@@ -478,27 +486,27 @@ export const LIGHTS = (() => {
   for (const t of tableRects) {
     const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
     if (t.kind === 'roulette') {
-      list.push({ x: cx, y: 84, z: cz, r: 300, col: [1.0, 0.86, 0.6], int: 0.95 });
+      list.push({ x: cx, y: 72, z: cz, r: 210, col: [1.0, 0.86, 0.6], int: 1.15 });
     } else {
-      list.push({ x: cx, y: 86, z: cz, r: 250, col: [1.0, 0.82, 0.55], int: 0.85 });
+      list.push({ x: cx, y: 74, z: cz, r: 190, col: [1.0, 0.82, 0.55], int: 1.0 });
     }
   }
   const bar = OBJ('bar');
-  list.push({ x: bar.x + bar.w / 2, y: 70, z: bar.y + bar.h / 2, r: 260, col: [1.0, 0.78, 0.5], int: 0.9 });
+  list.push({ x: bar.x + bar.w / 2, y: 62, z: bar.y + bar.h / 2, r: 230, col: [1.0, 0.78, 0.5], int: 1.0 });
   const sh = OBJ('shelf');
-  list.push({ x: sh.x + sh.w / 2, y: 78, z: sh.y + sh.h / 2, r: 300, col: [1.0, 0.72, 0.42], int: 0.7 });
-  list.push({ x: 1228, y: 40, z: 40, r: 340, col: [1.0, 0.30, 0.55], int: 1.1 });
-  list.push({ x: 86, y: 46, z: 320, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
-  list.push({ x: 86, y: 46, z: 640, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
-  list.push({ x: 86, y: 46, z: 960, r: 300, col: [0.45, 0.95, 0.85], int: 0.8 });
-  list.push({ x: 400, y: 60, z: 1160, r: 300, col: [0.72, 0.82, 1.0], int: 0.75 });
-  list.push({ x: 760, y: 90, z: 640, r: 340, col: [1.0, 0.80, 0.58], int: 0.5 });
-  list.push({ x: 1796, y: 110, z: 200, r: 280, col: [1.0, 0.84, 0.6], int: 0.6 });
-  list.push({ x: 2200, y: 90, z: 660, r: 320, col: [1.0, 0.80, 0.55], int: 0.45 });
-  list.push({ x: 130, y: 80, z: 120, r: 260, col: [1.0, 0.78, 0.5], int: 0.45 });
-  list.push({ x: 700, y: 36, z: 1000, r: 320, col: [0.45, 0.95, 0.9], int: 0.75 });
-  list.push({ x: 880, y: 36, z: 1140, r: 280, col: [1.0, 0.45, 0.7], int: 0.6 });
-  list.push({ x: 520, y: 70, z: 500, r: 280, col: [1.0, 0.78, 0.5], int: 0.5 });
+  list.push({ x: sh.x + sh.w / 2, y: 72, z: sh.y + sh.h / 2, r: 280, col: [1.0, 0.72, 0.42], int: 0.8 });
+  list.push({ x: 1228, y: 40, z: 40, r: 360, col: [1.0, 0.30, 0.55], int: 1.25 });
+  list.push({ x: 86, y: 46, z: 320, r: 270, col: [0.45, 0.95, 0.85], int: 0.9 });
+  list.push({ x: 86, y: 46, z: 640, r: 270, col: [0.45, 0.95, 0.85], int: 0.9 });
+  list.push({ x: 86, y: 46, z: 960, r: 270, col: [0.45, 0.95, 0.85], int: 0.9 });
+  list.push({ x: 400, y: 60, z: 1160, r: 300, col: [0.72, 0.82, 1.0], int: 0.65 });
+  list.push({ x: 760, y: 90, z: 640, r: 340, col: [1.0, 0.80, 0.58], int: 0.45 });
+  list.push({ x: 1796, y: 110, z: 200, r: 280, col: [1.0, 0.84, 0.6], int: 0.55 });
+  list.push({ x: 2200, y: 90, z: 660, r: 320, col: [1.0, 0.80, 0.55], int: 0.4 });
+  list.push({ x: 130, y: 80, z: 120, r: 260, col: [1.0, 0.78, 0.5], int: 0.4 });
+  list.push({ x: 700, y: 36, z: 1000, r: 320, col: [0.45, 0.95, 0.9], int: 0.9 });
+  list.push({ x: 880, y: 36, z: 1140, r: 280, col: [1.0, 0.45, 0.7], int: 0.7 });
+  list.push({ x: 520, y: 70, z: 500, r: 280, col: [1.0, 0.78, 0.5], int: 0.45 });
   return list;
 })();
 
@@ -521,11 +529,18 @@ function buildContent(b) {
   column(b, 2176, 1014);
   for (const t of tableRects) {
     const cx = t.x + t.w / 2, cz = t.y + t.h / 2;
-    hangingLamp(b, cx, cz, t.kind === 'roulette' ? 52 : 46);
+    const drop = t.kind === 'roulette' ? 52 : 46;
+    hangingLamp(b, cx, cz, drop);
+    const shadeY = 136 - drop - 18;
+    spotBeam(b, 'spot', cx, cz, t.kind === 'roulette' ? 40 : 38, shadeY - 2,
+      t.kind === 'roulette' ? 30 : 27, 5);
   }
   hangingLamp(b, 1796, 130, 58);
+  spotBeam(b, 'spot', 1796, 130, 6, 58, 32, 6);
   hangingLamp(b, 760, 560, 62);
+  spotBeam(b, 'spot', 760, 560, 6, 54, 32, 6);
   hangingLamp(b, 760, 720, 62);
+  spotBeam(b, 'spot', 760, 720, 6, 54, 32, 6);
   sofa(b, 900, 400, Math.PI, 150);
   sofa(b, 900, 900, 0, 150);
   armchair(b, 660, 480, Math.PI / 2);

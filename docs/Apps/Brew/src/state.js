@@ -12,7 +12,7 @@ export class Host {
     this.players = new Map();
     this.occupancy = new Map();
     this.activity = null;
-    this.objects = { lights: true };
+    this.objects = { lights: false };
     this.seq = 0;
     this.startedAt = Date.now();
   }
