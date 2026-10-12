@@ -81,6 +81,8 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   const password = $("#regPassword2").value;
   const display = $("#regDisplay2").value.trim() || username;
   const errBox = $("#regError");
+  errBox?.classList.remove("note");
+  errBox?.classList.add("error");
   showErr(errBox, "");
   primeSound("logon");
   if (!username || !password) { showErr(errBox, "Username and password are required."); playSound("error"); return; }
@@ -1931,6 +1933,13 @@ function startServerWatch() {
   if (serverWatchTimer) return;
   const hint = $("#authHint");
   if (hint && !hint.textContent) hint.textContent = "Server unreachable — retrying automatically...";
+  const regDlg = $("#registerDialog");
+  if (regDlg?.open) {
+    const regErr = $("#regError");
+    showErr(regErr, "Server unreachable — retrying automatically...");
+    regErr?.classList.remove("error");
+    regErr?.classList.add("note");
+  }
   serverWatchTimer = setInterval(async () => {
     if (!serverWatchTimer) return;
     try {
@@ -1941,6 +1950,16 @@ function startServerWatch() {
       authNotice = "";
       showErr($("#authError"), "");
       if (hint) hint.textContent = "Server is back online — sign in to continue.";
+      // The register dialog is a modal <dialog>: everything outside it (toast,
+      // auth hint) is stuck in the top-layer backdrop — surface recovery
+      // inside the dialog itself.
+      const regDlg = $("#registerDialog");
+      if (regDlg?.open) {
+        const regErr = $("#regError");
+        showErr(regErr, "Server is back online — try creating your account again.");
+        regErr?.classList.remove("error");
+        regErr?.classList.add("note");
+      }
       ui.toast("Server is back online");
       playSound("message");
     } catch { /* next tick */ }

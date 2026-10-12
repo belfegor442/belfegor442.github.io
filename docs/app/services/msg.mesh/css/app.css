@@ -386,6 +386,7 @@ dialog .win-cap.close{
 }
 .sunken:focus-within{outline:1px solid var(--xp-accent);outline-offset:0}
 .error{color:var(--xp-error);font-size:11px;margin:8px 0 0;min-height:14px}
+.reg-dialog .note{color:#16a34a;font-size:11px;margin:8px 0 0;min-height:14px}
 
 /* real XP checkbox sprites (native settings draw_checkbox) */
 input[type=checkbox]{

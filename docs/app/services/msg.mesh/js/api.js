@@ -188,6 +188,11 @@ const FRIENDLY = {
 
 export function friendlyError(err) {
   if (!(err instanceof ApiError)) return "Something went wrong. Please try again.";
+  // Status 0 covers both "never reached the server" and "gave up waiting":
+  // a slow/busy server must not masquerade as an outage.
+  if (err.status === 0 && /did not respond in time/.test(err.message || "")) {
+    return "The msg.mesh server took too long to respond — it may be busy. Try again in a moment.";
+  }
   if (FRIENDLY[err.status]) return FRIENDLY[err.status];
   return err.message || `Server error (${err.status}).`;
 }
@@ -266,9 +271,11 @@ export const api = {
     }
   },
 
-  login: (username, password) => call("/api/v1/users/login", { username, password }, { allow401: true }),
+  // Auth endpoints hash passwords server-side (PBKDF2 100k): give them more
+  // headroom than regular calls so a busy server reads as slow, not dead.
+  login: (username, password) => call("/api/v1/users/login", { username, password }, { allow401: true, timeoutMs: 30000 }),
   register: (username, password, display_name) =>
-    call("/api/v1/users/register", { username, password, display_name }, { allow401: true }),
+    call("/api/v1/users/register", { username, password, display_name }, { allow401: true, timeoutMs: 30000 }),
   whoami: (opts = {}) => call("/api/v1/auth/whoami", {}, opts),
   logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true }),
 
