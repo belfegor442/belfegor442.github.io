@@ -779,7 +779,7 @@ export class Renderer {
       const px = me.rx != null ? me.rx : me.x;
       const pz = me.ry != null ? me.ry : me.y;
       const bob = me.anim === 'walk' ? Math.sin(this.time * 11) * 0.7 : 0;
-      const ex = px, ey = 24.5 + bob, ez = pz;
+      const ex = px, ey = 32 + bob, ez = pz;
       const cp = Math.cos(this.fpPitch), sp = Math.sin(this.fpPitch);
       this.eye.x = ex; this.eye.y = ey; this.eye.z = ez;
       lookAt(this.mView, ex, ey, ez,
@@ -1190,7 +1190,7 @@ export class Renderer {
       const seated = p.status === 'seated' || p.anim === 'sit';
       const isMe = !!me && p.id === me.id;
       if (isMe && this.fp) continue;
-      const topH = this.glbPlayer ? (seated ? 52 : 44) : (seated ? 72 : 64);
+      const topH = this.glbPlayer ? (seated ? 62 : 54) : (seated ? 72 : 64);
       const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;

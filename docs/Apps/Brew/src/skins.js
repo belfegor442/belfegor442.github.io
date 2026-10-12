@@ -1,5 +1,5 @@
 // Player skin catalogue. Every skin is fitted to the same world height so the
-// gameplay scale (nametags at 44, FP eye 24.5, seat anchors) stays valid no
+// gameplay scale (nametags at 54, FP eye 32, seat anchors) stays valid no
 // matter which model is worn.
 //
 // rotX/yaw reorient the model after load (Sketchfab exports often ship the
@@ -12,13 +12,13 @@
 // It is intentionally absent until the export is fixed or animated.
 
 export const DEFAULT_SKIN = 'classic';
-export const TARGET_H = 32;
+export const TARGET_H = 42;
 
 export const SKINS = [
   { id: 'classic', name: 'CLASSIC', url: './Assets/gbl/Player/steve.skin.glb' },
-  { id: 'homer', name: 'HOMER', url: './Assets/player/homerball.glb', height: 26 },
+  { id: 'homer', name: 'HOMER', url: './Assets/player/homerball.glb', height: 34 },
   { id: 'franco', name: 'FRANCO', url: './Assets/player/franco.glb' },
-  { id: 'yahu', name: 'BIG YAHU', url: './Assets/player/big.yahu.glb', height: 36 }
+  { id: 'yahu', name: 'BIG YAHU', url: './Assets/player/big.yahu.glb', height: 47 }
 ];
 
 export const SKIN_BY_ID = new Map(SKINS.map(s => [s.id, s]));
