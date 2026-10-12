@@ -145,14 +145,31 @@ export class Renderer {
     const c = this.canvas;
     if (!c) return;
     c.addEventListener('contextmenu', e => e.preventDefault());
+    // Roblox-style look: hold the right button and the pointer is captured so
+    // the camera turns on relative mouse movement (cursor hidden, never
+    // travels); release it and the cursor comes straight back.
     c.addEventListener('pointerdown', e => {
-      if (e.button !== 0 && e.button !== 2) return;
-      // While the pointer is locked in first person the mousemove handler
-      // owns the look; drags stay reserved for the unlocked orbit view.
+      if (e.button === 2) {
+        if (!this.lockDisabled) {
+          try {
+            const p = c.requestPointerLock();
+            if (p && p.catch) p.catch(() => {});
+          } catch (err) { /* noop */ }
+        }
+        return;
+      }
+      if (e.button !== 0) return;
+      // While the pointer is locked the mousemove handler owns the look;
+      // drags stay reserved for the unlocked orbit view.
       if (document.pointerLockElement === c) return;
       this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this._drag = { x: e.clientX, y: e.clientY };
       try { c.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    });
+    c.addEventListener('pointerup', e => {
+      if (e.button === 2 && document.pointerLockElement === c) {
+        try { document.exitPointerLock(); } catch (err) { /* noop */ }
+      }
     });
     // First-person mouse look: with the pointer locked the view follows the
     // raw mouse movement - no button, no dragging, ever. In orbit mode a
@@ -238,12 +255,7 @@ export class Renderer {
       this.freeCam = false;
       this._prevPitch = this.orbit.pitch;
       this.fpPitch = Math.max(-1.1, Math.min(0.75, 1.0 - this.orbit.pitch));
-      try {
-        const p = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
-        if (p && p.catch) p.catch(() => {});
-      } catch (e) { /* noop */ }
     } else {
-      // Keep the pointer captured: the orbit view keeps relative mouse look.
       this.orbit.pitch = Math.max(0.55, Math.min(1.35, this._prevPitch || 0.85));
     }
     return this.fp;

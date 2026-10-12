@@ -656,23 +656,19 @@ input.on('help', toggleHelp);
   });
   input.on('fp', () => {
     const on = renderer.toggleFP();
-    ui.toast(on ? 'FIRST PERSON — mouse: look · WASD: move · click: walk · V: exit' : 'FOLLOW CAM');
+    ui.toast(on ? 'FIRST PERSON — hold right mouse: look · WASD: move · V: exit' : 'FOLLOW CAM');
   });
   input.on('escape', () => {
     if (renderer.fp) { renderer.toggleFP(); ui.toast('FOLLOW CAM'); }
-    try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { /* noop */ }
     const hp = document.getElementById('helpPanel');
     if (hp && !hp.classList.contains('hidden')) toggleHelp();
   });
-  let capturedOnce = false;
+  let lookHintShown = false;
   document.addEventListener('pointerlockchange', () => {
-    const locked = document.pointerLockElement === canvas;
-    if (locked && !capturedOnce) {
-      capturedOnce = true;
-      ui.toast('MOUSE CAPTURED — ESC TO FREE IT');
+    if (document.pointerLockElement === canvas && !lookHintShown) {
+      lookHintShown = true;
+      ui.toast('CAMERA LOOK — RELEASE RIGHT MOUSE FOR THE CURSOR');
     }
-    // The browser eats Esc while locked; leaving the lock also leaves FP.
-    if (!locked && renderer.fp) { renderer.toggleFP(); ui.toast('FOLLOW CAM'); }
   });
 
 function toggleHelp() {
@@ -756,26 +752,16 @@ canvas.addEventListener('pointerup', e => {
   if (!d || e.button !== 0 || e.target !== canvas) return;
   if (performance.now() - d.t > 450) return;
   const locked = document.pointerLockElement === canvas;
-  // Captured mouse, both views: no cursor - the click walks toward the
+  // While the right-button look is held, a left click walks toward the
   // crosshair (viewport centre).
   if (locked) {
     handleWorldClick(renderer.vw / 2, renderer.vh / 2);
     return;
   }
   // A moved pointer was a camera drag (handled by the renderer) - never
-  // capture and never walk. Mouse needs a rock-steady press for anything
-  // else; touch taps keep a friendlier radius.
+  // walk. Mouse needs a rock-steady press; touch taps keep a friendly radius.
   const tol = d.pe === 'mouse' ? 4 : 10;
   if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > tol) return;
-  // A steady mouse click captures the pointer for relative look (touch
-  // never locks; ?nolock keeps the old drag-and-click behaviour).
-  if (!renderer.lockDisabled && d.pe === 'mouse') {
-    try {
-      const p = canvas.requestPointerLock();
-      if (p && p.catch) p.catch(() => {});
-    } catch (err) { /* noop */ }
-    return;
-  }
   handleWorldClick(e.clientX, e.clientY);
 });
 
