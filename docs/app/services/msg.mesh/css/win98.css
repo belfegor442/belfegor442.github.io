@@ -80,17 +80,25 @@
 }
 [data-theme="win98"] .win-titlebar{
   height:26px;gap:2px;
-  padding:0;
+  padding:0 0 0 3px;
   background:#000080;
   border:3px solid transparent;
-  border-image:url("../assets/win98/gui/Window_Header.png") 3 fill / 3px;
+  border-left-width:0;
+  border-right-width:0;
+  /* Window_Header.png's center is navy only for its top 22px (rest is the
+     #d4d0c8 face) — with `fill` that grey half was stretched across the
+     lower titlebar, cutting the white caption in two. Drop `fill` so the
+     solid navy background fills the centre and the sprite only paints the
+     3px bevel margins; side borders 0 so the frame's Window_Base bevel
+     isn't drawn twice (single 3px white bevel like the native client). */
+  border-image:url("../assets/win98/gui/Window_Header.png") 3 / 3px 0;
   color:#fff;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
   font-weight:700;font-size:11px;
 }
 [data-theme="win98"] .win-app.inactive .win-titlebar{
   background:#8c8c8c;
-  border-image:url("../assets/win98/gui/Window_Header_Inactive.png") 3 fill / 3px;
+  border-image:url("../assets/win98/gui/Window_Header_Inactive.png") 3 / 3px 0;
 }
 [data-theme="win98"] .win-title-ico{width:16px;height:16px;margin:0}
 [data-theme="win98"] .win-title{text-shadow:none}
@@ -416,16 +424,22 @@
   padding:0;
   background:#d4d0c8;
   border:3px solid transparent;
+  border-top-width:0;
   border-image:url("../assets/win98/gui/Window_Base.png") 3 fill / 3px;
   box-shadow:0 16px 52px rgba(0,0,0,.6),0 4px 14px rgba(0,0,0,.4);
 }
-/* titlebar: navy header sprite, bold 18px, big ? + X caps */
+/* titlebar: navy header sprite, bold 18px, big ? + X caps.
+   No `fill` + side borders 0: same Window_Header centre-grey defect as the
+   app titlebar (uniform navy background, sprite draws only top/bottom
+   bevel margins, logon-root's Window_Base draws the sides). */
 [data-theme="win98"] .w98-logon-titlebar{
   display:flex;align-items:center;justify-content:space-between;
   height:42px;padding:0 5px 0 12px;
   background:#000080;
   border:3px solid transparent;
-  border-image:url("../assets/win98/gui/Window_Header.png") 3 fill / 3px;
+  border-left-width:0;
+  border-right-width:0;
+  border-image:url("../assets/win98/gui/Window_Header.png") 3 / 3px 0;
   color:#fff;
   font-family:"Tahoma","Segoe UI",Verdana,sans-serif;
   font-weight:700;font-size:18px;
