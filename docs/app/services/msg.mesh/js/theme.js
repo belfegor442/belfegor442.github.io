@@ -35,6 +35,8 @@ const W98 = {
   "Generic Document.png": null,
   "TB File.png": null,
   "Folder Closed.png": null,
+  "smiley.png": "smiley.png",
+  "Connection Status.png": "conn_pcs_on_on.png",
 };
 
 export function currentTheme() {

@@ -1,5 +1,6 @@
 import { state, conversationOrder, peerLabel, peerUser, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 import { playSound } from "./sound.js";
+import { api } from "./api.js";
 
 export const $ = (s) => document.querySelector(s);
 
@@ -281,12 +282,72 @@ function statusGlyph(m, peer) {
   return "✓";
 }
 
+/* Classic typed emoticon codes -> unicode, on RAW text before esc() so
+   "<3" still reaches the converter (esc would make it "&lt;3"). Longer
+   codes must come first so the alternation prefers them. */
+const EMOTE_PAIRS = [
+  ["</3", "💔"], [":'(", "😢"], ["^_^", "😊"], [":-)", "😀"], [":-(", "😞"], [";-)", "😉"],
+  ["<3", "❤️"], [":)", "😀"], [":(", "😞"], [":D", "😄"], [";)", "😉"], [":P", "😛"],
+  [":p", "😛"], [":O", "😮"], [":o", "😮"], [":|", "😐"], [":*", "😘"],
+  [":S", "😕"], [":s", "😕"], ["XD", "😂"], ["xd", "😂"], ["B)", "😎"],
+];
+const EMOTE_LOOKUP = new Map(EMOTE_PAIRS);
+const EMOTE_RE = new RegExp(
+  EMOTE_PAIRS.map(([code]) => code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+  "g"
+);
+function emotes(t) {
+  return String(t).replace(EMOTE_RE, (m) => EMOTE_LOOKUP.get(m) || m);
+}
+
+function isImageAtt(att) {
+  if (!att) return false;
+  if ((att.type || "").startsWith("image/")) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(att.filename || "");
+}
+
+/* Image attachments render as an inline thumbnail inside the same clickable
+   att-chip (contract with f13 tests) — hydrated from api.download() with a
+   data-URL cache so re-renders don't re-fetch. */
+const attImgCache = new Map();
+
+function hydrateAttImages(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll("img[data-attimg]").forEach((img) => {
+    const id = img.dataset.attimg;
+    if (attImgCache.has(id)) {
+      img.src = attImgCache.get(id);
+      img.classList.add("att-img-ready");
+      return;
+    }
+    if (img.dataset.loading) return;
+    img.dataset.loading = "1";
+    img.classList.add("att-img-loading");
+    api.download(id).then((r) => {
+      const url = "data:" + (r.content_type || "image/png") + ";base64," + r.content_base64;
+      attImgCache.set(id, url);
+      img.src = url;
+      img.classList.remove("att-img-loading");
+      img.classList.add("att-img-ready");
+    }).catch(() => {
+      delete img.dataset.loading;
+      img.classList.remove("att-img-loading");
+      img.classList.add("att-img-failed");
+    });
+  });
+}
+
 function messageLineHtml(m, peer) {
-  const att = m.attachment
-    ? `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(m.attachment.filename || "file")}" href="#"><img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"><span>${esc(m.attachment.filename || "file")}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small></span></a>`
-    : "";
+  let att = "";
+  if (m.attachment) {
+    const fname = m.attachment.filename || "file";
+    const meta = `${esc(fname)}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small>`;
+    att = isImageAtt(m.attachment)
+      ? `<a class="att-chip att-img-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img class="att-img" data-attimg="${esc(m.attachment.id)}" alt="${esc(fname)}"><span>${meta}</span></a>`
+      : `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"><span>${meta}</span></a>`;
+  }
   const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
-  const body = m.text ? esc(m.text) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
+  const body = m.text ? esc(emotes(m.text)) : (att ? "" : `<span class="msg-type-label">(${esc(m.type)})</span>`);
   const st = statusGlyph(m, peer);
   const cls = ["msg-line", m.mine ? "mine" : "other"];
   if (m.sync === "sending") cls.push("pending");
@@ -323,6 +384,7 @@ export function renderMessages(opts = {}) {
   }
   box.innerHTML = html;
   $("#loadOlder")?.classList.toggle("hidden", !c.hasMore);
+  hydrateAttImages(box);
 
   if (opts.scroll !== false) wrap.scrollTop = wrap.scrollHeight;
 }

@@ -496,9 +496,7 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
 }
 
 let uploadSeq = 0;
-$("#fileInput").addEventListener("change", async () => {
-  const file = $("#fileInput").files[0];
-  $("#fileInput").value = "";
+async function handleFile(file) {
   if (!file) return;
   if (file.size > MAX_FILE) {
     ui.toast(`File too large (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
@@ -530,6 +528,11 @@ $("#fileInput").addEventListener("change", async () => {
     if (seq === uploadSeq) setPendingAttachment(null);
     ui.toast("Upload failed: " + friendlyError(e), true);
   }
+}
+$("#fileInput").addEventListener("change", () => {
+  const file = $("#fileInput").files[0];
+  $("#fileInput").value = "";
+  handleFile(file);
 });
 
 function fileToBase64(file) {
@@ -591,7 +594,7 @@ $("#newChatForm").addEventListener("submit", async (e) => {
   if (!q) return;
   const box = $("#newChatResults");
   showErr($("#newChatStatus"), "Searching…");
-  box.innerHTML = "";
+  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searching…</p>';
   try {
     const r = await api.usersSearch(q);
     const users = (r.users || []).filter((u) => String(u.user_id) !== state.user.user_id);
@@ -667,7 +670,7 @@ $("#searchForm").addEventListener("submit", async (e) => {
   const q = $("#searchInput").value.trim();
   if (!q) return;
   const box = $("#searchResults");
-  box.innerHTML = '<p class="hint">Searching…</p>';
+  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searching…</p>';
   try {
     const r = await api.searchMessages(q);
     const items = r.items || [];
@@ -1088,6 +1091,112 @@ function syncSendEnabled() {
   if (!send) return;
   const hasText = !!(msgInput && msgInput.value.trim());
   send.disabled = !(hasText || pendingAttachment);
+}
+
+/* ---------------- emoticon / sticker picker ---------------- */
+const FACE_EMOJI = [
+  "😀", "😃", "😄", "😁", "😂", "🤣", "😊", "😍", "😘", "😜",
+  "🤪", "😎", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁",
+  "😣", "😖", "😫", "😩", "😢", "😭", "😤", "😠", "😡", "🤯",
+  "😳", "🥵", "🥶", "😱", "😨", "😰", "🤗", "🤔", "🤭", "🤫",
+  "😶", "😐", "😑", "😬", "🙄", "😴", "🤤", "😮", "🤐", "😷",
+  "😇", "🤡", "😈", "👋", "🤝", "👍", "👎", "👌", "✌️", "🤞",
+  "🤙", "🙏", "💪", "👏", "🙌", "❤️", "💔", "💯", "🔥", "✨",
+  "🎉", "🎁", "🎂", "☕", "🌻", "🌹", "🍀", "⭐", "🌙", "🌈",
+];
+const STICKERS = ["wink", "surprise", "cry", "party", "thumbsup", "wave", "heart", "coffee", "smile"];
+const STICKER_LABELS = {
+  wink: "Wink", surprise: "Surprised", cry: "Crying", party: "Party",
+  thumbsup: "Thumbs up", wave: "Wave", heart: "Heart", coffee: "Coffee", smile: "Smile",
+};
+
+const emojiPanel = $("#emojiPanel");
+const emojiBtn = $("#emojiBtn");
+const emojiFacesBox = $("#emojiFaces");
+const emojiStickersBox = $("#emojiStickers");
+const emojiTabFaces = $("#emojiTabFaces");
+const emojiTabGifs = $("#emojiTabGifs");
+
+function insertAtCursor(text) {
+  const el = msgInput;
+  if (!el) return;
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? start;
+  el.focus();
+  el.setRangeText(text, start, end, "end");
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function closeEmojiPanel() {
+  if (!emojiPanel) return;
+  emojiPanel.classList.add("hidden");
+  emojiBtn?.setAttribute("aria-expanded", "false");
+}
+
+function emojiTab(which) {
+  const faces = which === "faces";
+  emojiTabFaces.classList.toggle("active", faces);
+  emojiTabGifs.classList.toggle("active", !faces);
+  emojiTabFaces.setAttribute("aria-selected", String(faces));
+  emojiTabGifs.setAttribute("aria-selected", String(!faces));
+  emojiFacesBox.classList.toggle("hidden", !faces);
+  emojiStickersBox.classList.toggle("hidden", faces);
+}
+
+async function insertSticker(name) {
+  const path = "./assets/xp/gifs/sticker_" + name + ".gif";
+  closeEmojiPanel();
+  try {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error("http " + res.status);
+    const blob = await res.blob();
+    const file = new File([blob], "sticker_" + name + ".gif", { type: "image/gif" });
+    handleFile(file);
+  } catch {
+    ui.toast("Sticker failed to load", true);
+  }
+}
+
+if (emojiPanel) {
+  for (const ch of FACE_EMOJI) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "emoji-cell";
+    b.textContent = ch;
+    b.addEventListener("click", () => insertAtCursor(ch));
+    emojiFacesBox.appendChild(b);
+  }
+  for (const name of STICKERS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "emoji-cell sticker-cell";
+    b.title = STICKER_LABELS[name] || name;
+    const img = document.createElement("img");
+    img.src = "./assets/xp/gifs/sticker_" + name + ".gif";
+    img.alt = STICKER_LABELS[name] || name;
+    img.loading = "lazy";
+    img.draggable = false;
+    b.appendChild(img);
+    b.addEventListener("click", () => insertSticker(name));
+    emojiStickersBox.appendChild(b);
+  }
+  emojiTabFaces.addEventListener("click", () => emojiTab("faces"));
+  emojiTabGifs.addEventListener("click", () => emojiTab("gifs"));
+  emojiBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const nowHidden = emojiPanel.classList.toggle("hidden");
+    emojiBtn.setAttribute("aria-expanded", String(!nowHidden));
+  });
+  // Staying open on face picks (MSN-style) — panel closes on sticker, outside
+  // click or Esc; the sticker tap itself closes via insertSticker().
+  document.addEventListener("click", (e) => {
+    if (emojiPanel.classList.contains("hidden")) return;
+    if (e.target.closest?.("#emojiPanel") || e.target.closest?.("#emojiBtn")) return;
+    closeEmojiPanel();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeEmojiPanel();
+  });
 }
 
 $("#conversationList").addEventListener("click", (e) => {

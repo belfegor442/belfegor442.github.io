@@ -472,3 +472,20 @@
 [data-theme="north"] a:focus-visible{
   outline:2px solid #38bdf8;outline-offset:2px;
 }
+
+/* emoticon / sticker picker */
+[data-theme="north"] .emoji-panel{
+  background:#111827;border:1px solid #334155;border-radius:12px;
+  box-shadow:0 12px 32px rgba(0,0,0,.55);padding:8px;
+}
+[data-theme="north"] .emoji-tab{
+  background:#1f2937;border:1px solid #334155;border-radius:8px;color:#94a3b8;
+}
+[data-theme="north"] .emoji-tab.active{
+  background:#0ea5e9;border-color:#38bdf8;color:#0f172a;font-weight:700;
+}
+[data-theme="north"] .emoji-cell{border-radius:8px}
+[data-theme="north"] .emoji-cell:hover{background:#334155;border-color:#475569}
+[data-theme="north"] .emoji-btn{border-radius:8px}
+[data-theme="north"] .att-chip .att-img{background:#0f172a;border:1px solid #334155}
+[data-theme="north"] .emoji-panel .emoji-cell:hover{color:inherit}

@@ -199,7 +199,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   background-size:100% 100%;
   color:#fff;font-weight:400;font-size:12px;
   text-shadow:0 1px 0 rgba(0,0,0,.25);
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
 }
+.xp-btn img{width:16px;height:16px;flex:none}
 .xp-btn:hover{background:url("../assets/xp/sprites/button_blue_hover.png") no-repeat;background-size:100% 100%}
 .xp-btn:active{filter:brightness(.92)}
 .xp-btn:disabled{opacity:.55;cursor:default;filter:grayscale(.4)}
@@ -574,6 +576,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 
 /* composer */
 .composer-strip{
+  position:relative;
   flex:none;margin-top:4px;
   padding:8px;
   background:var(--xp-face);
@@ -834,3 +837,76 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
   .empty-state{display:flex}
   .empty-state.hidden{display:none!important}
 }
+
+/* ---------- emoticon / sticker picker ---------- */
+.emoji-btn{width:34px;height:34px;flex:none;align-self:flex-end}
+.emoji-panel{
+  position:absolute;left:8px;bottom:calc(100% + 2px);
+  width:min(304px,calc(100vw - 32px));
+  background:var(--xp-face);
+  border:1px solid;
+  border-color:var(--xp-shadow-out) var(--xp-dark) var(--xp-dark) var(--xp-shadow-out);
+  box-shadow:0 6px 24px rgba(0,0,0,.35);
+  z-index:32;padding:6px;
+}
+.emoji-tabs{display:flex;gap:4px;margin-bottom:6px}
+.emoji-tab{
+  flex:1;height:24px;
+  border:1px solid var(--xp-border);
+  background:linear-gradient(180deg,#fff,#e8e8e8);
+  font-size:11px;color:#1a3a6a;
+}
+.emoji-tab.active{
+  background:linear-gradient(180deg,#dcebfc,#c4dcf8);
+  border-color:var(--xp-accent);font-weight:700;
+}
+.emoji-grid{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:2px;
+  max-height:186px;overflow:auto;padding:2px;
+}
+.emoji-grid.hidden{display:none}
+.sticker-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+.emoji-cell{
+  border:1px solid transparent;background:transparent;
+  font-size:18px;line-height:1;padding:4px 0;
+  display:grid;place-items:center;min-height:30px;
+}
+.emoji-cell:hover{border-color:var(--xp-border);background:#e8f0fc}
+.emoji-cell:active{background:#d0e2fa}
+.sticker-cell{min-height:56px}
+.sticker-cell img{width:44px;height:44px;object-fit:contain;display:block}
+
+/* inline image attachment thumbnail (stays inside the clickable att-chip) */
+.att-img-chip{flex-direction:column;align-items:flex-start;gap:4px;max-width:min(250px,72vw)}
+.att-chip .att-img{
+  width:120px;height:76px;
+  object-fit:cover;
+  border:1px solid var(--xp-border);background:#e6edf7;
+  display:block;
+}
+.att-chip .att-img.att-img-ready{width:auto;height:auto;max-width:220px;max-height:170px;object-fit:contain}
+.att-chip .att-img.att-img-loading{animation:attShimmer 1.1s ease-in-out infinite alternate}
+.att-chip .att-img.att-img-failed{
+  width:120px;height:24px;
+  display:grid;place-items:center;
+  font-size:10px;color:#6d7b95;
+}
+@keyframes attShimmer{from{opacity:.55}to{opacity:1}}
+
+/* hourglass spinner in "Searching…" hints */
+.hourglass{
+  width:16px;height:16px;vertical-align:-3px;margin-right:4px;
+  animation:hourglassBob .9s ease-in-out infinite;
+}
+@keyframes hourglassBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+
+/* details rows: small label icons */
+.detail-row span img{width:14px;height:14px;vertical-align:-2px;margin-right:5px}
+
+/* ambient motion (all guarded by the global prefers-reduced-motion rule) */
+@keyframes badgePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+.unread{animation:badgePulse 1.8s ease-in-out infinite}
+@keyframes ledPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(0,0,0,.2),0 0 6px rgba(80,175,40,.55)}50%{box-shadow:inset 0 0 0 1px rgba(0,0,0,.2),0 0 11px rgba(80,175,40,.95)}}
+.led.on{animation:ledPulse 2.2s ease-in-out infinite}
+@keyframes markFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.empty-state .mesh-mark{animation:markFloat 3.4s ease-in-out infinite}

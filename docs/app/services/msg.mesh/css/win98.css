@@ -641,3 +641,22 @@
     align-self:center;margin-top:16px;
   }
 }
+
+/* ---------- emoticon / sticker picker ---------- */
+[data-theme="win98"] .emoji-panel{
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#fff #808080 #808080 #fff;
+  box-shadow:none;padding:6px;
+}
+[data-theme="win98"] .emoji-tab{
+  background:#c0c0c0;color:#000;
+  border:1px solid;
+  border-color:#fff #808080 #808080 #fff;
+}
+[data-theme="win98"] .emoji-tab.active{
+  background:#d4d0c8;font-weight:700;
+  border-color:#808080 #fff #fff #808080;
+}
+[data-theme="win98"] .emoji-cell:hover{background:#000080;color:#fff;border-color:#000080}
+[data-theme="win98"] .att-chip .att-img{background:#fff;border:1px solid #808080}
