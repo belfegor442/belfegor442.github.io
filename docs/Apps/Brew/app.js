@@ -885,10 +885,26 @@ function frame(now) {
   }
 
   for (const p of players.values()) {
-    if (p === me) { p.rx = p.x; p.ry = p.y; continue; }
+    if (p === me) {
+      p.rx = p.x;
+      p.ry = p.y;
+      p._renderStatus = p.status;
+      p._renderSeat = p.seat;
+      continue;
+    }
+    const snap = p.rx == null || p.ry == null ||
+      p._renderStatus !== p.status || p._renderSeat !== p.seat ||
+      Math.hypot(p.x - p.rx, p.y - p.ry) > 180;
+    if (snap) {
+      p.rx = p.x;
+      p.ry = p.y;
+      p._renderStatus = p.status;
+      p._renderSeat = p.seat;
+      continue;
+    }
     const k = Math.min(1, dt * 12);
-    p.rx = p.rx == null ? p.x : p.rx + (p.x - p.rx) * k;
-    p.ry = p.ry == null ? p.y : p.ry + (p.y - p.ry) * k;
+    p.rx += (p.x - p.rx) * k;
+    p.ry += (p.y - p.ry) * k;
   }
 
   moveAcc += dt * 1000;
