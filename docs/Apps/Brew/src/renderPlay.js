@@ -222,7 +222,7 @@ export class Renderer {
       ? buildFloor(false, this.worldSpec.width, this.worldSpec.depth)
       : buildFloor());
     this.texApron = this.uploadTexture(this.clientMode
-      ? buildFloor(false, this.worldSpec.width, this.worldSpec.depth)
+      ? buildFloor(true, this.worldSpec.width, this.worldSpec.depth, false)
       : buildFloor(true, MAP.w, MAP.h, false));
     this.texDot = this.uploadTexture(dotTexture());
     this.texSign = this.uploadTexture(signTexture('BREW'));
@@ -895,7 +895,7 @@ export class Renderer {
     if (this.glbReady && this.glbWorld && this.glbWorld.opaque.length) {
       this.useTex();
       this.setTexM(this.mIdent);
-      this.setTexTint(0.44, 0.37, 0.29, 1);
+      this.setTexTint(1.3, 1.15, 1.0, 1);
       this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -925,7 +925,7 @@ export class Renderer {
       // from staring past the walls into raw clear color.
       this.useTex();
       this.setTexM(this.mIdent);
-      this.setTexTint(0.44, 0.37, 0.29, 1);
+      this.setTexTint(1.3, 1.15, 1.0, 1);
       this.bindTex(this.gpuApron, this.texApron);
       gl.drawElements(gl.TRIANGLES, this.gpuApron.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
