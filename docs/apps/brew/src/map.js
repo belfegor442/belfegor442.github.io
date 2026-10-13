@@ -726,11 +726,11 @@ export async function buildBrewMap() {
   let slotSymbols = [];
   try {
     slotSymbols = await Promise.all([
-      loadImageBitmap('./Assets/slot/7.png'),
-      loadImageBitmap('./Assets/slot/cherry.png'),
-      loadImageBitmap('./Assets/slot/blueberry.png'),
-      loadImageBitmap('./Assets/slot/clover.png'),
-      loadImageBitmap('./Assets/slot/diamond.png')
+      loadImageBitmap('../../Apps/Brew/Assets/slot/7.png'),
+      loadImageBitmap('../../Apps/Brew/Assets/slot/cherry.png'),
+      loadImageBitmap('../../Apps/Brew/Assets/slot/blueberry.png'),
+      loadImageBitmap('../../Apps/Brew/Assets/slot/clover.png'),
+      loadImageBitmap('../../Apps/Brew/Assets/slot/diamond.png')
     ]);
   } catch (e) {
     console.warn('[map] slot symbols unavailable:', e && e.message);
