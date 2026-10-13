@@ -11,7 +11,7 @@
   "scripts": {
     "check": "node --check app.js && node --check src/world.js && node --check src/render.js && node --check src/renderGeo.js && node --check src/map.js && node --check src/mapGeom.js && node --check src/mapTex.js && node --check src/glb.js && node --check src/input.js && node --check src/state.js && node --check src/activities.js && node --check src/skins.js && node --check src/protocol.js && node --check src/ui.js",
     "start": "npx --yes serve -l 8080 .",
-    "test": "npm run check && node --test \"tests/**/*.test.js\""
+    "test": "npm run check && node --test tests/unit/*.test.js tests/integration/*.test.js tests/acceptance/*.test.js"
   },
   "dependencies": {}
 }
