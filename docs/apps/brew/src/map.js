@@ -263,7 +263,7 @@ function chandelier(b, x, z) {
 // Hazy down-light cone under a hanging lamp or over the dance floor. Blend
 // material (filtered out of nav) so it never blocks movement.
 function spotBeam(b, mat, x, z, yBot, yTop, rBot, rTop) {
-  b.cyl(mat, x, yBot, z, rBot, rTop, yTop - yBot, 16, { tile: yTop - yBot, top: false });
+  b.cyl(mat, x, yBot, z, rBot, rTop, yTop - yBot, 20, { tile: yTop - yBot, top: false });
 }
 
 // dir: +1 = wall at low z/x, fixture points into the room (+); -1 = opposite.
@@ -697,7 +697,8 @@ function buildMaterials(images) {
       nrmSmp: 0,
       smp: samplers.length,
       unlit: !!(opts && opts.unlit),
-      blend: !!(opts && opts.blend)
+      blend: !!(opts && opts.blend),
+      edgeSoft: !!(opts && opts.edgeSoft)
     };
     imagesList.push(albedo);
     samplers.push(SMP);
@@ -714,7 +715,7 @@ function buildMaterials(images) {
   for (const name of MAT_ORDER) {
     if (EXPLICIT[name]) continue;
     const m = material(name);
-    addMat(name, m.albedo, m.normal, { blend: m.blend, unlit: m.unlit, emissive: m.emissive });
+    addMat(name, m.albedo, m.normal, { blend: m.blend, unlit: m.unlit, emissive: m.emissive, edgeSoft: m.edgeSoft });
   }
   addMat('wheel', images.wheel, null);
   addMat('slotFace', images.slotFace, null, { unlit: true, emissive: [1.35, 1.25, 1.05] });

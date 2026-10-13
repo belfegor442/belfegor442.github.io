@@ -135,6 +135,18 @@ function packMetal(ac, metal) {
   return ac;
 }
 
+// Flat tangent-space normal (128,128,255) with roughness packed in alpha, for
+// materials with no height detail. packRough(cv(size), r) on a blank canvas
+// used to leave RGB at (0,0,0) which decodes to a garbage inward normal and
+// broke lighting on posters, chips, beams, spills and bulbs.
+function flatNrm(size, rough) {
+  const a = cv(size);
+  const g = a.getContext('2d');
+  g.fillStyle = 'rgb(128,128,255)';
+  g.fillRect(0, 0, size, size);
+  return packRough(a, rough);
+}
+
 function rgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -450,7 +462,7 @@ function neon(size) {
   });
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.5),
+    normal: flatNrm(size, 0.5),
     unlit: true,
     emissive: [2.4, 0.55, 0.95]
   };
@@ -498,28 +510,30 @@ function bulb(size) {
   });
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.5),
+    normal: flatNrm(size, 0.5),
     unlit: true,
     emissive: [2.1, 1.55, 0.75]
   };
 }
 
 // Volumetric beam haze for the blend batch. Canvas y=0 (top) maps to cone
-// bottom (uv v=0) so the alpha ramps up toward the lamp.
+// bottom (uv v=0) so the alpha ramps up toward the lamp. No u-seam: the old
+// texture faded alpha near u=0/1 and punched a visible slit through the beam;
+// the grazing-angle silhouette fade now happens in the shader (uEdgeFade).
 function spotCone(size, hexCol, peak, emissive) {
   const a = cv(size);
   const g = a.getContext('2d');
   const c = rgb(hexCol);
   shade(g, size, (u, v) => {
-    const edge = Math.min(u, 1 - u);
-    const soft = edge < 0.08 ? edge / 0.08 : 1;
-    const alpha = Math.pow(v, 1.7) * peak * soft;
+    const rim = v > 0.92 ? Math.max(0, (1 - v) / 0.08) : 1;
+    const alpha = Math.pow(v, 1.55) * peak * rim;
     return [c[0], c[1], c[2], alpha];
   });
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.5),
+    normal: flatNrm(size, 0.5),
     blend: true,
+    edgeSoft: true,
     emissive
   };
 }
@@ -551,7 +565,7 @@ function chip(size, hexCol) {
   g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
   return {
     albedo: packMetal(a, 0),
-    normal: packRough(cv(size), 0.55)
+    normal: flatNrm(size, 0.55)
   };
 }
 
@@ -614,7 +628,7 @@ function poster(size, kind) {
   grain(g, size, 0.05, 63);
   return {
     albedo: packMetal(a, 0),
-    normal: packRough(cv(size), 0.85),
+    normal: flatNrm(size, 0.85),
     emissive: [0.38, 0.36, 0.3]
   };
 }
@@ -650,7 +664,7 @@ function nightSky(size) {
   }
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.5),
+    normal: flatNrm(size, 0.5),
     unlit: true,
     emissive: [0.85, 0.9, 1.05]
   };
@@ -673,7 +687,7 @@ function aoBlob(size) {
   });
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.9),
+    normal: flatNrm(size, 0.9),
     blend: true
   };
 }
@@ -693,7 +707,7 @@ function floorSpillTex(size, hex, peak, glow) {
   });
   return {
     albedo: a,
-    normal: packRough(cv(size), 0.9),
+    normal: flatNrm(size, 0.9),
     blend: true,
     emissive: [c[0] * glow, c[1] * glow, c[2] * glow]
   };

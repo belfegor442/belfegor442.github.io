@@ -299,7 +299,8 @@ export class Renderer {
     this.pGLB = this.makeProgram(VS_GLB, FS_GLB, ['aPos', 'aNrm', 'aTan', 'aUV'],
       ['uVP', 'uM', 'uN', 'uCam', 'uTex', 'uNrmTex', 'uShadowTex', 'uShadowMat', 'uTint',
         'uUnlit', 'uHasNrm', 'uShadowOn', 'uShadowTexel', 'uSunDir', 'uSunColor', 'uAmbient',
-        'uFogColor', 'uFogRange', 'uEmissive', 'uLightPos', 'uLightCol', 'uLightCount', 'uExposure']);
+        'uFogColor', 'uFogRange', 'uEmissive', 'uLightPos', 'uLightCol', 'uLightCount', 'uExposure',
+        'uEdgeFade']);
     if (!this.pGLB.ok) {
       console.warn('[gl] advanced GLB shader failed, using simple lighting');
       this.pGLB = this.makeProgram(VS_GLB, FS_GLB_SIMPLE, ['aPos', 'aNrm', 'aTan', 'aUV'],
@@ -483,10 +484,27 @@ export class Renderer {
     if (!P.u.uLightPos) return;
     const gl = this.gl;
     const night = this.lights ? 1 : 1.95;
-    const list = LIGHTS.map(l => {
+    const sorted = LIGHTS.map(l => {
       const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
       return { l, d: dx * dx + dy * dy + dz * dz };
-    }).sort((a, b) => a.d - b.d).slice(0, 8);
+    }).sort((a, b) => a.d - b.d);
+    // Hysteresis: lights selected last frame stay selected while they remain
+    // within 1.26x the distance of the 8th nearest candidate; new lights only
+    // claim free slots. Without this the whole room relit on every step.
+    const cut = (sorted[Math.min(7, sorted.length - 1)] || { d: 0 }).d * 1.6;
+    const prev = this.lightSel || [];
+    const sel = [];
+    for (const l of prev) {
+      if (sel.length >= 8) break;
+      const r = sorted.find(c => c.l === l);
+      if (r && r.d <= cut) sel.push(l);
+    }
+    for (const r of sorted) {
+      if (sel.length >= 8) break;
+      if (sel.indexOf(r.l) < 0) sel.push(r.l);
+    }
+    this.lightSel = sel;
+    const list = sel.map(l => sorted.find(c => c.l === l));
     for (let i = 0; i < 8; i++) {
       const rec = list[i];
       if (rec) {
@@ -1017,8 +1035,15 @@ export class Renderer {
     }
 
     const procPlayers = [];
+    let dynN = 0;
     if (this.glbReady && (this.glbPlayer || this.playerSkins.size)) {
       this.useGLB(def);
+      if (!this.rySm) this.rySm = new Map();
+      else if (this.rySm.size > 48) {
+        const alive = new Set(list.map(p => p.id));
+        for (const k of this.rySm.keys()) if (!alive.has(k)) this.rySm.delete(k);
+      }
+      if (!this.dynMats) this.dynMats = [];
       for (const p of list) {
         if (this.fp && me && p.id === me.id) continue;
         const sid = normalizeSkin(p.skin);
@@ -1032,13 +1057,30 @@ export class Renderer {
         const pz = p.ry != null ? p.ry : p.y;
         const seated = p.status === 'seated' || p.anim === 'sit';
         const walking = p.anim === 'walk' && !seated;
-        const ry = Math.PI / 2 - (p.dir || 0);
-        const phase = this.time * 11 + (p.id.charCodeAt(0) || 0);
-        const bob = walking ? Math.abs(Math.sin(phase)) * 1.2 : 0;
-        trs(this.mScratch, px, bob, pz, ry, 1, 1, 1);
+        const seed = p.id.charCodeAt(0) || 0;
+        const phase = this.time * 11 + seed;
+        // Ease the turn instead of snapping 180 degrees through the wall.
+        const ryT = Math.PI / 2 - (p.dir || 0);
+        let ry = this.rySm.get(p.id);
+        if (ry == null) ry = ryT;
+        let dr = ryT - ry;
+        while (dr > Math.PI) dr -= Math.PI * 2;
+        while (dr < -Math.PI) dr += Math.PI * 2;
+        ry += dr * Math.min(1, (dt || 0.016) * 10);
+        this.rySm.set(p.id, ry);
+        // Walk bob, or a slow breath so idle players aren't frozen mannequins.
+        const breath = Math.sin(this.time * 1.7 + seed);
+        const bob = walking ? Math.abs(Math.sin(phase)) * 1.2 : breath * 0.14;
+        const br = walking ? 1 : 1 + breath * 0.006;
+        trs(this.mScratch, px, bob, pz, ry, 1, br, 1);
         for (const g of mdl.opaque) {
           mul(this.mScratch2, this.mScratch, g.matrix);
           this.drawGLBD(g, this.mScratch2);
+          // Copy for the per-frame character shadow pass (see drawDynamicShadows).
+          const rec = this.dynMats[dynN] || (this.dynMats[dynN] = { m: new Float32Array(16), g: null });
+          rec.m.set(this.mScratch2);
+          rec.g = g;
+          dynN++;
         }
       }
     } else {
@@ -1060,6 +1102,7 @@ export class Renderer {
       this.stats.draws++;
     }
 
+    this.drawDynamicShadows(dynN, M.idx.length > 0);
     this.glErr('players');
 
     if (me && !this.fp) {
@@ -1184,6 +1227,7 @@ export class Renderer {
       gl.uniform4f(P.u.uTint, mat.base[0] * k, mat.base[1] * k, mat.base[2] * k, mat.base[3]);
     } else gl.uniform4f(P.u.uTint, 1, 1, 1, 1);
     gl.uniform1f(P.u.uUnlit, mat && mat.unlit ? 1 : 0);
+    if (P.u.uEdgeFade) gl.uniform1f(P.u.uEdgeFade, mat && mat.edgeSoft ? 1 : 0);
     if (P.u.uEmissive) {
       const e = mat && mat.emissive;
       gl.uniform3f(P.u.uEmissive, e ? e[0] : 0, e ? e[1] : 0, e ? e[2] : 0);
@@ -1209,6 +1253,49 @@ export class Renderer {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.idx);
     gl.drawElements(gl.TRIANGLES, g.count, g.type, 0);
     this.stats.draws++;
+  }
+
+  // Characters move, the static shadow map is baked once, so their depth is
+  // stamped into the same baked map every frame without clearing it. Runs
+  // between the opaque and blend passes where the GLB program state is safe
+  // to switch away from and back (uniforms live on the program object).
+  drawDynamicShadows(n, withProc) {
+    if ((!n && !withProc) || !this.shadowOk || !this.shadowBaked || !this.shadowFbo) return;
+    const gl = this.gl;
+    // WebGL forbids sampling a texture that is bound as the render target:
+    // park the shadow sampler on an empty unit for the duration of the pass.
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFbo);
+    gl.viewport(0, 0, this.shadowSize, this.shadowSize);
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(2.0, 4.0);
+    const P = this.pShadow;
+    gl.useProgram(P.prog);
+    gl.uniformMatrix4fv(P.u.uLightVP, false, this.mLightVP);
+    for (let i = 0; i < n; i++) {
+      const rec = this.dynMats[i];
+      if (!rec || !rec.g) continue;
+      gl.uniformMatrix4fv(P.u.uM, false, rec.m);
+      this.bindAttrs(set => { set(P.a.aPos, rec.g.pos, 3); });
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rec.g.idx);
+      gl.drawElements(gl.TRIANGLES, rec.g.count, rec.g.type, 0);
+      this.stats.draws++;
+    }
+    if (withProc && this.gpuPlayers && this.gpuPlayers.count) {
+      gl.uniformMatrix4fv(P.u.uM, false, this.mIdent);
+      this.bindAttrs(set => { set(P.a.aPos, this.gpuPlayers.pos, 3); });
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpuPlayers.idx);
+      gl.drawElements(gl.TRIANGLES, this.gpuPlayers.count, gl.UNSIGNED_SHORT, 0);
+      this.stats.draws++;
+    }
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   glErr(phase) {
@@ -1391,6 +1478,14 @@ export class Renderer {
       const anchor = this.sp(p.rx != null ? p.rx : p.x, topH, p.ry != null ? p.ry : p.y);
       if (!anchor) continue;
       const x = anchor.x, ty = anchor.y;
+      // Far players fade their tag so the zoomed-out overview isn't buried
+      // under a solid wall of names.
+      const fx = (p.rx != null ? p.rx : p.x) - this.eye.x;
+      const fy = topH - this.eye.y;
+      const fz = (p.ry != null ? p.ry : p.y) - this.eye.z;
+      const far = Math.sqrt(fx * fx + fy * fy + fz * fz);
+      const fade = far > 750 ? Math.max(0.25, 1 - (far - 750) / 1700) : 1;
+      if (fade < 1) o.globalAlpha = fade;
       o.font = '13px BrewPixel, Arial, sans-serif';
       o.textAlign = 'center';
       o.textBaseline = 'middle';
@@ -1406,6 +1501,7 @@ export class Renderer {
         o.fillStyle = '#e9c877';
         o.fillText('PLAYING', x, ty - 17);
       }
+      if (fade < 1) o.globalAlpha = 1;
 
       if (p.chat && now - p.chat.at < 6500) {
         this.bubble(o, x, ty - 26, p.chat.text, '#0b1f18', '#e7e0cf', 200);
@@ -1440,11 +1536,11 @@ export class Renderer {
 
     const cx = this.vw / 2, cy = this.vh / 2;
     const vg = o.createRadialGradient(
-      cx, cy, Math.min(this.vw, this.vh) * 0.35,
-      cx, cy, Math.max(this.vw, this.vh) * 0.75
+      cx, cy, Math.min(this.vw, this.vh) * 0.42,
+      cx, cy, Math.max(this.vw, this.vh) * 0.82
     );
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,.55)');
+    vg.addColorStop(1, 'rgba(0,0,0,.40)');
     o.fillStyle = vg;
     o.fillRect(0, 0, this.vw, this.vh);
   }

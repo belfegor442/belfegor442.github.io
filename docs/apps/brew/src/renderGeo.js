@@ -176,6 +176,7 @@ uniform vec4 uTint;
 uniform float uUnlit;
 uniform float uHasNrm;
 uniform float uShadowOn;
+uniform float uEdgeFade;
 uniform vec2 uShadowTexel;
 uniform vec2 uFogRange;
 uniform vec3 uCam;
@@ -225,25 +226,29 @@ void main() {
     lit = clamp(mix(vec3(l), lit, 1.15), 0.0, 1.0);
     lit += albedo * uEmissive;
   } else {
+    float ndl = max(dot(N, -uSunDir), 0.0);
     float shadow = 1.0;
     if (uShadowOn > 0.5) {
       vec4 sc = uShadowMat * vec4(vW, 1.0);
       vec3 s = sc.xyz / sc.w;
       s = s * 0.5 + 0.5;
       if (s.z > 0.0 && s.z < 1.0 && s.x > 0.0 && s.x < 1.0 && s.y > 0.0 && s.y < 1.0) {
-        float bias = 0.0022;
+        float bias = 0.0012 + 0.0028 * (1.0 - ndl);
+        // Rotate the 3x3 kernel per pixel so the blocky NEAREST staircase
+        // dissolves into a soft penumbra instead of hard texel steps.
+        float rot = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+        float cr = cos(rot), sr = sin(rot);
         float sum = 0.0;
         for (int i = -1; i <= 1; i++) {
           for (int j = -1; j <= 1; j++) {
-            vec2 o = vec2(float(i), float(j)) * uShadowTexel;
+            vec2 o = vec2(cr * float(i) - sr * float(j), sr * float(i) + cr * float(j)) * (uShadowTexel * 2.0);
             float dep = texture2D(uShadowTex, s.xy + o).r;
-            sum += (s.z - bias > dep) ? 0.15 : 1.0;
+            sum += (s.z - bias > dep) ? 0.12 : 1.0;
           }
         }
         shadow = sum / 9.0;
       }
     }
-    float ndl = max(dot(N, -uSunDir), 0.0);
     vec3 diff = uSunColor * ndl * shadow;
     vec3 spec = vec3(0.0);
     float gloss = mix(140.0, 6.0, rough);
@@ -272,7 +277,16 @@ void main() {
   float fog = smoothstep(uFogRange.x, uFogRange.y, length(vW - uCam));
   vec3 outc = mix(lit, uFogColor, fog);
   if (uUnlit < 0.5) outc = aces(outc);
-  gl_FragColor = vec4(outc, tex.a);
+  float alpha = tex.a;
+  if (uEdgeFade > 0.5) {
+    // Volumetric shells (light beams): soften the hard geometric silhouette
+    // when the shell is seen edge-on, but never below 55% alpha or the cone
+    // disappears at the camera angles used in play (measured nv sits at
+    // 0.1-0.5 across the visible shell, not near 1).
+    float nv = abs(dot(N, V));
+    alpha *= 0.55 + 0.45 * smoothstep(0.0, 0.5, nv);
+  }
+  gl_FragColor = vec4(outc, alpha);
 }`;
 
 export const VS_SHADOW = `
