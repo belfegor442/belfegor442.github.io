@@ -16,9 +16,9 @@ export const TARGET_H = 42;
 
 export const SKINS = [
   { id: 'classic', name: 'CLASSIC', url: './Assets/gbl/Player/steve.skin.glb' },
-  { id: 'homer', name: 'HOMER', url: './Assets/player/homerball.glb', height: 34 },
-  { id: 'franco', name: 'FRANCO', url: './Assets/player/franco.glb' },
-  { id: 'yahu', name: 'BIG YAHU', url: './Assets/player/big.yahu.glb', height: 47 }
+  { id: 'homer', name: 'HOMER', url: '../../Apps/Brew/Assets/player/homerball.glb', height: 34 },
+  { id: 'franco', name: 'FRANCO', url: '../../Apps/Brew/Assets/player/franco.glb' },
+  { id: 'yahu', name: 'BIG YAHU', url: '../../Apps/Brew/Assets/player/big.yahu.glb', height: 47 }
 ];
 
 export const SKIN_BY_ID = new Map(SKINS.map(s => [s.id, s]));

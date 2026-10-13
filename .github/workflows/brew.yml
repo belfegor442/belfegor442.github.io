@@ -4,18 +4,26 @@ on:
   push:
     paths:
       - "docs/Apps/Brew/**"
+      - "docs/apps/brew/**"
       - ".github/workflows/brew.yml"
   pull_request:
     paths:
       - "docs/Apps/Brew/**"
+      - "docs/apps/brew/**"
       - ".github/workflows/brew.yml"
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        brew-directory:
+          - docs/Apps/Brew
+          - docs/apps/brew
     defaults:
       run:
-        working-directory: docs/Apps/Brew
+        working-directory: ${{ matrix.brew-directory }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
