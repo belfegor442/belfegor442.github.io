@@ -5,7 +5,13 @@ import {
   newMesh, newTMesh, pushBox, pushCyl, pushEllip, pushDisc,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture, signTexture
 } from './renderGeo.js';
-import { loadGLB, buildNav, stripCeiling, genNormals } from './glb.js';
+import { loadGLB, buildNav } from './glb.js';
+
+// stripCeiling/genNormals were dropped from glb.js in the build-21 map rework.
+// They only ever ran in the lobby.glb index branch below, which play mode
+// skips entirely (clientMode), so stubs keep that historical code compiling.
+const stripCeiling = () => 0;
+const genNormals = () => {};
 
 const PALETTE = [
   { body: '#c2373f', trim: '#f0d0a0', hair: '#241a14' },
