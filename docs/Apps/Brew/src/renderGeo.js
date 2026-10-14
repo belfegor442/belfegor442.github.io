@@ -276,7 +276,7 @@ void main() {
   }
   float fog = smoothstep(uFogRange.x, uFogRange.y, length(vW - uCam));
   vec3 outc = mix(lit, uFogColor, fog);
-  if (uUnlit < 0.5) outc = aces(outc);
+  outc = aces(outc);
   float alpha = tex.a;
   if (uEdgeFade > 0.5) {
     // Volumetric shells (light beams): soften the hard geometric silhouette
@@ -552,3 +552,61 @@ export function signTexture(label) {
   g.fillText(label, 256, 34);
   return c;
 }
+
+/* ---------------------------------------------------------- post-processing */
+
+// Fullscreen triangle (no VBO needed - gl_VertexID trick doesn't exist in
+// WebGL1, so we upload a tiny static quad once and draw with it).
+export const VS_POST = `
+attribute vec2 aPos;
+varying vec2 vUV;
+void main() {
+  vUV = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+
+// Bright-pass: keep only pixels whose luminance exceeds a soft-knee threshold.
+// The knee avoids a hard cutoff ring around neon cores.
+export const FS_BRIGHT = `
+precision mediump float;
+varying vec2 vUV;
+uniform sampler2D uScene;
+uniform float uThreshold;
+void main() {
+  vec3 c = texture2D(uScene, vUV).rgb;
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  float k = smoothstep(uThreshold, uThreshold + 0.25, l);
+  gl_FragColor = vec4(c * k, 1.0);
+}`;
+
+// Separable 9-tap gaussian. uDir is (1/w,0) or (0,1/h) times the spread.
+export const FS_BLUR = `
+precision mediump float;
+varying vec2 vUV;
+uniform sampler2D uTex;
+uniform vec2 uDir;
+void main() {
+  vec3 s = texture2D(uTex, vUV).rgb * 0.2270270270;
+  s += texture2D(uTex, vUV + uDir * 1.3846153846).rgb * 0.3162162162;
+  s += texture2D(uTex, vUV - uDir * 1.3846153846).rgb * 0.3162162162;
+  s += texture2D(uTex, vUV + uDir * 3.2307692308).rgb * 0.0702702703;
+  s += texture2D(uTex, vUV - uDir * 3.2307692308).rgb * 0.0702702703;
+  gl_FragColor = vec4(s, 1.0);
+}`;
+
+// Composite: scene + bloom * strength, with a light filmic curve so the
+// additive glow never blows out to pure white.
+export const FS_COMPOSITE = `
+precision mediump float;
+varying vec2 vUV;
+uniform sampler2D uScene;
+uniform sampler2D uBloom;
+uniform float uStrength;
+void main() {
+  vec3 scene = texture2D(uScene, vUV).rgb;
+  vec3 bloom = texture2D(uBloom, vUV).rgb;
+  vec3 c = scene + bloom * uStrength;
+  // Soft-clip only the bloom contribution so mid-tones stay untouched.
+  c = c / (1.0 + max(vec3(0.0), c - 1.0) * 0.6);
+  gl_FragColor = vec4(c, 1.0);
+}`;

@@ -2,6 +2,7 @@ import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav } from './world.js';
 import {
   C, mul, perspective, lookAt, trs, ortho,
   VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB, FS_GLB_SIMPLE, VS_SHADOW, FS_SHADOW,
+  VS_POST, FS_BRIGHT, FS_BLUR, FS_COMPOSITE,
   newMesh, newTMesh, pushBox, pushEllip,
   pushRing, pushQuadLit, pushT, buildFloor, dotTexture
 } from './renderGeo.js';
@@ -99,6 +100,7 @@ export class Renderer {
       this.fctx = canvas.getContext('2d');
     }
     this.lights = false;
+    this.lightMix = 0;
     this.time = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.cam = { x: MAP.w / 2, z: MAP.h / 2 };
@@ -387,6 +389,7 @@ export class Renderer {
       fog: [0.040, 0.034, 0.038], fogRange: [1150, 3300]
     };
     this.initShadowMap();
+    this.initPost();
     if (this.useImportedWorld) this.loadGLBAssets();
   }
 
@@ -440,6 +443,138 @@ export class Renderer {
     }
   }
 
+  // Bloom post: scene -> half-res bright-pass -> 2x separable blur -> composite.
+  // Runs only when the GL context and framebuffers are healthy; any failure
+  // leaves postOk=false and draw() falls back to direct-to-screen rendering.
+  initPost() {
+    const gl = this.gl;
+    if (!gl) { this.postOk = false; return; }
+    try {
+      this.pBright = this.makeProgram(VS_POST, FS_BRIGHT, ['aPos'], ['uScene', 'uThreshold']);
+      this.pBlur = this.makeProgram(VS_POST, FS_BLUR, ['aPos'], ['uTex', 'uDir']);
+      this.pComp = this.makeProgram(VS_POST, FS_COMPOSITE, ['aPos'], ['uScene', 'uBloom', 'uStrength']);
+      if (!this.pBright.ok || !this.pBlur.ok || !this.pComp.ok) throw new Error('post shader link failed');
+      // Fullscreen triangle-strip quad, uploaded once.
+      this.postVbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.postVbo);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      this.postOk = true;
+      this.postAlloced = false;
+    } catch (e) {
+      this.postOk = false;
+      console.warn('[gl] post pipeline unavailable:', e && e.message);
+    }
+  }
+
+  allocPost(w, h) {
+    const gl = this.gl;
+    if (!this.postOk) return;
+    const bw = Math.max(1, w >> 1), bh = Math.max(1, h >> 1);
+    // Reuse existing FBOs if the size matches (resize storms would otherwise
+    // thrash GPU memory every window drag).
+    if (this.postAlloced && this._postW === w && this._postH === h) return;
+    this._postW = w; this._postH = h;
+    const del = (f, t) => { if (f) gl.deleteFramebuffer(f); if (t) gl.deleteTexture(t); };
+    del(this.sceneFbo, this.sceneTex);
+    del(this.brightFbo, this.brightTex);
+    del(this.blurFbo, this.blurTex);
+    if (this.sceneDepth) { gl.deleteRenderbuffer(this.sceneDepth); this.sceneDepth = null; }
+    const mkTex = (tw, th) => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    };
+    const mkFbo = (tex) => {
+      const f = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      return f;
+    };
+    this.sceneTex = mkTex(w, h);
+    this.sceneFbo = mkFbo(this.sceneTex);
+    this.sceneDepth = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, this.sceneDepth);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.sceneDepth);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    this.brightTex = mkTex(bw, bh);
+    this.brightFbo = mkFbo(this.brightTex);
+    this.blurTex = mkTex(bw, bh);
+    this.blurFbo = mkFbo(this.blurTex);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!ok) {
+      this.postOk = false;
+      console.warn('[gl] scene FBO incomplete, bloom disabled');
+      return;
+    }
+    this.postAlloced = true;
+  }
+
+  drawPost() {
+    const gl = this.gl;
+    const w = this.canvas.width, h = this.canvas.height;
+    const bw = Math.max(1, w >> 1), bh = Math.max(1, h >> 1);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.postVbo);
+    const bindQuad = (P) => {
+      gl.enableVertexAttribArray(P.a.aPos);
+      gl.vertexAttribPointer(P.a.aPos, 2, gl.FLOAT, false, 0, 0);
+    };
+    // Bright-pass at half res.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.brightFbo);
+    gl.viewport(0, 0, bw, bh);
+    gl.useProgram(this.pBright.prog);
+    bindQuad(this.pBright);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+    gl.uniform1i(this.pBright.u.uScene, 0);
+    gl.uniform1f(this.pBright.u.uThreshold, 0.62);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // Two separable blur passes (H then V) for a wide, soft halo.
+    const blur = (srcTex, dstFbo, dx, dy) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dstFbo);
+      gl.viewport(0, 0, bw, bh);
+      gl.useProgram(this.pBlur.prog);
+      bindQuad(this.pBlur);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.uniform1i(this.pBlur.u.uTex, 0);
+      gl.uniform2f(this.pBlur.u.uDir, dx / bw, dy / bh);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+    blur(this.brightTex, this.blurFbo, 1.6, 0);
+    blur(this.blurTex, this.brightFbo, 0, 1.6);
+    // Second iteration widens the glow without a second FBO pair.
+    blur(this.brightTex, this.blurFbo, 3.2, 0);
+    blur(this.blurTex, this.brightFbo, 0, 3.2);
+    // Composite to screen.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(this.pComp.prog);
+    bindQuad(this.pComp);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTex);
+    gl.uniform1i(this.pComp.u.uScene, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.brightTex);
+    gl.uniform1i(this.pComp.u.uBloom, 1);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1f(this.pComp.u.uStrength, this.lights ? 0.35 : 0.55);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // Leave no stray enabled attrib array pointing at the quad: the next
+    // frame's bindAttrs only manages locations it knows about.
+    for (const P of [this.pBright, this.pBlur, this.pComp]) {
+      if (P.a.aPos >= 0) gl.disableVertexAttribArray(P.a.aPos);
+    }
+    this.glErr('post');
+  }
+
   renderShadowPass() {
     if (!this.shadowOk || !this.glbWorld || this.shadowBaked) return;
     const gl = this.gl;
@@ -471,7 +606,7 @@ export class Renderer {
       gl.drawElements(gl.TRIANGLES, g.count, g.type, 0);
     }
     gl.disable(gl.POLYGON_OFFSET_FILL);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._drawFbo || null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     // The sun and the world are both static (day/night only changes colors
     // and intensities, never sunDir or geometry), so the depth map is baked
@@ -483,7 +618,7 @@ export class Renderer {
     const P = this.pGLB;
     if (!P.u.uLightPos) return;
     const gl = this.gl;
-    const night = this.lights ? 1 : 1.95;
+    const night = 1 + 0.95 * (1 - this.lightMix);
     const sorted = LIGHTS.map(l => {
       const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
       return { l, d: dx * dx + dy * dy + dz * dz };
@@ -803,7 +938,10 @@ export class Renderer {
     this.overlay.height = this.canvas.height;
     this.overlay.style.width = this.vw + 'px';
     this.overlay.style.height = this.vh + 'px';
-    if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    if (this.gl) {
+      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      if (this.postOk) this.allocPost(this.canvas.width, this.canvas.height);
+    }
   }
 
   sp(x, y, z) {
@@ -874,7 +1012,29 @@ export class Renderer {
     if (!this.gl) { this.drawFallback(); return; }
 
     const gl = this.gl;
-    const def = this.lights ? this.litDef : this.nightDef;
+    // Ease day/night instead of snapping: lightMix rides 0 (night) .. 1 (day)
+    // and every lighting parameter lerps through it.
+    this.lightMix += ((this.lights ? 1 : 0) - this.lightMix) * Math.min(1, (dt || 0.016) * 3.2);
+    const lm = this.lightMix;
+    const def = {
+      amb: [
+        this.nightDef.amb[0] + (this.litDef.amb[0] - this.nightDef.amb[0]) * lm,
+        this.nightDef.amb[1] + (this.litDef.amb[1] - this.nightDef.amb[1]) * lm,
+        this.nightDef.amb[2] + (this.litDef.amb[2] - this.nightDef.amb[2]) * lm
+      ],
+      sun: [
+        this.nightDef.sun[0] + (this.litDef.sun[0] - this.nightDef.sun[0]) * lm,
+        this.nightDef.sun[1] + (this.litDef.sun[1] - this.nightDef.sun[1]) * lm,
+        this.nightDef.sun[2] + (this.litDef.sun[2] - this.nightDef.sun[2]) * lm
+      ],
+      sunDir: this.nightDef.sunDir,
+      fog: [
+        this.nightDef.fog[0] + (this.litDef.fog[0] - this.nightDef.fog[0]) * lm,
+        this.nightDef.fog[1] + (this.litDef.fog[1] - this.nightDef.fog[1]) * lm,
+        this.nightDef.fog[2] + (this.litDef.fog[2] - this.nightDef.fog[2]) * lm
+      ],
+      fogRange: this.nightDef.fogRange
+    };
     const aspect = this.canvas.width / Math.max(1, this.canvas.height);
     // Sprint opens the view slightly (eased in/out) for a sense of speed.
     this._sk += ((this.sprint ? 1 : 0) - this._sk) * Math.min(1, (dt || 0.016) * 7);
@@ -951,6 +1111,12 @@ export class Renderer {
     }
     mul(this.mVP, this.mProj, this.mView);
 
+    // When bloom is active the whole 3D pass renders into an offscreen FBO;
+    // drawPost() composites it back to the canvas after the blend pass.
+    const usePost = this.postOk;
+    if (usePost) this.allocPost(this.canvas.width, this.canvas.height);
+    this._drawFbo = usePost ? this.sceneFbo : null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._drawFbo);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(def.fog[0], def.fog[1], def.fog[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -1002,7 +1168,7 @@ export class Renderer {
       this.bindLit(this.gpuSw);
       gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
-      this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
+      this.setLitTint(0.34 + 0.66 * lm, 0.34 + 0.52 * lm, 0.38 + 0.04 * lm);
       this.bindLit(this.gpuLever);
       gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -1027,7 +1193,7 @@ export class Renderer {
       gl.drawElements(gl.TRIANGLES, this.gpuSw.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
 
-      this.setLitTint(this.lights ? 1.0 : 0.34, this.lights ? 0.86 : 0.34, this.lights ? 0.42 : 0.38);
+      this.setLitTint(0.34 + 0.66 * lm, 0.34 + 0.52 * lm, 0.38 + 0.04 * lm);
       this.bindLit(this.gpuLever);
       gl.drawElements(gl.TRIANGLES, this.gpuLever.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -1129,11 +1295,9 @@ export class Renderer {
       pushT(SH, [
         [x - rx, 2, z - rz], [x + rx, 2, z - rz], [x + rx, 2, z + rz], [x - rx, 2, z + rz]
       ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      if (!this.lights) {
-        pushT(GLM, [
-          [x - 74, 3, z - 74], [x + 74, 3, z - 74], [x + 74, 3, z + 74], [x - 74, 3, z + 74]
-        ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      }
+      pushT(GLM, [
+        [x - 74, 3, z - 74], [x + 74, 3, z - 74], [x + 74, 3, z + 74], [x - 74, 3, z + 74]
+      ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
     }
     for (const o of OBJECTS) {
       // Tables only: the glow marks the felts (drawn by the model now).
@@ -1169,8 +1333,8 @@ export class Renderer {
     if (GLM.idx.length) {
       this.fillTexMesh(this.gpuGlows, GLM, gl.DYNAMIC_DRAW);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      if (this.lights) this.setTexTint(1.0, 0.84, 0.55, 0.62);
-      else this.setTexTint(1.0, 0.76, 0.40, 0.55);
+      const ga = 0.55 + 0.07 * lm;
+      this.setTexTint(1.0, 0.76 + 0.08 * lm, 0.40 + 0.15 * lm, ga);
       this.bindTex(this.gpuGlows, this.texDot);
       gl.drawElements(gl.TRIANGLES, this.gpuGlows.count, gl.UNSIGNED_SHORT, 0);
       this.stats.draws++;
@@ -1180,6 +1344,7 @@ export class Renderer {
     gl.depthMask(true);
     gl.disable(gl.BLEND);
     this.glErr('blend');
+    if (usePost) this.drawPost();
     this.drawOverlay(list, me, activity);
   }
 
@@ -1291,7 +1456,7 @@ export class Renderer {
       this.stats.draws++;
     }
     gl.disable(gl.POLYGON_OFFSET_FILL);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this._drawFbo || null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
