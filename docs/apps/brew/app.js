@@ -171,7 +171,7 @@ function startHost() {
   net.host(room, will);
 }
 
-function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
+function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.classList.toggle('hidden', !on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
 
 function onHostReady() {
   const spawn = eject(SPAWNS[0].x, SPAWNS[0].y);

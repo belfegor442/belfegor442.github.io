@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-brew-build="33">
+<html lang="en" data-brew-build="34">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="BREW — a browser-based 2.5D multiplayer social arcade world by North Assembly.">
 <title>BREW — North Assembly</title>
 <link rel="icon" href="../../icon.jpg">
-<link rel="stylesheet" href="./style.css?v=33">
+<link rel="stylesheet" href="./style.css?v=34">
 </head>
 <body class="world">
 <canvas id="world"></canvas>
@@ -51,6 +51,7 @@
         </div>
       </div>
       <div class="chatbox">
+        <button id="chatCollapse" class="chat-collapse" type="button" title="Collapse chat" aria-label="Collapse chat">▾</button>
         <div id="chatLog" class="chatlog"></div>
         <div class="chatrow">
           <input id="chatInput" maxlength="140" placeholder="PROXIMITY CHAT — ENTER TO SEND">
@@ -83,7 +84,7 @@
     </div>
     <button id="helpClose" class="mini">CLOSE</button>
   </div>
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast"></div>
 </div>
 
 <div id="entry" class="entry">
@@ -109,6 +110,6 @@
 </div>
 
 <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-<script type="module" src="./app.js?v=33"></script>
+<script type="module" src="./app.js?v=34"></script>
 </body>
 </html>

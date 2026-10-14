@@ -30,6 +30,13 @@ export class UI {
       });
     });
     $('#chatSend').onclick = () => this.sendChat();
+    const chatCollapse = $('#chatCollapse');
+    if (chatCollapse) chatCollapse.onclick = () => {
+      const box = this.chatLog.closest('.chatbox');
+      const collapsed = box.classList.toggle('collapsed');
+      chatCollapse.textContent = collapsed ? '▴' : '▾';
+      chatCollapse.title = collapsed ? 'Expand chat' : 'Collapse chat';
+    };
     this.chatInput.addEventListener('keydown', e => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); this.sendChat(); }
@@ -160,6 +167,14 @@ export class UI {
     row.appendChild(document.createTextNode(text));
     this.chatLog.appendChild(row);
     while (this.chatLog.children.length > 40) this.chatLog.removeChild(this.chatLog.firstChild);
+    if (kind === 'other') {
+      const box = this.chatLog.closest('.chatbox');
+      if (box && box.classList.contains('collapsed')) {
+        box.classList.remove('collapsed');
+        const btn = $('#chatCollapse');
+        if (btn) { btn.textContent = '▾'; btn.title = 'Collapse chat'; }
+      }
+    }
     this.chatLog.scrollTop = this.chatLog.scrollHeight;
   }
 
@@ -196,8 +211,13 @@ export class UI {
   toast(text) {
     this.toastEl.textContent = text;
     this.toastEl.classList.remove('hidden');
+    requestAnimationFrame(() => this.toastEl.classList.add('show'));
     clearTimeout(this._toastT);
-    this._toastT = setTimeout(() => this.toastEl.classList.add('hidden'), 2600);
+    clearTimeout(this._toastT2);
+    this._toastT = setTimeout(() => {
+      this.toastEl.classList.remove('show');
+      this._toastT2 = setTimeout(() => this.toastEl.classList.add('hidden'), 300);
+    }, 2600);
   }
 
   renderPicker(list, cb) {

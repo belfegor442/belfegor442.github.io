@@ -18,6 +18,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07110c;color:var(--in
 .hidden{display:none!important}
 #world{position:fixed;inset:0;display:block;z-index:0}
 button{font:inherit;cursor:pointer;border-radius:0}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mini,.emotes button,.stakebar button,.skin-pick button,.chatrow button,.chat-collapse,.primary,.act-choices .chip,.field input,.chatrow input{
+  transition:background .18s ease,color .18s ease,border-color .18s ease,transform .08s ease,box-shadow .18s ease,opacity .18s ease
+}
+.roster,.skin-panel,.help-panel,.activity,.chatbox,.world-card,.prompt{transition:opacity .22s ease,transform .22s ease}
 .hud{position:fixed;inset:0;z-index:2;pointer-events:none}
 .hud>*{pointer-events:auto}
 
@@ -25,12 +30,12 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .hud-actions{display:flex;gap:8px}
 .mini{
   background:var(--panel);border:1px solid var(--line);color:var(--muted);
-  font-size:10px;font-weight:700;letter-spacing:.16em;padding:0 14px;height:40px
+  font-size:10px;font-weight:700;letter-spacing:.16em;padding:0 14px;height:40px;border-radius:3px
 }
 .mini:hover{background:var(--gold);border-color:var(--gold);color:#14100a}
 .world-card{
   display:flex;align-items:stretch;height:40px;background:var(--panel);
-  border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.5)
+  border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.5);border-radius:4px;overflow:hidden
 }
 .world-card>*{display:flex;align-items:center;padding:0 13px;border-left:1px solid var(--line);white-space:nowrap}
 .world-card>:first-child{border-left:0}
@@ -45,7 +50,8 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .roster{
   position:absolute;top:76px;right:16px;width:224px;background:var(--panel-2);
   border:1px solid var(--line);font-size:11px;max-height:30vh;overflow:auto;
-  box-shadow:0 10px 26px rgba(0,0,0,.45)
+  box-shadow:0 10px 26px rgba(0,0,0,.45);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)
 }
 .roster::before{
   content:'ON THE FLOOR';display:block;padding:9px 12px;border-bottom:1px solid var(--line);
@@ -64,8 +70,11 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .prompt{
   display:flex;align-items:center;gap:9px;height:38px;padding:0 14px;background:rgba(4,16,11,.95);
   border:1px solid var(--gold);font-size:11px;font-weight:700;letter-spacing:.16em;
-  box-shadow:0 8px 22px rgba(0,0,0,.5)
+  box-shadow:0 8px 22px rgba(0,0,0,.5);border-radius:4px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  animation:promptIn .16s ease both
 }
+@keyframes promptIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .prompt .key{
   display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;
   background:rgba(233,200,119,.14);border:1px solid var(--gold);color:var(--gold);
@@ -79,7 +88,7 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .emotes button,.stakebar button{
   background:var(--panel);border:1px solid var(--line);color:var(--muted);
   font-size:10px;font-weight:700;letter-spacing:.1em;padding:9px 10px;
-  box-shadow:0 2px 0 rgba(0,0,0,.55)
+  box-shadow:0 2px 0 rgba(0,0,0,.55);border-radius:4px
 }
 .emotes button:hover,.stakebar button:hover{color:var(--gold);border-color:var(--gold)}
 .emotes button:active,.stakebar button:active{transform:translateY(2px);box-shadow:none}
@@ -89,7 +98,7 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .skin-pick button{
   background:var(--panel);border:1px solid var(--line);color:var(--muted);
   font-size:10px;font-weight:700;letter-spacing:.12em;padding:10px 12px;
-  box-shadow:0 2px 0 rgba(0,0,0,.55)
+  box-shadow:0 2px 0 rgba(0,0,0,.55);border-radius:4px
 }
 .skin-pick button:hover{color:var(--gold);border-color:var(--gold)}
 .skin-pick button:active{transform:translateY(2px);box-shadow:none}
@@ -97,22 +106,33 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .skin-panel{
   position:absolute;top:74px;left:16px;min-width:220px;
   background:var(--panel-2);border:1px solid var(--line);
-  padding:10px 12px;box-shadow:0 10px 26px rgba(0,0,0,.5)
+  padding:10px 12px;box-shadow:0 10px 26px rgba(0,0,0,.5);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  animation:panelIn .18s ease both
 }
+@keyframes panelIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .skin-panel .k{display:block;color:var(--gold-dim);font-size:9px;font-weight:700;letter-spacing:.24em;margin-bottom:8px}
 
 .help-panel{
   position:absolute;top:74px;left:16px;min-width:300px;max-width:min(92vw,420px);
   background:var(--panel-2);border:1px solid var(--line);
-  padding:12px 14px;box-shadow:0 10px 26px rgba(0,0,0,.5)
+  padding:12px 14px;box-shadow:0 10px 26px rgba(0,0,0,.5);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  animation:panelIn .18s ease both
 }
 .help-panel .k{display:block;color:var(--gold-dim);font-size:9px;font-weight:700;letter-spacing:.24em;margin-bottom:10px}
 .help-grid{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:10px;letter-spacing:.08em;margin-bottom:12px}
 .help-grid b{color:var(--gold);font-weight:700;white-space:nowrap}
 .help-grid i{color:var(--muted);font-style:normal}
 
-.chatbox{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);padding:0;box-shadow:0 10px 26px rgba(0,0,0,.5)}
-.chatlog{height:108px;overflow:auto;font-size:12px;line-height:1.5;padding:10px 12px}
+.chatbox{flex:1;min-width:0;position:relative;background:var(--panel-2);border:1px solid var(--line);padding:0;box-shadow:0 10px 26px rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.chat-collapse{
+  position:absolute;top:6px;right:8px;z-index:1;background:transparent;border:1px solid var(--line);
+  color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.14em;padding:2px 8px;border-radius:3px
+}
+.chat-collapse:hover{color:var(--gold);border-color:var(--gold)}
+.chatlog{height:108px;overflow:auto;font-size:12px;line-height:1.5;padding:10px 12px;transition:height .2s ease,padding .2s ease}
+.chatbox.collapsed .chatlog{height:0;padding-top:0;padding-bottom:0;overflow:hidden}
 .chatlog .line{color:var(--muted);word-break:break-word;letter-spacing:.02em}
 .chatlog .line.me{color:var(--gold)}
 .chatlog .line.me::before{content:'» '}
@@ -129,7 +149,7 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .chatrow input::placeholder{color:rgba(169,191,177,.5);font-size:10px;letter-spacing:.16em}
 .chatrow button{
   background:var(--gold);color:#14100a;border:0;font-size:10px;font-weight:700;
-  letter-spacing:.18em;padding:0 18px
+  letter-spacing:.18em;padding:0 18px;border-radius:0 3px 3px 0
 }
 .chatrow button:hover{background:#f7de9a}
 
@@ -137,6 +157,8 @@ button{font:inherit;cursor:pointer;border-radius:0}
   position:absolute;right:16px;top:340px;min-width:280px;max-width:320px;
   background:rgba(4,16,11,.96);border:1px solid var(--gold);box-shadow:0 18px 44px rgba(0,0,0,.6);
   text-align:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  animation:panelIn .2s ease both;
   clip-path:polygon(0 14px,14px 0,calc(100% - 14px) 0,100% 14px,100% calc(100% - 14px),calc(100% - 14px) 100%,14px 100%,0 calc(100% - 14px))
 }
 .act-head{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--line);text-align:left}
@@ -173,17 +195,22 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .act-choices .chip:disabled{opacity:.4;cursor:default;filter:saturate(.3)}
 
 .toast{
-  position:absolute;top:74px;left:50%;transform:translateX(-50%);
-  background:var(--gold);color:#14100a;padding:9px 18px;
-  font-size:11px;font-weight:700;letter-spacing:.18em;box-shadow:0 6px 18px rgba(0,0,0,.5)
+  position:absolute;top:74px;left:50%;transform:translateX(-50%) translateY(-6px);
+  background:var(--gold);color:#14100a;padding:9px 18px;border-radius:4px;
+  font-size:11px;font-weight:700;letter-spacing:.18em;box-shadow:0 6px 18px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease,transform .25s ease
 }
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-.entry{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(2,8,6,.78)}
+.entry{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(2,8,6,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .entry-card{
   width:100%;max-width:540px;background:rgba(4,16,11,.97);border:1px solid var(--gold);
   box-shadow:0 30px 80px rgba(0,0,0,.7);
+  animation:entryIn .35s cubic-bezier(.2,.8,.25,1) both;
   clip-path:polygon(0 18px,18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px))
 }
+@keyframes entryIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 .sign{text-align:center}
 .sign .bulbs{
   display:block;height:8px;opacity:.85;
@@ -210,13 +237,13 @@ button{font:inherit;cursor:pointer;border-radius:0}
 .field span em{font-style:normal;color:var(--muted);opacity:.7;letter-spacing:.1em}
 .field input{
   width:100%;border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--ink);
-  padding:13px 14px;font:inherit;font-size:14px;letter-spacing:.2em;text-transform:uppercase;outline:none
+  padding:13px 14px;font:inherit;font-size:14px;letter-spacing:.2em;text-transform:uppercase;outline:none;border-radius:3px
 }
 .field input:focus{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
 .field input::placeholder{color:rgba(169,191,177,.4)}
 .primary{
   display:block;width:100%;margin-top:16px;padding:13px;border:0;border-bottom:4px solid #8a6a2a;
-  background:var(--gold);color:#14100a;font-family:var(--sign);font-size:26px;letter-spacing:.06em
+  background:var(--gold);color:#14100a;font-family:var(--sign);font-size:26px;letter-spacing:.06em;border-radius:3px
 }
 .primary:hover{background:#f7de9a}
 .primary:active{transform:translateY(2px);border-bottom-width:2px}
@@ -246,10 +273,13 @@ button{font:inherit;cursor:pointer;border-radius:0}
 }
 
 .touch-controls{position:fixed;inset:0;z-index:8;pointer-events:none;display:none}
-.touch-controls.visible{display:block}
 .joystick{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:118px;height:118px;border:2px solid rgba(233,200,119,.5);border-radius:50%;background:rgba(6,14,10,.4);pointer-events:auto;touch-action:none}
 .joystick span{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border-radius:50%;background:rgba(233,200,119,.85);box-shadow:0 5px 20px rgba(0,0,0,.4)}
 .touch-controls button{position:absolute;width:58px;height:58px;border-radius:6px;border:1px solid rgba(233,200,119,.6);background:rgba(6,14,10,.85);color:var(--gold);font-family:var(--sign);font-size:22px;pointer-events:auto;touch-action:manipulation;box-shadow:0 3px 0 rgba(0,0,0,.5)}
 #touchInteract{right:max(24px,env(safe-area-inset-right));bottom:105px}
 #touchGame{right:max(92px,calc(env(safe-area-inset-right) + 68px));bottom:35px}
-@media (max-width:800px),(pointer:coarse){.touch-controls.visible{display:block}.hud-top{padding:10px}.roster{display:none}.emotes{display:none}.chatbox{max-width:70vw}.entry-card{width:min(92vw,540px)}.entry h1{font-size:64px}}
+@media (max-width:800px),(pointer:coarse){.touch-controls.visible{display:block}.hud-top{padding:10px}.roster{display:none}.emotes{display:none}.chatbox{max-width:70vw}.hud-bottom{padding-bottom:150px}.entry-card{width:min(92vw,540px)}.entry h1{font-size:64px}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
