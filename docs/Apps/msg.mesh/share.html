@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080a0d">
+<title>share viewer — North Assembly</title>
+<link rel="icon" href="../../icon.jpg">
+<style>
+:root{--bg:#080a0d;--panel:#0d1117;--panel2:#11161d;--line:#202833;--text:#e9edf2;--muted:#7f8a98;--accent:#d9e1ea;--blue:#7fb2ff;--danger:#e16b6b;--ok:#72c989;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;
+  font:13px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+
+.topbar{height:54px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 18px;background:#090c10;letter-spacing:.08em;font-size:11px}
+.brand{color:#dfe6ef;text-decoration:none;font-weight:800}
+.slash{color:#414a55}
+.section{color:#778290}
+.conn{margin-left:auto;font-size:10px;letter-spacing:.12em;color:var(--muted);display:flex;gap:7px;align-items:center}
+.conn i{width:7px;height:7px;border-radius:50%;background:#777}
+.conn.live{color:#a9d5b0}.conn.live i{background:var(--ok)}
+.conn.fail{color:#e5a3a3}.conn.fail i{background:var(--danger)}
+
+.shell{max-width:920px;margin:0 auto;padding:18px}
+.notice{border:1px solid #3a3423;background:#17140c;color:#cbb478;border-radius:9px;padding:11px 13px;font-size:12px;margin-bottom:16px}
+.notice b{color:#e8d6a2;font-weight:700}
+.notice code,.inline{font:11px var(--mono);background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px}
+
+.searchbar{display:flex;gap:8px;margin-bottom:16px}
+.searchbar input{flex:1;min-width:0;height:40px;padding:0 12px;border:1px solid #27313d;background:#11161d;color:#e8edf3;border-radius:8px;outline:0;font:12px var(--mono)}
+.searchbar input::placeholder{color:#5f6a77;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.02em}
+.searchbar input:focus{border-color:#3d4c5e;box-shadow:0 0 0 3px rgba(127,178,255,.1)}
+.btn{height:40px;padding:0 16px;border:1px solid #303a46;background:#171d25;color:#e3e8ee;border-radius:8px;cursor:pointer;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.08em}
+.btn:hover{background:#1c232d}
+.btn.primary{border:1px solid #d7e0e9;background:#dce4ec;color:#0a0d11}
+.btn.primary:hover{background:#fff}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:17px;margin-bottom:14px}
+.title{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;color:#eef2f7}
+.sub{color:var(--muted);font-size:12px;font-family:var(--mono);word-break:break-all}
+.badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.badge{font:11px/1 var(--mono);padding:5px 8px;border:1px solid var(--line);background:var(--panel2);border-radius:6px;color:var(--muted);white-space:nowrap}
+.badge b{color:#dbe3ec;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:13px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#0a0e13}
+.stat .k{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#5e6a78}
+.stat .v{font:13px/1.35 var(--mono);margin-top:3px;color:#dbe3ec;word-break:break-all}
+
+h2{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#5e6a78;margin:4px 0 11px;font-weight:700}
+.msg{border:1px solid var(--line);border-left-width:3px;border-radius:9px;padding:12px 14px;margin-bottom:9px;background:var(--panel)}
+.msg.user{border-left-color:var(--blue)}
+.msg.assistant{border-left-color:#4d5867}
+.msg .who{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+.msg .who .t{font-weight:400;text-transform:none;letter-spacing:0;color:#596572;font-family:var(--mono);font-size:10px}
+.msg .body{margin-top:7px;white-space:pre-wrap;word-break:break-word;color:#dce2e9}
+.tool{font:11px var(--mono);color:#8e99a6;background:#10151b;border:1px solid #222c37;border-radius:6px;padding:7px 9px;margin-top:7px;white-space:pre-wrap;word-break:break-word}
+.empty{border:1px dashed #2a3440;border-radius:9px;padding:22px;text-align:center;color:var(--muted);background:var(--panel);font-size:12px}
+.empty b{color:#dbe3ec}
+.src{font:10px var(--mono);color:#4e5966;margin-top:8px;word-break:break-all}
+.err{border:1px solid #4a2b2b;background:#1a1010;color:#e5a3a3;border-radius:9px;padding:12px 14px;font-size:12px}
+.loading{color:var(--muted);padding:34px 0;text-align:center;font-size:12px;letter-spacing:.04em}
+
+.foot{max-width:920px;margin:0 auto;padding:6px 18px 30px;color:#4e5966;font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.foot a{color:#596572}
+@media(max-width:560px){.shell{padding:12px}.searchbar{flex-wrap:wrap}.btn{flex:1}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="../../">NORTH ASSEMBLY</a><span class="slash">/</span><span class="section">SHARE VIEWER</span>
+  <span id="conn" class="conn"><i></i> IDLE</span>
+</header>
+
+<main class="shell">
+  <div class="notice">
+    <b>opncd.ai/share/… is returning 500.</b> OpenCode is retiring session sharing — PRs <b>#55716</b> and
+    <b>#55718</b> (opened 2026-10-15) tear the viewer down, so every share link fails server-side with
+    <code>getData is not a function</code>. This page reads the share's data API directly instead, which still works.
+  </div>
+
+  <div class="searchbar">
+    <input id="id" type="text" spellcheck="false" autocomplete="off"
+           placeholder="Share URL or ID — e.g. https://opncd.ai/share/BSEakVtA">
+    <button id="go" class="btn primary">OPEN</button>
+    <button id="retry" class="btn">RELOAD</button>
+  </div>
+
+  <div id="out"><div class="loading">Loading…</div></div>
+</main>
+
+<div class="foot">
+  <span>Reads any <span class="inline">opncd.ai</span> share. Self-contained — no build step, no dependencies.</span>
+  <span><a href="./">← msg.mesh</a></span>
+</div>
+
+<script id="fallback" type="application/json">
+[{"type":"session","data":{"id":"ses_f5648c28dffeWDzi65BSEakVtA","slug":"quiet-engine","projectID":"3c2cdb4d290212fa3ac48a303130243a8f59e8d3","directory":"C:\\Users\\orimu\\Desktop\\msg.term","path":"","title":"Refactorización completa de MSG.TERM C++20","agent":"build","model":{"id":"mimo-v2.6-flash-free","providerID":"opencode","variant":"default"},"version":"1.18.31","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":22911682,"output":1611313,"reasoning":1792774,"cache":{"read":399421120,"write":0}},"share":{"url":"https://opncd.ai/share/BSEakVtA"},"time":{"created":1789553753458,"updated":1792072889659}}}]
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var $id = document.getElementById("id");
+  var $out = document.getElementById("out");
+  var $conn = document.getElementById("conn");
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function num(n) {
+    if (typeof n !== "number" || !isFinite(n)) return "—";
+    return n.toLocaleString("en-US");
+  }
+  function bytes(n) {
+    if (typeof n !== "number") return "—";
+    var u = ["B", "KB", "MB", "GB", "TB"], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)) + " " + u[i];
+  }
+  function when(ms) {
+    if (typeof ms !== "number") return "—";
+    return new Date(ms).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  }
+  function ago(ms) {
+    if (typeof ms !== "number") return "";
+    var m = Math.round((Date.now() - ms) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return m + "m ago";
+    var h = Math.round(m / 60);
+    if (h < 24) return h + "h ago";
+    return Math.round(h / 24) + "d ago";
+  }
+  function setConn(cls, text) {
+    $conn.className = "conn " + cls;
+    $conn.innerHTML = "<i></i> " + esc(text);
+  }
+
+  // ---- normalise both backend shapes into one model ----
+
+  function fromV2(list) {
+    var session = null, out = [], byMessage = {}, models = [], diffs = [];
+    list.forEach(function (item) {
+      var d = item.data;
+      if (item.type === "session") session = d;
+      if (item.type === "messages") (d.messages || []).forEach(function (m) { out.push(m); });
+      if (item.type === "message") out.push(d);
+      if (item.type === "part") (byMessage[d.messageID] = byMessage[d.messageID] || []).push(d);
+      if (item.type === "model") models = d;
+      if (item.type === "session_diff") diffs = d;
+    });
+    out.forEach(function (m) {
+      if ((!m.content || !m.content.length) && byMessage[m.id]) {
+        m.content = byMessage[m.id].map(function (p) {
+          if (p.type === "text") return { type: "text", text: p.text, synthetic: p.synthetic };
+          if (p.type === "tool") return { type: "tool", name: p.tool, state: p.state };
+          if (p.type === "reasoning") return { type: "reasoning", text: p.text };
+          if (p.type === "file") return { type: "file", url: p.url, filename: p.filename };
+          return { type: p.type };
+        });
+      }
+    });
+    return { session: session, messages: out, models: models, diffs: diffs };
+  }
+
+  function fromV1(payload) {
+    var messages = Object.keys(payload.messages || {}).map(function (k) {
+      var m = payload.messages[k];
+      var content = (m.parts || []).map(function (p) {
+        if (p.type === "text") return { type: "text", text: p.text, synthetic: p.synthetic };
+        if (p.type === "tool") return { type: "tool", name: p.tool, state: p.state };
+        if (p.type === "reasoning") return { type: "reasoning", text: p.text };
+        if (p.type === "file") return { type: "file", url: p.url, filename: p.filename };
+        return { type: p.type };
+      });
+      return {
+        id: m.id,
+        role: m.role || (m.type === "user" ? "user" : "assistant"),
+        time: m.time,
+        agent: m.agent,
+        modelID: m.modelID || (m.model && m.model.id),
+        content: content
+      };
+    });
+    messages.sort(function (a, b) {
+      return ((a.time && a.time.created) || 0) - ((b.time && b.time.created) || 0);
+    });
+    return { session: payload.info || null, messages: messages, models: [], diffs: [] };
+  }
+
+  // ---- fetching: V2 enterprise, then V1 SyncServer, then embedded ----
+
+  function get(url) {
+    return fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); });
+  }
+
+  function load(id) {
+    var v2 = "https://opncd.ai/api/share/" + encodeURIComponent(id) + "/data?cb=" + Date.now();
+    var v1 = "https://api.opencode.ai/share_data?id=" + encodeURIComponent(id) + "&cb=" + Date.now();
+
+    return get(v2)
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        var p = JSON.parse(r.text);
+        if (!Array.isArray(p) || !p.length) throw new Error("empty");
+        setConn("live", "LIVE");
+        return { model: fromV2(p), source: v2, status: r.status };
+      })
+      .catch(function () {
+        return get(v1).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          var p = JSON.parse(r.text);
+          if (!p.info && !(p.messages && Object.keys(p.messages).length)) throw new Error("empty");
+          setConn("live", "LIVE · V1");
+          return { model: fromV1(p), source: v1, status: r.status };
+        });
+      })
+      .catch(function (err) {
+        var doc = JSON.parse(document.getElementById("fallback").textContent);
+        var cached = fromV2(doc);
+        if (!cached.session || cached.session.id.slice(-8) !== id) {
+          var e = new Error(err && err.message ? err.message : "not found");
+          e.notFound = id;
+          setConn("fail", "NOT FOUND");
+          throw e;
+        }
+        setConn("fail", "CACHED");
+        return { model: cached, source: "embedded snapshot", status: 0, offline: true };
+      });
+  }
+
+  // ---- rendering ----
+
+  function badge(label, value) {
+    if (value === undefined || value === null || value === "") return "";
+    return '<span class="badge">' + esc(label) + " <b>" + esc(value) + "</b></span>";
+  }
+  function stat(k, v) {
+    return '<div class="stat"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + "</div></div>";
+  }
+
+  function contentHTML(c) {
+    if (!c) return "";
+    if (c.type === "text" || c.type === "reasoning") {
+      if (c.synthetic) return "";
+      return '<div class="body">' + esc(c.text) + "</div>";
+    }
+    if (c.type === "file") {
+      return '<div class="tool">attachment · ' + esc(c.filename || c.name || String(c.url || "").slice(0, 60)) + "</div>";
+    }
+    if (c.type === "tool") {
+      var st = c.state || {};
+      var head = esc(c.name || "tool") + "  ·  " + esc(st.status || "?");
+      var body = "";
+      if (st.status === "completed" && st.content && st.content[0] && st.content[0].text) {
+        body = String(st.content[0].text).slice(0, 1200);
+      } else if (st.error && st.error.message) {
+        body = st.error.message;
+      } else if (st.input) {
+        try { body = JSON.stringify(st.input).slice(0, 400); } catch (e) { body = ""; }
+      }
+      return '<div class="tool">' + head + (body ? "\n" + esc(body) : "") + "</div>";
+    }
+    if (c.type === "tool_result") return '<div class="tool">' + esc(String(c.content || "").slice(0, 800)) + "</div>";
+    return "";
+  }
+
+  function render(id, res) {
+    var s = res.model.session;
+    var msgs = res.model.messages;
+    var html = "";
+
+    if (res.offline) {
+      html += '<div class="err">Both backends were unreachable (offline, or blocked by CORS), so this is the snapshot cached at build time.</div><br>';
+    }
+
+    if (!s) {
+      $out.innerHTML = html + '<div class="empty">No session record in share <b>' + esc(id) + '</b>.<div class="src">source: ' + esc(res.source) + "</div></div>";
+      return;
+    }
+
+    var t = s.tokens || {};
+    var cache = t.cache || {};
+
+    html += '<div class="card">';
+    html += '<div class="title">' + esc(s.title || s.slug || id) + "</div>";
+    html += '<div class="sub">' + esc(s.id) + (s.directory ? " · " + esc(s.directory) : "") + "</div>";
+    html += '<div class="badges">';
+    html += badge("agent", s.agent);
+    html += badge("model", s.model && (s.model.providerID ? s.model.providerID + "/" + s.model.id : s.model.id));
+    html += badge("version", s.version);
+    html += badge("slug", s.slug);
+    html += badge("cost", typeof s.cost === "number" ? "$" + s.cost.toFixed(4) : null);
+    html += "</div>";
+    html += '<div class="grid">';
+    html += stat("tokens in", num(t.input));
+    html += stat("tokens out", num(t.output));
+    html += stat("reasoning", num(t.reasoning));
+    html += stat("cache read", bytes(cache.read));
+    html += stat("created", when(s.time && s.time.created));
+    html += stat("updated", when(s.time && s.time.updated) + (s.time && s.time.updated ? "  (" + ago(s.time.updated) + ")" : ""));
+    html += "</div></div>";
+
+    html += "<h2>Conversation · " + msgs.length + " message" + (msgs.length === 1 ? "" : "s") + "</h2>";
+
+    if (!msgs.length) {
+      html += '<div class="empty">';
+      html += "<b>No message transcript in this share.</b><br>";
+      html += "Only the session record was ever synced — there are no <span class=\"inline\">messages</span>, ";
+      html += "<span class=\"inline\">part</span> or <span class=\"inline\">session_diff</span> records in the snapshot, and the V1 sync server ";
+      html += "returns <span class=\"inline\">{\"messages\":{}}</span> for this ID. The conversation was never uploaded, so it cannot be recovered from the share.";
+      html += '<div class="src">source: ' + esc(res.source) + (res.status ? "  ·  HTTP " + res.status : "") + "</div>";
+      html += "</div>";
+    } else {
+      msgs.forEach(function (m) {
+        var role = m.role || m.type || "assistant";
+        var body = "";
+        if (m.content && Array.isArray(m.content)) {
+          m.content.forEach(function (c) { body += contentHTML(c); });
+        } else if (m.content) {
+          body = '<div class="body">' + esc(m.content) + "</div>";
+        } else if (m.text) {
+          body = '<div class="body">' + esc(m.text) + "</div>";
+        }
+        html += '<div class="msg ' + esc(role) + '">';
+        html += '<div class="who"><span>' + esc(role);
+        if (m.agent) html += " · " + esc(m.agent);
+        if (m.modelID) html += " · " + esc(m.modelID);
+        html += '</span><span class="t">' + esc(m.time && m.time.created ? when(m.time.created) : "") + "</span></div>";
+        html += body || '<div class="body" style="color:#596572">(no content)</div>';
+        html += "</div>";
+      });
+      html += '<div class="src">source: ' + esc(res.source) + (res.status ? "  ·  HTTP " + res.status : "") + "</div>";
+    }
+
+    $out.innerHTML = html;
+  }
+
+  function run() {
+    var raw = ($id.value || "BSEakVtA").trim();
+    var id = raw;
+    if (/^https?:/i.test(raw)) {
+      var m = raw.match(/\/(?:share|s)\/([^\/\?#]+)/);
+      if (m) id = m[1];
+    } else {
+      var t = raw.match(/([A-Za-z0-9_-]{4,})\s*$/);
+      if (t) id = t[1];
+    }
+    $id.value = id;
+    try { localStorage.setItem("shareid", id); } catch (e) {}
+
+    setConn("", "LOADING");
+    $out.innerHTML = '<div class="loading">Loading share ' + esc(id) + "…</div>";
+    load(id)
+      .then(function (res) { render(id, res); })
+      .catch(function (e) {
+        $out.innerHTML = '<div class="err">Failed: <span class="inline">' + esc(e && e.message) + "</span></div>";
+      });
+  }
+
+  document.getElementById("go").onclick = run;
+  document.getElementById("retry").onclick = run;
+  $id.addEventListener("keydown", function (e) { if (e.key === "Enter") run(); });
+
+  try { $id.value = localStorage.getItem("shareid") || "https://opncd.ai/share/BSEakVtA"; }
+  catch (e) { $id.value = "https://opncd.ai/share/BSEakVtA"; }
+
+  run();
+})();
+</script>
+</body>
+</html>
