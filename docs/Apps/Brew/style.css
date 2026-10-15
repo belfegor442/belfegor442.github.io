@@ -167,8 +167,62 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 .act-head .act-table{margin-left:auto;font-size:10px;letter-spacing:.14em;color:var(--muted);border:1px solid var(--line);padding:3px 7px}
 .act-head .act-stake{font-size:10px;letter-spacing:.12em;color:var(--ink);font-weight:700}
 .act-result{
-  font-family:var(--sign);font-size:46px;letter-spacing:.02em;color:var(--gold);
-  text-shadow:3px 3px 0 rgba(0,0,0,.7);margin:10px 0 2px;line-height:1
+  font-family:var(--sign);font-size:38px;letter-spacing:.02em;color:var(--gold);
+  text-shadow:3px 3px 0 rgba(0,0,0,.7);margin:10px 0 2px;line-height:1;text-align:center
+}
+.act-result.win{
+  color:#5fd68a;
+  text-shadow:0 0 22px rgba(95,214,138,.6),0 0 44px rgba(95,214,138,.25),3px 3px 0 rgba(0,0,0,.7);
+  animation:winPop .5s cubic-bezier(.2,1.6,.4,1) both
+}
+.act-result.lose{
+  color:#e05a5a;
+  text-shadow:3px 3px 0 rgba(0,0,0,.7);
+  animation:loseShake .42s ease both
+}
+.act-result.push{color:var(--muted);animation:winPop .3s ease both}
+.act-outcome{
+  text-align:center;font-size:13px;font-weight:700;letter-spacing:.22em;margin:2px 0 4px
+}
+.act-outcome.win{color:#5fd68a;text-shadow:0 0 12px rgba(95,214,138,.5)}
+.act-outcome.lose{color:#e05a5a}
+.act-outcome.push{color:var(--muted)}
+.act-reveal{
+  font-family:var(--sign);font-size:34px;letter-spacing:.1em;color:var(--gold);
+  padding:16px 12px;min-height:56px;text-align:center;
+  background:rgba(0,0,0,.4);border:1px dashed rgba(233,200,119,.35);margin:10px 12px 4px;
+  text-shadow:2px 2px 0 rgba(0,0,0,.6);
+  animation:revealPulse .45s ease-in-out infinite alternate
+}
+.act-deltas{padding-top:4px!important}
+.act-deltas .pos{color:#5fd68a;font-weight:700}
+.act-deltas .neg{color:#e05a5a;font-weight:700}
+.act-deltas .zero{color:var(--muted)}
+.act-wait{text-align:center;font-size:12px;color:var(--muted);letter-spacing:.08em;padding:12px}
+.act-wait b{color:var(--gold)}
+.act-wait .dots i{animation:dotBlink 1.2s infinite;color:var(--gold);font-style:normal}
+.act-wait .dots i:nth-child(2){animation-delay:.2s}
+.act-wait .dots i:nth-child(3){animation-delay:.4s}
+.act-confetti{position:absolute;pointer-events:none;z-index:5}
+@keyframes winPop{
+  0%{transform:scale(.4);opacity:0}
+  60%{transform:scale(1.12);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes loseShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-7px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(3px)}
+}
+@keyframes revealPulse{
+  from{opacity:.65}
+  to{opacity:1}
+}
+@keyframes dotBlink{
+  0%,80%,100%{opacity:.15}
+  40%{opacity:1}
 }
 .act-sub{font-size:11px;color:var(--muted);letter-spacing:.06em;padding:2px 12px}
 .act-sub b{color:var(--gold)}

@@ -494,6 +494,7 @@ function settleActivityResult(act) {
   try { localStorage.setItem('brew.balance', String(balance)); } catch (e) {}
   sfx(d > 0 ? 'win' : 'lose');
   ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
+  refreshHud();
 }
 
 function applyActivityUpdate(msg) {
@@ -502,7 +503,13 @@ function applyActivityUpdate(msg) {
   else { activity.phase = msg.phase || activity.phase; if (msg.waiting) activity.waiting = msg.waiting; }
   if (activity && msg.activity && msg.activity.balances) activity.balances = msg.activity.balances;
   if (activity && msg.activity && msg.activity.result) activity.result = msg.activity.result;
-  if (activity && activity.phase === 'result') settleActivityResult(activity);
+  // Result settle (balance + sfx + toast) is deferred to the client reveal
+  // landing via renderActivityPanel's revealed callback — a casino game that
+  // flashes the answer on packet arrival has no tension. Spectators and
+  // in-panel-less cases still settle immediately.
+  if (activity && activity.phase === 'result' && (!activity.players || !activity.players.includes(myUid))) {
+    settleActivityResult(activity);
+  }
   renderActivityPanel();
   renderPrompt();
 }
@@ -541,6 +548,8 @@ function errText(code) {
 function renderActivityPanel() {
   ui.renderActivity(activity, myUid, {
     hand: myHand,
+    players,
+    revealed: act => settleActivityResult(act),
     activityInput: payload => {
       if (!activity) return;
       sendHost({ t: 'activity.input', id: activity.id, pick: payload.pick, side: payload.pick });

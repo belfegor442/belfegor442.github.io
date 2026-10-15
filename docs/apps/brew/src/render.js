@@ -1678,7 +1678,29 @@ export class Renderer {
     if (activity) {
       const table = OBJ_BY_ID.get(activity.table);
       if (table) {
-        const anchor = this.sp(table.x + table.w / 2, table.hgt + 46, table.y + table.h / 2);
+        const cxT = table.x + table.w / 2, czT = table.y + table.h / 2;
+        // Pulse ring on the felt while the round is live / settling so the
+        // table reads as "hot" from the orbit camera, not just the HTML panel.
+        if (activity.phase !== 'result' || (now % 900) < 550) {
+          const c0 = this.sp(cxT, 3, czT);
+          const e0 = this.sp(cxT + table.w * 0.42, 3, czT);
+          if (c0 && e0) {
+            const r0 = Math.hypot(e0.x - c0.x, e0.y - c0.y);
+            if (r0 >= 2 && r0 <= 400) {
+              const pulse = activity.phase === 'result'
+                ? 0.35 + 0.4 * Math.abs(Math.sin(this.time * 5))
+                : 0.18 + 0.08 * Math.sin(this.time * 2.2);
+              o.globalAlpha = pulse;
+              o.strokeStyle = activity.phase === 'result' ? '#ffe98a' : '#e9c877';
+              o.lineWidth = 2.5;
+              o.beginPath();
+              o.ellipse(c0.x, c0.y, r0, r0 * 0.62, 0, 0, Math.PI * 2);
+              o.stroke();
+              o.globalAlpha = 1;
+            }
+          }
+        }
+        const anchor = this.sp(cxT, table.hgt + 46, czT);
         if (anchor) {
           const label = (activity.phase === 'result'
             ? 'RESULT: ' + (activity.result || '').toUpperCase()
@@ -1688,7 +1710,7 @@ export class Renderer {
           o.fillStyle = 'rgba(4,16,12,.9)';
           this.rr(o, anchor.x - w / 2, anchor.y - 12, w, 24, 12);
           o.fill();
-          o.strokeStyle = 'rgba(233,200,119,.8)';
+          o.strokeStyle = activity.phase === 'result' ? 'rgba(255,233,138,.95)' : 'rgba(233,200,119,.8)';
           o.lineWidth = 1.5;
           o.stroke();
           o.fillStyle = '#e9c877';
