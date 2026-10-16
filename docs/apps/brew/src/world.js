@@ -32,7 +32,18 @@ export const OBJECTS = [
   { id: 'column-2', type: 'column', x: 1514, y: 920, w: 54, h: 54, solid: true, hgt: 150 },
 
   { id: 'lights', type: 'switch', x: 46, y: 548, w: 22, h: 56, solid: false, hgt: 44 },
-  { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' }
+  { id: 'coat', type: 'decor', x: 140, y: 40, w: 110, h: 26, solid: false, hgt: 60, label: 'WARDROBE' },
+
+  // Slot machine banks against the west wall: five banks of three cabinets,
+  // built by map.js slotBank(b, z0) with z0 in {210,400,590,780,970} and
+  // machines spanning x[46,99]. These rects mirror that geometry 1:1 so
+  // collision and the F-to-play proximity check line up with the cabinets;
+  // mapSpace = the rect is already in final map coordinates (no KX/KZ pass).
+  { id: 'slot-1', type: 'slots', x: 46, y: 185, w: 53, h: 150, solid: true, hgt: 66, mapSpace: true },
+  { id: 'slot-2', type: 'slots', x: 46, y: 375, w: 53, h: 150, solid: true, hgt: 66, mapSpace: true },
+  { id: 'slot-3', type: 'slots', x: 46, y: 565, w: 53, h: 150, solid: true, hgt: 66, mapSpace: true },
+  { id: 'slot-4', type: 'slots', x: 46, y: 755, w: 53, h: 150, solid: true, hgt: 66, mapSpace: true },
+  { id: 'slot-5', type: 'slots', x: 46, y: 945, w: 53, h: 150, solid: true, hgt: 66, mapSpace: true }
 ];
 
 // The map frame is 2.1:1 (2472x1300); the old 1720-wide frame forced that
@@ -45,6 +56,7 @@ export const KX = MAP.w / 1720;
 export const KZ = MAP.h / 1180;
 for (const o of OBJECTS) {
   if (o.type === 'wall') continue; // walls span MAP.w / MAP.h via MAP constants
+  if (o.mapSpace) continue; // slot-bank rects already live in final map space
   if (!o.glb) { o.x *= KX; o.w *= KX; }
   o.y *= KZ;
   o.h *= KZ;
@@ -227,4 +239,20 @@ export function insideInteract(x, y, range) {
     }
   }
   return null;
+}
+
+const SLOT_BANKS = OBJECTS.filter(o => o.type === 'slots');
+
+// Distance to the nearest slot-machine bank rect (0 when standing in front
+// of or between cabinets along the bank face). Returns the bank object when
+// within maxDist, so the F-to-play check and the authority agree on range.
+export function nearestSlotBank(x, y, maxDist) {
+  let best = null, bd = maxDist;
+  for (const o of SLOT_BANKS) {
+    const nx = Math.max(o.x, Math.min(x, o.x + o.w));
+    const ny = Math.max(o.y, Math.min(y, o.y + o.h));
+    const d = Math.hypot(x - nx, y - ny);
+    if (d <= bd) { bd = d; best = o; }
+  }
+  return best;
 }

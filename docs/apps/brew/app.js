@@ -2,7 +2,7 @@
 // different URLs becomes two module instances (nav state in one, seats in the
 // other). Cache busting lives on ./app.js?v=NN in index.html only.
 import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, seatsAt, insideInteract, tableOf, eject, getNav } from './src/world.js';
+import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, nearestSlotBank, seatsAt, insideInteract, tableOf, eject, getNav } from './src/world.js';
 import { findPath } from './src/path.js';
 import { Host } from './src/state.js';
 import { Net } from './src/net.js';
@@ -477,7 +477,13 @@ function applyChat(msg) {
 function applyActivityStart(msg) {
   activity = msg.activity;
   myHand = null;
-  if (activity && activity.players && activity.players.includes(myUid)) sfx('coin');
+  if (activity && activity.players && activity.players.includes(myUid)) {
+    sfx('coin');
+    // Playing at a slot machine leaves you standing: freeze local movement
+    // for the round the same way 'seated' does at a table.
+    if (me && me.status === 'standing') me.status = 'activity';
+    refreshHud();
+  }
   renderActivityPanel();
   renderPrompt();
   if (activity) ui.system(Registry[activity.kind] ? Registry[activity.kind].label + ' started at ' + activity.table : 'Activity started.');
@@ -515,13 +521,19 @@ function applyActivityUpdate(msg) {
 }
 
 function applyActivityEnd(msg) {
+  const mine = !!(activity && activity.players && activity.players.includes(myUid));
   if (msg.activity && msg.activity.id === msg.id) settleActivityResult(msg.activity);
   if (activity && activity.id === msg.id) {
     activity = null;
     myHand = null;
   }
+  if (mine && me && me.status === 'activity') {
+    me.status = me.seat ? 'seated' : 'standing';
+    me.anim = me.seat ? 'sit' : 'idle';
+  }
   renderActivityPanel();
   renderPrompt();
+  if (mine) refreshHud();
 }
 
 function errText(code) {
@@ -572,6 +584,7 @@ function computePrompt() {
   if (sw) return objects.lights ? 'E  LIGHTS OFF' : 'E  LIGHTS ON';
   const seat = nearestSeat(me.x, me.y, PROX.interact);
   if (seat && !seat.occupiedBy) return 'E  SIT DOWN';
+  if (!activity && nearestSlotBank(me.x, me.y, PROX.interact)) return 'F  PLAY SLOTS';
   for (const t of OBJECTS) {
     if (t.type !== 'table') continue;
     const seated = seatsAt(t.id).filter(s => s.occupiedBy).length;
@@ -582,12 +595,15 @@ function computePrompt() {
 
 function renderPrompt() {
   ui.setPrompt(computePrompt());
-  ui.stakeBar(!!me && me.status === 'seated' && !activity);
+  const atMachine = !!me && me.status === 'standing' && !activity &&
+    !!nearestSlotBank(me.x, me.y, PROX.interact);
+  ui.stakeBar(!!me && !activity && (me.status === 'seated' || atMachine));
 }
 
 function interact() {
   if (!me) return;
   if (me.status === 'seated') { sendHost({ t: 'stand' }); return; }
+  if (me.status === 'activity') { ui.toast('You are busy right now.'); return; }
   const sw = insideInteract(me.x, me.y, PROX.interact);
   if (sw) { sendHost({ t: 'obj', id: sw.id, val: !objects.lights }); return; }
   const seat = nearestSeat(me.x, me.y, PROX.interact);
@@ -596,7 +612,19 @@ function interact() {
 }
 
 function startActivity(kind) {
-  if (!me || me.status !== 'seated') { ui.toast('Sit at a table first.'); return; }
+  if (!me) return;
+  if (me.status === 'activity') { ui.toast('You are busy right now.'); return; }
+  if (me.status === 'standing') {
+    // F next to a slot bank pulls the lever on that machine; slot machines
+    // are never offered at the card tables (see openGamePicker).
+    if (nearestSlotBank(me.x, me.y, PROX.interact)) {
+      const machineKind = kind && Registry[kind] && Registry[kind].atMachine ? kind : 'slots';
+      sendHost({ t: 'activity.start', kind: machineKind, stake: nextStake });
+      return;
+    }
+    ui.toast('Sit at a table first.');
+    return;
+  }
   if (activity) { ui.toast('A game is already running at this table.'); return; }
   if (!kind || !Registry[kind]) { openGamePicker(); return; }
   sendHost({ t: 'activity.start', kind, stake: nextStake });
@@ -609,6 +637,7 @@ function openGamePicker() {
   const opts = activityKinds()
     .filter(k => {
       const d = Registry[k];
+      if (d.atMachine) return false; // played standing at the cabinet, not at a table
       return seatedN >= (d.minPlayers || 2) && seatedN <= (d.maxPlayers || 99);
     })
     .map(k => ({ kind: k, label: Registry[k].label }));

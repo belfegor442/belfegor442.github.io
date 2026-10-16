@@ -1,5 +1,5 @@
 import { MAX_PLAYERS, SPEED, RADIUS, MOVE_TOLERANCE, PROX, LIMITS, token } from './protocol.js';
-import { SEATS, SEAT_BY_ID, OBJ_BY_ID, move as collide, seatsAt, eject } from './world.js';
+import { SEATS, SEAT_BY_ID, OBJ_BY_ID, move as collide, seatsAt, eject, nearestSlotBank } from './world.js';
 import { Registry } from './activities.js';
 import { normalizeSkin } from './skins.js';
 
@@ -145,17 +145,30 @@ export class Host {
     if (!reg) return { error: 'unknown-activity' };
     if (this.activity) return { error: 'activity-running' };
     const p = this.players.get(uid);
-    if (!p || p.status !== 'seated' || !p.seat) return { error: 'must-sit' };
-    const seat = SEAT_BY_ID.get(p.seat);
-    const table = seat && seat.table;
-    if (!table) return { error: 'no-table' };
-    const seated = seatsAt(table).map(s => s.occupiedBy).filter(Boolean);
+    let table = null;
+    let players = [];
+    if (reg.atMachine) {
+      // Slot machines are played standing at the cabinet, not seated at a
+      // felt: the starter must be on foot within reach of a slot bank.
+      if (!p) return { error: 'unknown-player' };
+      if (p.status !== 'standing') return { error: 'busy' };
+      const bank = nearestSlotBank(p.x, p.y, PROX.interact + 10);
+      if (!bank) return { error: 'too-far' };
+      table = bank.id;
+      players = [uid];
+    } else {
+      if (!p || p.status !== 'seated' || !p.seat) return { error: 'must-sit' };
+      const seat = SEAT_BY_ID.get(p.seat);
+      table = seat && seat.table;
+      if (!table) return { error: 'no-table' };
+      players = seatsAt(table).map(s => s.occupiedBy).filter(Boolean);
+    }
     const need = Math.max(1, Number(reg.minPlayers) || 2);
-    if (seated.length < need) return { error: need <= 1 ? 'need-one-player' : 'need-two-players' };
-    if (seated.some(id => { const pl = this.players.get(id); return !pl || pl.status === 'activity'; })) return { error: 'need-two-players' };
+    if (players.length < need) return { error: need <= 1 ? 'need-one-player' : 'need-two-players' };
+    if (players.some(id => { const pl = this.players.get(id); return !pl || pl.status === 'activity'; })) return { error: 'need-two-players' };
     const act = {
       id: kind + '-' + (++this.seq) + '-' + Date.now().toString(36),
-      kind, table, players: seated.slice(), phase: 'picking',
+      kind, table, players, phase: 'picking',
       inputs: {}, data: {}, startedAt: Date.now(),
       stake: Math.max(1, Math.min(1000, Number(opts.stake) || 25))
     };

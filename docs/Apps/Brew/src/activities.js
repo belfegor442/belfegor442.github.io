@@ -78,6 +78,7 @@ register('coinflip', {
 
 register('slots', {
   label: 'SLOTS',
+  atMachine: true,
   minPlayers: 1,
   maxPlayers: 1,
   prompt: 'PULL THE LEVER BELOW',
