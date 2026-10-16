@@ -443,4 +443,164 @@ export class UI {
       b.onclick = () => handlers.stake && handlers.stake(Number(b.dataset.stake));
     });
   }
+
+  // --- scene badge ---------------------------------------------------------
+
+  setScene(id, label, hex) {
+    const el = document.getElementById('sceneName');
+    if (!el) return;
+    el.textContent = label || String(id || 'lobby').toUpperCase();
+    if (hex) el.style.color = hex;
+    else el.style.color = '';
+  }
+
+  // --- lobby game vote -----------------------------------------------------
+
+  showVote(v, myId, lobbyCount, handlers) {
+    this._vote = { v, myId, lobbyCount, handlers };
+    const el = $('#votePanel');
+    el.classList.remove('hidden');
+    this.renderVote();
+    if (!this._voteTimer) {
+      this._voteTimer = setInterval(() => { if (this._vote) this.renderVote(); }, 250);
+    }
+  }
+
+  updateVote(v, myId, lobbyCount, handlers) {
+    if (!this._vote) { this.showVote(v, myId, lobbyCount, handlers); return; }
+    this._vote.v = v;
+    this._vote.myId = myId;
+    this._vote.lobbyCount = lobbyCount;
+    this._vote.handlers = handlers;
+    this.renderVote();
+  }
+
+  renderVote() {
+    const st = this._vote;
+    if (!st) return;
+    const v = st.v;
+    const el = $('#votePanel');
+    const icon = GAME_ICON[v.kind] || '🎲';
+    const title = (v.kind === 'slots' ? 'SLOT GAME' : (v.kind || '').toUpperCase() + ' GAME');
+    const yes = v.accepted.length, no = v.declined.length;
+    const total = Math.max(st.lobbyCount, yes + no);
+    const mine = v.accepted.includes(st.myId) || v.declined.includes(st.myId);
+    const left = Math.max(0, Math.ceil(((v.deadline || 0) - Date.now()) / 1000));
+    el.innerHTML =
+      '<div class="vote-head"><span>' + icon + '</span><b>' + title + '</b>' +
+      '<span class="vote-count">' + yes + '/' + total + ' YES</span></div>' +
+      '<div class="vote-tally"><div class="vote-yes" style="width:' + Math.round(100 * yes / Math.max(1, total)) + '%"></div></div>' +
+      '<div class="vote-sub">' + (no ? no + ' declined · ' : '') + 'A majority teleports the WHOLE lobby into the room.</div>' +
+      '<div class="vote-row">' +
+      '<button id="voteAccept" class="chip red"' + (mine ? ' disabled' : '') + '>ACCEPT</button>' +
+      '<button id="voteDecline" class="chip dark"' + (mine ? ' disabled' : '') + '>DECLINE</button>' +
+      '</div><div class="vote-time">' + left + 's</div>';
+    const a = $('#voteAccept'), d = $('#voteDecline');
+    if (a) a.onclick = () => st.handlers.cast(true);
+    if (d) d.onclick = () => st.handlers.cast(false);
+  }
+
+  hideVote() {
+    this._vote = null;
+    if (this._voteTimer) { clearInterval(this._voteTimer); this._voteTimer = null; }
+    const el = $('#votePanel');
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  }
+
+  // --- skill-stop machine --------------------------------------------------
+
+  showMachine(view, handlers) {
+    this._mc = { view, handlers, t0: Date.now(), spinning: false };
+    const el = $('#machinePanel');
+    el.classList.remove('hidden');
+    this.renderMachine();
+    this.startMachineAnim();
+  }
+
+  updateMachine(view, resetClock) {
+    if (!this._mc) return;
+    this._mc.view = view;
+    if (resetClock && view && view.spin) this._mc.t0 = Date.now();
+    this.renderMachine();
+    this.startMachineAnim();
+  }
+
+  hideMachine() {
+    this._mc = null;
+    if (this._mcRaf) { cancelAnimationFrame(this._mcRaf); this._mcRaf = 0; }
+    const el = $('#machinePanel');
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  }
+
+  renderMachine() {
+    const st = this._mc;
+    if (!st) return;
+    const v = st.view;
+    const el = $('#machinePanel');
+    const over = v.phase === 'overbrew';
+    const live = v.phase === 'spinning' || over;
+    const heatPct = Math.round(v.heat || 0);
+    const reels = [0, 1, 2].map(i => {
+      const r = (v.reels || []).find(x => x.i === i) || { angle: 0, stopped: true, quality: null };
+      return '<div class="mc-reel"><div class="mc-dial"><div class="mc-zone"></div>' +
+        '<div class="mc-needle" id="mcNeedle' + i + '" style="transform:rotate(' + (r.angle || 0) + 'deg)"></div></div>' +
+        '<div class="mc-qlabel ' + (r.quality || '') + '" id="mcQ' + i + '">' + (r.quality || '') + '</div></div>';
+    }).join('');
+    el.innerHTML =
+      '<div class="mc-head"><b>SLOT MACHINE</b><span class="mc-stake">STAKE ' + v.stake + '</span></div>' +
+      '<div class="mc-reels">' + reels + '</div>' +
+      '<div class="mc-row">' +
+      '<button class="chip dark" data-stop="0"' + (!live ? ' disabled' : '') + '>1 STOP</button>' +
+      '<button class="chip dark" data-stop="1"' + (!live ? ' disabled' : '') + '>2 STOP</button>' +
+      '<button class="chip dark" data-stop="2"' + (!live ? ' disabled' : '') + '>3 STOP</button>' +
+      '</div>' +
+      '<div class="mc-stats"><span>SCORE <b>' + (v.score || 0) + '</b></span>' +
+      '<span>COMBO <b>' + (v.combo || 0) + '×' + (1 + (v.combo || 0) * 0.25).toFixed(2) + '</b></span>' +
+      '<span>HEAT <b>' + heatPct + '% ' + (v.tier || 'NOMINAL') + '</b></span></div>' +
+      '<div class="mc-heatbar"><div class="mc-heatfill" style="width:' + Math.min(100, heatPct) + '%"></div></div>' +
+      '<div class="mc-row">' +
+      '<button class="chip red" id="mcSpin"' + (v.phase !== 'idle' ? ' disabled' : '') + '>SPIN</button>' +
+      '<button class="chip green" id="mcCash"' + (!over ? ' disabled' : '') + '>OVERBREW ×2</button>' +
+      '<button class="chip dark" id="mcClose">E CLOSE</button>' +
+      '</div>';
+    el.querySelectorAll('[data-stop]').forEach(b => {
+      b.onclick = () => st.handlers.stop(Number(b.dataset.stop), Date.now() - st.t0);
+    });
+    const sp = $('#mcSpin');
+    if (sp) sp.onclick = () => st.handlers.spin();
+    const cash = $('#mcCash');
+    if (cash) cash.onclick = () => st.handlers.cashout();
+    const cl = $('#mcClose');
+    if (cl) cl.onclick = () => st.handlers.close();
+  }
+
+  // Reel animation: replay the spin locally from the arrival clock (host and
+  // client clocks differ); the authoritative stop angle arrives in updates.
+  startMachineAnim() {
+    const st = this._mc;
+    if (!st || !st.view || !st.view.spin) return;
+    st.spinning = true;
+    if (this._mcRaf) return;
+    const step = now => {
+      const s = this._mc;
+      if (!s || !s.view || !s.view.spin) { this._mcRaf = 0; return; }
+      const el = (now - s.t0) / 1000;
+      const spin = s.view.spin;
+      for (let i = 0; i < 3; i++) {
+        const rec = (s.view.reels || []).find(x => x.i === i);
+        if (rec && rec.stopped) continue;
+        const r = spin.reels[i];
+        if (!r) continue;
+        let a = r.baseAngle + r.speed * el;
+        if (spin.wobbleAmp) a += spin.wobbleAmp * Math.sin((el * 1000) / (spin.wobblePeriodMs || 900) * Math.PI * 2);
+        a = ((a % 360) + 360) % 360;
+        const nd = document.getElementById('mcNeedle' + i);
+        if (nd) nd.style.transform = 'rotate(' + a + 'deg)';
+      }
+      this._mcRaf = requestAnimationFrame(step);
+    };
+    this._mcRaf = requestAnimationFrame(step);
+  }
 }

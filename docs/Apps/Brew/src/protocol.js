@@ -36,4 +36,8 @@ export function topics(room) {
 }
 export const TYPES = ['hello', 'welcome', 'join', 'leave', 'mv', 'snap', 'sit', 'stand',
   'emote', 'skin', 'chat', 'interact', 'obj', 'activity.start', 'activity.input',
-  'activity.update', 'activity.end', 'activity.hand', 'ack', 'err', 'ping', 'pong', 'bye', 'presence'];
+  'activity.update', 'activity.end', 'activity.hand', 'ack', 'err', 'ping', 'pong', 'bye', 'presence',
+  'vote.start', 'vote.cast', 'vote.open', 'vote.update', 'vote.close',
+  'scene.teleport', 'scene.exit',
+  'machine.start', 'machine.spin', 'machine.stop', 'machine.cashout', 'machine.close',
+  'machine.open', 'machine.update'];

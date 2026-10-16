@@ -2,14 +2,15 @@
 // different URLs becomes two module instances (nav state in one, seats in the
 // other). Cache busting lives on ./app.js?v=NN in index.html only.
 import { MAX_PLAYERS, SPEED, RADIUS, PROX, TICK, LIMITS, token, roomCode, topics } from './src/protocol.js';
-import { MAP, OBJECTS, SEATS, SEAT_BY_ID, OBJ_BY_ID, SPAWNS, move as collide, nearestSeat, nearestSlotBank, seatsAt, insideInteract, tableOf, eject, getNav } from './src/world.js';
+import { MAP, OBJECTS, SEATS, move as collide, nearestSeat, insideInteract, getNav, getScene, listScenes } from './src/world.js';
+import { GAME_META } from './src/scenes.js';
 import { findPath } from './src/path.js';
 import { Host } from './src/state.js';
 import { Net } from './src/net.js';
 import { Renderer } from './src/render.js';
 import { Input } from './src/input.js';
 import { UI } from './src/ui.js';
-import { Registry, kinds as activityKinds } from './src/activities.js';
+import { Registry } from './src/activities.js';
 import { DEFAULT_SKIN, normalizeSkin } from './src/skins.js';
 
 const BROKERS = (() => {
@@ -61,6 +62,8 @@ let gRots = 0;
 let gTimer = null;
 let nextStake = 25;
 let sndOn = true;
+let vote = null;    // active lobby vote panel state (host-authoritative)
+let machine = null; // my skill-stop machine session view
 const motion = { x: 0, y: 0 };
 let savedName = '';
 const settledActivityResults = new Set();
@@ -107,8 +110,9 @@ function T() { return topics(room); }
 
 function serialize(p) {
   return {
-    id: p.id, name: p.name, pid: p.pid, seed: p.seed, skin: p.skin, x: p.x, y: p.y, dir: p.dir,
-    anim: p.anim, status: p.status, seat: p.seat, emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
+    id: p.id, name: p.name, pid: p.pid, seed: p.seed, skin: p.skin, scene: p.scene || 'lobby',
+    x: p.x, y: p.y, dir: p.dir, anim: p.anim, status: p.status, seat: p.seat,
+    emote: p.emote, emoteAt: p.emoteAt, balance: p.balance
   };
 }
 function entity(data) {
@@ -174,7 +178,8 @@ function startHost() {
 function setTouchControls(on) { const el = document.getElementById('touchControls'); if (el) { el.classList.toggle('visible', !!on); el.classList.toggle('hidden', !on); el.setAttribute('aria-hidden', on ? 'false' : 'true'); } }
 
 function onHostReady() {
-  const spawn = eject(SPAWNS[0].x, SPAWNS[0].y);
+  const lobby = getScene('lobby');
+  const spawn = lobby.eject(lobby.SPAWNS[0].x, lobby.SPAWNS[0].y);
   me = entity({
     id: myUid, name: myName, pid: myPid, seed: mySeed, skin: mySkin, x: spawn.x, y: spawn.y,
     dir: -Math.PI / 2, anim: 'idle', status: 'standing', seat: null,
@@ -275,6 +280,14 @@ function handleHost(msg) {
     case 'skin': reply(uid, authority.applySkin(uid, msg.skin)); break;
     case 'chat': reply(uid, authority.chat(uid, msg.text)); break;
     case 'obj': reply(uid, authority.objectState(uid, msg.id, msg.val)); break;
+    case 'vote.start': reply(uid, authority.startVote(uid, msg.kind)); break;
+    case 'vote.cast': reply(uid, authority.castVote(uid, !!msg.accept)); break;
+    case 'scene.exit': reply(uid, authority.exitRoom(uid)); break;
+    case 'machine.start': reply(uid, authority.machineStart(uid, msg.kind || 'slots', msg.stake)); break;
+    case 'machine.spin': reply(uid, authority.machineSpin(uid, msg.stake)); break;
+    case 'machine.stop': reply(uid, authority.machineStop(uid, msg.reel, msg.latency)); break;
+    case 'machine.cashout': reply(uid, authority.machineCashout(uid)); break;
+    case 'machine.close': reply(uid, { msgs: authority.closeMachine(uid, true) }); break;
     case 'activity.start': reply(uid, authority.startActivity(msg.kind, uid, { stake: msg.stake })); break;
     case 'activity.input': reply(uid, authority.inputActivity(uid, { side: msg.side, pick: msg.pick, id: msg.id })); break;
     case 'bye': removePlayer(uid, 'left the world'); break;
@@ -283,10 +296,10 @@ function handleHost(msg) {
 function reply(uid, res) {
   if (!res) return;
   if (res.error) { sendTo(uid, { t: 'err', code: res.error }); return; }
-  if (res.ok) {
-    broadcast(res.ok); handleClient(res.ok);
-    if (res.dms) for (const d of res.dms) sendTo(d.uid, d.msg);
-  }
+  const emit = m => { broadcast(m); handleClient(m); };
+  if (res.msgs) for (const m of res.msgs) emit(m);
+  else if (res.ok) emit(res.ok);
+  if (res.dms) for (const d of res.dms) sendTo(d.uid, d.msg);
 }
 
 function joinPlayer(msg, uid) {
@@ -295,8 +308,9 @@ function joinPlayer(msg, uid) {
     return;
   }
   if (authority.count() >= MAX_PLAYERS) { sendTo(uid, { t: 'err', code: 'world-full' }); return; }
-  const sp = SPAWNS[authority.count() % SPAWNS.length];
-  const spawn = eject(sp.x, sp.y);
+  const lobby = getScene('lobby');
+  const sp = lobby.SPAWNS[authority.count() % lobby.SPAWNS.length];
+  const spawn = lobby.eject(sp.x, sp.y);
   const p = authority.addPlayer({
     id: uid, name: msg.name, pid: msg.pid, seed: msg.seed, skin: msg.skin,
     x: spawn.x, y: spawn.y, dir: -Math.PI / 2, balance: msg.balance
@@ -323,7 +337,7 @@ function removePlayer(uid, reason) {
   const p = players.get(uid);
   if (!p) return;
   players.delete(uid);
-  const seat = p.seat ? SEAT_BY_ID.get(p.seat) : null;
+  const seat = p.seat ? (getScene(p.scene || 'lobby').SEAT_BY_ID.get(p.seat)) : null;
   if (seat && seat.occupiedBy === uid) seat.occupiedBy = null;
   if (isHost && authority) {
     for (const m of authority.removePlayer(uid)) {
@@ -352,6 +366,14 @@ function handleClient(msg) {
     case 'skin': { const sp = players.get(msg.uid); if (sp) sp.skin = msg.skin; break; }
     case 'chat': applyChat(msg); break;
     case 'obj': objects[msg.id] = msg.val; renderer.lights = objects.lights; break;
+    case 'vote.open': applyVoteOpen(msg); break;
+    case 'vote.update': applyVoteUpdate(msg); break;
+    case 'vote.close': applyVoteClose(msg); break;
+    case 'scene.teleport': applySceneTeleport(msg); break;
+    case 'machine.open': applyMachineOpen(msg); break;
+    case 'machine.spin': applyMachineMessage(msg); break;
+    case 'machine.update': applyMachineMessage(msg); break;
+    case 'machine.close': applyMachineClose(msg); break;
     case 'activity.start': applyActivityStart(msg); break;
     case 'activity.update': applyActivityUpdate(msg); break;
     case 'activity.end': applyActivityEnd(msg); break;
@@ -374,7 +396,14 @@ function applyWelcome(msg) {
   for (const sp of (msg.snapshot && msg.snapshot.players) || []) entity(sp);
   applySeats((msg.snapshot && msg.snapshot.seats) || []);
   const mine = players.get(myUid);
-  if (mine) { mine.rx = mine.x; mine.ry = mine.y; me = mine; }
+  if (mine) {
+    mine.rx = mine.x; mine.ry = mine.y; me = mine;
+    if (mine.scene && mine.scene !== 'lobby') performSceneSwap(mine.scene);
+    const meta = GAME_META[mine.scene];
+    ui.setScene(mine.scene || 'lobby', meta ? meta.label : (mine.scene === 'lobby' || !mine.scene ? 'LOBBY' : String(mine.scene).toUpperCase()), meta ? meta.hex : null);
+  }
+  vote = (msg.snapshot && msg.snapshot.vote) || null;
+  syncVotePanel();
   activity = msg.activity || null;
   ui.world(room, players.size, msg.max || MAX_PLAYERS);
   ui.hideEntry();
@@ -398,6 +427,10 @@ function applySnapshot(msg) {
   for (const id of [...players.keys()]) if (id !== myUid && !seen.has(id)) players.delete(id);
   applySeats(snap.seats || []);
   if (snap.obj) { objects = snap.obj; renderer.lights = objects.lights; }
+  if ('vote' in snap && (snap.vote ? (vote ? vote.id : null) !== snap.vote.id : !!vote)) {
+    vote = snap.vote || null;
+    syncVotePanel();
+  }
   if (snap.activity !== undefined && (!activity || (snap.activity && activity && snap.activity.id !== activity.id))) {
     activity = snap.activity;
     renderActivityPanel();
@@ -410,6 +443,10 @@ function applySnap(msg) {
   for (const s of msg.p || []) {
     if (s.id === myUid) {
       if (me && Math.hypot(s.x - me.x, s.y - me.y) > 90) { me.x = s.x; me.y = s.y; }
+      if (s.scene && me && s.scene !== me.scene) {
+        me.scene = s.scene;
+        performSceneSwap(s.scene);
+      }
       continue;
     }
     const p = players.get(s.id);
@@ -417,6 +454,7 @@ function applySnap(msg) {
     p.x = s.x; p.y = s.y; p.dir = s.dir; p.anim = s.anim;
     if (s.status) p.status = s.status;
     if (s.seat !== undefined) p.seat = s.seat;
+    if (s.scene) p.scene = s.scene;
     if (s.name) p.name = s.name;
     if (s.balance != null) p.balance = s.balance;
     if (s.skin) p.skin = s.skin;
@@ -425,17 +463,19 @@ function applySnap(msg) {
 }
 
 function applySeats(list) {
-  for (const s of SEATS) s.occupiedBy = null;
+  for (const id of listScenes()) for (const s of getScene(id).SEATS) s.occupiedBy = null;
   for (const entry of list) {
-    const seat = SEAT_BY_ID.get(entry[0]);
-    if (seat) seat.occupiedBy = entry[1];
+    for (const id of listScenes()) {
+      const seat = getScene(id).SEAT_BY_ID.get(entry[0]);
+      if (seat) { seat.occupiedBy = entry[1]; break; }
+    }
   }
 }
 
 function applySit(msg) {
   const p = players.get(msg.uid);
   if (!p) return;
-  const seat = SEAT_BY_ID.get(msg.seat);
+  const seat = getScene(p.scene || 'lobby').SEAT_BY_ID.get(msg.seat);
   if (seat) seat.occupiedBy = msg.uid;
   p.x = msg.x; p.y = msg.y; p.rx = msg.x; p.ry = msg.y; p.dir = msg.dir;
   p.status = 'seated'; p.seat = msg.seat; p.anim = 'sit';
@@ -447,7 +487,7 @@ function applySit(msg) {
 function applyStand(msg) {
   const p = players.get(msg.uid);
   if (!p) return;
-  const seat = p.seat ? SEAT_BY_ID.get(p.seat) : null;
+  const seat = p.seat ? getScene(p.scene || 'lobby').SEAT_BY_ID.get(p.seat) : null;
   if (seat && seat.occupiedBy === msg.uid) seat.occupiedBy = null;
   p.status = 'standing'; p.seat = null; p.anim = 'idle';
   // The authority ejects the player off the chair geometry; carry the landing
@@ -536,6 +576,150 @@ function applyActivityEnd(msg) {
   if (mine) refreshHud();
 }
 
+// --- lobby vote (client views) --------------------------------------------
+
+function countLobby() {
+  let n = 0;
+  for (const p of players.values()) if ((p.scene || 'lobby') === 'lobby') n++;
+  return Math.max(1, n);
+}
+
+function syncVotePanel() {
+  const handlers = { cast: accept => sendHost({ t: 'vote.cast', accept: !!accept }) };
+  if (vote) ui.updateVote(vote, myUid, countLobby(), handlers);
+  else ui.hideVote();
+}
+
+function applyVoteOpen(msg) {
+  vote = msg;
+  syncVotePanel();
+}
+
+function applyVoteUpdate(msg) {
+  if (!vote || vote.id === msg.id) { vote = msg; syncVotePanel(); }
+}
+
+function applyVoteClose(msg) {
+  if (vote && msg && msg.id && msg.id !== vote.id) return;
+  vote = null;
+  ui.hideVote();
+  if (!msg) return;
+  if (msg.passed) {
+    const meta = GAME_META[msg.kind];
+    ui.system((meta ? meta.label : String(msg.kind).toUpperCase()) + ' — teleporting…');
+    sfx('coin');
+  } else if (msg.reason === 'starter-left') {
+    ui.toast('The vote was cancelled.');
+  } else {
+    ui.toast('Vote failed.');
+  }
+}
+
+// --- scene swap ------------------------------------------------------------
+
+let swapSeq = 0;
+
+async function performSceneSwap(id) {
+  const token = ++swapSeq;
+  ui.hideVote();
+  ui.hideMachine();
+  machine = null;
+  await renderer.ensureScene(id);
+  if (token !== swapSeq) return false;
+  const ok = renderer.useScene(id);
+  if (!ok) { console.warn('[scene] swap to ' + id + ' failed'); return false; }
+  const meta = GAME_META[id];
+  ui.setScene(id, meta ? meta.label : (id === 'lobby' ? 'LOBBY' : String(id).toUpperCase()), meta ? meta.hex : null);
+  if (me && renderer.cam) { renderer.cam.x = me.x; renderer.cam.z = me.y; }
+  renderPrompt();
+  return true;
+}
+
+function applySceneTeleport(msg) {
+  const scene = msg.scene;
+  for (const rec of msg.players || []) {
+    const p = players.get(rec.id);
+    if (!p) continue;
+    p.scene = rec.scene || scene;
+    p.x = rec.x; p.y = rec.y;
+    if (p.rx == null) { p.rx = p.x; p.ry = p.y; }
+    if (p.seat) {
+      const seat = getScene(p.scene || 'lobby').SEAT_BY_ID.get(p.seat);
+      if (seat && seat.occupiedBy === rec.id) seat.occupiedBy = null;
+    }
+    if (rec.id === myUid) {
+      p.status = 'standing'; p.seat = null; p.anim = 'idle';
+    }
+  }
+  const mine = (msg.players || []).find(r => r.id === myUid);
+  if (mine && me) {
+    me.scene = scene;
+    me.x = mine.x; me.y = mine.y; me.rx = mine.x; me.ry = mine.y;
+    me.status = 'standing'; me.seat = null; me.anim = 'idle';
+    motion.x = motion.y = 0;
+    movePath = null; pathAction = null;
+    activity = null;
+    myHand = null;
+    renderActivityPanel();
+    performSceneSwap(scene);
+  }
+}
+
+// --- skill-stop machine (client view) --------------------------------------
+
+function viewOf(msg) {
+  return {
+    uid: msg.uid, phase: msg.phase, stake: msg.stake, score: msg.score,
+    combo: msg.combo, maxCombo: msg.maxCombo, heat: msg.heat, tier: msg.tier,
+    reels: msg.reels, spin: msg.spin, roundEarned: msg.roundEarned,
+    overbrewDeadline: msg.overbrewDeadline
+  };
+}
+
+function applyMachineOpen(msg) {
+  if (msg.uid !== myUid) return;
+  machine = viewOf(msg);
+  if (me) { me.status = 'machine'; me.seat = null; me.anim = 'idle'; }
+  ui.showMachine(machine, {
+    spin: () => sendHost({ t: 'machine.spin', stake: machine.stake }),
+    stop: (reel, latency) => sendHost({ t: 'machine.stop', reel, latency: Math.max(0, latency | 0) }),
+    cashout: () => sendHost({ t: 'machine.cashout' }),
+    close: () => sendHost({ t: 'machine.close' })
+  });
+  sfx('coin');
+  refreshHud();
+  renderPrompt();
+}
+
+function applyMachineMessage(msg) {
+  if (!machine || msg.uid !== myUid) return;
+  const resetClock = !!msg.spin && msg.phase === 'spinning';
+  Object.assign(machine, viewOf(msg));
+  ui.updateMachine(machine, resetClock);
+  if (msg.stop) {
+    ui.toast('STOP: ' + msg.stop.quality + (msg.stop.gained ? ' +' + msg.stop.gained : ''));
+    sfx(msg.stop.quality === 'MISS' ? 'lose' : 'coin');
+  }
+  if (msg.result) {
+    const d = msg.result.delta;
+    sfx(d > 0 ? 'win' : 'lose');
+    ui.toast(d > 0 ? 'YOU WON +' + d : 'YOU LOST ' + d);
+  }
+  if (msg.overbrew) ui.toast('OVERBREW — cash out (×2) or fold (×0.25)!');
+}
+
+function applyMachineClose(msg) {
+  if (msg.uid !== myUid) return;
+  machine = null;
+  ui.hideMachine();
+  if (me) {
+    me.status = me.seat ? 'seated' : 'standing';
+    me.anim = me.seat ? 'sit' : 'idle';
+  }
+  refreshHud();
+  renderPrompt();
+}
+
 function errText(code) {
   const map = {
     'world-full': 'That world is full (20 players).',
@@ -552,7 +736,15 @@ function errText(code) {
     'already-picked': 'You already made your pick.',
     'bad-pick': 'Pick one of the offered options.',
     'need-one-player': 'This game is played solo — the others must stand up.',
-    'in-activity': 'You are in a game right now.'
+    'in-activity': 'You are in a game right now.',
+    'not-seated': 'You are not sitting down.',
+    'wrong-scene': 'You cannot do that here.',
+    'vote-running': 'A vote is already running.',
+    'no-vote': 'No vote is running.',
+    'already-voted': 'You already voted.',
+    'no-machine': 'You are not at a machine.',
+    'bad-reel': 'Stop the reels in order (1, 2, 3).',
+    'machine-busy': 'That machine is in use.'
   };
   return map[code] || 'That action is not available.';
 }
@@ -572,38 +764,50 @@ function renderActivityPanel() {
 
 function computePrompt() {
   if (!me) return null;
+  if (machine) return null;
   if (activity && activity.players && activity.players.includes(myUid) && activity.phase === 'picking') {
     const def = Registry[activity.kind];
     return (def && def.prompt) || 'MAKE YOUR PICK BELOW';
   }
   if (me.status === 'seated') {
-    if (!activity) return 'E  STAND UP · F  START GAME';
+    const reg = me.scene !== 'lobby' ? Registry[me.scene] : null;
+    if (reg) return 'E  STAND UP · F  START ' + reg.label;
     return 'E  STAND UP';
+  }
+  if (me.scene === 'lobby' || !me.scene) {
+    const vp = getScene('lobby').nearestVotePoint(me.x, me.y, PROX.interact);
+    if (vp && vp.kind) {
+      const meta = GAME_META[vp.kind];
+      return 'F  VOTE: ' + (meta ? meta.vote : String(vp.kind).toUpperCase());
+    }
+  } else {
+    const W = getScene(me.scene);
+    const portal = W.nearestPortal(me.x, me.y, PROX.interact);
+    if (portal) return 'E  RETURN TO LOBBY';
+    if (me.scene === 'slots' && W.nearestMachine(me.x, me.y, PROX.interact)) return 'F  PLAY SLOTS';
   }
   const sw = insideInteract(me.x, me.y, PROX.interact);
   if (sw) return objects.lights ? 'E  LIGHTS OFF' : 'E  LIGHTS ON';
   const seat = nearestSeat(me.x, me.y, PROX.interact);
   if (seat && !seat.occupiedBy) return 'E  SIT DOWN';
-  if (!activity && nearestSlotBank(me.x, me.y, PROX.interact)) return 'F  PLAY SLOTS';
-  for (const t of OBJECTS) {
-    if (t.type !== 'table') continue;
-    const seated = seatsAt(t.id).filter(s => s.occupiedBy).length;
-    if (seated >= 2) return 'A GAME IS RUNNING AT ' + t.id.toUpperCase();
-  }
   return null;
 }
 
 function renderPrompt() {
   ui.setPrompt(computePrompt());
-  const atMachine = !!me && me.status === 'standing' && !activity &&
-    !!nearestSlotBank(me.x, me.y, PROX.interact);
-  ui.stakeBar(!!me && !activity && (me.status === 'seated' || atMachine));
+  ui.stakeBar(!!me && !activity && !machine && (me.status === 'seated' || me.status === 'machine'));
 }
 
 function interact() {
   if (!me) return;
+  if (machine) { sendHost({ t: 'machine.close' }); return; }
   if (me.status === 'seated') { sendHost({ t: 'stand' }); return; }
   if (me.status === 'activity') { ui.toast('You are busy right now.'); return; }
+  if (me.status === 'machine') { sendHost({ t: 'machine.close' }); return; }
+  if (me.scene !== 'lobby' && me.scene) {
+    const portal = getScene(me.scene).nearestPortal(me.x, me.y, PROX.interact);
+    if (portal) { sendHost({ t: 'scene.exit' }); return; }
+  }
   const sw = insideInteract(me.x, me.y, PROX.interact);
   if (sw) { sendHost({ t: 'obj', id: sw.id, val: !objects.lights }); return; }
   const seat = nearestSeat(me.x, me.y, PROX.interact);
@@ -611,38 +815,28 @@ function interact() {
   ui.toast('Nothing to interact with here.');
 }
 
-function startActivity(kind) {
+function startActivity() {
   if (!me) return;
   if (me.status === 'activity') { ui.toast('You are busy right now.'); return; }
-  if (me.status === 'standing') {
-    // F next to a slot bank pulls the lever on that machine; slot machines
-    // are never offered at the card tables (see openGamePicker).
-    if (nearestSlotBank(me.x, me.y, PROX.interact)) {
-      const machineKind = kind && Registry[kind] && Registry[kind].atMachine ? kind : 'slots';
-      sendHost({ t: 'activity.start', kind: machineKind, stake: nextStake });
-      return;
-    }
-    ui.toast('Sit at a table first.');
+  if (me.status === 'machine') { ui.toast('Close the machine first (E).'); return; }
+  if (me.status === 'seated') {
+    if (activity) { ui.toast('A game is already running at this table.'); return; }
+    const gk = me.scene && me.scene !== 'lobby' ? me.scene : null;
+    if (!gk || !Registry[gk]) { ui.toast('No game here.'); return; }
+    sendHost({ t: 'activity.start', kind: gk, stake: nextStake });
     return;
   }
-  if (activity) { ui.toast('A game is already running at this table.'); return; }
-  if (!kind || !Registry[kind]) { openGamePicker(); return; }
-  sendHost({ t: 'activity.start', kind, stake: nextStake });
-}
-
-function openGamePicker() {
-  const seat = SEAT_BY_ID.get(me.seat);
-  const table = seat && seat.table;
-  const seatedN = table ? seatsAt(table).filter(s => s.occupiedBy).length : 1;
-  const opts = activityKinds()
-    .filter(k => {
-      const d = Registry[k];
-      if (d.atMachine) return false; // played standing at the cabinet, not at a table
-      return seatedN >= (d.minPlayers || 2) && seatedN <= (d.maxPlayers || 99);
-    })
-    .map(k => ({ kind: k, label: Registry[k].label }));
-  if (!opts.length) { ui.toast('No game fits this table.'); return; }
-  ui.renderPicker(opts, k => startActivity(k));
+  if (me.scene === 'lobby' || !me.scene) {
+    const vp = getScene('lobby').nearestVotePoint(me.x, me.y, PROX.interact);
+    if (!vp || !vp.kind) { ui.toast('Walk up to a game terminal first.'); return; }
+    sendHost({ t: 'vote.start', kind: vp.kind });
+    return;
+  }
+  if (me.scene === 'slots') {
+    const cab = getScene('slots').nearestMachine(me.x, me.y, PROX.interact);
+    if (cab) { sendHost({ t: 'machine.start', kind: 'slots', stake: nextStake }); return; }
+  }
+  ui.toast('Nothing to start here.');
 }
 
 function say(text) {
@@ -974,12 +1168,14 @@ function frame(now) {
     }
   }
 
-  renderer.draw(me, players.values(), activity, dt);
+  const sceneList = me ? [...players.values()].filter(p => (p.scene || 'lobby') === me.scene) : [...players.values()];
+  renderer.draw(me, sceneList, activity, dt);
 }
 
 window.addEventListener('resize', () => renderer.resize());
 
 ui.setSound(sndOn);
+ui.setScene('lobby', 'LOBBY', null);
 ui.setName(savedName);
 ui.setPid(myPid);
 ui.stake(nextStake);
@@ -989,7 +1185,7 @@ if (!sndOn) ui.setSound(false);
 ui.showEntry('Ready.');
 
 window.Brew = {
-  version: 10,
+  version: 11,
   get me() { return me; },
   get authority() { return isHost ? authority : null; },
   get welcomes() { return welcomeN; },
@@ -1001,6 +1197,20 @@ window.Brew = {
   get net() { return net; },
   get objects() { return objects; },
   get welcomed() { return welcomed; },
+  get vote() { return vote; },
+  get machine() { return machine; },
+  get scene() { return me ? me.scene : null; },
+  get listScenes() { return listScenes; },
+  getScene,
+  sendHost,
+  startVote: kind => sendHost({ t: 'vote.start', kind }),
+  castVote: accept => sendHost({ t: 'vote.cast', accept: !!accept }),
+  exitRoom: () => sendHost({ t: 'scene.exit' }),
+  machineStart: (kind, stake) => sendHost({ t: 'machine.start', kind: kind || 'slots', stake: stake || nextStake }),
+  machineSpin: stake => sendHost({ t: 'machine.spin', stake: stake || (machine ? machine.stake : nextStake) }),
+  machineStop: (reel, latency) => sendHost({ t: 'machine.stop', reel, latency: latency | 0 }),
+  machineCashout: () => sendHost({ t: 'machine.cashout' }),
+  machineClose: () => sendHost({ t: 'machine.close' }),
   enter, interact, startActivity, say,
   warp(x, y, uid) {
     if (uid && uid !== myUid) {
@@ -1018,8 +1228,16 @@ window.Brew = {
     }
     return true;
   },
-  seatAt: id => SEAT_BY_ID.get(id),
-  MAP, OBJECTS, SEATS
+  seatAt: id => {
+    for (const sc of listScenes()) {
+      const s = getScene(sc).SEAT_BY_ID.get(id);
+      if (s) return s;
+    }
+    return undefined;
+  },
+  get MAP() { return MAP; },
+  get OBJECTS() { return OBJECTS; },
+  get SEATS() { return SEATS; }
 };
 
 requestAnimationFrame(frame);

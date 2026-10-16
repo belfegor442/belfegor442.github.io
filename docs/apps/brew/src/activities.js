@@ -56,6 +56,7 @@ function readPick(payload) {
 
 register('coinflip', {
   label: 'COINFLIP',
+  scene: 'coinflip',
   minPlayers: 2,
   maxPlayers: 2,
   prompt: 'PICK HEADS OR TAILS BELOW',
@@ -76,48 +77,11 @@ register('coinflip', {
   }
 });
 
-register('slots', {
-  label: 'SLOTS',
-  atMachine: true,
-  minPlayers: 1,
-  maxPlayers: 1,
-  prompt: 'PULL THE LEVER BELOW',
-  pickInfo: () => 'Triple 7 pays ×10 · any triple ×5 · any pair or cherry ×2',
-  choices: [{ v: 'spin', label: 'SPIN', cls: 'red' }],
-  resultLabel: act => String(act.result || '').toUpperCase(),
-  validate(host, act) {
-    if (act.players.length !== 1) return 'need-one-player';
-    const p = host.players.get(act.players[0]);
-    if (!p) return 'unknown-player';
-    if (p.balance < 1) return 'no-balance';
-    return null;
-  },
-  input(host, act, uid, payload) {
-    if (readPick(payload) !== 'spin') return { error: 'bad-pick' };
-    if (act.inputs[uid]) return { error: 'already-picked' };
-    act.inputs[uid] = 'spin';
-    const SYMS = ['7', 'BAR', 'BELL', 'CHERRY', 'LEMON', 'GRAPE', 'PLUM'];
-    const reels = [0, 1, 2].map(() => SYMS[Math.floor(Math.random() * SYMS.length)]);
-    const count = s => reels.filter(x => x === s).length;
-    let mult = 0;
-    if (reels[0] === reels[1] && reels[1] === reels[2]) mult = reels[0] === '7' ? 10 : 5;
-    else if (count('7') === 2) mult = 4;
-    else if (count('CHERRY') >= 1) mult = 2;
-    else if (new Set(reels).size === 2) mult = 2;
-    const p = host.players.get(uid);
-    const stake = Math.max(1, Math.min(act.stake, p ? p.balance : 1));
-    const balances = {};
-    for (const id of act.players) balances[id] = 0;
-    balances[uid] = mult > 0 ? stake * mult - stake : -stake;
-    applyBalances(host, act.players, balances);
-    return finish(act, reels.join(' · '), balances, { data: Object.assign({}, act.data, { mult }) });
-  }
-});
-
 const HL_CARD = () => 1 + Math.floor(Math.random() * 13);
 
 register('highlow', {
   label: 'HIGH-LOW',
+  scene: 'highlow',
   minPlayers: 2,
   maxPlayers: 2,
   prompt: 'WILL THE NEXT CARD BE HIGHER OR LOWER?',
@@ -158,6 +122,7 @@ const RPS_BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
 
 register('dice', {
   label: 'DICE ROLL',
+  scene: 'dice',
   minPlayers: 2,
   maxPlayers: 2,
   prompt: 'ROLL — HIGHEST TOTAL TAKES THE POT',
@@ -196,6 +161,7 @@ register('dice', {
 
 register('rps', {
   label: 'ROCK PAPER SCISSORS',
+  scene: 'rps',
   minPlayers: 2,
   maxPlayers: 2,
   prompt: 'PICK ROCK, PAPER OR SCISSORS',
@@ -229,6 +195,7 @@ const ROULETTE_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27,
 
 register('roulette', {
   label: 'ROULETTE',
+  scene: 'roulette',
   minPlayers: 2,
   maxPlayers: 6,
   prompt: 'BET RED, BLACK — OR GREEN',
@@ -319,6 +286,7 @@ function rank7(cards) {
 
 register('poker', {
   label: 'HEADS-UP POKER',
+  scene: 'poker',
   minPlayers: 2,
   maxPlayers: 2,
   prompt: 'CALL TO SEE THE SHOWDOWN OR FOLD',

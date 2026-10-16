@@ -1,4 +1,6 @@
-import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav } from './world.js';
+import { MAP, OBJECTS, SEATS, OBJ_BY_ID, setNav, setScene, setSceneNav, getScene } from './world.js';
+import { ROOM_KINDS } from './scenes.js';
+import { buildRoomGeometry, buildLobbyTerminalsGeometry } from './scenesGeom.js';
 import {
   C, mul, perspective, lookAt, trs, ortho,
   VS_MAIN, FS_MAIN, VS_TEX, FS_TEX, VS_GLB, FS_GLB, FS_GLB_SIMPLE, VS_SHADOW, FS_SHADOW,
@@ -100,6 +102,12 @@ export class Renderer {
       this.fctx = canvas.getContext('2d');
     }
     this.lights = false;
+    // Active-scene GPU state: sceneId shadows world.js's facade, sceneLights
+    // feeds uploadLights (rooms carry their own list; the lobby uses map.js).
+    this.sceneId = 'lobby';
+    this.sceneLights = LIGHTS;
+    this.sceneCache = new Map(); // room id -> { raw, nav, gpu? }
+    this.lobbyGpu = null;        // { world, nav } saved once at boot
     this.lightMix = 0;
     this.time = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
@@ -619,7 +627,7 @@ export class Renderer {
     if (!P.u.uLightPos) return;
     const gl = this.gl;
     const night = 1 + 0.95 * (1 - this.lightMix);
-    const sorted = LIGHTS.map(l => {
+    const sorted = this.sceneLights.map(l => {
       const dx = l.x - this.eye.x, dy = l.y - this.eye.y, dz = l.z - this.eye.z;
       return { l, d: dx * dx + dy * dy + dz * dz };
     }).sort((a, b) => a.d - b.d);
@@ -684,6 +692,31 @@ export class Renderer {
       setNav(nav);
       this.nav = nav;
       this.glbWorld = this.uploadGLB(world);
+      // The six lobby vote terminals are their own GLB (self-contained
+      // materials); concatenate their meshes onto the lobby world and OR
+      // their obstacle cells into the lobby nav grid.
+      try {
+        const term = buildLobbyTerminalsGeometry();
+        const up = this.uploadGLB(term);
+        this.glbWorld.opaque.push(...up.opaque);
+        this.glbWorld.blend.push(...up.blend);
+        const termNav = buildNav(term.draws.filter(d => !term.materials[d.mat].blend), MAP.w, MAP.h);
+        // buildNav marks every cell with no floor under it as blocked, so OR-ing
+        // the terminal grid wholesale would wall off the entire lobby. Only the
+        // cabinets' own obstacle cells (floor present plus something ≥24 above
+        // it — the same STEP rule buildNav applies) join the lobby grid.
+        for (let i = 0; i < nav.block.length; i++) {
+          const f = termNav.floor[i], o = termNav.obs[i];
+          if (f >= 0 && o >= 0 && o - f > 24) nav.block[i] = 1;
+        }
+        nav.open = 0;
+        for (let i = 0; i < nav.block.length; i++) if (!nav.block[i]) nav.open++;
+        this.nav = nav;
+        console.log('[map] terminals merged: +' + up.opaque.length + ' opaque, nav open ' + nav.open + '/' + nav.total);
+      } catch (e) {
+        console.warn('[map] terminal build failed:', e && e.message);
+      }
+      this.lobbyGpu = { world: this.glbWorld, nav };
       this.mapReady = true;
       this.glbReady = true;
       const b = world.bounds;
@@ -693,6 +726,9 @@ export class Renderer {
         b.max.map(v => Math.round(v)).join(',') +
         ', nav ' + nav.open + '/' + nav.total + ' open cells, ' +
         LIGHTS.length + ' lights');
+      // Warm the 7 game rooms in the background so the first vote teleport
+      // into a room doesn't hitch on geometry build.
+      this.prebuildScenes();
     } catch (e) {
       this.glbReady = false;
       this.mapReady = false;
@@ -700,6 +736,74 @@ export class Renderer {
       if (e && e.stack) console.warn(e.stack);
     }
     await this.ensureSkin(DEFAULT_SKIN);
+  }
+
+  // Build (data + nav) for every game room, sequentially, in the background.
+  // GPU upload stays lazy in useScene so the lobby keeps its buffers.
+  prebuildScenes() {
+    const queue = [...ROOM_KINDS];
+    const step = () => {
+      const kind = queue.shift();
+      if (!kind) { console.log('[map] all room scenes prebuilt'); return; }
+      try {
+        const data = buildRoomGeometry(kind);
+        const W = getScene(kind);
+        const nav = buildNav(data.draws.filter(d => !data.materials[d.mat].blend), W.MAP.w, W.MAP.h);
+        this.sceneCache.set(kind, { raw: data, nav });
+        setSceneNav(kind, nav);
+      } catch (e) {
+        console.warn('[map] room ' + kind + ' prebuild failed:', e && e.message);
+      }
+      setTimeout(step, 20);
+    };
+    setTimeout(step, 150);
+  }
+
+  // Make sure a room's geometry + nav exist (build now if the background
+  // prebuild hasn't reached it yet). Resolves true when usable.
+  async ensureScene(id) {
+    if (id === 'lobby') return !!this.lobbyGpu;
+    if (this.sceneCache.has(id)) return true;
+    const W = getScene(id);
+    if (!W) return false;
+    try {
+      const data = buildRoomGeometry(id);
+      const nav = buildNav(data.draws.filter(d => !data.materials[d.mat].blend), W.MAP.w, W.MAP.h);
+      this.sceneCache.set(id, { raw: data, nav });
+      setSceneNav(id, nav);
+      return true;
+    } catch (e) {
+      console.warn('[map] ensureScene ' + id + ' failed:', e && e.message);
+      return false;
+    }
+  }
+
+  // Swap the live GL world to another scene. Geometry must already be in the
+  // cache (ensureScene / prebuildScenes). Resets the baked shadow and the
+  // light selection; the caller snaps the camera.
+  useScene(id) {
+    if (this.sceneId === id) return true;
+    if (id === 'lobby') {
+      if (!this.lobbyGpu) return false;
+      this.glbWorld = this.lobbyGpu.world;
+      this.nav = this.lobbyGpu.nav;
+      setNav(this.lobbyGpu.nav);
+      this.sceneLights = LIGHTS;
+    } else {
+      const entry = this.sceneCache.get(id);
+      if (!entry) return false;
+      if (!entry.gpu) entry.gpu = this.uploadGLB(entry.raw);
+      this.glbWorld = entry.gpu;
+      this.nav = entry.nav;
+      setNav(entry.nav);
+      const W = getScene(id);
+      this.sceneLights = (W && W.LIGHTS) || [];
+    }
+    setScene(id);
+    this.sceneId = id;
+    this.shadowBaked = false;
+    this.lightSel = null;
+    return true;
   }
 
   // Lazy-load + upload one skin from the catalogue. Resolves with the uploaded

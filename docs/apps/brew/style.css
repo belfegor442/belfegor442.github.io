@@ -22,7 +22,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 .mini,.emotes button,.stakebar button,.skin-pick button,.chatrow button,.chat-collapse,.primary,.act-choices .chip,.field input,.chatrow input{
   transition:background .18s ease,color .18s ease,border-color .18s ease,transform .08s ease,box-shadow .18s ease,opacity .18s ease
 }
-.roster,.skin-panel,.help-panel,.activity,.chatbox,.world-card,.prompt{transition:opacity .22s ease,transform .22s ease}
+.roster,.skin-panel,.help-panel,.activity,.chatbox,.world-card,.prompt,.vote,.machine{transition:opacity .22s ease,transform .22s ease}
 .hud{position:fixed;inset:0;z-index:2;pointer-events:none}
 .hud>*{pointer-events:auto}
 
@@ -337,3 +337,36 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* --- scene badge + build-38 panels -------------------------------------- */
+.world-card .scene{font-size:10px;letter-spacing:.14em;color:var(--gold);border:1px solid var(--gold-dim);padding:3px 7px;font-weight:700}
+.vote,.machine{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);width:min(92vw,420px);background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 34px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:6;color:var(--ink);text-align:center;pointer-events:auto}
+.vote.hidden,.machine.hidden{display:none}
+.vote-head{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px 6px}
+.vote-head b{font-family:var(--sign);font-weight:400;font-size:22px;letter-spacing:.04em;color:var(--gold);line-height:1}
+.vote-head .vote-count{font-size:10px;letter-spacing:.14em;color:var(--muted);border:1px solid var(--line);padding:3px 7px}
+.vote-tally{margin:6px 16px;height:8px;background:rgba(255,255,255,.07);border:1px solid var(--line);overflow:hidden}
+.vote-yes{height:100%;width:0;background:linear-gradient(90deg,#2f8f5b,#59d973);transition:width .18s ease}
+.vote-sub{font-size:11px;color:var(--muted);letter-spacing:.06em;padding:6px 14px 2px}
+.vote-row{display:flex;gap:10px;justify-content:center;padding:10px 14px 4px}
+.vote-row .chip{min-width:110px;padding:10px 14px;font-size:12px;letter-spacing:.16em}
+.vote-time{font-size:11px;color:var(--gold-dim);letter-spacing:.14em;padding-bottom:12px}
+.mc-head{display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 14px 4px}
+.mc-head b{font-family:var(--sign);font-weight:400;font-size:20px;letter-spacing:.04em;color:var(--gold)}
+.mc-head .mc-stake{font-size:10px;letter-spacing:.14em;color:var(--muted);border:1px solid var(--line);padding:3px 7px}
+.mc-reels{display:flex;gap:10px;justify-content:center;padding:8px 14px 2px}
+.mc-reel{width:86px;height:86px;border:1px solid var(--line);background:rgba(0,0,0,.35);position:relative;overflow:hidden}
+.mc-dial{position:absolute;inset:0}
+.mc-needle{position:absolute;left:50%;top:50%;width:4px;height:38px;margin-left:-2px;transform-origin:50% 0%;background:linear-gradient(180deg,var(--gold),#c2373f);border-radius:2px}
+.mc-zone{position:absolute;left:50%;top:4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #59d973;box-shadow:0 0 8px rgba(89,217,115,.7)}
+.mc-qlabel{position:absolute;left:0;right:0;bottom:4px;font-size:11px;font-weight:700;letter-spacing:.12em}
+.mc-qlabel.PERFECT{color:#59d973}.mc-qlabel.GOOD{color:#ffd97e}.mc-qlabel.OK{color:#c8c2b0}.mc-qlabel.MISS{color:#c2373f}
+.mc-stats{display:flex;justify-content:center;gap:16px;font-size:10px;letter-spacing:.12em;color:var(--muted);padding:6px 14px 2px}
+.mc-stats b{color:var(--ink)}
+.mc-heatbar{margin:4px 26px 6px;height:8px;border:1px solid var(--line);background:rgba(255,255,255,.06);overflow:hidden}
+.mc-heatfill{height:100%;width:0;background:linear-gradient(90deg,#3ec6c6,#ffd97e,#c2373f);transition:width .12s linear}
+.mc-row{display:flex;gap:8px;justify-content:center;padding:6px 14px 12px;flex-wrap:wrap}
+.mc-row .chip{padding:9px 13px;font-size:11px;letter-spacing:.14em}
+.mc-row .chip.red{--c:#c2373f}.mc-row .chip.green{--c:#2f8f5b}.mc-row .chip.dark{--c:#262b30}
+.mc-row .chip:hover{filter:brightness(1.12)}
+.mc-row .chip:disabled{opacity:.35;cursor:default;filter:saturate(.3)}
