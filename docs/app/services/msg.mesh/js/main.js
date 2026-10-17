@@ -559,11 +559,14 @@ function cancelActiveUpload() {
   }
 }
 
-function uploadWithProgress(filename, contentType, b64, size, onProgress) {
+function uploadWithProgress(filename, contentType, b64, size, onProgress, uploadToken) {
   return new Promise((resolve, reject) => {
+    if (!uploadToken || getToken() !== uploadToken) {
+      reject(new ApiError(0, { error: "session changed before upload" }));
+      return;
+    }
     const xhr = new XMLHttpRequest();
     activeUploadXhr = xhr;
-    const uploadToken = getToken();
     xhr.open("POST", apiBase() + "/api/v1/files/upload");
     xhr.setRequestHeader("Content-Type", "application/json");
     xhr.timeout = 60000;
@@ -610,9 +613,17 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
 let uploadSeq = 0;
 async function handleFile(file) {
   const seq = ++uploadSeq; // a new selection supersedes any previous upload
+  const uploadToken = getToken();
+  const uploadUserId = state.user && state.user.user_id;
+  const sessionIsCurrent = () => !!uploadToken && getToken() === uploadToken &&
+    !!state.user && state.user.user_id === uploadUserId;
   if (activeUploadXhr) { activeUploadXhr.abort(); activeUploadXhr = null; }
   setPendingAttachment(null);
   if (!file) return;
+  if (!sessionIsCurrent()) {
+    ui.toast("Sign in before uploading a file.", true);
+    return;
+  }
   const type = String(file.type || "").toLowerCase();
   const compressibleImage = ["image/jpeg", "image/png", "image/webp"].includes(type);
   const sourceLimit = compressibleImage ? MAX_IMAGE_SOURCE : MAX_FILE;
@@ -627,7 +638,7 @@ async function handleFile(file) {
   if (label) label.textContent = file.name + " — preparing";
   try {
     const prepared = await prepareUploadFile(file);
-    if (seq !== uploadSeq) return;
+    if (seq !== uploadSeq || !sessionIsCurrent()) return;
     if (prepared.size > MAX_FILE) {
       setPendingAttachment(null);
       ui.toast(`Image is still too large after compression (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
@@ -635,25 +646,28 @@ async function handleFile(file) {
     }
     const uploadName = prepared.filename || file.name;
     const b64 = await fileToBase64(prepared.blob);
+    if (seq !== uploadSeq || !sessionIsCurrent()) return;
     const r = await uploadWithProgress(
       uploadName,
       prepared.type,
       b64,
       prepared.size,
       (loaded, total) => {
-        if (seq === uploadSeq && label && bar && !bar.classList.contains("hidden")) {
+        if (seq === uploadSeq && sessionIsCurrent() && label && bar && !bar.classList.contains("hidden")) {
           const pct = Math.round((loaded / total) * 100);
           label.textContent = file.name + " — " + pct + "%";
         }
-      }
+      },
+      uploadToken
     );
-    if (seq !== uploadSeq) return;
+    if (seq !== uploadSeq || !sessionIsCurrent()) return;
     setPendingAttachment({ id: r.attachment_id, filename: r.filename || uploadName, content_type: r.content_type || prepared.type, size_bytes: r.size_bytes ?? prepared.size });
     const saved = Number(r.size_bytes ?? prepared.size);
     const reduction = file.size > 0 ? Math.round((1 - saved / file.size) * 100) : 0;
     ui.toast(reduction >= 5 ? `Attached ${r.filename || uploadName} (${reduction}% smaller)` : "Attached " + (r.filename || uploadName));
   } catch (e) {
-    if (seq === uploadSeq) setPendingAttachment(null);
+    if (seq !== uploadSeq || !sessionIsCurrent()) return;
+    setPendingAttachment(null);
     ui.toast("Upload failed: " + friendlyError(e), true);
   }
 }
