@@ -1017,6 +1017,9 @@ wireImagePicker("#profileBannerBrowse", "#profileBannerInput", "#profileBannerCl
 
 $("#profileForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  if (!sessionToken || !sessionUserId) return;
   const name = sanitizeProfileValue($("#profileDisplayName").value, 64);
   if (!name) { showErr($("#profileStatus"), "Display name must be 1-64 characters."); return; }
   const status = sanitizeProfileValue($("#profileStatusText").value, 128);
@@ -1033,6 +1036,7 @@ $("#profileForm").addEventListener("submit", async (e) => {
       photo: pendingPhoto,
       banner: pendingBanner,
     });
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     state.user = normalizeUser(r.user ? { user: r.user, role: state.user.role, tenant_id: state.user.tenant_id } : r);
     const sp = (r.user && r.user.profile) || {};
     if (!saveProfile({
