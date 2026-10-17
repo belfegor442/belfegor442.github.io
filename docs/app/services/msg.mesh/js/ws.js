@@ -176,6 +176,9 @@ export function connect() {
       emit("readstate", data);
     } else if (event === "error" && data) {
       const code = Number(data.code) || 0;
+      // Surface correlated call-signaling failures (offline peer, permission
+      // denied, rate limit) instead of leaving the caller ringing until timeout.
+      emit("servererror", data);
       if (code === 401) {
         // Session rejected during WS auth: stop reconnecting and hand the
         // session-lost flow to the app (same path as an HTTP 401).
