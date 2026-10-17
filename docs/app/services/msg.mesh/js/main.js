@@ -377,7 +377,9 @@ window.addEventListener("hashchange", route);
 const readRequestsInFlight = new Set();
 
 async function markRead(peer) {
-  if (!peer || readRequestsInFlight.has(peer)) return;
+  if (!peer || readRequestsInFlight.has(peer) || !getToken()) return;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
   const max = maxRowid(peer);
   if (!max) return;
   const ptr = state.pointers.get(peer) || 0;
@@ -391,6 +393,9 @@ async function markRead(peer) {
   let succeeded = false;
   try {
     const r = await api.read(peer, requestedMax);
+    // An HTTP response from a previous account must never mutate the new
+    // account's read pointers after logout, expiry, or a fast account switch.
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     if (r && typeof r.my_last_read_rowid === "number") {
       const cur = state.pointers.get(peer) || 0;
       if (r.my_last_read_rowid > cur) state.pointers.set(peer, r.my_last_read_rowid);
@@ -439,6 +444,8 @@ async function sendMessage() {
   const input = $("#messageInput");
   const text = input.value.trim();
   const peer = state.activePeer;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
   if (!peer || (!text && !pendingAttachment)) return;
   requestNotificationPermission();
   const att = pendingAttachment;
@@ -462,6 +469,7 @@ async function sendMessage() {
 
   try {
     const r = await api.send(peer, "text", JSON.stringify(env), tmp);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     const m = findMessage(peer, tmp);
     if (m && r.message_id) {
       m.id = r.message_id;
@@ -471,20 +479,24 @@ async function sendMessage() {
     }
     markRead(peer);
   } catch (e) {
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     const m = findMessage(peer, tmp);
     if (m) m.sync = "failed";
     ui.renderMessages({ scroll: false });
     ui.toast("Send failed: " + friendlyError(e), true);
   }
-  ui.renderSidebar();
+  if (getToken() === sessionToken && state.user && state.user.user_id === sessionUserId) ui.renderSidebar();
 }
 
 async function retryMessage(peer, m) {
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
   m.sync = "sending";
   ui.renderMessages({ scroll: false });
   const cid = m.clientId || (String(m.id).startsWith("tmp-") ? m.id : "");
   try {
     const r = await api.send(peer, m.type || "text", JSON.stringify(m.env), cid || undefined);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     if (r.message_id && findMessage(peer, m.id)) {
       const cur = findMessage(peer, m.id);
       cur.id = r.message_id;
@@ -494,6 +506,7 @@ async function retryMessage(peer, m) {
       markRead(peer);
     }
   } catch (e) {
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     m.sync = "failed";
     ui.renderMessages({ scroll: false });
     ui.toast("Retry failed: " + friendlyError(e), true);
