@@ -624,9 +624,10 @@ async function handleFile(file) {
       ui.toast(`Image is still too large after compression (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
       return;
     }
+    const uploadName = prepared.filename || file.name;
     const b64 = await fileToBase64(prepared.blob);
     const r = await uploadWithProgress(
-      file.name,
+      uploadName,
       prepared.type,
       b64,
       prepared.size,
@@ -638,20 +639,19 @@ async function handleFile(file) {
       }
     );
     if (seq !== uploadSeq) return;
-    setPendingAttachment({ id: r.attachment_id, filename: r.filename || file.name, content_type: r.content_type || prepared.type, size_bytes: r.size_bytes ?? prepared.size });
+    setPendingAttachment({ id: r.attachment_id, filename: r.filename || uploadName, content_type: r.content_type || prepared.type, size_bytes: r.size_bytes ?? prepared.size });
     const saved = Number(r.size_bytes ?? prepared.size);
     const reduction = file.size > 0 ? Math.round((1 - saved / file.size) * 100) : 0;
-    ui.toast(reduction >= 5 ? `Attached ${r.filename || file.name} (${reduction}% smaller)` : "Attached " + (r.filename || file.name));
+    ui.toast(reduction >= 5 ? `Attached ${r.filename || uploadName} (${reduction}% smaller)` : "Attached " + (r.filename || uploadName));
   } catch (e) {
     if (seq === uploadSeq) setPendingAttachment(null);
     ui.toast("Upload failed: " + friendlyError(e), true);
   }
 }
 
-// Downscale large raster images before Base64 encoding. Keep the original MIME
-// type and filename, preserve transparency for PNG, and never transcode GIF,
-// SVG, or non-image files. If the browser cannot decode/encode the image, or
-// the result is larger, the original file is uploaded unchanged.
+// Resize raster images and, when needed, use WebP for a much smaller upload.
+// GIF/SVG and non-image files are never transcoded. If the browser cannot decode
+// an image or encoding is not beneficial, retain the original bytes unchanged.
 async function prepareUploadFile(file) {
   const type = String(file.type || "").toLowerCase();
   if (!["image/jpeg", "image/png", "image/webp"].includes(type) ||
@@ -664,18 +664,25 @@ async function prepareUploadFile(file) {
   try {
     const maxEdge = 1920;
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-    if (scale >= 1) return { blob: file, type: file.type, size: file.size };
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const ctx = canvas.getContext("2d", { alpha: type === "image/png" });
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return { blob: file, type: file.type, size: file.size };
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.84));
-    if (!blob || blob.size >= file.size || blob.type !== type) {
-      return { blob: file, type: file.type, size: file.size };
+    const encode = (mime, quality) => new Promise(resolve => canvas.toBlob(resolve, mime, quality));
+    const sameType = await encode(type, 0.82);
+    if (sameType && sameType.type === type && sameType.size < file.size) {
+      return { blob: sameType, type, size: sameType.size };
     }
-    return { blob, type, size: blob.size };
+    if (file.size > MAX_FILE && (type === "image/png" || type === "image/jpeg")) {
+      const webp = await encode("image/webp", 0.82);
+      if (webp && webp.type === "image/webp" && webp.size < file.size) {
+        const filename = file.name.replace(/\.[^.]+$/, "") + ".webp";
+        return { blob: webp, type: "image/webp", size: webp.size, filename };
+      }
+    }
+    return { blob: file, type: file.type, size: file.size };
   } finally {
     bitmap.close?.();
   }
