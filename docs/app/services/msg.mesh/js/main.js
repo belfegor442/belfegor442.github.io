@@ -672,7 +672,8 @@ async function prepareUploadFile(file) {
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const encode = (mime, quality) => new Promise(resolve => canvas.toBlob(resolve, mime, quality));
     const sameType = await encode(type, 0.82);
-    if (sameType && sameType.type === type && sameType.size < file.size) {
+    if (sameType && sameType.type === type && sameType.size < file.size &&
+        (sameType.size <= MAX_FILE || type === "image/webp")) {
       return { blob: sameType, type, size: sameType.size };
     }
     if (file.size > MAX_FILE && (type === "image/png" || type === "image/jpeg")) {
