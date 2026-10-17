@@ -210,19 +210,32 @@ async function call(path, data, opts = {}) {
   const headers = { "Content-Type": "application/json" };
   if (requestToken) headers["X-Session-Token"] = requestToken;
   let res;
+  let timeoutController = null;
+  let timeoutTimer = null;
+  let requestSignal = opts.signal;
+  if (requestSignal === undefined) {
+    const timeoutMs = opts.timeoutMs || 15000;
+    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+      requestSignal = AbortSignal.timeout(timeoutMs);
+    } else if (typeof AbortController !== "undefined") {
+      // Older browsers (including embedded WebViews) lack AbortSignal.timeout.
+      // Keep the same bounded request time instead of hanging forever.
+      timeoutController = new AbortController();
+      requestSignal = timeoutController.signal;
+      timeoutTimer = setTimeout(() => timeoutController.abort(), timeoutMs);
+    }
+  }
   try {
     res = await fetch(apiBase() + path, {
       method: "POST",
       headers,
       body: JSON.stringify(data || {}),
-      signal: opts.signal !== undefined
-        ? opts.signal
-        : (typeof AbortSignal !== "undefined" && AbortSignal.timeout
-            ? AbortSignal.timeout(opts.timeoutMs || 15000)
-            : undefined),
+      signal: requestSignal,
       cache: "no-store",
     });
+    if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
   } catch (e) {
+    if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
     const timedOut = !!(e && (e.name === "TimeoutError" || e.name === "AbortError"));
     if (!opts.noFailover) {
       const switched = await failoverBase().catch(() => null);
