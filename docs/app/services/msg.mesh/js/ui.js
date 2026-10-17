@@ -314,8 +314,10 @@ function emoteTokens(html) {
 
 function isImageAtt(att) {
   if (!att) return false;
-  if ((att.type || "").startsWith("image/")) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(att.filename || "");
+  const type = String(att.type || "").toLowerCase().split(";")[0];
+  const safeTypes = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/avif"]);
+  if (safeTypes.has(type)) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(att.filename || "");
 }
 
 /* Image attachments render as an inline thumbnail inside the same clickable
@@ -338,6 +340,10 @@ function hydrateAttImages(root) {
   if (!root || !root.querySelectorAll) return;
   root.querySelectorAll("img[data-attimg]").forEach((img) => {
     const id = img.dataset.attimg;
+    if ((Number(img.dataset.attimgSize) || 0) > MAX_ATT_IMAGE_PREVIEW_BYTES) {
+      img.classList.add("att-img-failed");
+      return;
+    }
     if (attImgCache.has(id)) {
       const url = attImgCache.get(id);
       attImgCache.delete(id);
@@ -356,7 +362,11 @@ function hydrateAttImages(root) {
           encoded.length > Math.ceil(MAX_ATT_IMAGE_PREVIEW_BYTES * 4 / 3) + 8) {
         throw new Error("image preview exceeds memory limit");
       }
-      const url = "data:" + (r.content_type || "image/png") + ";base64," + encoded;
+      const contentType = String(r.content_type || "").toLowerCase().split(";")[0];
+      if (!["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/avif"].includes(contentType)) {
+        throw new Error("unsupported image preview type");
+      }
+      const url = "data:" + contentType + ";base64," + encoded;
       cacheAttImage(id, url);
       img.src = url;
       img.classList.remove("att-img-loading");
@@ -375,7 +385,7 @@ function messageLineHtml(m, peer) {
     const fname = m.attachment.filename || "file";
     const meta = `${esc(fname)}<small> ${esc(m.attachment.type || "")}${m.attachment.size ? " · " + fileSize(m.attachment.size) : ""}</small>`;
     att = isImageAtt(m.attachment)
-      ? `<a class="att-chip att-img-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img class="att-img" data-attimg="${esc(m.attachment.id)}" alt="${esc(fname)}"><span>${meta}</span></a>`
+      ? `<a class="att-chip att-img-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img class="att-img" data-attimg="${esc(m.attachment.id)}" data-attimg-size="${esc(m.attachment.size || 0)}" alt="${esc(fname)}"><span>${meta}</span></a>`
       : `<a class="att-chip" data-att="${esc(m.attachment.id)}" data-attname="${esc(fname)}" href="#"><img src="./assets/xp/icons/Generic Document.png" alt="" width="14" height="14"><span>${meta}</span></a>`;
   }
   const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
