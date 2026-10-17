@@ -327,6 +327,12 @@ const attImgCache = new Map();
 const MAX_ATT_IMAGE_CACHE_ENTRIES = 16;
 const MAX_ATT_IMAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 
+// Attachment data URLs contain private content; discard them at account/session
+// boundaries so a shared browser cannot reuse one user's cached images.
+export function clearAttachmentImageCache() {
+  attImgCache.clear();
+}
+
 function cacheAttImage(id, url) {
   // Small LRU cache prevents every opened image from being retained forever.
   attImgCache.delete(id);
