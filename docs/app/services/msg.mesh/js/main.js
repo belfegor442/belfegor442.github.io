@@ -1495,9 +1495,21 @@ ctxMenu?.addEventListener("click", async (e) => {
 });
 document.addEventListener("click", hideCtxMenu);
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") hideCtxMenu();
+  if (e.key === "Escape" || ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) {
+    hideCtxMenu();
+  }
 });
-document.addEventListener("scroll", hideCtxMenu, true);
+// Dismiss on real user scroll intent only. A bare scroll listener also fires
+// for the app's own adjustments (history pagination, autoscroll to a new
+// message, focus scrollIntoView) and would blink the menu shut the instant it
+// opened — right-click was racing those internal scrolls. Wheel/touch cover
+// gesture scrolling, and pointerdown-outside also catches scrollbar drags
+// (a scroll with no gesture before it is programmatic: leave the menu alone).
+document.addEventListener("wheel", hideCtxMenu, { passive: true, capture: true });
+document.addEventListener("touchmove", hideCtxMenu, { passive: true, capture: true });
+document.addEventListener("pointerdown", (e) => {
+  if (ctxMenu && !e.target.closest("#ctxMenu")) hideCtxMenu();
+}, true);
 
 /* ---------------- emoticon / sticker picker ---------------- */
 const STICKERS = ["wink", "surprise", "cry", "party", "thumbsup", "wave", "heart", "coffee", "smile"];
