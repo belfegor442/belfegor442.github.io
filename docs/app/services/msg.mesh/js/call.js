@@ -339,14 +339,23 @@ function onSignal(d) {
         return;
       }
     }
-    pc.createOffer()
-      .then((offer) => pc.setLocalDescription(offer))
-      .then(() => {
-        if (pc && callId && peer) {
-          sendSignal({ action: "offer", call_id: callId, to: peer, sdp: pc.localDescription.sdp });
+    const activePc = pc;
+    const activeCallId = callId;
+    const activePeer = peer;
+    activePc.createOffer()
+      .then((offer) => {
+        if (pc !== activePc || callId !== activeCallId || peer !== activePeer) {
+          throw new Error("call changed during offer creation");
         }
+        return activePc.setLocalDescription(offer);
       })
-      .catch(() => endCall("could not start the audio stream"));
+      .then(() => {
+        if (pc !== activePc || callId !== activeCallId || peer !== activePeer) return;
+        sendSignal({ action: "offer", call_id: activeCallId, to: activePeer, sdp: activePc.localDescription.sdp });
+      })
+      .catch(() => {
+        if (pc === activePc && callId === activeCallId) endCall("could not start the audio stream");
+      });
     return;
   }
   if (action === "offer" && phase === "connecting" && pc && d.sdp) {
