@@ -556,7 +556,7 @@ async function retryMessage(peer, m) {
   const cid = m.clientId || (String(m.id).startsWith("tmp-") ? m.id : "");
   try {
     const r = await api.send(peer, m.type || "text", JSON.stringify(m.env), cid || undefined);
-    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return false;
     if (r.message_id && findMessage(peer, m.id)) {
       const cur = findMessage(peer, m.id);
       cur.id = r.message_id;
@@ -566,12 +566,14 @@ async function retryMessage(peer, m) {
       ui.renderMessages({ scroll: false });
       markRead(peer);
     }
+    return true;
   } catch (e) {
-    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return false;
     m.sync = "failed";
     m.retryable = isRetryableSendError(e);
     ui.renderMessages({ scroll: false });
     ui.toast("Retry failed: " + friendlyError(e), true);
+    return false;
   }
 }
 
@@ -1860,7 +1862,10 @@ on("connection", (mode) => {
     for (const item of pending) {
       if (getToken() !== sessionToken || !state.user ||
           state.user.user_id !== sessionUserId || state.connection !== "online") break;
-      await retryMessage(item.peer, item.message);
+      const sent = await retryMessage(item.peer, item.message);
+      // One failure usually means the HTTP path is still unhealthy. Stop this
+      // reconnect burst rather than stacking up to 20 long timeout waits.
+      if (!sent) break;
     }
   }, 250);
 });
