@@ -204,8 +204,9 @@ async function startSession() {
     // the active session.
     if (getToken() !== sessionToken) throw new ApiError(401, { error: "session changed" });
     state.user = normalizeUser(w);
-    await syncProfileFromServer(w.profile);
-    if (getToken() !== sessionToken) {
+    const sessionUserId = state.user.user_id;
+    await syncProfileFromServer(w.profile, sessionToken, sessionUserId);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) {
       // A newer login may already have populated state.user; do not clear or
       // overwrite state owned by that newer session from this stale promise.
       throw new ApiError(401, { error: "session changed" });
@@ -234,10 +235,13 @@ async function startSession() {
 // The server owns the profile (shared with the native client); localStorage
 // only caches it for offline rendering. A legacy local-only profile is
 // migrated to the server once so it stops being device-private.
-async function syncProfileFromServer(serverProfile) {
+async function syncProfileFromServer(serverProfile, sessionToken = getToken(), sessionUserId = state.user && state.user.user_id) {
   const has = (v) => typeof v === "string" && v.length > 0;
   const sp = serverProfile || {};
-  const migrationKey = "msg.mesh.profileMigrated." + String(state.user && state.user.user_id || "");
+  const sessionIsCurrent = () => getToken() === sessionToken &&
+    !!state.user && state.user.user_id === sessionUserId;
+  if (!sessionIsCurrent()) return;
+  const migrationKey = "msg.mesh.profileMigrated." + String(sessionUserId || "");
   const markMigrated = () => {
     try { localStorage.setItem(migrationKey, "1"); } catch { /* storage may be unavailable */ }
   };
@@ -246,6 +250,7 @@ async function syncProfileFromServer(serverProfile) {
   })();
   const serverHas = has(sp.status_text) || has(sp.about) || has(sp.avatar) || has(sp.photo) || has(sp.banner);
   if (serverHas) {
+    if (!sessionIsCurrent()) return;
     saveProfile({
       status: sp.status_text || "",
       about: sp.about || "",
@@ -259,13 +264,15 @@ async function syncProfileFromServer(serverProfile) {
     return;
   }
   if (alreadyMigrated) {
+    if (!sessionIsCurrent()) return;
     saveProfile({ status: "", about: "", avatar: "", photo: "", banner: "" });
     return;
   }
+  if (!sessionIsCurrent()) return;
   const local = loadProfile();
   const localHas = local.status || local.about || local.avatar || local.photo || local.banner;
   if (!localHas) {
-    markMigrated();
+    if (sessionIsCurrent()) markMigrated();
     return;
   }
   try {
@@ -276,7 +283,7 @@ async function syncProfileFromServer(serverProfile) {
       photo: local.photo,
       banner: local.banner,
     });
-    markMigrated();
+    if (sessionIsCurrent()) markMigrated();
   } catch { /* keep the local cache; retry migration on next sign-in */ }
 }
 
