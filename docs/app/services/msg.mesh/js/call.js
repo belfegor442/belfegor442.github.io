@@ -316,12 +316,12 @@ function onSignal(d) {
   }
   if (action === "candidate") {
     if (!pc) return;
-    if (pc.remoteDescription && d.candidate) {
-      pc.addIceCandidate(d.candidate).catch(() => { /* late/duplicate candidate */ });
-    } else if (d.candidate) {
-      if (pendingCandidates.length < 50) pendingCandidates.push(d.candidate);
-    } else if (pc.remoteDescription) {
-      pc.addIceCandidate(null).catch(() => { /* end marker already implied */ });
+    if (pc.remoteDescription) {
+      pc.addIceCandidate(d.candidate || null).catch(() => { /* late/duplicate candidate or end marker */ });
+    } else if (pendingCandidates.length < 50) {
+      // Preserve the end-of-candidates marker too; it can arrive before the
+      // offer/answer establishes remoteDescription on slower connections.
+      pendingCandidates.push(d.candidate || null);
     }
     return;
   }
