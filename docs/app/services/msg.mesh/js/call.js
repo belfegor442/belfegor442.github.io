@@ -24,6 +24,7 @@ let cameraOff = false;
 let startedAt = 0;
 let ringTimer = null;
 let tickTimer = null;
+let connectionGraceTimer = null;
 let pendingCandidates = [];
 
 export function callState() {
@@ -60,6 +61,10 @@ function cleanupMedia() {
 function reset() {
   clearRingTimer();
   stopTick();
+  if (connectionGraceTimer) {
+    clearTimeout(connectionGraceTimer);
+    connectionGraceTimer = null;
+  }
   stopRing();
   pendingCandidates = [];
   if (pc) {
@@ -99,15 +104,32 @@ function makePc() {
     // Closing a previous RTCPeerConnection is asynchronous. Ignore its late
     // events so they cannot end or mutate a newer call.
     if (pc !== p || callId !== activeCallId || peer !== activePeer) return;
-    if (p.connectionState === "connected" && (phase === "connecting" || phase === "in-call")) {
-      if (phase === "connecting") {
-        startedAt = Date.now();
-        stopRing();
-        clearRingTimer();
-        setPhase("in-call");
-        playSound("logon");
-        stopTick();
-        tickTimer = setInterval(() => emit("callstate", callState()), 1000);
+    if (p.connectionState === "connected") {
+      if (connectionGraceTimer) {
+        clearTimeout(connectionGraceTimer);
+        connectionGraceTimer = null;
+      }
+      if (phase === "connecting" || phase === "in-call") {
+        if (phase === "connecting") {
+          startedAt = Date.now();
+          stopRing();
+          clearRingTimer();
+          setPhase("in-call");
+          playSound("logon");
+          stopTick();
+          tickTimer = setInterval(() => emit("callstate", callState()), 1000);
+        }
+      }
+    } else if (p.connectionState === "disconnected") {
+      // Browsers can report a short disconnect during network handover.
+      // Allow ICE a few seconds to recover before terminating the call.
+      if (!connectionGraceTimer) {
+        connectionGraceTimer = setTimeout(() => {
+          connectionGraceTimer = null;
+          if (pc === p && callId === activeCallId && p.connectionState === "disconnected") {
+            endCall("connection lost");
+          }
+        }, 8000);
       }
     } else if (p.connectionState === "failed") {
       endCall("connection failed");
