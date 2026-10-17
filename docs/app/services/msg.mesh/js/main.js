@@ -1752,9 +1752,17 @@ async function loadOlder() {
   const peer = state.activePeer;
   const c = state.conversations.get(peer);
   if (!peer || !c || !c.hasMore) return;
-  const rowids = c.messages.filter((m) => m.rowid != null).map((m) => m.rowid);
-  if (!rowids.length) { c.hasMore = false; ui.renderMessages({ scroll: false }); return; }
-  const before = Math.min(...rowids);
+  // Avoid spreading an unbounded conversation into Math.min(...values),
+  // which can exceed the engine's argument limit in long-running chats.
+  let before = Infinity;
+  for (const message of c.messages) {
+    if (message.rowid != null && message.rowid < before) before = message.rowid;
+  }
+  if (!Number.isFinite(before)) {
+    c.hasMore = false;
+    ui.renderMessages({ scroll: false });
+    return;
+  }
   const wrap = $("#messages");
   const keepBottom = wrap.scrollHeight - wrap.scrollTop;
   try {
