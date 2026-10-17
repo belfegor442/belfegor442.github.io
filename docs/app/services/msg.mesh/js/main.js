@@ -174,6 +174,7 @@ let booted = false;
 
 function handleSessionLost() {
   if (!getToken()) return;
+  cancelActiveUpload();
   if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   setToken("");
   wsDisconnect();
@@ -312,6 +313,7 @@ function emitFriends() {
 
 async function logout() {
   primeSound("logoff");
+  cancelActiveUpload();
   if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   try { await api.logout(); } catch { /* session may already be gone */ }
   setToken("");
@@ -540,15 +542,24 @@ $("#pendingFileCancel")?.addEventListener("click", () => {
 // api.upload; falls back to the plain error payload on non-2xx.
 let activeUploadXhr = null;
 
+function cancelActiveUpload() {
+  uploadSeq += 1;
+  if (activeUploadXhr) {
+    const xhr = activeUploadXhr;
+    activeUploadXhr = null;
+    try { xhr.abort(); } catch { /* already completed */ }
+  }
+}
+
 function uploadWithProgress(filename, contentType, b64, size, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     activeUploadXhr = xhr;
+    const uploadToken = getToken();
     xhr.open("POST", apiBase() + "/api/v1/files/upload");
     xhr.setRequestHeader("Content-Type", "application/json");
     xhr.timeout = 60000;
-    const tok = getToken();
-    if (tok) xhr.setRequestHeader("X-Session-Token", tok);
+    if (uploadToken) xhr.setRequestHeader("X-Session-Token", uploadToken);
     if (xhr.upload) {
       xhr.upload.addEventListener("progress", (ev) => {
         if (ev.lengthComputable && onProgress) onProgress(ev.loaded, ev.total);
@@ -556,6 +567,10 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
     }
     xhr.onload = () => {
       if (activeUploadXhr === xhr) activeUploadXhr = null;
+      if (getToken() !== uploadToken) {
+        reject(new ApiError(0, { error: "session changed while upload was in flight" }));
+        return;
+      }
       let payload = {};
       try { payload = JSON.parse(xhr.responseText || "{}"); } catch { /* empty body */ }
       if (xhr.status >= 200 && xhr.status < 300) {
