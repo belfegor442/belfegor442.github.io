@@ -365,6 +365,12 @@ function onSignal(d) {
 }
 
 on("call", onSignal);
+on("servererror", (d) => {
+  if (!d || !callId || d.call_id !== callId || phase === "idle") return;
+  const message = String(d.error || "call failed").slice(0, 160);
+  reset();
+  emit("callnotice", message);
+});
 // Socket died mid-call: the relay is gone and so is the peer's signaling.
 on("connection", (mode) => {
   if (mode === "online" || phase === "idle") return;
