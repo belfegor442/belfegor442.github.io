@@ -520,6 +520,7 @@ async function sendMessage() {
   try {
     const r = await api.send(peer, "text", JSON.stringify(env), tmp);
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (!r || !r.message_id) throw new ApiError(502, { error: "server did not confirm the message" });
     const m = findMessage(peer, tmp);
     if (m && r.message_id) {
       m.id = r.message_id;
