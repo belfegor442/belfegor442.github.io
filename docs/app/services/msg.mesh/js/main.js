@@ -530,16 +530,20 @@ const MAX_FILE = 700 * 1024;
 
 $("#sendFileBtn")?.addEventListener("click", () => $("#fileInput").click());
 $("#pendingFileCancel")?.addEventListener("click", () => {
-  uploadSeq += 1; // invalidate any in-flight upload before clearing the attachment
+  uploadSeq += 1;
+  if (activeUploadXhr) { activeUploadXhr.abort(); activeUploadXhr = null; }
   setPendingAttachment(null);
 });
 
 // XHR upload so the pending-file bar can show real byte progress (fetch has
 // no upload progress events). Same endpoint/headers/failure contract as
 // api.upload; falls back to the plain error payload on non-2xx.
+let activeUploadXhr = null;
+
 function uploadWithProgress(filename, contentType, b64, size, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    activeUploadXhr = xhr;
     xhr.open("POST", apiBase() + "/api/v1/files/upload");
     xhr.setRequestHeader("Content-Type", "application/json");
     xhr.timeout = 60000;
@@ -551,6 +555,7 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
       });
     }
     xhr.onload = () => {
+      if (activeUploadXhr === xhr) activeUploadXhr = null;
       let payload = {};
       try { payload = JSON.parse(xhr.responseText || "{}"); } catch { /* empty body */ }
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -561,8 +566,15 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
         reject(new ApiError(xhr.status, payload));
       }
     };
-    xhr.onerror = () => reject(new ApiError(0, { error: "cannot reach the msg.mesh server" }));
-    xhr.ontimeout = () => reject(new ApiError(0, { error: "upload timed out" }));
+    xhr.onerror = () => {
+      if (activeUploadXhr === xhr) activeUploadXhr = null;
+      reject(new ApiError(0, { error: "cannot reach the msg.mesh server" }));
+    };
+    xhr.ontimeout = () => {
+      if (activeUploadXhr === xhr) activeUploadXhr = null;
+      reject(new ApiError(0, { error: "upload timed out" }));
+    };
+    xhr.onabort = () => reject(new ApiError(0, { error: "upload cancelled" }));
     xhr.send(JSON.stringify({
       filename,
       content_type: contentType,
@@ -575,6 +587,7 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
 let uploadSeq = 0;
 async function handleFile(file) {
   const seq = ++uploadSeq; // a new selection supersedes any previous upload
+  if (activeUploadXhr) { activeUploadXhr.abort(); activeUploadXhr = null; }
   if (!file) return;
   if (file.size > MAX_FILE) {
     ui.toast(`File too large (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
