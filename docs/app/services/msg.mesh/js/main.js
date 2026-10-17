@@ -225,6 +225,13 @@ async function startSession() {
 async function syncProfileFromServer(serverProfile) {
   const has = (v) => typeof v === "string" && v.length > 0;
   const sp = serverProfile || {};
+  const migrationKey = "msg.mesh.profileMigrated." + String(state.user && state.user.user_id || "");
+  const markMigrated = () => {
+    try { localStorage.setItem(migrationKey, "1"); } catch { /* storage may be unavailable */ }
+  };
+  const alreadyMigrated = (() => {
+    try { return localStorage.getItem(migrationKey) === "1"; } catch { return false; }
+  })();
   const serverHas = has(sp.status_text) || has(sp.about) || has(sp.avatar) || has(sp.photo) || has(sp.banner);
   if (serverHas) {
     saveProfile({
@@ -234,11 +241,21 @@ async function syncProfileFromServer(serverProfile) {
       photo: sp.photo || "",
       banner: sp.banner || "",
     });
+    // An intentionally empty profile after a later edit must not resurrect
+    // stale local values on the next sign-in.
+    markMigrated();
+    return;
+  }
+  if (alreadyMigrated) {
+    saveProfile({ status: "", about: "", avatar: "", photo: "", banner: "" });
     return;
   }
   const local = loadProfile();
   const localHas = local.status || local.about || local.avatar || local.photo || local.banner;
-  if (!localHas) return;
+  if (!localHas) {
+    markMigrated();
+    return;
+  }
   try {
     await api.usersUpdate({
       status_text: local.status,
@@ -247,7 +264,8 @@ async function syncProfileFromServer(serverProfile) {
       photo: local.photo,
       banner: local.banner,
     });
-  } catch { /* keep the local cache; retried on next sign-in */ }
+    markMigrated();
+  } catch { /* keep the local cache; retry migration on next sign-in */ }
 }
 
 async function initialLoad() {
