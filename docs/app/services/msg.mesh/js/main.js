@@ -529,6 +529,7 @@ async function retryMessage(peer, m) {
 /* ---------------- attachments ---------------- */
 
 const MAX_FILE = 700 * 1024;
+const MAX_IMAGE_SOURCE = 5 * 1024 * 1024;
 
 $("#sendFileBtn")?.addEventListener("click", () => $("#fileInput").click());
 $("#pendingFileCancel")?.addEventListener("click", () => {
@@ -604,8 +605,12 @@ async function handleFile(file) {
   const seq = ++uploadSeq; // a new selection supersedes any previous upload
   if (activeUploadXhr) { activeUploadXhr.abort(); activeUploadXhr = null; }
   if (!file) return;
-  if (file.size > MAX_FILE) {
-    ui.toast(`File too large (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
+  const type = String(file.type || "").toLowerCase();
+  const compressibleImage = ["image/jpeg", "image/png", "image/webp"].includes(type);
+  const sourceLimit = compressibleImage ? MAX_IMAGE_SOURCE : MAX_FILE;
+  if (file.size > sourceLimit) {
+    const limit = compressibleImage ? "5 MB before image compression" : `${Math.round(MAX_FILE / 1024)} KB`;
+    ui.toast(`File too large (max ${limit})`, true);
     return;
   }
   const bar = $("#pendingFile");
@@ -615,6 +620,10 @@ async function handleFile(file) {
   try {
     const prepared = await prepareUploadFile(file);
     if (seq !== uploadSeq) return;
+    if (prepared.size > MAX_FILE) {
+      ui.toast(`Image is still too large after compression (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
+      return;
+    }
     const b64 = await fileToBase64(prepared.blob);
     const r = await uploadWithProgress(
       file.name,
