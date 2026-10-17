@@ -324,12 +324,14 @@ function isImageAtt(att) {
    att-chip (contract with f13 tests) — hydrated from api.download() with a
    data-URL cache so re-renders don't re-fetch. */
 const attImgCache = new Map();
+let attImgCacheGeneration = 0;
 const MAX_ATT_IMAGE_CACHE_ENTRIES = 16;
 const MAX_ATT_IMAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 // Attachment data URLs contain private content; discard them at account/session
 // boundaries so a shared browser cannot reuse one user's cached images.
 export function clearAttachmentImageCache() {
+  attImgCacheGeneration += 1;
   attImgCache.clear();
   if (typeof document !== "undefined") {
     document.querySelectorAll("img[data-attimg]").forEach(img => {
@@ -369,8 +371,11 @@ function hydrateAttImages(root) {
     img.dataset.loading = "1";
     img.classList.add("att-img-loading");
     const sessionToken = getToken();
+    const cacheGeneration = attImgCacheGeneration;
     api.download(id).then((r) => {
-      if (getToken() !== sessionToken) throw new Error("session changed");
+      if (getToken() !== sessionToken || cacheGeneration !== attImgCacheGeneration) {
+        throw new Error("session changed");
+      }
       const size = Number(r.size_bytes) || 0;
       const encoded = typeof r.content_base64 === "string" ? r.content_base64 : "";
       if (size > MAX_ATT_IMAGE_PREVIEW_BYTES ||
