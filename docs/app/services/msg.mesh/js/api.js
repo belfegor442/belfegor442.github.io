@@ -267,13 +267,20 @@ export function failoverBase() {
 
 export const api = {
   health: async () => {
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 5000) : null;
     try {
-      const res = await fetch(apiBase() + "/health", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      const res = await fetch(apiBase() + "/health", {
+        cache: "no-store",
+        signal: ctrl ? ctrl.signal : undefined,
+      });
       if (!res.ok) return { ok: false };
       const j = await res.json().catch(() => ({}));
       return { ok: j.status === "ok", ...j };
     } catch {
       return { ok: false };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   },
 
