@@ -12,6 +12,7 @@ let poller = null;
 let watchdog = null;
 let watchdogFails = 0;
 let attempts = 0;
+let reconnectTimer = null;
 let closedByUs = false;
 let started = false;
 
@@ -97,13 +98,14 @@ function stopPolling() {
 }
 
 function scheduleReconnect() {
-  if (closedByUs || !started || !getToken()) return;
+  if (closedByUs || !started || !getToken() || reconnectTimer !== null) return;
   attempts += 1;
   const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(attempts, 5)) + Math.random() * 500;
   setConnection("reconnecting");
   emit("sync", "RECONNECTING");
   if (attempts >= 2) startPolling();
-  setTimeout(async () => {
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
     // The previous base may be the dead server: probe the others first so
     // the reconnect lands on a live one instead of looping on the same host.
     const switched = attempts >= 1 ? await failoverBase().catch(() => null) : null;
@@ -114,6 +116,10 @@ function scheduleReconnect() {
 
 export function connect() {
   if (!getToken()) return;
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) return;
   closedByUs = false;
   started = true;
@@ -186,9 +192,13 @@ export function connect() {
   };
 
   ws.onclose = () => {
+    // A deliberately replaced socket can close asynchronously after a new
+    // socket has already opened. It must not stop the new socket's watchdog
+    // or schedule a second reconnect loop.
+    if (socket !== ws) return;
     stopHeartbeat();
     stopWatchdog();
-    if (socket === ws) socket = null;
+    socket = null;
     if (closedByUs) { setConnection("offline"); return; }
     setConnection("offline");
     scheduleReconnect();
@@ -221,6 +231,10 @@ export function disconnect() {
   closedByUs = true;
   started = false;
   attempts = 0;
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   stopHeartbeat();
   stopWatchdog();
   stopPolling();
@@ -235,6 +249,10 @@ export function disconnect() {
 export function forceReconnect() {
   if (!started || !getToken()) return;
   attempts = 0;
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (socket) {
     closedByUs = true;
     try { socket.close(); } catch { /* ignore */ }
