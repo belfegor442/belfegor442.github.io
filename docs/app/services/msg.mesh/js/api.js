@@ -155,6 +155,17 @@ export function setToken(next) {
   else safeRemove(TOKEN_KEY);
 }
 
+// Keep separate tabs on the same browser origin from silently retaining an
+// older account session. Reloading lets the normal boot flow pick up the new
+// token (or show login after logout) and drops all in-memory private caches.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === TOKEN_KEY && (event.newValue || "") !== token) {
+      window.location.reload();
+    }
+  });
+}
+
 export class ApiError extends Error {
   constructor(status, payload) {
     super((payload && payload.error) || `HTTP ${status}`);
