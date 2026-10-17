@@ -726,14 +726,7 @@ async function prepareUploadFile(file) {
 
   // Do not recompress an image that already fits the wire limit. Compression
   // is a fallback for oversized images, not a blanket quality reduction.
-  if (file.size <= MAX_FILE) {
-    let dimensions;
-    try { dimensions = await createImageBitmap(file); }
-    catch { return { blob: file, type, size: file.size }; }
-    const fits = Math.max(dimensions.width, dimensions.height) <= 1920;
-    dimensions.close?.();
-    if (fits) return { blob: file, type, size: file.size };
-  }
+  if (file.size <= MAX_FILE) return { blob: file, type, size: file.size };
 
   let bitmap;
   try { bitmap = await createImageBitmap(file); }
