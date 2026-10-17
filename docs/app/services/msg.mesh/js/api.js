@@ -204,8 +204,11 @@ export function friendlyError(err) {
 }
 
 async function call(path, data, opts = {}) {
+  // Bind each request to the session that started it. A late network failure
+  // must not replay an account-A operation using account B's newer token.
+  const requestToken = token;
   const headers = { "Content-Type": "application/json" };
-  if (token) headers["X-Session-Token"] = token;
+  if (requestToken) headers["X-Session-Token"] = requestToken;
   let res;
   try {
     res = await fetch(apiBase() + path, {
@@ -225,16 +228,26 @@ async function call(path, data, opts = {}) {
       const switched = await failoverBase().catch(() => null);
       // Connection-level errors never reached the server: safe to replay on
       // the new base. Timeouts may have been processed: switch but don't replay.
-      if (switched && !timedOut) return call(path, data, { ...opts, noFailover: true });
+      if (switched && !timedOut && token === requestToken) {
+        return call(path, data, { ...opts, noFailover: true });
+      }
+      if (token !== requestToken) {
+        throw new ApiError(0, { error: "session changed while request was in flight" });
+      }
     }
     if (timedOut) {
       throw new ApiError(0, { error: "the msg.mesh server did not respond in time" });
     }
     throw new ApiError(0, { error: "cannot reach the msg.mesh server" });
   }
+  // Ignore late responses after logout or account switch. This also avoids
+  // a stale 401 logging out a different, newly authenticated account.
+  if (token !== requestToken) {
+    throw new ApiError(0, { error: "session changed while request was in flight" });
+  }
   let payload = {};
   try { payload = await res.json(); } catch { /* empty body */ }
-  if (res.status === 401 && token && !opts.allow401 && onUnauthorized) {
+  if (res.status === 401 && requestToken && !opts.allow401 && onUnauthorized) {
     onUnauthorized();
   }
   if (!res.ok) throw new ApiError(res.status, payload);
