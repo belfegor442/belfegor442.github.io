@@ -207,7 +207,14 @@ async function startSession() {
     // hydrate the app with the identity returned for a token that is no longer
     // the active session.
     if (getToken() !== sessionToken) throw new ApiError(401, { error: "session changed" });
-    state.user = normalizeUser(w);
+    const nextUser = normalizeUser(w);
+    if (state.user && state.user.user_id !== nextUser.user_id) {
+      // Attachment IDs and the profile cache are private to an account.
+      // Clear them before any asynchronous profile/history work for the new one.
+      ui.clearAttachmentImageCache();
+      clearProfileCache();
+    }
+    state.user = nextUser;
     const sessionUserId = state.user.user_id;
     await syncProfileFromServer(w.profile, sessionToken, sessionUserId);
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) {
