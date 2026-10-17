@@ -320,9 +320,9 @@ function isImageAtt(att) {
   return /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(att.filename || "");
 }
 
-/* Image attachments render as an inline thumbnail inside the same clickable
-   att-chip (contract with f13 tests) — hydrated from api.download() with a
-   data-URL cache so re-renders don't re-fetch. */
+/* Image attachments render as inline thumbnails. A bounded object-URL cache
+   avoids retaining large base64 strings for every preview and is cleared at
+   account/session boundaries. */
 const attImgCache = new Map();
 let attImgCacheGeneration = 0;
 const MAX_ATT_IMAGE_CACHE_ENTRIES = 16;
@@ -330,8 +330,16 @@ const MAX_ATT_IMAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 // Attachment data URLs contain private content; discard them at account/session
 // boundaries so a shared browser cannot reuse one user's cached images.
+function revokeAttImageUrl(url) {
+  if (typeof url === "string" && url.startsWith("blob:") &&
+      typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    try { URL.revokeObjectURL(url); } catch { /* already released */ }
+  }
+}
+
 export function clearAttachmentImageCache() {
   attImgCacheGeneration += 1;
+  for (const url of attImgCache.values()) revokeAttImageUrl(url);
   attImgCache.clear();
   if (typeof document !== "undefined") {
     document.querySelectorAll("img[data-attimg]").forEach(img => {
@@ -344,10 +352,15 @@ export function clearAttachmentImageCache() {
 
 function cacheAttImage(id, url) {
   // Small LRU cache prevents every opened image from being retained forever.
+  const previous = attImgCache.get(id);
+  if (previous && previous !== url) revokeAttImageUrl(previous);
   attImgCache.delete(id);
   attImgCache.set(id, url);
   while (attImgCache.size > MAX_ATT_IMAGE_CACHE_ENTRIES) {
-    attImgCache.delete(attImgCache.keys().next().value);
+    const oldestId = attImgCache.keys().next().value;
+    const oldestUrl = attImgCache.get(oldestId);
+    attImgCache.delete(oldestId);
+    revokeAttImageUrl(oldestUrl);
   }
 }
 
@@ -386,7 +399,17 @@ function hydrateAttImages(root) {
       if (!["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "image/avif"].includes(contentType)) {
         throw new Error("unsupported image preview type");
       }
-      const url = "data:" + contentType + ";base64," + encoded;
+      let url;
+      if (typeof Blob !== "undefined" && typeof URL !== "undefined" &&
+          typeof URL.createObjectURL === "function") {
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+      } else {
+        // Legacy browser fallback; the cache limit still bounds retained data.
+        url = "data:" + contentType + ";base64," + encoded;
+      }
       cacheAttImage(id, url);
       img.src = url;
       img.classList.remove("att-img-loading");
