@@ -604,6 +604,7 @@ let uploadSeq = 0;
 async function handleFile(file) {
   const seq = ++uploadSeq; // a new selection supersedes any previous upload
   if (activeUploadXhr) { activeUploadXhr.abort(); activeUploadXhr = null; }
+  setPendingAttachment(null);
   if (!file) return;
   const type = String(file.type || "").toLowerCase();
   const compressibleImage = ["image/jpeg", "image/png", "image/webp"].includes(type);
@@ -621,6 +622,7 @@ async function handleFile(file) {
     const prepared = await prepareUploadFile(file);
     if (seq !== uploadSeq) return;
     if (prepared.size > MAX_FILE) {
+      setPendingAttachment(null);
       ui.toast(`Image is still too large after compression (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
       return;
     }
