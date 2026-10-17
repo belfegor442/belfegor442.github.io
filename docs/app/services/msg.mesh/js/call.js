@@ -238,15 +238,15 @@ export async function acceptCall() {
 }
 
 export function declineCall() {
-  if (phase !== "ringing-in" || !callId) return;
+  if ((phase !== "ringing-in" && phase !== "preparing-in") || !callId) return;
   sendSignal({ action: "decline", call_id: callId, to: peer });
   reset();
   emit("callstate", callState());
 }
 
 export function cancelCall() {
-  if (phase !== "ringing-out" || !callId) return;
-  sendSignal({ action: "end", call_id: callId, to: peer });
+  if (phase !== "ringing-out" && phase !== "preparing-out") return;
+  if (callId && peer) sendSignal({ action: "end", call_id: callId, to: peer });
   reset();
   emit("callstate", callState());
 }
