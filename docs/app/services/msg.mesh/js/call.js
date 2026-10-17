@@ -155,7 +155,10 @@ async function getMedia(kind) {
 
 export async function startCall(target, kind) {
   if (phase !== "idle") return { ok: false, error: "another call is already active" };
-  if (!target || target === state.selfNode) return { ok: false, error: "invalid call target" };
+  const targetMatch = /^u(\d+)$/.exec(String(target || ""));
+  if (!targetMatch || target === state.selfNode) return { ok: false, error: "invalid call target" };
+  if (!isFriend(targetMatch[1])) return { ok: false, error: "calls are only allowed with friends" };
+  if (state.connection !== "online") return { ok: false, error: "not connected to the server" };
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     return { ok: false, error: "camera/microphone unavailable in this browser" };
   }
