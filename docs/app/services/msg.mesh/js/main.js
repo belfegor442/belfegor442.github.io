@@ -205,7 +205,8 @@ async function startSession() {
     state.user = normalizeUser(w);
     await syncProfileFromServer(w.profile);
     if (getToken() !== sessionToken) {
-      state.user = null;
+      // A newer login may already have populated state.user; do not clear or
+      // overwrite state owned by that newer session from this stale promise.
       throw new ApiError(401, { error: "session changed" });
     }
   } catch (e) {
