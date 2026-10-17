@@ -374,14 +374,23 @@ window.addEventListener("hashchange", route);
 
 /* ---------------- read state ---------------- */
 
+const readRequestsInFlight = new Set();
+
 async function markRead(peer) {
-  if (!peer) return;
+  if (!peer || readRequestsInFlight.has(peer)) return;
   const max = maxRowid(peer);
   if (!max) return;
   const ptr = state.pointers.get(peer) || 0;
   if (max <= ptr) return;
+
+  // Coalesce overlapping focus/open/message events into one request per peer.
+  // If a newer message arrives while it is in flight, send one follow-up after
+  // the successful response instead of flooding the server with duplicates.
+  const requestedMax = max;
+  readRequestsInFlight.add(peer);
+  let succeeded = false;
   try {
-    const r = await api.read(peer, max);
+    const r = await api.read(peer, requestedMax);
     if (r && typeof r.my_last_read_rowid === "number") {
       const cur = state.pointers.get(peer) || 0;
       if (r.my_last_read_rowid > cur) state.pointers.set(peer, r.my_last_read_rowid);
@@ -395,7 +404,16 @@ async function markRead(peer) {
     refreshConversations();
     ui.renderSidebar();
     if (state.activePeer === peer) ui.renderChatHead();
+    succeeded = true;
   } catch { /* pointer retried on next event */ }
+  finally {
+    readRequestsInFlight.delete(peer);
+    const latest = maxRowid(peer);
+    const current = state.pointers.get(peer) || 0;
+    if (succeeded && latest > requestedMax && latest > current) {
+      queueMicrotask(() => markRead(peer));
+    }
+  }
 }
 
 /* ---------------- sending ---------------- */
