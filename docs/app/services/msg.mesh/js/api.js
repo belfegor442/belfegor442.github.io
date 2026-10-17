@@ -37,7 +37,13 @@ export function setApiBase(next) {
 
 function baseFromQuery() {
   const q = new URLSearchParams(location.search).get("api");
-  return q ? q.replace(/\/+$/, "") : "";
+  if (!q) return "";
+  const candidate = q.replace(/\/+$/, "");
+  // Never send login credentials to an arbitrary HTTPS host supplied by a
+  // shared URL. Custom servers remain available through the explicit server
+  // settings flow, where the user can validate the destination themselves.
+  if (SERVER_CANDIDATES.includes(candidate) || isLocalhost(candidate)) return candidate;
+  return "";
 }
 
 function isHttpsUrl(u) {
