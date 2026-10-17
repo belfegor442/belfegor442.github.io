@@ -666,6 +666,10 @@ async function prepareUploadFile(file) {
   try {
     const maxEdge = 1920;
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    // Do not degrade a small image that already fits the server limit.
+    if (scale >= 1 && file.size <= MAX_FILE) {
+      return { blob: file, type: file.type, size: file.size };
+    }
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
