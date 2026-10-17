@@ -557,7 +557,15 @@ async function retryMessage(peer, m) {
   try {
     const r = await api.send(peer, m.type || "text", JSON.stringify(m.env), cid || undefined);
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return false;
-    if (r.message_id && findMessage(peer, m.id)) {
+    if (!r || !r.message_id) {
+      m.sync = "failed";
+      m.retryable = true;
+      ui.renderMessages({ scroll: false });
+      ui.renderSidebar();
+      ui.toast("The server did not confirm the message. You can retry it.", true);
+      return false;
+    }
+    if (findMessage(peer, m.id)) {
       const cur = findMessage(peer, m.id);
       cur.id = r.message_id;
       if (cur.rowid == null && typeof r.rowid === "number") cur.rowid = r.rowid;
