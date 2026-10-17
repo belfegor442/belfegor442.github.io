@@ -151,6 +151,12 @@ export function connect() {
   socket = ws;
 
   ws.onopen = () => {
+    // A replaced socket can finish opening after forceReconnect() has already
+    // installed its successor. It must not reset timers or mark the new session online.
+    if (socket !== ws || closedByUs || !started) {
+      try { ws.close(); } catch { /* already closed */ }
+      return;
+    }
     attempts = 0;
     try {
       ws.send(JSON.stringify({ type: "auth", session_token: getToken() }));
@@ -164,6 +170,7 @@ export function connect() {
   };
 
   ws.onmessage = (ev) => {
+    if (socket !== ws || closedByUs || !started) return;
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     if (!msg || typeof msg !== "object") return;
