@@ -525,17 +525,27 @@ async function sendMessage() {
       m.id = r.message_id;
       if (m.rowid == null && typeof r.rowid === "number") m.rowid = r.rowid;
       if (m.sync === "sending") m.sync = "sent";
+      m.retryable = false;
       ui.renderMessages({ scroll: false });
     }
     markRead(peer);
   } catch (e) {
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     const m = findMessage(peer, tmp);
-    if (m) m.sync = "failed";
+    if (m) {
+      m.sync = "failed";
+      m.retryable = isRetryableSendError(e);
+    }
     ui.renderMessages({ scroll: false });
     ui.toast("Send failed: " + friendlyError(e), true);
   }
   if (getToken() === sessionToken && state.user && state.user.user_id === sessionUserId) ui.renderSidebar();
+}
+
+function isRetryableSendError(error) {
+  const status = Number(error && error.status);
+  return status === 0 || status === 408 || status === 429 ||
+    status === 500 || status === 502 || status === 503;
 }
 
 async function retryMessage(peer, m) {
@@ -552,12 +562,14 @@ async function retryMessage(peer, m) {
       cur.id = r.message_id;
       if (cur.rowid == null && typeof r.rowid === "number") cur.rowid = r.rowid;
       cur.sync = "sent";
+      cur.retryable = false;
       ui.renderMessages({ scroll: false });
       markRead(peer);
     }
   } catch (e) {
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
     m.sync = "failed";
+    m.retryable = isRetryableSendError(e);
     ui.renderMessages({ scroll: false });
     ui.toast("Retry failed: " + friendlyError(e), true);
   }
@@ -1830,7 +1842,34 @@ on("messages", (detail) => {
   }
 });
 
-on("connection", () => ui.renderConnection());
+let reconnectRetryTimer = null;
+on("connection", (mode) => {
+  ui.renderConnection();
+  if (mode !== "online" || reconnectRetryTimer !== null) return;
+  reconnectRetryTimer = setTimeout(async () => {
+    reconnectRetryTimer = null;
+    const sessionToken = getToken();
+    const sessionUserId = state.user && state.user.user_id;
+    if (!sessionToken || !sessionUserId || state.connection !== "online") return;
+    const pending = [];
+    for (const [peer, conversation] of state.conversations) {
+      for (const message of conversation.messages) {
+        if (message.mine && message.sync === "failed" && message.retryable) {
+          pending.push({ peer, message });
+          if (pending.length >= 20) break;
+        }
+      }
+      if (pending.length >= 20) break;
+    }
+    // Bound the burst after a reconnect; client_msg_id makes ambiguous retries
+    // idempotent on the server. Stop immediately if the session changes.
+    for (const item of pending) {
+      if (getToken() !== sessionToken || !state.user ||
+          state.user.user_id !== sessionUserId || state.connection !== "online") break;
+      await retryMessage(item.peer, item.message);
+    }
+  }, 250);
+});
 on("sync", (text) => {
   const sync = $("#syncState");
   if (sync) sync.textContent = text;
