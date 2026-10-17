@@ -304,6 +304,12 @@ function onSignal(d) {
       if (d.call_id && d.from) sendSignal({ action: "decline", call_id: d.call_id, to: d.from });
       return;
     }
+    if (typeof RTCPeerConnection === "undefined" ||
+        !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      sendSignal({ action: "decline", call_id: d.call_id, to: d.from });
+      emit("callnotice", "voice/video calls are unavailable in this browser");
+      return;
+    }
     peer = d.from;
     callId = d.call_id;
     role = "callee";
