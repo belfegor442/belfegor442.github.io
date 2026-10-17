@@ -1324,8 +1324,18 @@ function gifState(text) {
     : "";
 }
 
+async function fetchWithTimeout(url, timeoutMs = 12000) {
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  try {
+    return await fetch(url, ctrl ? { signal: ctrl.signal } : {});
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function gifFetch(path) {
-  const r = await fetch(GIF_API + path);
+  const r = await fetchWithTimeout(GIF_API + path, 12000);
   if (!r.ok) throw new Error("http " + r.status);
   return r.json();
 }
@@ -1430,7 +1440,7 @@ async function gifSend(it) {
   let file = null;
   for (const u of candidates) {
     try {
-      const res = await fetch(u);
+      const res = await fetchWithTimeout(u, 15000);
       if (!res.ok) continue;
       const blob = await res.blob();
       const webp = /\.webp(\?|$)/i.test(u) || blob.type === "image/webp";
