@@ -198,6 +198,34 @@ setOnServerSwitch(() => {
   try { wsForceReconnect(); } catch { /* reconnect loop continues */ }
 });
 
+// localStorage changes are not reflected in this module's in-memory token.
+// Keep other tabs aligned when a user signs out or switches accounts.
+window.addEventListener("storage", (event) => {
+  if (event.key !== "msg.mesh.token") return;
+  const nextToken = event.newValue || "";
+  if (nextToken === getToken()) return;
+
+  cancelActiveUpload();
+  if (Call.isCallActive()) Call.endCall();
+  wsDisconnect();
+  setToken(nextToken);
+  resetState();
+  clearProfileCache();
+  ui.clearAttachmentImageCache();
+  booted = false;
+
+  if (!nextToken) {
+    ui.showAuth("login");
+    setMode("login");
+    location.hash = "#/login";
+    ui.toast("Signed out in another tab.");
+    return;
+  }
+  startSession().catch(() => {
+    if (getToken() === nextToken) handleSessionLost();
+  });
+});
+
 async function startSession() {
   const sessionToken = getToken();
   if (!sessionToken) throw new ApiError(401, { error: "session missing" });
