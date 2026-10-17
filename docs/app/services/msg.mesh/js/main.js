@@ -726,17 +726,24 @@ async function prepareUploadFile(file) {
         }
       }
 
-      const preferredMime = type === "image/png" ? "image/webp" : type;
-      for (const quality of qualities) {
-        const encoded = await encode(preferredMime, quality);
-        if (!encoded || encoded.type !== preferredMime) continue;
-        if (!best || encoded.size < best.blob.size) {
-          best = { blob: encoded, type: encoded.type, size: encoded.size,
-            filename: preferredMime !== type ? file.name.replace(/\.[^.]+$/, "") + ".webp" : undefined };
-        }
-        if (encoded.size <= MAX_FILE) {
-          return { blob: encoded, type: encoded.type, size: encoded.size,
-            filename: preferredMime !== type ? file.name.replace(/\.[^.]+$/, "") + ".webp" : undefined };
+      const outputTypes = type === "image/webp"
+        ? ["image/webp"]
+        : type === "image/jpeg"
+          ? ["image/jpeg", "image/webp"]
+          : ["image/webp"];
+      for (const outputType of outputTypes) {
+        for (const quality of qualities) {
+          const encoded = await encode(outputType, quality);
+          if (!encoded || encoded.type !== outputType) continue;
+          const filename = outputType !== type
+            ? file.name.replace(/\.[^.]+$/, "") + ".webp"
+            : undefined;
+          if (!best || encoded.size < best.blob.size) {
+            best = { blob: encoded, type: encoded.type, size: encoded.size, filename };
+          }
+          if (encoded.size <= MAX_FILE) {
+            return { blob: encoded, type: encoded.type, size: encoded.size, filename };
+          }
         }
       }
     }
