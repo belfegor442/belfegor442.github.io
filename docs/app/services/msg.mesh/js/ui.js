@@ -331,6 +331,13 @@ const MAX_ATT_IMAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 // boundaries so a shared browser cannot reuse one user's cached images.
 export function clearAttachmentImageCache() {
   attImgCache.clear();
+  if (typeof document !== "undefined") {
+    document.querySelectorAll("img[data-attimg]").forEach(img => {
+      img.removeAttribute("src");
+      delete img.dataset.loading;
+      img.classList.remove("att-img-ready", "att-img-loading");
+    });
+  }
 }
 
 function cacheAttImage(id, url) {
