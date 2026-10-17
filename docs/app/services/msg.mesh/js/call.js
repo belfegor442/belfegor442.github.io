@@ -78,23 +78,28 @@ function reset() {
 }
 
 function makePc() {
+  const activeCallId = callId;
+  const activePeer = peer;
   const p = new RTCPeerConnection({ iceServers: STUN_SERVERS });
   p.onicecandidate = (ev) => {
-    if (!callId || !peer) return;
+    if (pc !== p || callId !== activeCallId || peer !== activePeer) return;
     sendSignal({
       action: "candidate",
-      call_id: callId,
-      to: peer,
+      call_id: activeCallId,
+      to: activePeer,
       candidate: ev.candidate ? ev.candidate.toJSON() : null,
     });
   };
   p.ontrack = (ev) => {
+    if (pc !== p || callId !== activeCallId || peer !== activePeer) return;
     remoteStream = ev.streams && ev.streams[0] ? ev.streams[0] : new MediaStream([ev.track]);
     emit("callstate", callState());
   };
   p.onconnectionstatechange = () => {
-    if (!pc) return;
-    if (pc.connectionState === "connected" && (phase === "connecting" || phase === "in-call")) {
+    // Closing a previous RTCPeerConnection is asynchronous. Ignore its late
+    // events so they cannot end or mutate a newer call.
+    if (pc !== p || callId !== activeCallId || peer !== activePeer) return;
+    if (p.connectionState === "connected" && (phase === "connecting" || phase === "in-call")) {
       if (phase === "connecting") {
         startedAt = Date.now();
         stopRing();
@@ -104,7 +109,7 @@ function makePc() {
         stopTick();
         tickTimer = setInterval(() => emit("callstate", callState()), 1000);
       }
-    } else if (pc.connectionState === "failed") {
+    } else if (p.connectionState === "failed") {
       endCall("connection failed");
     }
   };
