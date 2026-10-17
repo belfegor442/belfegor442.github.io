@@ -11,6 +11,8 @@ let heartbeat = null;
 let poller = null;
 let watchdog = null;
 let watchdogFails = 0;
+let watchdogProbeInFlight = false;
+let pollInFlight = false;
 let attempts = 0;
 let reconnectTimer = null;
 let closedByUs = false;
@@ -40,15 +42,23 @@ function startWatchdog() {
   stopWatchdog();
   watchdogFails = 0;
   watchdog = setInterval(async () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    const h = await api.health();
-    if (h.ok) {
-      watchdogFails = 0;
-      return;
-    }
-    watchdogFails += 1;
-    if (watchdogFails >= 2) {
-      try { socket.close(); } catch { /* onclose follows */ }
+    if (watchdogProbeInFlight || !socket || socket.readyState !== WebSocket.OPEN) return;
+    const checkedSocket = socket;
+    watchdogProbeInFlight = true;
+    try {
+      const h = await api.health();
+      // Ignore a probe that completed after its socket was replaced.
+      if (socket !== checkedSocket || checkedSocket.readyState !== WebSocket.OPEN) return;
+      if (h.ok) {
+        watchdogFails = 0;
+        return;
+      }
+      watchdogFails += 1;
+      if (watchdogFails >= 2) {
+        try { checkedSocket.close(); } catch { /* onclose follows */ }
+      }
+    } finally {
+      watchdogProbeInFlight = false;
     }
   }, WATCHDOG_MS);
 }
@@ -80,16 +90,20 @@ async function resync() {
 function startPolling() {
   if (poller) return;
   poller = setInterval(async () => {
-    if (!getToken()) return;
+    if (pollInFlight || !getToken() || socket && socket.readyState === WebSocket.OPEN) return;
+    pollInFlight = true;
     try {
       const r = await api.history({ limit: 50 });
+      // A socket may reconnect while this HTTP request is in flight. Ingesting
+      // remains safe (the store deduplicates), but avoid redundant user refreshes.
       ingest(r.items || []);
       await primeUsers();
       refreshConversations();
       emit("conversations");
       emit("messages");
-      emit("sync", "POLLING");
+      emit("sync", socket && socket.readyState === WebSocket.OPEN ? "SYNCED" : "POLLING");
     } catch { /* server unreachable */ }
+    finally { pollInFlight = false; }
   }, POLL_MS);
 }
 
