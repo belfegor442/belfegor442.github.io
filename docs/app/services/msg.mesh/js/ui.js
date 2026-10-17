@@ -324,8 +324,8 @@ function isImageAtt(att) {
    att-chip (contract with f13 tests) — hydrated from api.download() with a
    data-URL cache so re-renders don't re-fetch. */
 const attImgCache = new Map();
-const MAX_ATT_IMAGE_CACHE_ENTRIES = 24;
-const MAX_ATT_IMAGE_PREVIEW_BYTES = 8 * 1024 * 1024;
+const MAX_ATT_IMAGE_CACHE_ENTRIES = 16;
+const MAX_ATT_IMAGE_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 function cacheAttImage(id, url) {
   // Small LRU cache prevents every opened image from being retained forever.
