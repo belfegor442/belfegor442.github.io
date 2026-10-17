@@ -141,6 +141,7 @@ function scheduleReconnect() {
 
 export function connect() {
   if (!getToken()) return;
+  const socketToken = getToken();
   if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -164,13 +165,14 @@ export function connect() {
   ws.onopen = () => {
     // A replaced socket can finish opening after forceReconnect() has already
     // installed its successor. It must not reset timers or mark the new session online.
-    if (socket !== ws || closedByUs || !started) {
+    // Never authenticate a socket created for an older account with a newer token.
+    if (socket !== ws || closedByUs || !started || getToken() !== socketToken) {
       try { ws.close(); } catch { /* already closed */ }
       return;
     }
     attempts = 0;
     try {
-      ws.send(JSON.stringify({ type: "auth", session_token: getToken() }));
+      ws.send(JSON.stringify({ type: "auth", session_token: socketToken }));
     } catch { /* onclose follows */ }
     setConnection("online");
     startHeartbeat();
@@ -182,6 +184,10 @@ export function connect() {
 
   ws.onmessage = (ev) => {
     if (socket !== ws || closedByUs || !started) return;
+    if (getToken() !== socketToken) {
+      try { ws.close(); } catch { /* already closed */ }
+      return;
+    }
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     if (!msg || typeof msg !== "object") return;
