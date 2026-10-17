@@ -1530,7 +1530,7 @@ async function loadOlder() {
   const wrap = $("#messages");
   const keepBottom = wrap.scrollHeight - wrap.scrollTop;
   try {
-    const r = await api.history({ limit: 200, before_id: before });
+    const r = await api.history({ limit: 200, before_id: before, peer_node_id: peer });
     const items = r.items || [];
     const countBefore = c.messages.length;
     ingest(items);
