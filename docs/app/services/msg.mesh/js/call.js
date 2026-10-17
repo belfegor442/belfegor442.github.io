@@ -223,6 +223,9 @@ export function dismissCall() {
 function onSignal(d) {
   if (!d || typeof d !== "object") return;
   if (d.from === state.selfNode) return; // our own frame echoed back
+  // The server stamps both routing fields. Ignore frames not addressed to this
+  // session before they can trigger a decline, UI notification, or call state.
+  if (!state.selfNode || d.to !== state.selfNode || typeof d.from !== "string") return;
   const action = d.action;
   if (action === "invite") {
     if (phase !== "idle" || !d.call_id || !d.from) {
@@ -256,8 +259,9 @@ function onSignal(d) {
     emit("callinvite", { from: d.from, call_id: d.call_id });
     return;
   }
-  // Every other action belongs to the active call only.
-  if (!callId || d.call_id !== callId) return;
+  // Every other action must come from the peer in the current call. This
+  // prevents unrelated/stale signaling frames from changing or tearing it down.
+  if (!callId || d.call_id !== callId || d.from !== peer) return;
   if (action === "accept" && phase === "ringing-out") {
     stopRing();
     clearRingTimer();
@@ -277,22 +281,32 @@ function onSignal(d) {
     return;
   }
   if (action === "offer" && phase === "connecting" && pc && d.sdp) {
-    pc.setRemoteDescription({ type: "offer", sdp: d.sdp })
-      .then(() => pc.createAnswer())
-      .then((answer) => pc.setLocalDescription(answer))
+    const activePc = pc;
+    const activeCallId = callId;
+    const activePeer = peer;
+    activePc.setRemoteDescription({ type: "offer", sdp: d.sdp })
+      .then(() => activePc.createAnswer())
+      .then((answer) => activePc.setLocalDescription(answer))
       .then(() => {
-        if (pc && callId && peer) {
-          sendSignal({ action: "answer", call_id: callId, to: peer, sdp: pc.localDescription.sdp });
-        }
+        if (pc !== activePc || callId !== activeCallId || peer !== activePeer) return;
+        sendSignal({ action: "answer", call_id: activeCallId, to: activePeer, sdp: activePc.localDescription.sdp });
         flushCandidates();
       })
-      .catch(() => endCall("could not negotiate the audio stream"));
+      .catch(() => {
+        if (pc === activePc && callId === activeCallId) endCall("could not negotiate the audio stream");
+      });
     return;
   }
   if (action === "answer" && pc && d.sdp) {
-    pc.setRemoteDescription({ type: "answer", sdp: d.sdp })
-      .then(flushCandidates)
-      .catch(() => endCall("could not negotiate the audio stream"));
+    const activePc = pc;
+    const activeCallId = callId;
+    activePc.setRemoteDescription({ type: "answer", sdp: d.sdp })
+      .then(() => {
+        if (pc === activePc && callId === activeCallId) flushCandidates();
+      })
+      .catch(() => {
+        if (pc === activePc && callId === activeCallId) endCall("could not negotiate the audio stream");
+      });
     return;
   }
   if (action === "candidate") {
