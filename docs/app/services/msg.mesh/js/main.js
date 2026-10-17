@@ -566,12 +566,14 @@ async function retryMessage(peer, m) {
       ui.renderMessages({ scroll: false });
       markRead(peer);
     }
+    ui.renderSidebar();
     return true;
   } catch (e) {
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return false;
     m.sync = "failed";
     m.retryable = isRetryableSendError(e);
     ui.renderMessages({ scroll: false });
+    ui.renderSidebar();
     ui.toast("Retry failed: " + friendlyError(e), true);
     return false;
   }
