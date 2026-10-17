@@ -163,11 +163,18 @@ export async function startCall(target, kind) {
     return { ok: false, error: "camera/microphone unavailable in this browser" };
   }
   media = kind === "video" ? "video" : "audio";
+  // Reserve the call slot before opening the browser permission prompt. Without
+  // this, rapid clicks can acquire multiple streams and create parallel calls.
+  setPhase("preparing-out");
   try {
     await getMedia(media);
   } catch {
-    reset();
+    if (phase === "preparing-out") reset();
     return { ok: false, error: media === "video" ? "camera/microphone access denied" : "microphone access denied" };
+  }
+  if (phase !== "preparing-out") {
+    cleanupMedia();
+    return { ok: false, error: "call setup was cancelled" };
   }
   peer = target;
   role = "caller";
@@ -186,13 +193,25 @@ export async function startCall(target, kind) {
 
 export async function acceptCall() {
   if (phase !== "ringing-in" || !callId || !peer) return { ok: false };
+  const acceptedCallId = callId;
+  const acceptedPeer = peer;
+  const acceptedMedia = media;
+  setPhase("preparing-in");
   try {
-    await getMedia(media);
+    await getMedia(acceptedMedia);
   } catch {
-    sendSignal({ action: "decline", call_id: callId, to: peer });
-    reset();
-    emit("callnotice", "camera/microphone access denied");
+    if (callId === acceptedCallId && peer === acceptedPeer) {
+      sendSignal({ action: "decline", call_id: acceptedCallId, to: acceptedPeer });
+      reset();
+      emit("callnotice", "camera/microphone access denied");
+    }
     return { ok: false, error: "camera/microphone access denied" };
+  }
+  // The caller may cancel or the call may be reset while permission is pending.
+  // Never attach a late media stream to a different call.
+  if (phase !== "preparing-in" || callId !== acceptedCallId || peer !== acceptedPeer) {
+    cleanupMedia();
+    return { ok: false, error: "call setup was cancelled" };
   }
   stopRing();
   clearRingTimer();
