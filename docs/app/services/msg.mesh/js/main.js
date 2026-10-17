@@ -677,40 +677,73 @@ async function handleFile(file) {
 // an image or encoding is not beneficial, retain the original bytes unchanged.
 async function prepareUploadFile(file) {
   const type = String(file.type || "").toLowerCase();
-  if (!["image/jpeg", "image/png", "image/webp"].includes(type) ||
-      typeof createImageBitmap !== "function" || file.size < 96 * 1024) {
+  const supported = ["image/jpeg", "image/png", "image/webp"].includes(type);
+  if (!supported || typeof createImageBitmap !== "function" || file.size < 96 * 1024) {
     return { blob: file, type: file.type || "application/octet-stream", size: file.size };
   }
+
+  // Do not recompress an image that already fits the wire limit. Compression
+  // is a fallback for oversized images, not a blanket quality reduction.
+  if (file.size <= MAX_FILE) {
+    let dimensions;
+    try { dimensions = await createImageBitmap(file); }
+    catch { return { blob: file, type, size: file.size }; }
+    const fits = Math.max(dimensions.width, dimensions.height) <= 1920;
+    dimensions.close?.();
+    if (fits) return { blob: file, type, size: file.size };
+  }
+
   let bitmap;
   try { bitmap = await createImageBitmap(file); }
-  catch { return { blob: file, type: file.type, size: file.size }; }
+  catch { return { blob: file, type, size: file.size }; }
   try {
-    const maxEdge = 1920;
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-    // Do not degrade a small image that already fits the server limit.
-    if (scale >= 1 && file.size <= MAX_FILE) {
-      return { blob: file, type: file.type, size: file.size };
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const ctx = canvas.getContext("2d", { alpha: true });
-    if (!ctx) return { blob: file, type: file.type, size: file.size };
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const encode = (mime, quality) => new Promise(resolve => canvas.toBlob(resolve, mime, quality));
-    const sameType = await encode(type, 0.82);
-    if (sameType && sameType.type === type && sameType.size < file.size &&
-        (sameType.size <= MAX_FILE || type === "image/webp")) {
-      return { blob: sameType, type, size: sameType.size };
-    }
-    if (file.size > MAX_FILE && (type === "image/png" || type === "image/jpeg")) {
-      const webp = await encode("image/webp", 0.82);
-      if (webp && webp.type === "image/webp" && webp.size < file.size) {
-        const filename = file.name.replace(/\.[^.]+$/, "") + ".webp";
-        return { blob: webp, type: "image/webp", size: webp.size, filename };
+    const sourceMax = Math.max(bitmap.width, bitmap.height);
+    const edgeTargets = [1920, 1600, 1280, 1024, 800, 640];
+    const targets = [...new Set(edgeTargets.map(edge => Math.min(sourceMax, edge)))];
+    const qualities = [0.88, 0.82, 0.76, 0.70, 0.64, 0.58, 0.52];
+    let best = null;
+
+    for (const edge of targets) {
+      const scale = Math.min(1, edge / sourceMax);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d", { alpha: type === "image/png" });
+      if (!ctx) continue;
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const encode = (mime, quality) => new Promise(resolve => canvas.toBlob(resolve, mime, quality));
+
+      // PNG's quality parameter is ignored by browsers, so encode it once.
+      // JPEG/WebP are tried from high to lower quality; the first candidate
+      // under the server limit is the best-quality candidate at this size.
+      if (type === "image/png") {
+        const png = await encode("image/png");
+        if (png && png.type === "image/png") {
+          if (!best || png.size < best.blob.size) best = { blob: png, type: png.type, size: png.size };
+          if (png.size <= MAX_FILE) {
+            return { blob: png, type: png.type, size: png.size };
+          }
+        }
+      }
+
+      const preferredMime = type === "image/png" ? "image/webp" : type;
+      for (const quality of qualities) {
+        const encoded = await encode(preferredMime, quality);
+        if (!encoded || encoded.type !== preferredMime) continue;
+        if (!best || encoded.size < best.blob.size) {
+          best = { blob: encoded, type: encoded.type, size: encoded.size,
+            filename: preferredMime !== type ? file.name.replace(/\.[^.]+$/, "") + ".webp" : undefined };
+        }
+        if (encoded.size <= MAX_FILE) {
+          return { blob: encoded, type: encoded.type, size: encoded.size,
+            filename: preferredMime !== type ? file.name.replace(/\.[^.]+$/, "") + ".webp" : undefined };
+        }
       }
     }
-    return { blob: file, type: file.type, size: file.size };
+
+    // Keep the smallest successful encoding so the caller can report the
+    // precise size-limit failure; never silently send an oversized payload.
+    return best && best.size < file.size ? best : { blob: file, type, size: file.size };
   } finally {
     bitmap.close?.();
   }
