@@ -175,6 +175,7 @@ let booted = false;
 function handleSessionLost() {
   if (!getToken()) return;
   cancelActiveUpload();
+  ui.clearAttachmentImageCache();
   if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   setToken("");
   wsDisconnect();
@@ -192,7 +193,10 @@ setOnUnauthorized(handleSessionLost);
 // Mid-session node failover: the old socket points at the dead node, so drop
 // it now and reconnect against the base we just switched to (ws.js would
 // otherwise wait for the 30s x2 watchdog to notice the half-open connection).
-setOnServerSwitch(() => { try { wsForceReconnect(); } catch { /* reconnect loop continues */ } });
+setOnServerSwitch(() => {
+  ui.clearAttachmentImageCache();
+  try { wsForceReconnect(); } catch { /* reconnect loop continues */ }
+});
 
 async function startSession() {
   const sessionToken = getToken();
@@ -321,6 +325,7 @@ function emitFriends() {
 async function logout() {
   primeSound("logoff");
   cancelActiveUpload();
+  ui.clearAttachmentImageCache();
   if (Call.isCallActive()) Call.endCall(); // signaling dies with the session
   try { await api.logout(); } catch { /* session may already be gone */ }
   setToken("");
