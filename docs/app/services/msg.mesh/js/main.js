@@ -998,7 +998,15 @@ function renderCallState(st) {
   if (stage) stage.classList.toggle("hidden", !videoLive);
   // avatar: hide while the video stage is visible
   if (av) av.classList.toggle("hidden", videoLive);
-  if (st.phase === "ringing-in") {
+  if (st.phase === "preparing-in") {
+    if (status) status.textContent = "Preparing camera/microphone…";
+    if (btns.decline) btns.decline.classList.remove("hidden");
+    if (timer) timer.classList.add("hidden");
+  } else if (st.phase === "preparing-out") {
+    if (status) status.textContent = "Requesting camera/microphone access…";
+    if (btns.cancel) btns.cancel.classList.remove("hidden");
+    if (timer) timer.classList.add("hidden");
+  } else if (st.phase === "ringing-in") {
     if (status) status.textContent = st.media === "video" ? "Incoming video call…" : "Incoming call…";
     if (btns.accept) btns.accept.classList.remove("hidden");
     if (btns.decline) btns.decline.classList.remove("hidden");
