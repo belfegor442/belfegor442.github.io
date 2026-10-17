@@ -252,7 +252,25 @@ async function syncProfileFromServer(serverProfile, sessionToken = getToken(), s
   const sessionIsCurrent = () => getToken() === sessionToken &&
     !!state.user && state.user.user_id === sessionUserId;
   if (!sessionIsCurrent()) return;
-  const migrationKey = "msg.mesh.profileMigrated." + String(sessionUserId || "");
+
+  // The legacy profile cache was global to the browser, not account-scoped.
+  // Never let it leak into a different account after a tab reload or account
+  // switch. Migrate an unowned legacy cache only when the remembered username
+  // matches the account that just authenticated.
+  const profileOwnerKey = "msg.mesh.profileOwner";
+  const userId = String(sessionUserId || "");
+  try {
+    const cachedOwner = localStorage.getItem(profileOwnerKey) || "";
+    const remembered = lastUsername().trim().toLowerCase();
+    const currentUsername = String(state.user.username || "").trim().toLowerCase();
+    if ((cachedOwner && cachedOwner !== userId) ||
+        (!cachedOwner && remembered !== currentUsername)) {
+      clearProfileCache();
+    }
+    localStorage.setItem(profileOwnerKey, userId);
+  } catch { /* private mode: in-memory session checks still apply */ }
+
+  const migrationKey = "msg.mesh.profileMigrated." + userId;
   const markMigrated = () => {
     try { localStorage.setItem(migrationKey, "1"); } catch { /* storage may be unavailable */ }
   };
