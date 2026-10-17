@@ -69,14 +69,20 @@ function stopWatchdog() {
 }
 
 async function resync() {
+  const sessionToken = getToken();
+  const sessionNode = state.selfNode;
+  if (!sessionToken || !sessionNode) return;
   try {
     const r = await api.history({ limit: 200 });
+    if (getToken() !== sessionToken || state.selfNode !== sessionNode) return;
     ingest(r.items || []);
     await primeUsers();
+    if (getToken() !== sessionToken || state.selfNode !== sessionNode) return;
     refreshConversations(true);
     emit("conversations");
     emit("messages");
     const ptr = await api.read(null);
+    if (getToken() !== sessionToken || state.selfNode !== sessionNode) return;
     if (ptr && ptr.reads) {
       for (const [peer, rowid] of Object.entries(ptr.reads)) state.pointers.set(peer, rowid);
       emit("conversations");
@@ -91,13 +97,18 @@ function startPolling() {
   if (poller) return;
   poller = setInterval(async () => {
     if (pollInFlight || !getToken() || socket && socket.readyState === WebSocket.OPEN) return;
+    const sessionToken = getToken();
+    const sessionNode = state.selfNode;
+    if (!sessionNode) return;
     pollInFlight = true;
     try {
       const r = await api.history({ limit: 50 });
-      // A socket may reconnect while this HTTP request is in flight. Ingesting
-      // remains safe (the store deduplicates), but avoid redundant user refreshes.
+      // Ignore a late poll after logout/account switch. Deduplication protects
+      // message IDs, not the identity boundary between two local sessions.
+      if (getToken() !== sessionToken || state.selfNode !== sessionNode) return;
       ingest(r.items || []);
       await primeUsers();
+      if (getToken() !== sessionToken || state.selfNode !== sessionNode) return;
       refreshConversations();
       emit("conversations");
       emit("messages");
