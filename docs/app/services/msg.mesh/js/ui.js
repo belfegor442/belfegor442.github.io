@@ -322,13 +322,27 @@ function isImageAtt(att) {
    att-chip (contract with f13 tests) — hydrated from api.download() with a
    data-URL cache so re-renders don't re-fetch. */
 const attImgCache = new Map();
+const MAX_ATT_IMAGE_CACHE_ENTRIES = 24;
+const MAX_ATT_IMAGE_PREVIEW_BYTES = 8 * 1024 * 1024;
+
+function cacheAttImage(id, url) {
+  // Small LRU cache prevents every opened image from being retained forever.
+  attImgCache.delete(id);
+  attImgCache.set(id, url);
+  while (attImgCache.size > MAX_ATT_IMAGE_CACHE_ENTRIES) {
+    attImgCache.delete(attImgCache.keys().next().value);
+  }
+}
 
 function hydrateAttImages(root) {
   if (!root || !root.querySelectorAll) return;
   root.querySelectorAll("img[data-attimg]").forEach((img) => {
     const id = img.dataset.attimg;
     if (attImgCache.has(id)) {
-      img.src = attImgCache.get(id);
+      const url = attImgCache.get(id);
+      attImgCache.delete(id);
+      attImgCache.set(id, url);
+      img.src = url;
       img.classList.add("att-img-ready");
       return;
     }
@@ -336,8 +350,14 @@ function hydrateAttImages(root) {
     img.dataset.loading = "1";
     img.classList.add("att-img-loading");
     api.download(id).then((r) => {
-      const url = "data:" + (r.content_type || "image/png") + ";base64," + r.content_base64;
-      attImgCache.set(id, url);
+      const size = Number(r.size_bytes) || 0;
+      const encoded = typeof r.content_base64 === "string" ? r.content_base64 : "";
+      if (size > MAX_ATT_IMAGE_PREVIEW_BYTES ||
+          encoded.length > Math.ceil(MAX_ATT_IMAGE_PREVIEW_BYTES * 4 / 3) + 8) {
+        throw new Error("image preview exceeds memory limit");
+      }
+      const url = "data:" + (r.content_type || "image/png") + ";base64," + encoded;
+      cacheAttImage(id, url);
       img.src = url;
       img.classList.remove("att-img-loading");
       img.classList.add("att-img-ready");
