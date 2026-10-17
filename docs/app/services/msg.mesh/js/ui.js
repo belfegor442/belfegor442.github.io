@@ -1,6 +1,6 @@
 import { state, conversationOrder, peerLabel, peerUser, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 import { playSound } from "./sound.js";
-import { api } from "./api.js";
+import { api, getToken } from "./api.js";
 import { emoteFile } from "./emoticons.js";
 
 export const $ = (s) => document.querySelector(s);
@@ -361,7 +361,9 @@ function hydrateAttImages(root) {
     if (img.dataset.loading) return;
     img.dataset.loading = "1";
     img.classList.add("att-img-loading");
+    const sessionToken = getToken();
     api.download(id).then((r) => {
+      if (getToken() !== sessionToken) throw new Error("session changed");
       const size = Number(r.size_bytes) || 0;
       const encoded = typeof r.content_base64 === "string" ? r.content_base64 : "";
       if (size > MAX_ATT_IMAGE_PREVIEW_BYTES ||
