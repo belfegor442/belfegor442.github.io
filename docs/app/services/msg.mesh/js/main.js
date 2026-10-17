@@ -529,7 +529,10 @@ async function retryMessage(peer, m) {
 const MAX_FILE = 700 * 1024;
 
 $("#sendFileBtn")?.addEventListener("click", () => $("#fileInput").click());
-$("#pendingFileCancel")?.addEventListener("click", () => setPendingAttachment(null));
+$("#pendingFileCancel")?.addEventListener("click", () => {
+  uploadSeq += 1; // invalidate any in-flight upload before clearing the attachment
+  setPendingAttachment(null);
+});
 
 // XHR upload so the pending-file bar can show real byte progress (fetch has
 // no upload progress events). Same endpoint/headers/failure contract as
@@ -571,12 +574,12 @@ function uploadWithProgress(filename, contentType, b64, size, onProgress) {
 
 let uploadSeq = 0;
 async function handleFile(file) {
+  const seq = ++uploadSeq; // a new selection supersedes any previous upload
   if (!file) return;
   if (file.size > MAX_FILE) {
     ui.toast(`File too large (max ${Math.round(MAX_FILE / 1024)} KB)`, true);
     return;
   }
-  const seq = ++uploadSeq;
   const bar = $("#pendingFile");
   const label = $("#pendingFileName");
   if (bar) bar.classList.remove("hidden");
