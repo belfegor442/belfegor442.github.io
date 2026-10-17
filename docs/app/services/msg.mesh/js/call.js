@@ -159,6 +159,7 @@ export async function startCall(target, kind) {
   if (!targetMatch || target === state.selfNode) return { ok: false, error: "invalid call target" };
   if (!isFriend(targetMatch[1])) return { ok: false, error: "calls are only allowed with friends" };
   if (state.connection !== "online") return { ok: false, error: "not connected to the server" };
+  if (typeof RTCPeerConnection === "undefined") return { ok: false, error: "WebRTC is unavailable in this browser" };
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     return { ok: false, error: "camera/microphone unavailable in this browser" };
   }
@@ -193,6 +194,13 @@ export async function startCall(target, kind) {
 
 export async function acceptCall() {
   if (phase !== "ringing-in" || !callId || !peer) return { ok: false };
+  if (typeof RTCPeerConnection === "undefined" ||
+      !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    sendSignal({ action: "decline", call_id: callId, to: peer });
+    reset();
+    emit("callnotice", "voice/video calls are unavailable in this browser");
+    return { ok: false, error: "WebRTC unavailable" };
+  }
   const acceptedCallId = callId;
   const acceptedPeer = peer;
   const acceptedMedia = media;
@@ -215,9 +223,16 @@ export async function acceptCall() {
   }
   stopRing();
   clearRingTimer();
-  pc = makePc();
-  for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
-  sendSignal({ action: "accept", call_id: callId, to: peer });
+  try {
+    pc = makePc();
+    for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
+  } catch {
+    sendSignal({ action: "decline", call_id: acceptedCallId, to: acceptedPeer });
+    reset();
+    emit("callnotice", "could not start the audio stream");
+    return { ok: false, error: "could not start the audio stream" };
+  }
+  sendSignal({ action: "accept", call_id: acceptedCallId, to: acceptedPeer });
   setPhase("connecting");
   return { ok: true };
 }
@@ -316,8 +331,13 @@ function onSignal(d) {
     clearRingTimer();
     setPhase("connecting");
     if (!pc) {
-      pc = makePc();
-      if (localStream) for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
+      try {
+        pc = makePc();
+        if (localStream) for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
+      } catch {
+        endCall("could not start the audio stream");
+        return;
+      }
     }
     pc.createOffer()
       .then((offer) => pc.setLocalDescription(offer))
