@@ -743,7 +743,8 @@ async function prepareUploadFile(file) {
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      const ctx = canvas.getContext("2d", { alpha: type === "image/png" });
+      // Preserve transparent pixels for both PNG and WebP; only JPEG is opaque.
+      const ctx = canvas.getContext("2d", { alpha: type !== "image/jpeg" });
       if (!ctx) continue;
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const encode = (mime, quality) => new Promise(resolve => canvas.toBlob(resolve, mime, quality));
