@@ -1537,6 +1537,13 @@ async function loadOlder() {
     await primeUsers();
     if (!items.length || c.messages.length === countBefore) c.hasMore = false;
     else c.hasMore = items.length >= 200;
+    // The user may have switched conversations while history was loading.
+    // Keep the old conversation updated, but never restore its scroll offset
+    // onto the newly active conversation.
+    if (state.activePeer !== peer) {
+      ui.renderSidebar();
+      return;
+    }
     ui.renderMessages({ scroll: false });
     wrap.scrollTop = wrap.scrollHeight - keepBottom;
     ui.renderSidebar();
