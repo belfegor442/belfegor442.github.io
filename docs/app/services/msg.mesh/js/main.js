@@ -194,12 +194,22 @@ setOnUnauthorized(handleSessionLost);
 setOnServerSwitch(() => { try { wsForceReconnect(); } catch { /* reconnect loop continues */ } });
 
 async function startSession() {
+  const sessionToken = getToken();
+  if (!sessionToken) throw new ApiError(401, { error: "session missing" });
   try {
     const w = await api.whoami({ allow401: true });
+    // Login/logout/server-switch can race an in-flight whoami request. Never
+    // hydrate the app with the identity returned for a token that is no longer
+    // the active session.
+    if (getToken() !== sessionToken) throw new ApiError(401, { error: "session changed" });
     state.user = normalizeUser(w);
     await syncProfileFromServer(w.profile);
+    if (getToken() !== sessionToken) {
+      state.user = null;
+      throw new ApiError(401, { error: "session changed" });
+    }
   } catch (e) {
-    setToken("");
+    if (getToken() === sessionToken) setToken("");
     throw e;
   }
   state.selfNode = "u" + state.user.user_id;
