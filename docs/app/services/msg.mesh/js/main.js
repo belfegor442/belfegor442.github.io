@@ -580,14 +580,16 @@ async function handleFile(file) {
   const bar = $("#pendingFile");
   const label = $("#pendingFileName");
   if (bar) bar.classList.remove("hidden");
-  if (label) label.textContent = file.name + " — 0%";
+  if (label) label.textContent = file.name + " — preparing";
   try {
-    const b64 = await fileToBase64(file);
+    const prepared = await prepareUploadFile(file);
+    if (seq !== uploadSeq) return;
+    const b64 = await fileToBase64(prepared.blob);
     const r = await uploadWithProgress(
       file.name,
-      file.type || "application/octet-stream",
+      prepared.type,
       b64,
-      file.size,
+      prepared.size,
       (loaded, total) => {
         if (seq === uploadSeq && label && bar && !bar.classList.contains("hidden")) {
           const pct = Math.round((loaded / total) * 100);
@@ -596,11 +598,46 @@ async function handleFile(file) {
       }
     );
     if (seq !== uploadSeq) return;
-    setPendingAttachment({ id: r.attachment_id, filename: r.filename || file.name, content_type: r.content_type || file.type, size_bytes: r.size_bytes ?? file.size });
-    ui.toast("Attached " + (r.filename || file.name));
+    setPendingAttachment({ id: r.attachment_id, filename: r.filename || file.name, content_type: r.content_type || prepared.type, size_bytes: r.size_bytes ?? prepared.size });
+    const saved = Number(r.size_bytes ?? prepared.size);
+    const reduction = file.size > 0 ? Math.round((1 - saved / file.size) * 100) : 0;
+    ui.toast(reduction >= 5 ? `Attached ${r.filename || file.name} (${reduction}% smaller)` : "Attached " + (r.filename || file.name));
   } catch (e) {
     if (seq === uploadSeq) setPendingAttachment(null);
     ui.toast("Upload failed: " + friendlyError(e), true);
+  }
+}
+
+// Downscale large raster images before Base64 encoding. Keep the original MIME
+// type and filename, preserve transparency for PNG, and never transcode GIF,
+// SVG, or non-image files. If the browser cannot decode/encode the image, or
+// the result is larger, the original file is uploaded unchanged.
+async function prepareUploadFile(file) {
+  const type = String(file.type || "").toLowerCase();
+  if (!["image/jpeg", "image/png", "image/webp"].includes(type) ||
+      typeof createImageBitmap !== "function" || file.size < 96 * 1024) {
+    return { blob: file, type: file.type || "application/octet-stream", size: file.size };
+  }
+  let bitmap;
+  try { bitmap = await createImageBitmap(file); }
+  catch { return { blob: file, type: file.type, size: file.size }; }
+  try {
+    const maxEdge = 1920;
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1) return { blob: file, type: file.type, size: file.size };
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d", { alpha: type === "image/png" });
+    if (!ctx) return { blob: file, type: file.type, size: file.size };
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, type, 0.84));
+    if (!blob || blob.size >= file.size || blob.type !== type) {
+      return { blob: file, type: file.type, size: file.size };
+    }
+    return { blob, type, size: blob.size };
+  } finally {
+    bitmap.close?.();
   }
 }
 $("#fileInput").addEventListener("change", () => {
