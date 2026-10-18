@@ -1,5 +1,5 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache } from "./store.js";
+import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
@@ -149,6 +149,11 @@ $("#authForm").addEventListener("submit", async (e) => {
   const hint = $("#authHint");
   if (hint) hint.textContent = "Contacting server...";
   primeSound("logon");
+  // A manual sign-in supersedes any pending throttled boot retry.
+  if (bootRetryTimer) {
+    clearTimeout(bootRetryTimer);
+    bootRetryTimer = 0;
+  }
   try {
     const r = await api.login(username, password);
     setToken(r.session_token);
@@ -251,7 +256,9 @@ async function startSession() {
       throw new ApiError(401, { error: "session changed" });
     }
   } catch (e) {
-    if (getToken() === sessionToken) setToken("");
+    // A 429 is a temporary throttle, not a dead session: keep the token so
+    // the caller can retry without forcing a re-login.
+    if (!(e instanceof ApiError && e.status === 429) && getToken() === sessionToken) setToken("");
     throw e;
   }
   state.selfNode = "u" + state.user.user_id;
@@ -262,6 +269,8 @@ async function startSession() {
   applyServerSettings();
   ui.setActive(null);
   await initialLoad();
+  restoreOutbox();
+  ui.renderSidebar();
   wsConnect();
   booted = true;
   ["message", "click", "menu", "error", "notification", "call"].forEach(primeSound);
@@ -383,6 +392,8 @@ async function logout() {
   try { await api.logout(); } catch { /* session may already be gone */ }
   setToken("");
   wsDisconnect();
+  clearOutbox();
+  clearDrafts();
   resetState();
   clearProfileCache(); // do not leave PII/photo on shared device after sign-out
   booted = false;
@@ -432,12 +443,15 @@ function showEmpty() {
 
 function openChat(peer, opts = {}) {
   if (!peer) return;
+  flushDraft();
   const existed = state.conversations.has(peer);
   if (!existed) {
     const m = /^u(\d+)$/.exec(peer);
     if (m) rememberUser(m[1]);
   }
   ui.setActive(peer);
+  ensurePeerHistory(peer);
+  restoreDraft(peer);
   if (opts.push !== false && location.hash !== "#/chat/" + encodeURIComponent(peer)) {
     location.hash = "#/chat/" + encodeURIComponent(peer);
   }
@@ -540,7 +554,9 @@ async function sendMessage() {
   // Stable id for retries: the server dedupes sends by client_msg_id, so a
   // retry after a lost response returns the original message, not a copy.
   local.clientId = tmp;
+  outboxPut({ peer, id: tmp, type: "text", env, ts: env.ts });
   input.value = "";
+  clearDraft(peer);
   setPendingAttachment(null);
   ui.renderMessages();
   ui.renderSidebar();
@@ -557,6 +573,7 @@ async function sendMessage() {
       m.retryable = false;
       ui.renderMessages({ scroll: false });
     }
+    outboxDrop(tmp);
     markRead(peer);
   } catch (e) {
     if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
@@ -603,6 +620,7 @@ async function retryMessage(peer, m) {
       ui.renderMessages({ scroll: false });
       markRead(peer);
     }
+    outboxDrop(m.clientId || m.id);
     ui.renderSidebar();
     return true;
   } catch (e) {
@@ -615,6 +633,161 @@ async function retryMessage(peer, m) {
     return false;
   }
 }
+
+const OUTBOX_MAX = 200;
+const OUTBOX_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+function outboxKey() {
+  const id = state.user && state.user.user_id;
+  return id ? "msg.mesh.outbox." + id : "";
+}
+
+function readOutbox() {
+  const key = outboxKey();
+  if (!key) return [];
+  try {
+    const list = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch { return []; }
+}
+
+function writeOutbox(list) {
+  const key = outboxKey();
+  if (!key) return;
+  try {
+    if (list.length) localStorage.setItem(key, JSON.stringify(list.slice(-OUTBOX_MAX)));
+    else localStorage.removeItem(key);
+  } catch { /* private mode */ }
+}
+
+function outboxPut(entry) {
+  const list = readOutbox().filter((q) => q && q.id !== entry.id);
+  list.push(entry);
+  writeOutbox(list);
+}
+
+function outboxDrop(id) {
+  const list = readOutbox();
+  const next = list.filter((q) => q && q.id !== id);
+  if (next.length !== list.length) writeOutbox(next);
+}
+
+function clearOutbox() {
+  const key = outboxKey();
+  if (key) {
+    try { localStorage.removeItem(key); } catch { /* private mode */ }
+  }
+}
+
+// Re-materialize undelivered messages from a previous session as visible
+// failed entries: the reconnect burst (or a manual click) retries them with
+// their original client_msg_id, so a send that actually landed before the
+// crash cannot duplicate. Entries whose server copy is already in the loaded
+// window are simply dropped from the outbox.
+function restoreOutbox() {
+  const list = readOutbox();
+  if (!list.length) return;
+  const now = Date.now();
+  const keep = [];
+  for (const e of list) {
+    if (!e || !e.peer || !e.id || typeof e.id !== "string") continue;
+    if (now - (Number(e.ts) || 0) > OUTBOX_MAX_AGE) continue;
+    const env = e.env && typeof e.env === "object" ? e.env : {};
+    const text = typeof env.text === "string" ? env.text : "";
+    const attId = (env.attachment && env.attachment.id) || "";
+    const existing = state.conversations.get(e.peer);
+    const dup = existing && existing.messages.find((m) => m.mine &&
+      (m.id === e.id ||
+        (m.rowid != null &&
+          (Number(m.env && m.env.ts) || 0) === (Number(e.ts) || 0) &&
+          (m.text || "") === text &&
+          ((m.env && m.env.attachment && m.env.attachment.id) || "") === attId)));
+    if (dup) continue;
+    const m = pushLocal(e.peer, {
+      id: e.id,
+      text,
+      env,
+      attachment: env.attachment || null,
+      ts: Number(e.ts) || Date.now(),
+    });
+    m.clientId = e.id;
+    m.sync = "failed";
+    m.retryable = true;
+    keep.push(e);
+  }
+  writeOutbox(keep);
+}
+
+/* ---------------- drafts ---------------- */
+
+const DRAFTS_PREFIX = "msg.mesh.drafts.";
+let draftTimer = null;
+
+function draftsKey() {
+  const id = state.user && state.user.user_id;
+  return id ? DRAFTS_PREFIX + id : "";
+}
+
+function readDrafts() {
+  const key = draftsKey();
+  if (!key) return {};
+  try {
+    const d = JSON.parse(localStorage.getItem(key) || "{}");
+    return d && typeof d === "object" ? d : {};
+  } catch { return {}; }
+}
+
+function saveDraft(peer, text) {
+  const key = draftsKey();
+  if (!key || !peer) return;
+  try {
+    const d = readDrafts();
+    if (text) d[peer] = text;
+    else delete d[peer];
+    if (Object.keys(d).length) localStorage.setItem(key, JSON.stringify(d));
+    else localStorage.removeItem(key);
+  } catch { /* private mode */ }
+}
+
+function scheduleDraftSave() {
+  const peer = state.activePeer;
+  if (!peer) return;
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    draftTimer = null;
+    if (state.activePeer === peer) saveDraft(peer, msgInput ? msgInput.value : "");
+  }, 300);
+}
+
+function flushDraft() {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  if (state.activePeer) saveDraft(state.activePeer, msgInput ? msgInput.value : "");
+}
+
+function restoreDraft(peer) {
+  if (!msgInput) return;
+  const d = readDrafts();
+  msgInput.value = (peer && typeof d[peer] === "string") ? d[peer] : "";
+  msgInput.rows = Math.max(1, Math.min(msgInput.value.split("\n").length, 5));
+  updateCharCount();
+  syncSendEnabled();
+}
+
+function clearDraft(peer) {
+  saveDraft(peer, "");
+}
+
+function clearDrafts() {
+  const key = draftsKey();
+  if (key) {
+    try { localStorage.removeItem(key); } catch { /* private mode */ }
+  }
+}
+
+window.addEventListener("beforeunload", () => flushDraft());
 
 /* ---------------- attachments ---------------- */
 
@@ -1401,6 +1574,7 @@ msgInput?.addEventListener("input", () => {
   msgInput.rows = Math.max(1, lines);
   updateCharCount();
   syncSendEnabled();
+  scheduleDraftSave();
 });
 function syncSendEnabled() {
   const send = $("#sendBtn");
@@ -1806,6 +1980,32 @@ $("#messageList").addEventListener("click", (e) => {
     if (m) retryMessage(state.activePeer, m);
   }
 });
+
+const historyLoads = new Set();
+
+// Conversations created after the boot window (fresh WS message, sidebar row
+// that only carries metadata) start with hasMore=null: load their first page
+// from the server when they are opened so the transcript is never empty or
+// truncated. Boot-window conversations already know their state.
+async function ensurePeerHistory(peer) {
+  if (!peer || historyLoads.has(peer)) return;
+  const c = conv(peer);
+  if (c.hasMore !== null) return;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  historyLoads.add(peer);
+  try {
+    const r = await api.history({ limit: 200, peer_node_id: peer });
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    const items = r.items || [];
+    ingest(items);
+    const cur = state.conversations.get(peer);
+    if (cur) cur.hasMore = items.length >= 200;
+    ui.renderSidebar();
+    if (state.activePeer === peer) ui.renderMessages({ scroll: false });
+  } catch { /* hasMore stays null: retried on the next open */ }
+  finally { historyLoads.delete(peer); }
+}
 
 async function loadOlder() {
   const peer = state.activePeer;
@@ -2368,6 +2568,57 @@ function startServerWatch() {
 
 /* ---------------- boot ---------------- */
 
+let bootRetryTimer = 0;
+let bootInflight = false;
+
+async function startFromToken() {
+  if (!getToken()) {
+    ui.showAuth("login");
+    route();
+    return;
+  }
+  if (booted || bootInflight) return;
+  const sessionToken = getToken();
+  bootInflight = true;
+  try {
+    await startSession();
+    authNotice = "";
+    if (bootRetryTimer) {
+      clearTimeout(bootRetryTimer);
+      bootRetryTimer = 0;
+    }
+  } catch (e) {
+    // A newer login/logout owns the session now: leave it alone.
+    if (getToken() !== sessionToken) return;
+    if (e instanceof ApiError && e.status === 429) {
+      // Throttled, not dead: keep the token and keep retrying until the
+      // server window clears instead of kicking the session to a fresh login.
+      authNotice = "Too many requests — slow down for a moment. Retrying…";
+      ui.showAuth("login");
+      setMode("login");
+      route();
+      if (!bootRetryTimer) {
+        bootRetryTimer = setTimeout(() => {
+          bootRetryTimer = 0;
+          startFromToken();
+        }, 10000);
+      }
+      return;
+    }
+    setToken("");
+    const netDown = !(e instanceof ApiError) || e.status === 0 || e.status === 502 || e.status === 503;
+    authNotice = e instanceof ApiError && e.status === 401
+      ? "Session expired — please sign in again."
+      : "Cannot reach the msg.mesh server. Check your connection and retry.";
+    if (netDown) startServerWatch();
+    ui.showAuth("login");
+    setMode("login");
+    route();
+  } finally {
+    bootInflight = false;
+  }
+}
+
 async function boot() {
   playSound("startup");
   ui.renderConnection();
@@ -2387,19 +2638,7 @@ async function boot() {
     route();
     return;
   }
-  try {
-    await startSession();
-  } catch (e) {
-    setToken("");
-    const netDown = !(e instanceof ApiError) || e.status === 0 || e.status === 502 || e.status === 503;
-    authNotice = e instanceof ApiError && e.status === 401
-      ? "Session expired — please sign in again."
-      : "Cannot reach the msg.mesh server. Check your connection and retry.";
-    if (netDown) startServerWatch();
-    ui.showAuth("login");
-    setMode("login");
-    route();
-  }
+  await startFromToken();
 }
 
 boot();

@@ -91,7 +91,7 @@ export function resetState() {
 export function conv(peer) {
   let c = state.conversations.get(peer);
   if (!c) {
-    c = { peer, messages: [], hasMore: false };
+    c = { peer, messages: [], hasMore: null };
     state.conversations.set(peer, c);
   }
   return c;

@@ -250,9 +250,11 @@ async function call(path, data, opts = {}) {
     const timedOut = !!(e && (e.name === "TimeoutError" || e.name === "AbortError"));
     if (!opts.noFailover) {
       const switched = await failoverBase().catch(() => null);
-      // Connection-level errors never reached the server: safe to replay on
-      // the new base. Timeouts may have been processed: switch but don't replay.
-      if (switched && !timedOut && token === requestToken) {
+      // Timeouts may have been processed: switch but don't replay. Replays
+      // are limited to idempotent requests — the connection can die after the
+      // server committed a state change (friend request, profile update), and
+      // replaying those on the new base would execute them twice.
+      if (switched && !timedOut && token === requestToken && opts.idempotent) {
         return call(path, data, { ...opts, noFailover: true });
       }
       if (token !== requestToken) {
@@ -326,36 +328,38 @@ export const api = {
   login: (username, password) => call("/api/v1/users/login", { username, password }, { allow401: true, timeoutMs: 30000 }),
   register: (username, password, display_name) =>
     call("/api/v1/users/register", { username, password, display_name }, { allow401: true, timeoutMs: 30000 }),
-  whoami: (opts = {}) => call("/api/v1/auth/whoami", {}, opts),
-  logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true }),
+  whoami: (opts = {}) => call("/api/v1/auth/whoami", {}, { idempotent: true, ...opts }),
+  logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true, idempotent: true }),
 
-  history: (o = {}) => call("/api/v1/mesh/history", { limit: 200, ...o }),
+  history: (o = {}) => call("/api/v1/mesh/history", { limit: 200, ...o }, { idempotent: true }),
   // client_msg_id makes retries idempotent: re-sending the same id returns
   // the original message instead of storing a duplicate.
   send: (receiver_node_id, message_type, payload, client_msg_id) => {
     const body = { receiver_node_id, message_type, payload };
     if (client_msg_id) body.client_msg_id = client_msg_id;
-    return call("/api/v1/mesh/send", body);
+    return call("/api/v1/mesh/send", body, { idempotent: true });
   },
-  meshConversations: () => call("/api/v1/mesh/conversations", {}),
+  meshConversations: () => call("/api/v1/mesh/conversations", {}, { idempotent: true }),
   read: (peer_node_id, last_read_rowid) => {
     const body = {};
     if (peer_node_id) body.peer_node_id = peer_node_id;
     if (last_read_rowid != null) body.last_read_rowid = last_read_rowid;
-    return call("/api/v1/mesh/read", body);
+    return call("/api/v1/mesh/read", body, { idempotent: true });
   },
-  searchMessages: (query, o = {}) => call("/api/v1/mesh/search", { query, limit: 50, ...o }),
+  searchMessages: (query, o = {}) =>
+    call("/api/v1/mesh/search", { query, limit: 50, ...o }, { idempotent: true }),
 
-  usersSearch: (query) => call("/api/v1/users/search", { query }),
-  usersGet: (user_id) => call("/api/v1/users/get", { user_id: Number(user_id) }),
+  usersSearch: (query) => call("/api/v1/users/search", { query }, { idempotent: true }),
+  usersGet: (user_id) => call("/api/v1/users/get", { user_id: Number(user_id) }, { idempotent: true }),
   // Accepts an object of fields ({display_name, status_text, about, avatar,
   // photo, banner}) or a plain display name string (legacy callers).
   usersUpdate: (fields) =>
     call("/api/v1/users/update",
-      typeof fields === "string" ? { display_name: fields } : (fields || {})),
+      typeof fields === "string" ? { display_name: fields } : (fields || {}),
+      { idempotent: true }),
 
-  friendsList: () => call("/api/v1/friends/list", {}),
-  friendRequests: () => call("/api/v1/friends/requests", {}),
+  friendsList: () => call("/api/v1/friends/list", {}, { idempotent: true }),
+  friendRequests: () => call("/api/v1/friends/requests", {}, { idempotent: true }),
   friendRequest: (receiver_id) => call("/api/v1/friends/request", { receiver_id: Number(receiver_id) }),
   friendAccept: (request_id) => call("/api/v1/friends/accept", { request_id: Number(request_id) }),
   friendReject: (request_id) => call("/api/v1/friends/reject", { request_id: Number(request_id) }),
@@ -363,5 +367,6 @@ export const api = {
 
   upload: (filename, content_type, content_base64, size_bytes) =>
     call("/api/v1/files/upload", { filename, content_type, content_base64, size_bytes }),
-  download: (attachment_id) => call("/api/v1/files/download", { attachment_id }),
+  download: (attachment_id) =>
+    call("/api/v1/files/download", { attachment_id }, { idempotent: true }),
 };
