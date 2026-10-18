@@ -197,7 +197,9 @@ export function connect() {
       if (c.length) {
         primeUsers();
         emit("conversations");
-        emit("messages", { peer: c[0], item: data });
+        // update: server-initiated control event (edit/delete/react/pin) —
+        // consumers must not treat it as a brand-new incoming message.
+        emit("messages", { peer: c[0], item: data, update: data.update || undefined });
       }
     } else if (event === "call.signal" && data) {
       // Voice call signaling relayed by the server (invite/SDP/ICE/end).

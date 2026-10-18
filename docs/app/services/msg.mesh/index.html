@@ -163,13 +163,23 @@
           <button class="icon-btn" id="chatInfoBtn" title="Details"><img src="./assets/xp/icons/Information.png" alt="" width="16" height="16" draggable="false"></button>
         </div>
       </div>
+      <div class="pinned-strip hidden" id="pinnedStrip"></div>
       <div class="messages-sunken sunken" id="messages">
         <button class="load-older hidden" id="loadOlder">Load older messages</button>
         <div id="messageList" class="message-list"></div>
         <button class="new-msgs-pill hidden" id="newMsgsPill" type="button">↓ New messages</button>
       </div>
       <div class="composer-strip">
-        <div class="pending-file hidden" id="pendingFile"><span id="pendingFileName"></span><button type="button" id="pendingFileCancel">×</button></div>
+        <div class="pending-file hidden" id="pendingFile"><span id="pendingFileName"></span><button type="button" id="pendingFileCancel">✕</button></div>
+        <div class="reply-bar hidden" id="replyBar">
+          <span class="reply-bar-ico" aria-hidden="true">↩</span>
+          <span class="reply-bar-text"><b id="replyBarWho"></b> <span id="replyBarText"></span></span>
+          <button type="button" class="reply-bar-x" id="replyBarCancel" aria-label="Cancel reply">✕</button>
+        </div>
+        <div class="edit-bar hidden" id="editBar">
+          <span class="edit-bar-label">Editing message</span>
+          <button type="button" class="reply-bar-x" id="editBarCancel" aria-label="Cancel edit">✕</button>
+        </div>
         <div class="composer-row">
           <button class="icon-btn emoji-btn" id="emojiBtn" type="button" title="Emoticons and stickers" aria-haspopup="true" aria-expanded="false"><img src="./assets/xp/icons/smiley.png" alt="" width="16" height="16" draggable="false"></button>
           <div class="sunken composer-sunken">
@@ -367,6 +377,19 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div class="ctx-menu hidden" id="ctxMenu" role="menu">
+  <button type="button" id="ctxReply" role="menuitem">Reply</button>
+  <button type="button" id="ctxEdit" role="menuitem">Edit</button>
+  <button type="button" id="ctxReact" role="menuitem" aria-haspopup="true">React…</button>
+  <div class="ctx-react hidden" id="ctxReactGrid" role="menu" aria-label="Reactions">
+    <button type="button" data-emoji="👍" title="Thumbs up">👍</button>
+    <button type="button" data-emoji="❤️" title="Love">❤️</button>
+    <button type="button" data-emoji="😂" title="Laugh">😂</button>
+    <button type="button" data-emoji="😮" title="Surprised">😮</button>
+    <button type="button" data-emoji="😢" title="Sad">😢</button>
+    <button type="button" data-emoji="🎉" title="Party">🎉</button>
+  </div>
+  <button type="button" id="ctxPin" role="menuitem">Pin</button>
+  <button type="button" id="ctxDelete" role="menuitem">Delete</button>
   <button type="button" id="ctxCopy" role="menuitem">Copy message</button>
 </div>
 <input type="file" id="fileInput" class="hidden" tabindex="-1">

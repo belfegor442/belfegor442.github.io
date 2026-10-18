@@ -122,6 +122,11 @@ function normalize(item, mine) {
     attachment: env.attachment && env.attachment.id ? env.attachment : null,
     ts: typeof env.ts === "number" ? env.ts : createdMs(item),
     created: item.created_at || "",
+    edited: item.edited_at ? String(item.edited_at) : null,
+    deleted: item.deleted_at ? String(item.deleted_at) : null,
+    reactions: (item.reactions && typeof item.reactions === "object" && !Array.isArray(item.reactions)) ? item.reactions : {},
+    pinned: item.pinned_at ? String(item.pinned_at) : null,
+    reply: env.reply && env.reply.id ? env.reply : null,
     sync: "ok",
   };
 }
@@ -191,6 +196,11 @@ export function pushLocal(peer, partial) {
     attachment: partial.attachment || null,
     ts: partial.ts || Date.now(),
     created: "",
+    edited: null,
+    deleted: null,
+    reactions: {},
+    pinned: null,
+    reply: partial.env && partial.env.reply && partial.env.reply.id ? partial.env.reply : null,
     sync: "sending",
   };
   c.messages.push(m);
@@ -216,7 +226,7 @@ export function unreadCount(peer) {
   if (!c) return 0;
   const ptr = state.pointers.get(peer) || 0;
   let n = 0;
-  for (const m of c.messages) if (!m.mine && m.rowid != null && m.rowid > ptr) n++;
+  for (const m of c.messages) if (!m.mine && !m.deleted && m.rowid != null && m.rowid > ptr) n++;
   return n;
 }
 
@@ -254,6 +264,10 @@ export function conversationOrder() {
         attachment: env.attachment && env.attachment.id ? env.attachment : null,
         type: l.message_type || "message",
         ts: typeof env.ts === "number" ? env.ts : createdMs(l),
+        edited: l.edited_at ? String(l.edited_at) : null,
+        deleted: l.deleted_at ? String(l.deleted_at) : null,
+        reactions: (l.reactions && typeof l.reactions === "object" && !Array.isArray(l.reactions)) ? l.reactions : {},
+        pinned: l.pinned_at ? String(l.pinned_at) : null,
       },
       unread: meta.unread || 0,
       count: 0,

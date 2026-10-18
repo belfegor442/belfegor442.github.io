@@ -688,3 +688,19 @@
 }
 [data-theme="win98"] .ctx-menu button{color:#000}
 [data-theme="win98"] .ctx-menu button:hover{background:#000080;color:#fff}
+
+/* message control: reply / edit / reactions / pin / tombstone */
+[data-theme="win98"] .reply-quote{background:#dfdfdf;border-left-color:#000080;color:#404040}
+[data-theme="win98"] .reply-quote:hover{background:#d0d0d0}
+[data-theme="win98"] .reaction-chip{background:#c0c0c0;border-color:#808080;border-radius:0}
+[data-theme="win98"] .reaction-chip:hover,[data-theme="win98"] .reaction-chip.mine{border-color:#000080}
+[data-theme="win98"] .reaction-chip.mine{box-shadow:inset 0 0 0 1px #000080}
+[data-theme="win98"] .reaction-count{color:#404040}
+[data-theme="win98"] .ctx-react{border-top-color:#808080}
+[data-theme="win98"] .reply-bar,[data-theme="win98"] .edit-bar{background:#c0c0c0}
+[data-theme="win98"] .reply-bar-text b,[data-theme="win98"] .edit-bar-label{color:#000080}
+[data-theme="win98"] .reply-bar-text{color:#000}
+[data-theme="win98"] .pinned-strip{background:#ffffcc;border-bottom-color:#808080}
+[data-theme="win98"] .pinned-jump{color:#000080}
+[data-theme="win98"] .msg-line.deleted .body{color:#606060}
+[data-theme="win98"] .msg-line .edited-tag{color:#808080}

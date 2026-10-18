@@ -1,5 +1,5 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv } from "./store.js";
+import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv, peerLabel } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
@@ -451,6 +451,9 @@ function openChat(peer, opts = {}) {
   }
   ui.setActive(peer);
   ensurePeerHistory(peer);
+  // Reply/edit modes are per-conversation: never carry them across chats.
+  cancelReply();
+  cancelEdit();
   restoreDraft(peer);
   if (opts.push !== false && location.hash !== "#/chat/" + encodeURIComponent(peer)) {
     location.hash = "#/chat/" + encodeURIComponent(peer);
@@ -539,6 +542,10 @@ async function sendMessage() {
   const sessionToken = getToken();
   const sessionUserId = state.user && state.user.user_id;
   if (!peer || (!text && !pendingAttachment)) return;
+  if (editingMsg) {
+    saveEdit(editingMsg, text);
+    return;
+  }
   requestNotificationPermission();
   const att = pendingAttachment;
   const env = {
@@ -549,6 +556,16 @@ async function sendMessage() {
     text,
   };
   if (att) env.attachment = { id: att.id, filename: att.filename, type: att.content_type, size: att.size_bytes };
+  if (replyTarget && replyTarget.id) {
+    // Reply rides in the envelope only: it never touches mesh_messages
+    // columns, so the whole history shape stays stable server-side.
+    env.reply = {
+      id: replyTarget.id,
+      rowid: replyTarget.rowid != null ? replyTarget.rowid : null,
+      from: replyTarget.sender,
+      text: String(replyTarget.text || (replyTarget.attachment ? replyTarget.attachment.filename : "") || "").slice(0, 140),
+    };
+  }
   const tmp = uid();
   const local = pushLocal(peer, { id: tmp, text, env, attachment: env.attachment || null });
   // Stable id for retries: the server dedupes sends by client_msg_id, so a
@@ -558,6 +575,7 @@ async function sendMessage() {
   input.value = "";
   clearDraft(peer);
   setPendingAttachment(null);
+  cancelReply();
   ui.renderMessages();
   ui.renderSidebar();
 
@@ -752,6 +770,8 @@ function saveDraft(peer, text) {
 function scheduleDraftSave() {
   const peer = state.activePeer;
   if (!peer) return;
+  // While editing, the composer holds someone else's message, not a draft.
+  if (editingMsg) return;
   if (draftTimer) clearTimeout(draftTimer);
   draftTimer = setTimeout(() => {
     draftTimer = null;
@@ -764,6 +784,7 @@ function flushDraft() {
     clearTimeout(draftTimer);
     draftTimer = null;
   }
+  if (editingMsg) return;
   if (state.activePeer) saveDraft(state.activePeer, msgInput ? msgInput.value : "");
 }
 
@@ -1610,11 +1631,17 @@ messagesWrap?.addEventListener("scroll", () => {
   if (atBottom) newMsgsPill.classList.add("hidden");
 });
 
-/* ---------------- copy message (context menu) ---------------- */
+/* ---------------- message control: reply / edit / react / pin / delete ---------------- */
+let editingMsg = null;   // message being edited (composer mirrors its text)
+let replyTarget = null;  // message the composer will reply to
+let ctxLine = null;
+let ctxMsg = null;
+
 const ctxMenu = $("#ctxMenu");
 let ctxText = "";
 function hideCtxMenu() {
   ctxMenu?.classList.add("hidden");
+  document.getElementById("ctxReactGrid")?.classList.add("hidden");
 }
 function messagePlainText(line) {
   const body = line?.querySelector(".body");
@@ -1626,17 +1653,180 @@ function messagePlainText(line) {
   });
   return (clone.textContent || "").trim();
 }
+
+function updateCtxMenu(m) {
+  const mine = !!(m && m.mine);
+  const gone = !!(m && m.deleted);
+  const show = (id, on) => document.getElementById(id)?.classList.toggle("hidden", !on);
+  show("ctxReply", !!m && !gone);
+  show("ctxEdit", mine && !gone);
+  show("ctxReact", !!m && !gone);
+  show("ctxPin", !!m && !gone);
+  const pin = document.getElementById("ctxPin");
+  if (pin && m) pin.textContent = m.pinned ? "Unpin" : "Pin";
+  show("ctxDelete", mine && !gone);
+  show("ctxCopy", !!ctxText);
+  document.getElementById("ctxReactGrid")?.classList.add("hidden");
+}
+
+function startReply(m) {
+  if (!m || m.deleted) return;
+  if (editingMsg) cancelEdit();
+  replyTarget = m;
+  const who = m.mine ? "You" : peerLabel(state.activePeer).slice(0, 16);
+  const shown = String(m.text || (m.attachment ? m.attachment.filename : "") || "(" + (m.type || "message") + ")");
+  const whoEl = $("#replyBarWho");
+  if (whoEl) whoEl.textContent = who;
+  const txtEl = $("#replyBarText");
+  if (txtEl) txtEl.textContent = shown.slice(0, 140);
+  $("#replyBar")?.classList.remove("hidden");
+  msgInput?.focus();
+}
+function cancelReply() {
+  replyTarget = null;
+  $("#replyBar")?.classList.add("hidden");
+}
+
+function startEdit(m) {
+  if (!m || !m.mine || m.deleted || !msgInput) return;
+  cancelReply();
+  editingMsg = m;
+  msgInput.value = m.text || "";
+  msgInput.rows = Math.min(5, Math.max(1, msgInput.value.split("\n").length));
+  $("#editBar")?.classList.remove("hidden");
+  msgInput.focus();
+  try { msgInput.setSelectionRange(msgInput.value.length, msgInput.value.length); } catch { /* ignore */ }
+  updateCharCount();
+  syncSendEnabled();
+}
+function cancelEdit() {
+  if (!editingMsg) return;
+  editingMsg = null;
+  $("#editBar")?.classList.add("hidden");
+  if (msgInput) msgInput.value = "";
+  // The pre-edit draft was preserved by the scheduleDraftSave guard; put it back.
+  restoreDraft(state.activePeer);
+}
+
+async function saveEdit(target, newText) {
+  const peer = state.activePeer;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  try {
+    const r = await api.editMessage(target.id, newText);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (r && r.item) ingestOne(r.item);
+    else {
+      const m = findMessage(peer, target.id);
+      if (m) m.text = newText;
+    }
+    cancelEdit();
+    ui.renderMessages({ scroll: false });
+    ui.renderSidebar();
+    ui.toast("Message edited");
+  } catch (e) {
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (Number(e && e.status) === 409) {
+      ui.toast("That message was deleted.", true);
+      cancelEdit();
+      ui.renderMessages({ scroll: false });
+      ui.renderSidebar();
+    } else {
+      // Keep edit mode so the user can retry or cancel.
+      ui.toast("Edit failed: " + friendlyError(e), true);
+    }
+  }
+}
+
+async function toggleReaction(m, emoji) {
+  if (!m || m.rowid == null || m.deleted || !emoji) return;
+  const self = String(state.selfNode);
+  const ids = m.reactions && Array.isArray(m.reactions[emoji]) ? m.reactions[emoji] : [];
+  const on = !ids.includes(self);
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  try {
+    const r = await api.reactMessage(m.id, emoji, on);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (r && r.item) {
+      ingestOne(r.item);
+      ui.renderMessages({ scroll: false });
+      ui.renderSidebar();
+    }
+  } catch (e) {
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    ui.toast("Reaction failed: " + friendlyError(e), true);
+  }
+}
+
+async function togglePin(m) {
+  if (!m || m.rowid == null || m.deleted) return;
+  const pinned = !m.pinned;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  try {
+    const r = await api.pinMessage(m.id, pinned);
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    if (r && r.item) {
+      ingestOne(r.item);
+      ui.renderMessages({ scroll: false });
+      ui.renderSidebar();
+    }
+  } catch (e) {
+    if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+    ui.toast("Pin failed: " + friendlyError(e), true);
+  }
+}
+
+function deleteMessageFlow(m) {
+  if (!m || !m.mine || m.rowid == null || m.deleted) return;
+  if (!window.confirm("Delete this message for everyone?")) return;
+  const sessionToken = getToken();
+  const sessionUserId = state.user && state.user.user_id;
+  (async () => {
+    try {
+      const r = await api.deleteMessage(m.id);
+      if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+      if (r && r.item) {
+        ingestOne(r.item);
+        ui.renderMessages({ scroll: false });
+        ui.renderSidebar();
+      }
+    } catch (e) {
+      if (getToken() !== sessionToken || !state.user || state.user.user_id !== sessionUserId) return;
+      ui.toast("Delete failed: " + friendlyError(e), true);
+    }
+  })();
+}
+
+$("#replyBarCancel")?.addEventListener("click", () => cancelReply());
+$("#editBarCancel")?.addEventListener("click", () => cancelEdit());
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (editingMsg) cancelEdit();
+  else if (replyTarget) cancelReply();
+});
+
 $("#messageList")?.addEventListener("contextmenu", (e) => {
   const line = e.target.closest(".msg-line");
   if (!line) return;
   e.preventDefault();
+  const c = state.conversations.get(state.activePeer);
+  const m = c ? c.messages.find((x) => x.id === line.dataset.id) : null;
   let text = messagePlainText(line);
   if (!text) {
     const chip = line.querySelector("[data-attname]");
     text = (chip && chip.getAttribute("data-attname")) || "";
   }
-  if (!text || !ctxMenu) return;
+  if (!m && !text) return;
+  // A tombstone has no copyable text and no actions — no menu at all.
+  if (m && m.deleted) return;
+  if (!ctxMenu) return;
   ctxText = text;
+  ctxLine = line;
+  ctxMsg = m;
+  updateCtxMenu(m);
   ctxMenu.classList.remove("hidden");
   const mw = ctxMenu.offsetWidth;
   const mh = ctxMenu.offsetHeight;
@@ -1645,26 +1835,46 @@ $("#messageList")?.addEventListener("contextmenu", (e) => {
 });
 ctxMenu?.addEventListener("click", async (e) => {
   e.stopPropagation();
-  if (!e.target.closest("#ctxCopy")) return;
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  // The reaction grid lives inside the menu: picking one applies and closes.
+  if (btn.closest("#ctxReactGrid")) {
+    const emoji = btn.getAttribute("data-emoji");
+    const m = ctxMsg;
+    hideCtxMenu();
+    if (m && emoji) toggleReaction(m, emoji);
+    return;
+  }
+  if (btn.id === "ctxReact") {
+    document.getElementById("ctxReactGrid")?.classList.toggle("hidden");
+    return;
+  }
+  const m = ctxMsg;
   hideCtxMenu();
-  try {
-    await navigator.clipboard.writeText(ctxText);
-    ui.toast("Message copied");
-  } catch {
-    // fallback for contexts without the async clipboard API
-    const ta = document.createElement("textarea");
-    ta.value = ctxText;
-    ta.className = "ctx-ghost";
-    ta.setAttribute("readonly", "");
-    document.body.appendChild(ta);
-    ta.select();
+  if (btn.id === "ctxReply") { if (m) startReply(m); return; }
+  if (btn.id === "ctxEdit") { if (m) startEdit(m); return; }
+  if (btn.id === "ctxPin") { if (m) togglePin(m); return; }
+  if (btn.id === "ctxDelete") { if (m) deleteMessageFlow(m); return; }
+  if (btn.id === "ctxCopy") {
     try {
-      document.execCommand("copy");
+      await navigator.clipboard.writeText(ctxText);
       ui.toast("Message copied");
     } catch {
-      ui.toast("Copy failed", true);
+      // fallback for contexts without the async clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = ctxText;
+      ta.className = "ctx-ghost";
+      ta.setAttribute("readonly", "");
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        ui.toast("Message copied");
+      } catch {
+        ui.toast("Copy failed", true);
+      }
+      ta.remove();
     }
-    ta.remove();
   }
 });
 document.addEventListener("click", hideCtxMenu);
@@ -1973,12 +2183,39 @@ $("#messageList").addEventListener("click", (e) => {
     openAttachment(att.dataset.att, att.dataset.attname);
     return;
   }
+  const react = e.target.closest("[data-react]");
+  if (react) {
+    const line = react.closest(".msg-line");
+    const c = state.conversations.get(state.activePeer);
+    const m = line && c ? c.messages.find((x) => x.id === line.dataset.id) : null;
+    if (m) toggleReaction(m, react.getAttribute("data-react"));
+    return;
+  }
+  const quote = e.target.closest(".reply-quote");
+  if (quote) {
+    const rid = quote.getAttribute("data-jumprow");
+    if (rid) jumpTo(rid);
+    return;
+  }
   const msg = e.target.closest(".msg-line");
   if (msg && msg.classList.contains("failed")) {
     const c = state.conversations.get(state.activePeer);
     const m = c && c.messages.find((x) => x.id === msg.dataset.id);
     if (m) retryMessage(state.activePeer, m);
   }
+});
+
+// Pinned-message strip: jump to the pinned message or unpin it in place.
+$("#pinnedStrip")?.addEventListener("click", (e) => {
+  const c = state.conversations.get(state.activePeer);
+  if (!c) return;
+  const pinned = [...c.messages].reverse().find((m) => m.pinned && !m.deleted);
+  if (!pinned) return;
+  if (e.target.closest(".pinned-x")) {
+    togglePin(pinned);
+    return;
+  }
+  if (e.target.closest(".pinned-jump") && pinned.rowid != null) jumpTo(pinned.rowid);
 });
 
 const historyLoads = new Set();
@@ -2069,10 +2306,13 @@ on("conversations", () => {
 
 on("messages", (detail) => {
   ui.renderSidebar();
-  if (detail && detail.item && detail.item.sender_node_id !== state.selfNode) {
+  // update: a control event (edit/delete/react/pin) for a message we already
+  // have — re-render it, but never beep or notify as if it were new mail.
+  const isUpdate = !!(detail && detail.update);
+  if (detail && detail.item && !isUpdate && detail.item.sender_node_id !== state.selfNode) {
     playSound("message");
   }
-  if (detail && detail.peer && detail.peer !== state.activePeer) {
+  if (detail && detail.peer && detail.peer !== state.activePeer && !isUpdate) {
     const u = state.users.get(String(Number(String(detail.peer).slice(1))));
     notifyIncoming({
       tag: "peer-" + detail.peer,
@@ -2083,8 +2323,9 @@ on("messages", (detail) => {
   if (!detail || detail.peer === state.activePeer) {
     // "auto": stay pinned when already at the bottom; otherwise the user
     // keeps their reading position and gets the "new messages" pill.
-    ui.renderMessages({ scroll: "auto" });
-    if (detail && detail.peer) markRead(detail.peer);
+    // Updates re-render in place (scroll:false) so no pill appears for them.
+    ui.renderMessages({ scroll: isUpdate ? false : "auto" });
+    if (detail && detail.peer && !isUpdate) markRead(detail.peer);
     if (state.activePeer) ui.renderChatHead();
   }
 });

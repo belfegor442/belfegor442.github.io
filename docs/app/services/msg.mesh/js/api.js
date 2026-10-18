@@ -349,6 +349,17 @@ export const api = {
   searchMessages: (query, o = {}) =>
     call("/api/v1/mesh/search", { query, limit: 50, ...o }, { idempotent: true }),
 
+  // Message control (edit / delete / react / pin). Every endpoint is
+  // read-modify-write on one row, so retries are safe with failover enabled.
+  editMessage: (message_id, text) =>
+    call("/api/v1/mesh/edit", { message_id, text }, { idempotent: true }),
+  deleteMessage: (message_id) =>
+    call("/api/v1/mesh/delete", { message_id }, { idempotent: true }),
+  reactMessage: (message_id, emoji, on) =>
+    call("/api/v1/mesh/react", { message_id, emoji, on }, { idempotent: true }),
+  pinMessage: (message_id, pinned) =>
+    call("/api/v1/mesh/pin", { message_id, pinned }, { idempotent: true }),
+
   usersSearch: (query) => call("/api/v1/users/search", { query }, { idempotent: true }),
   usersGet: (user_id) => call("/api/v1/users/get", { user_id: Number(user_id) }, { idempotent: true }),
   // Accepts an object of fields ({display_name, status_text, about, avatar,
