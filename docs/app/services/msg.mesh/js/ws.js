@@ -204,6 +204,10 @@ export function connect() {
     } else if (event === "call.signal" && data) {
       // Voice call signaling relayed by the server (invite/SDP/ICE/end).
       emit("call", data);
+    } else if (event === "user.updated" && data) {
+      // Profile edit from another tab/device of the same account, or a
+      // friend's name/avatar refresh pushed by the server.
+      emit("userupdated", data);
     } else if (event === "read.state" && data) {
       const reader = data.reader_node_id;
       const other = reader === state.selfNode ? data.peer_node_id : reader;

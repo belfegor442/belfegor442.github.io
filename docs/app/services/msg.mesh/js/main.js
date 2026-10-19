@@ -2374,6 +2374,33 @@ on("readstate", () => {
   ui.renderSidebar();
   if (state.activePeer) ui.renderChatHead();
 });
+on("userupdated", (u) => {
+  // Live profile push: same account on another tab/device, or a friend's
+  // name/avatar refresh. Applies without waiting for the next refetch.
+  if (!u || !u.user_id) return;
+  const uid = String(u.user_id);
+  if (state.users.has(uid)) {
+    const prev = state.users.get(uid);
+    state.users.set(uid, { ...prev, ...u, user_id: uid });
+    ui.renderSidebar();
+    if (state.activePeer === "u" + uid || state.activePeer === uid) ui.renderChatHead();
+    ui.renderDetails();
+  }
+  if (state.user && String(state.user.user_id) === uid) {
+    state.user = normalizeUser({ ...u, role: state.user.role, tenant_id: state.user.tenant_id });
+    if (u.profile) {
+      saveProfile({
+        status: u.profile.status_text || "",
+        about: u.profile.about || "",
+        avatar: u.profile.avatar || "",
+        photo: u.profile.photo || "",
+        banner: u.profile.banner || "",
+      });
+    }
+    ui.renderProfile();
+    ui.renderMessages({ scroll: false });
+  }
+});
 
 /* ---------------- friend requests & contacts ---------------- */
 
