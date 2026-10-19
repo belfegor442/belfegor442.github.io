@@ -116,7 +116,8 @@ export function msgBox(opts = {}) {
     dlg.addEventListener("close", onClose, { once: true });
     try { dlg.showModal(); } catch { resolve("cancel"); return; }
     playSound(icon === "error" ? "error" : "notification");
-    (hasCancel ? cancelBtn : okBtn).focus();
+    // XP default button is OK: Enter accepts, Tab moves to Cancel, Esc aborts.
+    okBtn.focus();
   });
 }
 
