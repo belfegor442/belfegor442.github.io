@@ -1425,6 +1425,8 @@ function renderCallState(st) {
   const name = u ? (u.display_name || u.username) : (st.peer || "");
   const title = $("#callTitle");
   if (title) title.textContent = st.media === "video" ? "Windows Video Call" : "Windows Voice Call";
+  const titleIco = $("#callTitleIco");
+  if (titleIco) titleIco.src = st.media === "video" ? "./assets/xp/icons/TB Video.png" : "./assets/xp/icons/TB Call.png";
   const pn = $("#callPeerName");
   if (pn) pn.textContent = name;
   const ph = $("#callPeerHandle");
@@ -1778,9 +1780,10 @@ async function togglePin(m) {
   }
 }
 
-function deleteMessageFlow(m) {
+async function deleteMessageFlow(m) {
   if (!m || !m.mine || m.rowid == null || m.deleted) return;
-  if (!window.confirm("Delete this message for everyone?")) return;
+  const answer = await ui.msgBox({ title: "msg.mesh", text: "Delete this message for everyone?" });
+  if (answer !== "ok") return;
   const sessionToken = getToken();
   const sessionUserId = state.user && state.user.user_id;
   (async () => {
@@ -2463,7 +2466,8 @@ $("#removeContactBtn").addEventListener("click", async () => {
   if (!m) return;
   const entry = state.friends.get(m[1]);
   if (!entry || !entry.friendship_id) { ui.toast("No friendship record", true); return; }
-  if (!confirm("Remove this contact?")) return;
+  const answer = await ui.msgBox({ title: "msg.mesh", text: "Remove this contact?" });
+  if (answer !== "ok") return;
   const btn = $("#removeContactBtn");
   btn.disabled = true;
   try {

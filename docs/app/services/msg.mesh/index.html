@@ -90,7 +90,7 @@
 <!-- Register dialog (native Create Account dialog frame) -->
 <dialog id="registerDialog" class="reg-dialog">
   <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><span class="win-title">Create Account</span><button class="win-cap close" value="cancel" id="regClose" aria-label="Close"></button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/User Accounts.png" alt=""><span class="win-title">Create Account</span><button class="win-cap close" value="cancel" id="regClose" aria-label="Close"></button></div>
     <form class="dlg-body" id="regForm">
       <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" data-w98="address_book_user.png" alt="" width="16" height="16">Username</label><div class="sunken"><input id="regUsername2" required minlength="3" maxlength="32" autocomplete="username" spellcheck="false"></div></div>
       <div class="field"><label class="lbl-ico"><img src="./assets/xp/icons/Address Book.png" alt="" width="16" height="16">Display name (optional)</label><div class="sunken"><input id="regDisplay2" autocomplete="nickname" maxlength="64"></div></div>
@@ -248,7 +248,7 @@
 
 <dialog id="newChatDialog">
   <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><span class="win-title">New Conversation</span><button class="win-cap close" value="cancel" id="newChatClose" aria-label="Close">✕</button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/TB IM.png" alt=""><span class="win-title">New Conversation</span><button class="win-cap close" value="cancel" id="newChatClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="newChatForm">
       <label class="lbl-ico"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16">SEARCH BY USERNAME OR NAME</label>
       <div class="sunken"><input id="newChatInput" required maxlength="64" placeholder="Enter username" autocomplete="off"></div>
@@ -265,7 +265,7 @@
 
 <dialog id="searchDialog">
   <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><span class="win-title">Search Messages</span><button class="win-cap close" value="cancel" id="searchClose" aria-label="Close">✕</button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Search.png" alt=""><span class="win-title">Search Messages</span><button class="win-cap close" value="cancel" id="searchClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="searchForm">
       <label class="lbl-ico"><img src="./assets/xp/icons/Search.png" alt="" width="16" height="16">TEXT</label>
       <div class="sunken"><input id="searchInput" required maxlength="120" placeholder="Search…" autocomplete="off"></div>
@@ -277,7 +277,7 @@
 
 <dialog id="profileDialog">
   <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><span class="win-title">My Profile - msg.mesh</span><button class="win-cap close" value="cancel" id="profileClose" aria-label="Close">✕</button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/User Accounts.png" alt=""><span class="win-title">My Profile - msg.mesh</span><button class="win-cap close" value="cancel" id="profileClose" aria-label="Close">✕</button></div>
     <form class="dlg-body" id="profileForm">
       <div class="profile-banner hidden" id="profileBannerStrip"><img class="profile-banner-img" id="profileBannerImg" alt=""></div>
       <div class="profile-id"><div class="conv-avatar" id="profileAvatar"><span id="profileAvatarText">?</span><img class="avatar-photo hidden" id="profileAvatarImg" alt=""></div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small><small class="hint" id="profileStatusLine"></small></div></div>
@@ -311,7 +311,7 @@
 
 <dialog id="settingsDialog">
   <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><span class="win-title">Settings - msg.mesh</span><button class="win-cap close" value="cancel" id="settingsClose" aria-label="Close">✕</button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/TB Settings.png" alt=""><span class="win-title">Settings - msg.mesh</span><button class="win-cap close" value="cancel" id="settingsClose" aria-label="Close">✕</button></div>
     <div class="dlg-body">
       <label>THEME</label>
       <div class="theme-row">
@@ -336,7 +336,7 @@
 <!-- Voice/video call dialog (XP frame; WebRTC media, signaling over the WS relay) -->
 <dialog id="callDialog">
   <div class="win-frame dlg-frame call-frame">
-    <div class="win-titlebar"><span class="win-title" id="callTitle">Windows Call</span><button class="win-cap close" id="callClose" aria-label="Close"></button></div>
+    <div class="win-titlebar"><img class="win-title-ico" id="callTitleIco" src="./assets/xp/icons/TB Call.png" alt=""><span class="win-title" id="callTitle">Windows Call</span><button class="win-cap close" id="callClose" aria-label="Close"></button></div>
     <div class="dlg-body call-body">
       <div class="call-video-stage hidden" id="callVideoStage">
         <video id="callRemoteVideo" autoplay playsinline></video>
@@ -363,7 +363,7 @@
 <!-- About dialog (native render_about_ui card + real Windows logo asset) -->
 <dialog id="aboutDialog">
   <div class="win-frame dlg-frame about-frame">
-    <div class="win-titlebar"><span class="win-title">About msg.mesh</span><button class="win-cap close" id="aboutClose" aria-label="Close"></button></div>
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Information.png" alt=""><span class="win-title">About msg.mesh</span><button class="win-cap close" id="aboutClose" aria-label="Close"></button></div>
     <div class="dlg-body about-body">
       <img class="about-logo" src="./assets/xp/login/windows_logo.png" alt="" width="72" height="72" draggable="false">
       <h2 class="about-brand">msg.mesh</h2>
@@ -371,6 +371,24 @@
       <p class="about-line">Secure peer-to-peer mesh messenger.</p>
       <p class="about-line">Local SQLite storage + Weird Stuff Server control plane.</p>
       <div class="dlg-actions"><button class="xp-btn primary" type="button" id="aboutOk">Close</button></div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="msgBoxDialog">
+  <div class="win-frame dlg-frame msgbox">
+    <div class="win-titlebar">
+      <img class="win-title-ico" id="msgBoxTitleIco" src="./assets/xp/icons/Windows Messenger.png" alt="">
+      <span class="win-title" id="msgBoxTitle">msg.mesh</span>
+      <button class="win-cap close" id="msgBoxClose" aria-label="Close"></button>
+    </div>
+    <div class="msgbox-body">
+      <img class="msgbox-ico" id="msgBoxIcon" src="./assets/xp/icons/Question.png" alt="" width="32" height="32">
+      <p class="msgbox-text" id="msgBoxText"></p>
+    </div>
+    <div class="msgbox-actions">
+      <button type="button" class="xp-btn primary" id="msgBoxOk">OK</button>
+      <button type="button" class="xp-btn gray" id="msgBoxCancel">Cancel</button>
     </div>
   </div>
 </dialog>
