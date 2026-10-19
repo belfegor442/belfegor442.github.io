@@ -375,6 +375,21 @@ export const api = {
   friendAccept: (request_id) => call("/api/v1/friends/accept", { request_id: Number(request_id) }),
   friendReject: (request_id) => call("/api/v1/friends/reject", { request_id: Number(request_id) }),
   friendRemove: (friendship_id) => call("/api/v1/friends/remove", { friendship_id: Number(friendship_id) }),
+  // Blocking removes the friendship and fences requests/messages both ways;
+  // both verbs are idempotent (safe across a failover retry).
+  blockUser: (user_id) => call("/api/v1/friends/block", { user_id: Number(user_id) }, { idempotent: true }),
+  unblockUser: (user_id) => call("/api/v1/friends/unblock", { user_id: Number(user_id) }, { idempotent: true }),
+  blocksList: () => call("/api/v1/friends/blocks", {}, { idempotent: true }),
+
+  // Group chats: create returns 201 with {group:{id:"g5",name,...,members}}.
+  // Not idempotent (no client token) — never auto-replayed on failover.
+  groupCreate: (name, members) =>
+    call("/api/v1/groups/create", { name, members: (members || []).map(Number) }),
+  groupsList: () => call("/api/v1/groups/list", {}, { idempotent: true }),
+
+  // Call log + TURN/STUN credentials for WebRTC (call.js).
+  callHistory: (limit = 50) => call("/api/v1/calls/history", { limit }, { idempotent: true }),
+  callsIce: () => call("/api/v1/calls/ice", {}, { idempotent: true }),
 
   upload: (filename, content_type, content_base64, size_bytes) =>
     call("/api/v1/files/upload", { filename, content_type, content_base64, size_bytes }),

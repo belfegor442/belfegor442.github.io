@@ -230,6 +230,7 @@
           <span><img src="./assets/xp/icons/User Accounts.png" alt="" width="14" height="14">CONTACT</span>
           <button class="xp-btn gray small" id="addContactBtn">Add Friend</button>
           <button class="xp-btn gray small hidden" id="removeContactBtn">Remove</button>
+          <button class="xp-btn gray small hidden" id="blockContactBtn">Block</button>
         </div>
         <div class="detail-row hidden" id="sharedFilesBlock">
           <span><img src="./assets/xp/icons/Folder Closed.png" alt="" width="14" height="14">SHARED FILES</span>
@@ -329,6 +330,10 @@
         <p class="hint" id="serverHint">Messages stay on this server. Switching signs you out locally.</p>
       </div>
       <button type="button" class="xp-btn gray" id="logoutBtn">Sign Out</button>
+      <div class="server-block">
+        <label>BLOCKED USERS</label>
+        <div class="user-results sunken" id="blockedList"><div class="list-empty">Nobody is blocked.</div></div>
+      </div>
     </div>
   </div>
 </dialog>
@@ -357,6 +362,32 @@
         <button class="xp-btn primary hidden" id="callHangupBtn" type="button">Hang Up</button>
       </div>
     </div>
+  </div>
+</dialog>
+
+<!-- Call history (server-backed /calls/history; one row per call_log entry) -->
+<dialog id="callHistoryDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/TB Call.png" alt=""><span class="win-title">Call History</span><button class="win-cap close" value="cancel" id="callHistoryClose" aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <div class="user-results sunken" id="callHistoryList"><div class="list-empty">Loading…</div></div>
+      <div class="dlg-actions"><button class="xp-btn gray" type="button" id="callHistoryRefresh">Refresh</button></div>
+    </div>
+  </div>
+</dialog>
+
+<!-- New group chat (POST /groups/create with checked contacts) -->
+<dialog id="newGroupDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Windows Messenger.png" alt=""><span class="win-title">New Group</span><button class="win-cap close" value="cancel" id="newGroupClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="newGroupForm">
+      <label class="lbl-ico"><img src="./assets/xp/icons/Windows Messenger.png" width="16" height="16" alt="">GROUP NAME</label>
+      <div class="sunken"><input id="newGroupInput" required maxlength="64" placeholder="Enter group name" autocomplete="off"></div>
+      <label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" width="16" height="16" alt="">MEMBERS (CONTACTS)</label>
+      <div class="user-results sunken" id="newGroupMembers"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="newGroupCreate">Create Group</button></div>
+      <p class="error" id="newGroupStatus"></p>
+    </form>
   </div>
 </dialog>
 

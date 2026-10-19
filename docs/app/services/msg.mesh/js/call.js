@@ -6,9 +6,23 @@
    whether to open the camera before Accept. One active call at a time. */
 import { state, on, emit, isFriend } from "./store.js";
 import { sendFrame } from "./ws.js";
+import { api } from "./api.js";
 import { startRing, stopRing, playSound } from "./sound.js";
 
+// Fallback until /calls/ice answers: public STUN only. The server config
+// (STUN + TURN with credentials) replaces this list per session.
 const STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+let iceServersCache = null;
+let iceRefresh = null;
+function refreshIce() {
+  if (iceRefresh) return iceRefresh;
+  iceRefresh = api.callsIce().then((r) => {
+    if (r && Array.isArray(r.iceServers) && r.iceServers.length) {
+      iceServersCache = r.iceServers;
+    }
+  }).catch(() => { /* offline: keep STUN fallback */ }).finally(() => { iceRefresh = null; });
+  return iceRefresh;
+}
 const RING_TIMEOUT_MS = 45000;
 
 let callId = null;
@@ -85,7 +99,8 @@ function reset() {
 function makePc() {
   const activeCallId = callId;
   const activePeer = peer;
-  const p = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+  const p = new RTCPeerConnection({ iceServers: iceServersCache || STUN_SERVERS });
+  refreshIce(); // warm the server-provided (STUN+TURN) list for the next call
   p.onicecandidate = (ev) => {
     if (pc !== p || callId !== activeCallId || peer !== activePeer) return;
     sendSignal({
@@ -163,6 +178,7 @@ export async function startCall(target, kind) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     return { ok: false, error: "camera/microphone unavailable in this browser" };
   }
+  refreshIce(); // warm STUN/TURN list while the permission prompt is open
   media = kind === "video" ? "video" : "audio";
   // Reserve the call slot before opening the browser permission prompt. Without
   // this, rapid clicks can acquire multiple streams and create parallel calls.
@@ -224,6 +240,9 @@ export async function acceptCall() {
   stopRing();
   clearRingTimer();
   try {
+    // Cold start (invite beat the background refresh): one quick fetch so
+    // this call already rides TURN when the server configured it.
+    if (!iceServersCache) await refreshIce();
     pc = makePc();
     for (const t of localStream.getTracks()) pc.addTrack(t, localStream);
   } catch {
@@ -317,6 +336,7 @@ function onSignal(d) {
     muted = false;
     cameraOff = false;
     setPhase("ringing-in");
+    refreshIce(); // warm STUN/TURN while the user decides to Accept
     startRing();
     ringTimer = setTimeout(() => {
       if (phase === "ringing-in" && callId && peer) {

@@ -196,6 +196,10 @@ export function connect() {
       const c = ingest([data]);
       if (c.length) {
         primeUsers();
+        // First traffic in a group this session has not labeled yet (the
+        // creator made it while we were online): pull conversation metadata
+        // so the sidebar shows the real group name instead of "g<id>".
+        if (/^g\d+$/.test(c[0]) && !state.groups.has(c[0])) refreshConversations(true);
         emit("conversations");
         // update: server-initiated control event (edit/delete/react/pin) —
         // consumers must not treat it as a brand-new incoming message.
@@ -208,6 +212,16 @@ export function connect() {
       // Profile edit from another tab/device of the same account, or a
       // friend's name/avatar refresh pushed by the server.
       emit("userupdated", data);
+    } else if (event === "presence" && data) {
+      // Live presence transition: {user_id:"u73", status:"online"|"offline"}.
+      emit("presence", data);
+    } else if (event === "presence.snapshot" && data) {
+      // One-shot list of friends already online when this tab attached.
+      emit("presence.snapshot", data);
+    } else if (event === "typing" && data) {
+      // {from:"u73", to:"u76"|"g5"} — server already fence-checked blocks
+      // and group membership; the client just renders the indicator.
+      emit("typing", data);
     } else if (event === "read.state" && data) {
       const reader = data.reader_node_id;
       const other = reader === state.selfNode ? data.peer_node_id : reader;

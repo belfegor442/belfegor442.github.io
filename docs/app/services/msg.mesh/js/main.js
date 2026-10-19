@@ -1,6 +1,6 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
-import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, isFriend, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv, peerLabel } from "./store.js";
-import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect } from "./ws.js";
+import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, loadBlocked, loadGroups, isFriend, isBlocked, isTyping, setTyping, clearTyping, peerOnline, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv, peerLabel } from "./store.js";
+import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect, sendFrame as wsSendFrame } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
 import * as ui from "./ui.js";
 import { playSound, primeSound } from "./sound.js";
@@ -373,6 +373,7 @@ async function initialLoad() {
   } catch { /* pointers refresh later */ }
   await refreshConversations(true);
   await loadFriends().catch(() => null);
+  await Promise.all([loadBlocked().catch(() => null), loadGroups().catch(() => null)]);
   await primeUsers();
   ui.renderAll();
   emitFriends();
@@ -1303,6 +1304,8 @@ function openProfile() {
 function openSettings() {
   applyServerSettings();
   $("#settingsDialog").showModal();
+  // Refresh from the server so the list survives a reload/account switch.
+  loadBlocked().catch(() => null).finally(() => renderBlockedList());
 }
 
 function wireImagePicker(btnId, inputId, clearId, maxW, maxH, mime, quality, apply) {
@@ -1598,7 +1601,20 @@ msgInput?.addEventListener("input", () => {
   updateCharCount();
   syncSendEnabled();
   scheduleDraftSave();
+  maybeSendTyping();
 });
+
+// Fire-and-forget "I'm typing" toward the open chat (1:1 or group). Throttled
+// so a fast typist doesn't flood the socket; the server re-fans group frames.
+let lastTypingSentAt = 0;
+function maybeSendTyping() {
+  const peer = state.activePeer;
+  if (!peer || !msgInput || !msgInput.value.trim()) return;
+  const now = Date.now();
+  if (now - lastTypingSentAt < 1500) return;
+  lastTypingSentAt = now;
+  wsSendFrame({ type: "typing", to: peer });
+}
 function syncSendEnabled() {
   const send = $("#sendBtn");
   updateCharCount();
@@ -2323,6 +2339,20 @@ on("messages", (detail) => {
       body: "New message",
     });
   }
+  // Someone reacted to one of MY messages (1:1 or group): the server pushes
+  // the control frame back to the author too — surface it, don't just beep.
+  // detail.item is the raw wire payload: the author field is sender_node_id.
+  if (isUpdate && detail.item && detail.item.update === "react" &&
+      detail.item.sender_node_id === state.selfNode && detail.item.reactions) {
+    const reacted = Object.entries(detail.item.reactions).some(
+      ([, ids]) => Array.isArray(ids) && ids.some((n) => String(n) !== String(state.selfNode))
+    );
+    if (reacted) {
+      const u = state.users.get(String(Number(String(detail.peer || "").slice(1))));
+      const who = (u && (u.display_name || u.username)) || "Someone";
+      ui.toast(who + " reacted to your message");
+    }
+  }
   if (!detail || detail.peer === state.activePeer) {
     // "auto": stay pinned when already at the bottom; otherwise the user
     // keeps their reading position and gets the "new messages" pill.
@@ -2405,6 +2435,68 @@ on("userupdated", (u) => {
   }
 });
 
+/* ---------------- live presence + typing (WS) ---------------- */
+
+// Presence transitions ({user_id:"u73", status}) and the one-shot snapshot
+// both funnel into state.online; every dot in the app reads from it.
+on("presence", (d) => {
+  if (!d || !d.user_id) return;
+  const node = String(d.user_id);
+  if (node === state.selfNode) return;
+  if (d.status === "online") state.online.add(node);
+  else state.online.delete(node);
+  ui.renderSidebar();
+  if (state.activePeer === node) ui.renderChatHead();
+  else ui.renderDetails();
+});
+
+// Friends already online when this tab attached (add-only: a live transition
+// may have arrived first and must not be wiped by a stale snapshot).
+on("presence.snapshot", (d) => {
+  const list = d && Array.isArray(d.online) ? d.online : [];
+  for (const raw of list) {
+    const node = String(raw);
+    if (/^u\d+$/.test(node) && node !== state.selfNode) state.online.add(node);
+  }
+  ui.renderSidebar();
+  if (state.activePeer) ui.renderChatHead();
+});
+
+// Keep the "typing…" indicator alive while frames keep arriving; expire it
+// shortly after the peer goes quiet (server does not send a stop frame).
+const typingTimers = new Map();
+function scheduleTypingExpiry(peer) {
+  const prev = typingTimers.get(peer);
+  if (prev) clearTimeout(prev);
+  typingTimers.set(peer, setTimeout(() => {
+    typingTimers.delete(peer);
+    clearTyping(peer);
+    ui.renderSidebar();
+    if (state.activePeer === peer) ui.renderChatHead();
+  }, 4200));
+}
+
+on("typing", (d) => {
+  if (!d || !d.from) return;
+  const from = String(d.from);
+  const to = String(d.to || "");
+  if (from === state.selfNode) return;
+  let peer = null;
+  if (/^g\d+$/.test(to)) {
+    // Group typing rides the members list; only members ever see the frame.
+    if (!Array.isArray(d.recipients) || !d.recipients.includes(state.selfNode)) return;
+    peer = to;
+  } else if (to === state.selfNode) {
+    peer = from;
+  } else {
+    return;
+  }
+  setTyping(peer);
+  scheduleTypingExpiry(peer);
+  ui.renderSidebar();
+  if (state.activePeer === peer) ui.renderChatHead();
+});
+
 /* ---------------- friend requests & contacts ---------------- */
 
 $("#requestStrip").addEventListener("click", async (e) => {
@@ -2482,6 +2574,197 @@ $("#removeContactBtn").addEventListener("click", async () => {
   }
 });
 
+/* ---------------- block / unblock ---------------- */
+
+// Server-side block: deletes the friendship and fences requests + messages
+// both directions ("user is blocked" 403). Unblock is idempotent.
+$("#blockContactBtn")?.addEventListener("click", async () => {
+  const peer = state.activePeer;
+  const m = /^u(\d+)$/.exec(peer || "");
+  if (!m) return;
+  const uidStr = m[1];
+  const blocked = isBlocked(uidStr);
+  if (!blocked) {
+    const answer = await ui.msgBox({
+      title: "msg.mesh",
+      text: "Block this contact? They will no longer be able to message or contact you.",
+    });
+    if (answer !== "ok") return;
+  }
+  const btn = $("#blockContactBtn");
+  btn.disabled = true;
+  try {
+    if (blocked) {
+      await api.unblockUser(uidStr);
+      state.blocked.delete(uidStr);
+      ui.toast("Contact unblocked");
+    } else {
+      await api.blockUser(uidStr);
+      state.blocked.set(uidStr, { user_id: uidStr });
+      state.friends.delete(uidStr);
+      emitFriends();
+      ui.toast("Contact blocked");
+    }
+    renderBlockedList();
+    ui.renderDetails();
+    ui.renderSidebar();
+  } catch (err) {
+    ui.toast(friendlyError(err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function renderBlockedList() {
+  const box = $("#blockedList");
+  if (!box) return;
+  const ids = [...state.blocked.keys()];
+  if (!ids.length) {
+    box.innerHTML = '<div class="list-empty">Nobody is blocked.</div>';
+    return;
+  }
+  box.innerHTML = ids.map((id) => {
+    const u = state.users.get(String(id));
+    const name = u ? (u.display_name || u.username) : "u" + id;
+    return `<div class="user-item" data-unblock="${esc(id)}">
+      <span class="dot"></span>
+      <div><strong>${esc(name)}</strong><small>${esc(u ? "@" + u.username : "")}</small></div>
+      <button type="button" class="xp-btn gray small" data-unblock-btn="${esc(id)}">Unblock</button>
+    </div>`;
+  }).join("");
+}
+
+$("#blockedList")?.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-unblock-btn]");
+  if (!btn) return;
+  const id = String(btn.dataset.unblockBtn);
+  btn.disabled = true;
+  try {
+    await api.unblockUser(id);
+    state.blocked.delete(id);
+    ui.toast("Contact unblocked");
+    await renderBlockedList();
+    if (state.activePeer === "u" + id) ui.renderDetails();
+  } catch (err) {
+    ui.toast(friendlyError(err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- call history ---------------- */
+
+const CALL_STATE_LABEL = {
+  ended: "Completed",
+  missed: "Missed",
+  declined: "Declined",
+};
+
+async function renderCallHistory() {
+  const list = $("#callHistoryList");
+  if (!list) return;
+  try {
+    const r = await api.callHistory(50);
+    const items = (r && Array.isArray(r.items)) ? r.items : [];
+    if (!items.length) {
+      list.innerHTML = '<div class="list-empty">No calls yet.</div>';
+      return;
+    }
+    list.innerHTML = items.map((c) => {
+      const peer = String(c.peer || "");
+      const name = peerLabel(peer);
+      const dirIcon = "./assets/xp/icons/TB Call.png";
+      const media = c.media === "video" ? "Video" : "Audio";
+      const stateLabel = CALL_STATE_LABEL[String(c.state || "")] || String(c.state || "?");
+      const when = String(c.created_at || "").replace("T", " ").slice(0, 16);
+      const dur = c.duration_s != null ? " · " + String(Math.floor(c.duration_s / 60)).padStart(2, "0") + ":" + String(c.duration_s % 60).padStart(2, "0") : "";
+      return `<button type="button" class="user-item" data-peer="${esc(peer)}">
+        <img src="${dirIcon}" alt="" width="16" height="16">
+        <div><strong>${esc(name)}</strong><small>${esc(c.direction === "out" ? "Outgoing" : "Incoming")} ${esc(media)} · ${esc(stateLabel)}${esc(dur)}</small></div>
+        <span class="status">${esc(when)}</span>
+      </button>`;
+    }).join("");
+  } catch (err) {
+    list.innerHTML = `<div class="list-empty">Could not load call history: ${esc(friendlyError(err))}</div>`;
+  }
+}
+
+async function openCallHistory() {
+  const d = $("#callHistoryDialog");
+  const list = $("#callHistoryList");
+  if (!d) return;
+  if (list) list.innerHTML = '<div class="list-empty">Loading…</div>';
+  if (!d.open) d.showModal();
+  await renderCallHistory();
+}
+
+$("#callHistoryRefresh")?.addEventListener("click", () => renderCallHistory());
+$("#callHistoryList")?.addEventListener("click", (e) => {
+  const item = e.target.closest("[data-peer]");
+  if (!item) return;
+  $("#callHistoryDialog").close();
+  openChat(item.dataset.peer);
+});
+
+/* ---------------- new group ---------------- */
+
+function renderNewGroupMembers(selected) {
+  const box = $("#newGroupMembers");
+  if (!box) return;
+  const ids = [...state.friends.keys()];
+  if (!ids.length) {
+    box.innerHTML = '<div class="list-empty">Add contacts first — groups are made of your contacts.</div>';
+    return;
+  }
+  const picked = new Set((selected || []).map(String));
+  box.innerHTML = ids.map((id) => {
+    const u = state.users.get(String(id));
+    const name = u ? (u.display_name || u.username) : "u" + id;
+    return `<label class="chk-row"><input type="checkbox" value="${esc(id)}"${picked.has(id) ? " checked" : ""}><span class="chk-x">x</span> ${esc(name)}</label>`;
+  }).join("");
+}
+
+function openNewGroup() {
+  const status = $("#newGroupStatus");
+  if (status) status.textContent = "";
+  const input = $("#newGroupInput");
+  if (input) input.value = "";
+  renderNewGroupMembers([]);
+  const d = $("#newGroupDialog");
+  if (d && !d.open) d.showModal();
+  input?.focus();
+}
+
+$("#newGroupForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $("#newGroupInput");
+  const name = (input?.value || "").trim();
+  const members = [...document.querySelectorAll("#newGroupMembers input:checked")].map((i) => i.value);
+  const status = $("#newGroupStatus");
+  if (!name) return;
+  if (!members.length) {
+    if (status) status.textContent = "Select at least one contact.";
+    return;
+  }
+  const btn = $("#newGroupCreate");
+  btn.disabled = true;
+  try {
+    const r = await api.groupCreate(name, members);
+    const g = r && r.group;
+    if (!g || !g.id) throw new ApiError(502, { error: "server did not confirm the group" });
+    state.groups.set(String(g.id), g);
+    $("#newGroupDialog").close();
+    ui.toast("Group created");
+    refreshConversations(true).catch(() => null);
+    primeUsers().catch(() => null);
+    openChat(String(g.id));
+  } catch (err) {
+    if (status) status.textContent = friendlyError(err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 $("#sharedFiles").addEventListener("click", async (e) => {
   const item = e.target.closest("[data-att]");
   if (!item) return;
@@ -2532,11 +2815,13 @@ const menuActions = {
     ["Contact List", () => { ui.setActive(null); }, "Address Book.png"],
     ["Search User...", openNewChat, "Search.png"],
     ["Add Friend...", openNewChat, "User Accounts.png", "address_book_card_users.png"],
+    ["New Group...", openNewGroup, "Windows Messenger.png"],
     ["-", null],
     ["Refresh", () => { loadFriends().catch(() => null); }, "Network Connections.png"],
   ],
   actions: [
     ["Sync History", () => { if (booted) initialLoad(); }, "IE History.png"],
+    ["Call History...", openCallHistory, "TB Call.png"],
     ["-", null],
     ["Chats List", () => { ui.setActive(null); }, "Windows Messenger.png"],
   ],

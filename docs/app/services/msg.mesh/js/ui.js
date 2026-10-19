@@ -1,4 +1,4 @@
-import { state, conversationOrder, peerLabel, peerUser, isFriend, incomingRequests, outgoingRequests } from "./store.js";
+import { state, conversationOrder, peerLabel, peerUser, peerOnline, isTyping, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 import { playSound } from "./sound.js";
 import { api, getToken } from "./api.js";
 import { emoteFile } from "./emoticons.js";
@@ -256,7 +256,7 @@ export function renderContacts() {
     const u = state.users.get(String(id));
     const name = u ? (u.display_name || u.username) : "u" + id;
     const handle = u ? "@" + u.username : "";
-    const online = u && u.status === "online";
+    const online = state.online.has("u" + id);
     return `<button type="button" class="user-item" data-peer="u${esc(id)}">
       <span class="dot ${online ? "on" : ""}"></span>
       <div><strong>${esc(name)}</strong><small>${esc(handle)}</small></div>
@@ -268,16 +268,19 @@ export function renderContacts() {
 function rowMeta(r) {
   const label = peerLabel(r.peer);
   const last = r.last;
-  const preview = last
-    ? (last.deleted
-      ? "Message deleted"
-      : (last.mine ? "You: " : "") + (last.text || (last.attachment ? "Attachment" : (last.type || "message"))))
-    : "";
+  const isGroupPeer = /^g\d+$/.test(r.peer);
+  const preview = isTyping(r.peer)
+    ? "typing…"
+    : (last
+      ? (last.deleted
+        ? "Message deleted"
+        : (last.mine
+          ? "You: "
+          : (isGroupPeer ? peerLabel(last.sender).slice(0, 16) + ": " : "")) +
+          (last.text || (last.attachment ? "Attachment" : (last.type || "message"))))
+      : "");
   const time = last ? fmtTime(new Date(last.ts)) : "";
-  const online = (() => {
-    const u = peerUser(r.peer);
-    return !!(u && u.status === "online");
-  })();
+  const online = peerOnline(r.peer);
   return { label, preview, time, online, unread: r.unread };
 }
 
@@ -304,11 +307,11 @@ export function renderSidebar() {
   const allEl = $("#allCount");
   if (allEl) allEl.textContent = String(state.conversations.size || state.friends.size);
 
-  // presence counts for status bar
+  // presence counts for status bar (1:1 peers only; groups don't skew them)
   let online = 0, offline = 0;
   for (const r of conversationOrder()) {
-    const u = peerUser(r.peer);
-    if (u && u.status === "online") online++;
+    if (!/^u\d+$/.test(r.peer)) continue;
+    if (peerOnline(r.peer)) online++;
     else offline++;
   }
   const oc = $("#onlineCount");
@@ -323,11 +326,8 @@ export function renderSidebar() {
     return;
   }
 
-  // Group Online / Offline like the native client
-  const on = rows.filter((r) => {
-    const u = peerUser(r.peer);
-    return u && u.status === "online";
-  });
+  // Group Online / Offline like the native client (live presence now)
+  const on = rows.filter((r) => peerOnline(r.peer));
   const off = rows.filter((r) => !on.includes(r));
 
   let html = "";
@@ -574,7 +574,9 @@ function messageLineHtml(m, peer) {
   if (m.sync === "failed") cls.push("failed");
   if (m.deleted) cls.push("deleted");
   const ts = `<span class="ts">${esc(fmtTime(new Date(m.ts)))}</span>`;
-  const who = m.mine ? "You" : peerLabel(peer).slice(0, 16);
+  // In a group every incoming line is labelled with its actual sender.
+  const isGroupPeer = /^g\d+$/.test(peer);
+  const who = m.mine ? "You" : peerLabel(isGroupPeer ? m.sender : peer).slice(0, 16);
   const whoSpan = `<span class="who">${esc(who)}:</span>`;
 
   if (m.deleted) {
@@ -600,7 +602,9 @@ function messageLineHtml(m, peer) {
   let quote = "";
   const r = m.reply;
   if (r && r.id) {
-    const rwho = r.from != null && String(r.from) === String(state.selfNode) ? "You" : peerLabel(peer).slice(0, 16);
+    const rwho = r.from != null && String(r.from) === String(state.selfNode)
+      ? "You"
+      : peerLabel(isGroupPeer && r.from != null ? String(r.from) : peer).slice(0, 16);
     const rtext = r.text ? esc(String(r.text).slice(0, 140)) : "(attachment)";
     quote = `<div class="reply-quote" data-jumprow="${r.rowid != null && Number.isFinite(Number(r.rowid)) ? Number(r.rowid) : ""}" title="Jump to quoted message"><b>${esc(rwho)}:</b> ${rtext}</div>`;
   }
@@ -631,7 +635,9 @@ function renderPinnedStrip(c) {
     strip.innerHTML = "";
     return;
   }
-  const who = pinned.mine ? "You" : peerLabel(state.activePeer).slice(0, 16);
+  const who = pinned.mine
+    ? "You"
+    : peerLabel(/^g\d+$/.test(state.activePeer) && pinned.sender ? pinned.sender : state.activePeer).slice(0, 16);
   const text = String(pinned.text || (pinned.attachment ? pinned.attachment.filename : "") || "(" + (pinned.type || "message") + ")").slice(0, 140);
   strip.classList.remove("hidden");
   strip.innerHTML = `<span class="pinned-ico" title="Pinned message">📌</span><button type="button" class="pinned-jump" title="Jump to pinned message">${esc(who)}: ${esc(text)}</button><button type="button" class="pinned-x" title="Unpin">✕</button>`;
@@ -694,10 +700,17 @@ export function renderChatHead() {
 
   if (!metaEl) return;
   let head = "";
-  const online = u && u.status === "online";
+  const online = peerOnline(peer);
+  const typingNow = isTyping(peer);
+  const g = state.groups.get(peer);
   head += `<span class="dot ${online ? "on" : ""}"></span>`;
-  if (u) {
-    head += online ? "Ready to chat" : "Offline";
+  if (g) {
+    const n = Array.isArray(g.members) ? g.members.length : 0;
+    head += typingNow
+      ? `<span class="typing-meta">typing…</span>`
+      : esc(`${n} member${n === 1 ? "" : "s"}`);
+  } else if (u) {
+    head += typingNow ? `<span class="typing-meta">typing…</span>` : (online ? "Ready to chat" : "Offline");
     head += " &nbsp;·&nbsp; " + esc("@" + u.username);
   } else {
     head += esc("device " + peer);
@@ -719,8 +732,12 @@ export function renderDetails() {
   const c = state.conversations.get(peer);
   const dn = $("#detailsName");
   if (dn) dn.textContent = label;
+  const g = state.groups.get(peer);
   const dh = $("#detailsHandle");
-  if (dh) dh.textContent = u ? "@" + u.username : peer;
+  if (dh) {
+    if (g) dh.textContent = (Array.isArray(g.members) ? g.members.length : 0) + " members";
+    else dh.textContent = u ? "@" + u.username : peer;
+  }
   const photo = u && u.profile ? String(u.profile.photo || "") : "";
   const avatarChar = u && u.profile && u.profile.avatar ? u.profile.avatar : initials(label);
   const dat = $("#detailsAvatar");
@@ -742,7 +759,11 @@ export function renderDetails() {
     }
   }
   const ds = $("#detailsStatus");
-  if (ds) ds.textContent = u ? (u.status === "online" ? "Online" : "Offline") : "Device node";
+  if (ds) {
+    if (g) ds.textContent = "Group chat";
+    else if (u) ds.textContent = peerOnline(peer) ? "Online" : "Offline";
+    else ds.textContent = "Device node";
+  }
   // Server-side profile block (migration 018): status text + about.
   const pst = $("#detailsPeerStatus");
   if (pst) {
@@ -766,14 +787,26 @@ export function renderDetails() {
   const m = /^u(\d+)$/.exec(peer);
   const addBtn = $("#addContactBtn");
   const removeBtn = $("#removeContactBtn");
+  const blockBtn = $("#blockContactBtn");
   if (addBtn && removeBtn) {
     if (m) {
       const friend = isFriend(m[1]);
-      addBtn.classList.toggle("hidden", friend);
+      const blocked = state.blocked.has(m[1]);
+      // A blocked user can never be (re)added as a contact — the server 403s.
+      addBtn.classList.toggle("hidden", friend || blocked);
       removeBtn.classList.toggle("hidden", !friend);
     } else {
       addBtn.classList.add("hidden");
       removeBtn.classList.add("hidden");
+    }
+  }
+  if (blockBtn) {
+    if (m) {
+      const blocked = state.blocked.has(m[1]);
+      blockBtn.classList.remove("hidden");
+      blockBtn.textContent = blocked ? "Unblock" : "Block";
+    } else {
+      blockBtn.classList.add("hidden");
     }
   }
 

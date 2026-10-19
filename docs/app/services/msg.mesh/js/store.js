@@ -15,6 +15,10 @@ export const state = {
   filter: "all",
   connection: "offline",
   loading: false,
+  online: new Set(),      // "u<id>" nodes with a live session right now (WS presence)
+  typing: new Map(),      // peerId -> expiry timestamp for the live "typing…" indicator
+  blocked: new Map(),     // userId -> {user_id, created_at} from /friends/blocks
+  groups: new Map(),      // "g<id>" -> {id, name, creator_user_id, members:[]}
 };
 
 const listeners = new Map();
@@ -86,6 +90,10 @@ export function resetState() {
   state.peerPointers = new Map();
   state.activePeer = null;
   state.connection = "offline";
+  state.online = new Set();
+  state.typing = new Map();
+  state.blocked = new Map();
+  state.groups = new Map();
 }
 
 export function conv(peer) {
@@ -146,7 +154,9 @@ export function ingestOne(item) {
   const sender = item.sender_node_id || "";
   const receiver = item.receiver_node_id || "";
   const mine = sender === state.selfNode;
-  const peer = mine ? receiver : sender;
+  // Group rows (receiver g<id> in both directions) belong to the group
+  // conversation — never to the sender's 1:1 chat.
+  const peer = /^g\d+$/.test(receiver) ? receiver : (mine ? receiver : sender);
   if (!peer) return null;
   const c = conv(peer);
   const existing = c.messages.find((m) => m.id === item.message_id);
@@ -260,6 +270,7 @@ export function conversationOrder() {
         rowid: l.rowid,
         id: l.message_id,
         mine: l.sender_node_id === state.selfNode,
+        sender: l.sender_node_id,
         text: typeof env.text === "string" ? env.text : "",
         attachment: env.attachment && env.attachment.id ? env.attachment : null,
         type: l.message_type || "message",
@@ -272,6 +283,12 @@ export function conversationOrder() {
       unread: meta.unread || 0,
       count: 0,
     });
+    seen.add(peer);
+  }
+  // Groups belong in the sidebar from creation, before their first message.
+  for (const [peer, meta] of state.convMeta) {
+    if (seen.has(peer) || !meta || !meta.group || meta.last) continue;
+    rows.push({ peer, last: null, unread: meta.unread || 0, count: 0 });
     seen.add(peer);
   }
   // Friends with no traffic yet still belong in the sidebar.
@@ -306,7 +323,14 @@ export function refreshConversations(immediate = false) {
         const meta = new Map();
         for (const c of r.conversations) {
           if (!c || !c.peer) continue;
-          meta.set(c.peer, { unread: Number(c.unread) || 0, last: c.last || null });
+          // Group rows carry {group:{id,name,creator_user_id,members}} — keep
+          // it on the meta (sidebar label) and mirror it into state.groups.
+          meta.set(c.peer, {
+            unread: Number(c.unread) || 0,
+            last: c.last || null,
+            group: c.group || null,
+          });
+          if (c.group) state.groups.set(c.peer, c.group);
         }
         state.convMeta = meta;
         emit("conversations");
@@ -328,7 +352,49 @@ export function peerUser(peer) {
 export function peerLabel(peer) {
   const u = peerUser(peer);
   if (u) return u.display_name || u.username || peer;
+  const g = state.groups.get(peer || "");
+  if (g && g.name) return g.name;
   return peer || "unknown";
+}
+
+export function groupInfo(peer) {
+  return state.groups.get(peer || "") || null;
+}
+
+// Live presence: a node is "online" while at least one WS session is up.
+// A group reads as online when any of its members is online.
+export function peerOnline(peer) {
+  if (!peer) return false;
+  if (state.online.has(peer)) return true;
+  const g = state.groups.get(peer);
+  if (g && Array.isArray(g.members)) return g.members.some((m) => state.online.has(m));
+  return false;
+}
+
+/* ---------------- live typing indicator ---------------- */
+
+export function setTyping(peer, ttlMs = 4000) {
+  if (!peer) return;
+  state.typing.set(peer, Date.now() + ttlMs);
+}
+
+export function clearTyping(peer) {
+  state.typing.delete(peer);
+}
+
+export function isTyping(peer) {
+  if (!peer) return false;
+  const exp = state.typing.get(peer);
+  if (!exp) return false;
+  if (Date.now() > exp) {
+    state.typing.delete(peer);
+    return false;
+  }
+  return true;
+}
+
+export function isBlocked(userId) {
+  return state.blocked.has(String(userId));
 }
 
 export function setPointer(peer, rowid) {
@@ -351,6 +417,13 @@ export async function primeUsers() {
     for (const raw of [r.sender_user_id, r.receiver_user_id]) {
       const id = String(raw);
       if (/^\d+$/.test(id) && !state.users.has(id)) ids.add(id);
+    }
+  }
+  // Group members resolve to display names in group transcripts.
+  for (const g of state.groups.values()) {
+    for (const m of (Array.isArray(g.members) ? g.members : [])) {
+      const mm = /^u(\d+)$/.exec(String(m));
+      if (mm && !state.users.has(mm[1])) ids.add(mm[1]);
     }
   }
   await Promise.all([...ids].map(async (id) => {
@@ -457,4 +530,35 @@ export function upsertFriend(userId) {
       state.requests.delete(rid);
     }
   }
+}
+
+/* ---------------- blocks & groups ---------------- */
+
+// Pull the authoritative block list (same shape as friendships: cached per
+// session, local updates win until the next refresh).
+export async function loadBlocked() {
+  try {
+    const r = await api.blocksList();
+    if (r && Array.isArray(r.blocks)) {
+      state.blocked = new Map();
+      for (const b of r.blocks) {
+        if (b && b.user_id != null) state.blocked.set(String(b.user_id), b);
+      }
+    }
+  } catch { /* offline: keep the last known list */ }
+  return true;
+}
+
+// Pull my groups (name/members) — conversations only refreshes the ones with
+// traffic, this covers empty groups too.
+export async function loadGroups() {
+  try {
+    const r = await api.groupsList();
+    if (r && Array.isArray(r.groups)) {
+      for (const g of r.groups) {
+        if (g && g.id) state.groups.set(String(g.id), g);
+      }
+    }
+  } catch { /* offline: keep the last known map */ }
+  return true;
 }
