@@ -387,6 +387,39 @@ export const api = {
     call("/api/v1/groups/create", { name, members: (members || []).map(Number) }),
   groupsList: () => call("/api/v1/groups/list", {}, { idempotent: true }),
 
+  // Roles + moderation (owner > admin > moderator > member). Every call is
+  // authorized server-side; the client gates UI with hasChatPerm() only as a
+  // courtesy — the ladder lives in the server.
+  chatRolesList: () => call("/api/v1/chat/roles/list", {}, { idempotent: true }),
+  chatRoleSet: (user_id, app_role) =>
+    call("/api/v1/chat/roles/set", { user_id: Number(user_id), app_role }),
+  chatUserMute: (user_id, minutes, reason) => {
+    const body = { user_id: Number(user_id) };
+    if (minutes != null) body.minutes = Number(minutes);
+    if (reason) body.reason = String(reason);
+    return call("/api/v1/chat/users/mute", body);
+  },
+  chatUserUnmute: (user_id) => call("/api/v1/chat/users/unmute", { user_id: Number(user_id) }),
+  chatUserBan: (user_id, reason) => {
+    const body = { user_id: Number(user_id) };
+    if (reason) body.reason = String(reason);
+    return call("/api/v1/chat/users/ban", body);
+  },
+  chatUserUnban: (user_id) => call("/api/v1/chat/users/unban", { user_id: Number(user_id) }),
+  chatModRecent: (limit = 30) => call("/api/v1/chat/mod/recent", { limit }, { idempotent: true }),
+  // action: "delete" | "edit" (edit also needs {text}).
+  chatModMessage: (message_id, action, text) => {
+    const body = { message_id, action };
+    if (text != null) body.text = String(text);
+    return call("/api/v1/chat/mod/message", body);
+  },
+  chatGroupManage: (group_id, action, user_id) => {
+    const body = { group_id: Number(group_id), action };
+    if (user_id != null) body.user_id = Number(user_id);
+    return call("/api/v1/chat/groups/manage", body);
+  },
+  chatAudit: (limit = 50) => call("/api/v1/chat/audit", { limit }, { idempotent: true }),
+
   // Call log + TURN/STUN credentials for WebRTC (call.js).
   callHistory: (limit = 50) => call("/api/v1/calls/history", { limit }, { idempotent: true }),
   callsIce: () => call("/api/v1/calls/ice", {}, { idempotent: true }),

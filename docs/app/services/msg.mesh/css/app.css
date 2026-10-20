@@ -1062,3 +1062,35 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 /* failed messages read as clickable retry targets */
 .msg-line.failed{cursor:pointer}
 .msg-line.failed:hover .st{text-decoration:underline}
+
+/* ---------------- roles: badges + Admin Panel ---------------- */
+.role-badge{
+  display:inline-block;margin:0 4px;padding:0 5px;border-radius:2px;
+  font-size:9px;line-height:14px;vertical-align:middle;text-transform:uppercase;
+  letter-spacing:.3px;color:#fff;border:1px solid rgba(0,0,0,.35);
+}
+.badge-owner{background:#8a2be2}
+.badge-admin{background:#c0392b}
+.badge-moderator{background:#1f6fb2}
+.badge-muted{background:#b9770e}
+.badge-banned{background:#6e2b2b}
+.badge-online{background:#1e7d32}
+.admin-frame{width:min(720px,94vw)}
+.admin-tabs{display:flex;gap:6px;margin-bottom:6px}
+.admin-tab.sel{font-weight:700;box-shadow:inset 0 0 0 1px var(--xp-dark)}
+.admin-pane{max-height:46vh;min-height:180px;overflow:auto;padding:2px}
+.admin-pane.hidden{display:none}
+.admin-user-row,.admin-msg-row,.admin-audit-row{
+  display:flex;gap:8px;align-items:center;padding:5px 6px;
+  border-bottom:1px solid var(--xp-shadow-out);
+}
+.admin-user-row:last-child,.admin-msg-row:last-child,.admin-audit-row:last-child{border-bottom:none}
+.admin-user-id{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px}
+.admin-user-id small{width:100%}
+.admin-user-acts{display:flex;gap:4px;flex-shrink:0}
+.admin-role{font-size:12px;max-width:110px}
+.admin-msg-row{flex-wrap:wrap}
+.admin-msg-meta{display:flex;gap:8px;align-items:baseline;width:100%}
+.admin-msg-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.admin-edit-input{flex:1;min-width:120px;font-size:12px;padding:2px 4px}
+.admin-audit-row{flex-direction:column;align-items:stretch;gap:1px}

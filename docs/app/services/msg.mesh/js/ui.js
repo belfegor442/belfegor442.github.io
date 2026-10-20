@@ -259,10 +259,21 @@ export function renderContacts() {
     const online = state.online.has("u" + id);
     return `<button type="button" class="user-item" data-peer="u${esc(id)}">
       <span class="dot ${online ? "on" : ""}"></span>
-      <div><strong>${esc(name)}</strong><small>${esc(handle)}</small></div>
+      <div><strong>${esc(name)}</strong>${roleBadge(id)}<small>${esc(handle)}</small></div>
       <span class="status ${online ? "on" : ""}">${online ? "online" : "offline"}</span>
     </button>`;
   }).join("");
+}
+
+// Role badge next to a name (owner > admin > moderator; members stay bare).
+// state.roles comes from /chat/roles/list — empty until the roster loads.
+function roleBadge(userId) {
+  const rec = state.roles.get(String(userId));
+  if (!rec) return "";
+  const role = String(rec.app_role || "").toLowerCase();
+  if (role === "member" || !role) return "";
+  const label = role === "owner" ? "owner" : role === "admin" ? "admin" : "mod";
+  return `<span class="role-badge badge-${esc(role)}" title="${esc(role)}">${label}</span>`;
 }
 
 function rowMeta(r) {
@@ -289,7 +300,7 @@ function contactRowHtml(r, active) {
   return `<button type="button" class="contact-row ${active ? "active" : ""} ${r.unread ? "has-unread" : ""}" data-peer="${esc(r.peer)}">
     <span class="dot ${m.online ? "on" : ""}"></span>
     <span class="contact-name-wrap contact-name-flex">
-      <span class="contact-name">${esc(m.label)}</span>
+      <span class="contact-name">${esc(m.label)}${roleBadge(/^u(\d+)$/.exec(r.peer) ? /^u(\d+)$/.exec(r.peer)[1] : "")}</span>
       ${m.preview ? `<span class="contact-preview">${emoteTokens(esc(emotes(m.preview)))}</span>` : ""}
     </span>
     <span class="contact-time">${esc(m.time)}</span>
@@ -710,8 +721,8 @@ export function renderChatHead() {
       ? `<span class="typing-meta">typing…</span>`
       : esc(`${n} member${n === 1 ? "" : "s"}`);
   } else if (u) {
-    head += typingNow ? `<span class="typing-meta">typing…</span>` : (online ? "Ready to chat" : "Offline");
-    head += " &nbsp;·&nbsp; " + esc("@" + u.username);
+    head += typingNow ? `<span class="typing-meta">typing.</span>` : (online ? "Ready to chat" : "Offline");
+    head += " &nbsp;·&nbsp; " + esc("@" + u.username) + roleBadge(u.user_id);
   } else {
     head += esc("device " + peer);
   }

@@ -19,6 +19,9 @@ export const state = {
   typing: new Map(),      // peerId -> expiry timestamp for the live "typing…" indicator
   blocked: new Map(),     // userId -> {user_id, created_at} from /friends/blocks
   groups: new Map(),      // "g<id>" -> {id, name, creator_user_id, members:[]}
+  roles: new Map(),       // userId -> {app_role, muted, banned, ...} from /chat/roles/list
+  myPerms: new Set(),     // chat permission strings for the signed-in user
+  myRole: "member",       // owner | admin | moderator | member (server truth)
 };
 
 const listeners = new Map();
@@ -94,6 +97,9 @@ export function resetState() {
   state.typing = new Map();
   state.blocked = new Map();
   state.groups = new Map();
+  state.roles = new Map();
+  state.myPerms = new Set();
+  state.myRole = "member";
 }
 
 export function conv(peer) {
@@ -560,5 +566,54 @@ export async function loadGroups() {
       }
     }
   } catch { /* offline: keep the last known map */ }
+  return true;
+}
+
+/* ---------------- roles & moderation ---------------- */
+
+// owner(3) > admin(2) > moderator(1) > member(0) — mirrors app_role_rank()
+// on the server; the ladder is enforced there, this is UI gating only.
+export const ROLE_RANK = { member: 0, moderator: 1, admin: 2, owner: 3 };
+
+export function roleRank(role) {
+  return ROLE_RANK[String(role || "").toLowerCase()] ?? 0;
+}
+
+export function myRank() {
+  return roleRank(state.myRole);
+}
+
+export function hasChatPerm(perm) {
+  return state.myPerms.has(perm);
+}
+
+// The signed-in user's mute/ban view, refreshed with loadRoles().
+export function selfModeration() {
+  const me = selfId();
+  return state.roles.get(me) || null;
+}
+
+export function isSelfMuted() {
+  const r = selfModeration();
+  return !!(r && r.muted);
+}
+
+// Pull the role roster (users + app_role + mute/ban flags) and my permission
+// set. Readable by every member (rank 0); role changes elsewhere are picked
+// up by the next refresh, not pushed over WS.
+export async function loadRoles() {
+  try {
+    const r = await api.chatRolesList();
+    if (r && Array.isArray(r.users)) {
+      const next = new Map();
+      for (const u of r.users) {
+        if (u && u.user_id != null) next.set(String(u.user_id), u);
+      }
+      state.roles = next;
+      state.myRole = r.your_role || state.myRole;
+      state.myPerms = new Set(Array.isArray(r.your_permissions) ? r.your_permissions : []);
+    }
+    emit("roles");
+  } catch { /* offline or not authorized for the roster: keep last known */ }
   return true;
 }

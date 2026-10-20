@@ -112,6 +112,7 @@
     <span class="menu-slot"><span class="menu-item" data-menu="contacts">Contacts</span></span>
     <span class="menu-slot"><span class="menu-item" data-menu="actions">Actions</span></span>
     <span class="menu-slot"><span class="menu-item" data-menu="view">View</span></span>
+    <span class="menu-slot hidden" id="toolsMenuSlot"><span class="menu-item" data-menu="tools">Tools</span></span>
     <span class="menu-slot"><span class="menu-item" data-menu="help">Help</span></span>
   </div>
 
@@ -403,6 +404,48 @@
       <p class="about-line">Local SQLite storage + Weird Stuff Server control plane.</p>
       <div class="dlg-actions"><button class="xp-btn primary" type="button" id="aboutOk">Close</button></div>
     </div>
+  </div>
+</dialog>
+
+<!-- Admin Panel (roles ladder owner > admin > moderator > member; tabs mirror
+     the /chat/* routes: users+roles, moderation queue, audit log) -->
+<dialog id="adminPanelDialog">
+  <div class="win-frame dlg-frame admin-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Manage Your Server.png" alt=""><span class="win-title">Admin Panel - msg.mesh</span><button class="win-cap close" value="cancel" id="adminPanelClose" aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <div class="admin-tabs" role="tablist">
+        <button type="button" class="xp-btn gray admin-tab sel" data-admin-tab="users" id="adminTabUsers">Users</button>
+        <button type="button" class="xp-btn gray admin-tab" data-admin-tab="moderation" id="adminTabMod">Moderation</button>
+        <button type="button" class="xp-btn gray admin-tab" data-admin-tab="audit" id="adminTabAudit">Audit</button>
+      </div>
+      <div class="admin-pane sunken" id="adminUsersPane"><div class="list-empty">Loading…</div></div>
+      <div class="admin-pane sunken hidden" id="adminModPane"><div class="list-empty">Loading…</div></div>
+      <div class="admin-pane sunken hidden" id="adminAuditPane"><div class="list-empty">Loading…</div></div>
+      <div class="dlg-actions">
+        <span class="hint" id="adminRoleHint"></span>
+        <button class="xp-btn gray" type="button" id="adminRefresh">Refresh</button>
+      </div>
+      <p class="error" id="adminStatus"></p>
+    </div>
+  </div>
+</dialog>
+
+<!-- Mute dialog (Admin Panel: minutes + reason for /chat/users/mute) -->
+<dialog id="muteDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Manage Your Server.png" alt=""><span class="win-title">Mute User</span><button class="win-cap close" value="cancel" id="muteClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="muteForm">
+      <p class="hint" id="muteWho"></p>
+      <label>MINUTES (1-525600)</label>
+      <div class="sunken"><input id="muteMinutes" type="number" min="1" max="525600" value="60" required></div>
+      <label>REASON</label>
+      <div class="sunken"><input id="muteReason" maxlength="500" placeholder="Optional" autocomplete="off"></div>
+      <div class="dlg-actions">
+        <button class="xp-btn primary" type="submit" id="muteSubmit">Mute</button>
+        <button class="xp-btn gray" type="button" id="muteCancel">Cancel</button>
+      </div>
+      <p class="error" id="muteStatus"></p>
+    </form>
   </div>
 </dialog>
 
