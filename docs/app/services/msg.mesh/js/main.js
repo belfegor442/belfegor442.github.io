@@ -89,6 +89,9 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   if (password.length < 8) { showErr(errBox, "Password must be 8-128 characters."); playSound("error"); return; }
   const btn = $("#regSubmit2");
   btn.disabled = true;
+  // Never race the boot probe: an unresolved base would POST to the page
+  // origin (GitHub Pages answers 405) instead of the msg.mesh server.
+  if (!apiBase()) await resolveApiBase();
   try {
     await api.register(username, password, display);
     const r = await api.login(username, password);
@@ -154,6 +157,9 @@ $("#authForm").addEventListener("submit", async (e) => {
     clearTimeout(bootRetryTimer);
     bootRetryTimer = 0;
   }
+  // Never race the boot probe: an unresolved base would POST to the page
+  // origin (GitHub Pages answers 405) instead of the msg.mesh server.
+  if (!apiBase()) await resolveApiBase();
   try {
     const r = await api.login(username, password);
     setToken(r.session_token);
