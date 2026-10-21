@@ -16,7 +16,7 @@
   --xp-face:#d4dbe4;
   --xp-white:#fff;
   --xp-text:#000;
-  --xp-dim:#6d6d6d;
+  --xp-dim:#595959;
   --xp-border:#788cac;
   --xp-title-a:#0a3caa;
   --xp-title-b:#3278dc;
@@ -493,7 +493,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 .contact-name{flex:1;min-width:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .contact-name-flex{flex:1;min-width:0}
 .msg-type-label{color:#969696}
-.contact-time{font-size:10px;color:#969696;flex:none;align-self:flex-start;margin-top:2px}
+  .contact-time{font-size:10px;color:#6e6e6e;flex:none;align-self:flex-start;margin-top:2px}
 .unread{
   min-width:18px;height:18px;padding:0 5px;flex:none;
   background:var(--xp-badge);color:#fff;
@@ -781,7 +781,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
 .self-banner{display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--xp-face);border-bottom:1px solid var(--xp-border)}
 .self-banner-avatar{width:32px;height:32px;font-size:13px;flex:none}
 .self-banner-body{min-width:0;flex:1}
-.self-banner-body strong{display:block;font-size:12px;color:#146428;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .self-banner-body strong{display:block;font-size:12px;color:#0f5a22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .self-banner-body .hint{display:block;padding:0;margin:1px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .server-block{border-top:1px solid var(--xp-border);margin-top:12px;padding-top:10px;text-align:left}
 .server-row{display:flex;gap:6px;margin-top:4px}

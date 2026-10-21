@@ -67,3 +67,31 @@
 
 ### Blockers
 - None.
+
+## R41-43 — axe accessibility + contrast (2026-10-21)
+
+- R41: axe-core 4.10.2 pass over logon + chat (default theme). CDN injection blocked by page CSP `script-src 'self'` (correct hardening) → smoke loads axe.min.js locally and injects via page.evaluate (Runtime.evaluate not subject to page CSP). Found D-7 (logon inputs unlabeled, axe critical).
+- R42: D-7 fixed (aria-labels, no visual change). Then axe contrast pass found D-8 in default theme: #selfHandle 3.7:1 + .contact-time 2.95:1. Root cause: --xp-dim and gray tokens fail 4.5:1 on --xp-face (#d4dbe4) — 17 usages affected though axe only flags visible ones.
+- R43: theme pass (win98 + north) via smoke_themes_a11y.py found D-8 deeper: win98 self-banner green 4.0:1 + list grays 3.94:1; north uses light-bg slate #64748b on dark surfaces (6 nodes, 2.35-3.95:1). Fixed across app.css/win98.css/north.css (15 text tokens → #94a3b8 in north; hover border left alone — borders exempt from WCAG text contrast).
+
+### Defects
+- D-7 FIXED: aria-label on #authUsername/#authPassword.
+- D-8 FIXED: contrast tokens across all 3 themes (app.css --xp-dim #595959, .contact-time #6e6e6e, banner green #0f5a22; win98 grays #6e6e6e; north slate tokens #94a3b8).
+
+### Modified files
+- index.html: aria-labels (D-7)
+- css/app.css: --xp-dim, .contact-time, .self-banner-body strong colors (D-8)
+- css/win98.css: list grays (D-8)
+- css/north.css: 15 text tokens (D-8)
+
+### New test assets
+- smoke_a11y.py: axe WCAG A/AA on logon + chat (2 assertions)
+- smoke_themes_a11y.py: axe color-contrast on win98 + north (2 assertions)
+- probe_contrast.py: violation detail dumper (fg/bg/ratio/target)
+
+### Next rounds (44+)
+- Continue handler sweep (mesh poll done — clean: node auth, tx claim, TTL sweep, clamped LIMIT); remaining: signal/call_signal, handshake/nodes, activate/keys, group_manage/chat_audit, tenants
+- Optional: axe pass over dialogs (profile/settings/new-chat) when opened
+
+### Blockers
+- None.

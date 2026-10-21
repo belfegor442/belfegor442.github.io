@@ -59,12 +59,12 @@
       <div class="logon-fields" id="logonFields">
         <div class="logon-f-row hidden" id="rowUsername">
           <span class="logon-f-label"><u>U</u>ser name:</span>
-          <div class="logon-f-box"><input id="authUsername" autocomplete="username" maxlength="32" spellcheck="false" placeholder=""></div>
+          <div class="logon-f-box"><input id="authUsername" aria-label="User name" autocomplete="username" maxlength="32" spellcheck="false" placeholder=""></div>
         </div>
         <div class="logon-f-row" id="rowPassword">
           <span class="logon-f-label"><u>P</u>assword:</span>
           <div class="logon-f-box">
-            <input id="authPassword" type="password" autocomplete="current-password" maxlength="128" placeholder="">
+            <input id="authPassword" type="password" aria-label="Password" autocomplete="current-password" maxlength="128" placeholder="">
             <span class="caps-warn hidden" id="capsWarn">Caps Lock is on.</span>
           </div>
           <button class="logon-arrow" id="authSubmit" type="submit" aria-label="Sign In">

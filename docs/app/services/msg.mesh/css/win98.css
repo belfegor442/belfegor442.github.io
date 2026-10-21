@@ -315,9 +315,9 @@
 [data-theme="win98"] .contact-row.active .contact-time,
 [data-theme="win98"] .contact-row.active .contact-preview,
 [data-theme="win98"] .contact-row.active .msg-type-label{color:#d8e8ff}
-[data-theme="win98"] .contact-time,
-[data-theme="win98"] .msg-type-label,
-[data-theme="win98"] .list-empty{color:#808080}
+  [data-theme="win98"] .contact-time,
+  [data-theme="win98"] .msg-type-label,
+  [data-theme="win98"] .list-empty{color:#6e6e6e}
 [data-theme="win98"] .contact-preview{color:#404040}
 [data-theme="win98"] .group-label{color:#000080;background:#fff}
 [data-theme="win98"] .unread{border-radius:0}

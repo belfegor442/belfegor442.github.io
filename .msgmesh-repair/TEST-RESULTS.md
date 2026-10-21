@@ -26,3 +26,8 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | probe_d6 (post-fix) | 0/0 OK | testuser1 history count=0, alien=0 |
 | 10-21 | FULL battery (R35, post D-6) | 399/399 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 |
 | 10-21 | Server audit close (R36-40) | 0 defects | http_server/database/mutation/moderation/admin/apps/ops sweep all clean; no rebuild needed (no code change) |
+| 10-21 | smoke_a11y (new, R41) | 2/2 | logon axe critical (D-7) + chat contrast serious (D-8) found |
+| 10-21 | smoke_a11y post D-7 | 2/2 | logon 0 violations |
+| 10-21 | smoke_themes_a11y (new, R43) pre-fix | 0/2 | win98 4 nodes + north 6 nodes contrast (D-8) |
+| 10-21 | smoke_a11y + themes post D-8 | 4/4 | logon+chat 0/0; win98+north 0/0 |
+| 10-21 | regression post D-7/D-8 | 17/17 | statusbar 8/8 + call msgbox 9/9 |
