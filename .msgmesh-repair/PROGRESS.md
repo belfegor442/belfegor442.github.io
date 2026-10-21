@@ -126,3 +126,19 @@
 
 ### Blockers
 - None.
+
+## R49-50 — friends/groups/roles sweep, server map CLOSED (2026-10-21)
+
+- R49: friends REST fully read — request/accept/reject/lists/remove/block/unblock all clean (session identity binding with claimed-id mismatch → 403, recipient checks, conditional UPDATEs, block kills friendship+pending both ways). typing: muted/banned dropped, group-membership + block fences. helpers (users_blocked/is_group_member/group_members/friend_participants/publish_presence) parameterized.
+- R50: groups/calls/roles — group_create (name/size/member caps, per-member exists+block fences, rollback on partial insert), group_list (membership JOIN), calls_history (me-scoped caller/callee), calls_ice (session-gated config echo), chat role ladder (owner unassignable, chat_target_allowed with owner_immutable, admin grants ≤ moderator, changes()==1), mute (int minutes → datetime modifier, no user string in SQL), group_manage (creator OR manage_any; ladder on remove_member), chat_audit (admin+, limit clamped). Server handler map is now fully swept (R21-R50): D-6, D-9, D-10 found; nothing else.
+- Design observations (NOT defects — behavior is test-encoded): (1) group_create accepts non-friend members (roles_test:291 and test_api_hardening.cpp both assert 201 without prior friendship; product policy is "strangers can contact you, blocks are the fence", same as DMs); (2) native-node identity (resolve_friend_identity==0) may act on legacy friend endpoints without ownership checks — node tokens are operator-issued high-trust credentials; (3) group with all members removed lingers as an orphan row (cosmetic).
+
+### Defects
+- None this round.
+
+### Next rounds (51+)
+- Client dialog axe pass (profile/settings/new-chat/group dialogs opened via UI, axe WCAG A/AA + contrast across 3 themes)
+- Optional: mesh_read (6962+) and tenants (8881+) spot re-read; call_log cleanup of probe rows
+
+### Blockers
+- None.
