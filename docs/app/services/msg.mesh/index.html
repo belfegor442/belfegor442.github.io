@@ -73,6 +73,7 @@
         </div>
         <p class="logon-error hidden" id="authError" role="alert"></p>
         <p class="logon-hint" id="authHint"></p>
+        <button type="button" class="logon-forgot" id="forgotPwBtn">Forgot your password?</button>
         <!-- Win98 classic Cancel (display:none unless data-theme=win98) -->
         <button type="button" id="w98CancelBtn">Cancel</button>
       </div>
@@ -388,6 +389,39 @@
       <div class="user-results sunken" id="newGroupMembers"></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="newGroupCreate">Create Group</button></div>
       <p class="error" id="newGroupStatus"></p>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="changePwDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Key.png" alt=""><span class="win-title">Change Password</span><button class="win-cap close" value="cancel" id="changePwClose" aria-label="Close"></button></div>
+    <form class="dlg-body" id="changePwForm">
+      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">CURRENT PASSWORD</label>
+      <div class="sunken"><input id="curPw" type="password" required maxlength="128" autocomplete="current-password"></div>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">NEW PASSWORD</label>
+      <div class="sunken"><input id="newPw" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">CONFIRM NEW PASSWORD</label>
+      <div class="sunken"><input id="newPw2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="changePwSave">Change</button></div>
+      <p class="error" id="changePwError"></p>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="resetPwDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Login Question.png" alt=""><span class="win-title">Reset Password</span><button class="win-cap close" value="cancel" id="resetPwClose" aria-label="Close"></button></div>
+    <form class="dlg-body" id="resetPwForm">
+      <p class="hint">Password reset needs the server key from server.local.conf on the machine that runs the server.</p>
+      <label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" width="16" height="16" alt="">USERNAME</label>
+      <div class="sunken"><input id="resetPwUser" required maxlength="32" autocomplete="username" spellcheck="false"></div>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">NEW PASSWORD</label>
+      <div class="sunken"><input id="resetPwNew" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">SERVER KEY</label>
+      <div class="sunken"><input id="resetPwKey" type="password" required maxlength="256" autocomplete="off" spellcheck="false" placeholder="shutdown_token"></div>
+      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="resetPwGo">Reset</button></div>
+      <p class="error" id="resetPwStatus"></p>
     </form>
   </div>
 </dialog>

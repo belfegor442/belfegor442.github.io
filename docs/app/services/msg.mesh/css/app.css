@@ -332,6 +332,14 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   text-shadow:1px 1px 0 rgba(0,0,0,.3);
   min-height:1em;
 }
+.logon-forgot{
+  display:block;margin:8px auto 0;
+  border:0;background:transparent;padding:2px 6px;
+  font:inherit;font-size:12px;color:#d6eaff;
+  text-decoration:underline;cursor:pointer;
+  text-shadow:1px 1px 0 rgba(0,0,0,.3);
+}
+.logon-forgot:hover{color:#fff}
 .logon-add{
   position:absolute;left:clamp(12px,3vw,36px);bottom:clamp(16px,5vh,48px);
   display:flex;align-items:center;gap:12px;

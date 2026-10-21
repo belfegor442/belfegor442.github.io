@@ -330,6 +330,14 @@ export const api = {
     call("/api/v1/users/register", { username, password, display_name }, { allow401: true, timeoutMs: 30000 }),
   whoami: (opts = {}) => call("/api/v1/auth/whoami", {}, { idempotent: true, ...opts }),
   logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true, idempotent: true }),
+  // Password lifecycle. change_password rotates the signed-in account's
+  // password (server revokes every session for it). reset_password is the
+  // forgot-password escape hatch and needs the server's shutdown token from
+  // server.local.conf — nobody can reset an account over the public API alone.
+  changePassword: (old_password, new_password) =>
+    call("/api/v1/users/change_password", { old_password, new_password }, { allow401: true }),
+  resetPassword: (username, new_password, server_key) =>
+    call("/api/v1/users/reset_password", { token: server_key, username, new_password }, { allow401: true }),
 
   history: (o = {}) => call("/api/v1/mesh/history", { limit: 200, ...o }, { idempotent: true }),
   // client_msg_id makes retries idempotent: re-sending the same id returns

@@ -123,6 +123,86 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   }
 });
 
+/* ---------------- change / reset password ---------------- */
+
+function openChangePw() {
+  const d = $("#changePwDialog");
+  if (!d || d.open) return;
+  showErr($("#changePwError"), "");
+  $("#changePwForm")?.reset();
+  d.showModal();
+}
+
+$("#changePwForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const oldP = $("#curPw").value;
+  const newP = $("#newPw").value;
+  const newP2 = $("#newPw2").value;
+  const errBox = $("#changePwError");
+  showErr(errBox, "");
+  if (!oldP || !newP) { showErr(errBox, "Both passwords are required."); playSound("error"); return; }
+  if (newP.length < 8) { showErr(errBox, "Password must be 8-128 characters."); playSound("error"); return; }
+  if (newP !== newP2) { showErr(errBox, "New passwords do not match."); playSound("error"); return; }
+  const btn = $("#changePwSave");
+  btn.disabled = true;
+  try {
+    await api.changePassword(oldP, newP);
+    $("#changePwDialog").close();
+    ui.toast("Password changed - sign in again");
+    // The server revoked every session for the account; return to logon.
+    await logout();
+  } catch (err) {
+    // 401 here means the CURRENT password was wrong, not a dead session.
+    const msg = err instanceof ApiError && err.status === 401
+      ? "Current password is incorrect."
+      : err instanceof ApiError ? friendlyError(err) : "Could not change password.";
+    showErr(errBox, msg);
+    playSound("error");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#forgotPwBtn")?.addEventListener("click", () => {
+  const d = $("#resetPwDialog");
+  if (!d || d.open) return;
+  showErr($("#resetPwStatus"), "");
+  $("#resetPwForm")?.reset();
+  const user = $("#authUsername")?.value?.trim();
+  if (user && $("#resetPwUser")) $("#resetPwUser").value = user;
+  d.showModal();
+});
+
+$("#resetPwForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = $("#resetPwUser").value.trim();
+  const newP = $("#resetPwNew").value;
+  const key = $("#resetPwKey").value;
+  const st = $("#resetPwStatus");
+  showErr(st, "");
+  if (!username || !newP || !key) {
+    showErr(st, "Username, new password and server key are required.");
+    playSound("error");
+    return;
+  }
+  if (newP.length < 8) { showErr(st, "Password must be 8-128 characters."); playSound("error"); return; }
+  try {
+    await api.resetPassword(username, newP, key);
+    $("#resetPwDialog").close();
+    ui.toast("Password updated - sign in");
+    if ($("#authUsername")) $("#authUsername").value = username;
+    $("#authPassword").value = "";
+    showErr($("#authError"), "");
+    const hint = $("#authHint");
+    if (hint) hint.textContent = "Password updated. Sign in with the new password.";
+    primeSound("logon");
+    $("#authPassword")?.focus();
+  } catch (err) {
+    showErr(st, err instanceof ApiError ? friendlyError(err) : "Could not reset password.");
+    playSound("error");
+  }
+});
+
 // Win98 classic logon Cancel: clear both fields and return focus to user name.
 $("#w98CancelBtn")?.addEventListener("click", () => {
   $("#authUsername").value = "";
@@ -3196,6 +3276,7 @@ const menuActions = {
     ["-", null],
     ["Sign In...", () => { setMode("login"); location.hash = "#/login"; }, "Login Question.png"],
     ["Create Account...", () => { setMode("register"); location.hash = "#/register"; }, "User Accounts.png"],
+    ["Change Password...", openChangePw, "Key.png"],
     ["Sign Out", logout, "Logout.png"],
   ],
   contacts: [
