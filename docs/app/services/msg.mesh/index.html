@@ -413,7 +413,7 @@
   <div class="win-frame dlg-frame">
     <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Login Question.png" alt=""><span class="win-title">Reset Password</span><button class="win-cap close" value="cancel" id="resetPwClose" aria-label="Close"></button></div>
     <form class="dlg-body" id="resetPwForm">
-      <p class="hint">Password reset needs the server key from server.local.conf on the machine that runs the server.</p>
+      <p class="hint">Password reset needs the server key: the 64-character <b>shutdown_token</b> value from server.local.conf on the machine that runs the server.</p>
       <label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" width="16" height="16" alt="">USERNAME</label>
       <div class="sunken"><input id="resetPwUser" required maxlength="32" autocomplete="username" spellcheck="false"></div>
       <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">NEW PASSWORD</label>

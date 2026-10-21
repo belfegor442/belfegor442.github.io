@@ -198,7 +198,20 @@ $("#resetPwForm")?.addEventListener("submit", async (e) => {
     primeSound("logon");
     $("#authPassword")?.focus();
   } catch (err) {
-    showErr(st, err instanceof ApiError ? friendlyError(err) : "Could not reset password.");
+    // Surface the server's specific 403 reason: "unauthorized" means the
+    // shutdown token was wrong — the generic permission text hid that.
+    let msg = "Could not reset password.";
+    if (err instanceof ApiError) {
+      const e = err.payload && err.payload.error;
+      if (err.status === 403 && e === "unauthorized") {
+        msg = "Server key is incorrect. Copy the shutdown_token value from server.local.conf on the server machine.";
+      } else if (err.status === 403 && e === "password reset is disabled") {
+        msg = "Password reset is disabled on this server (no shutdown_token configured).";
+      } else {
+        msg = friendlyError(err);
+      }
+    }
+    showErr(st, msg);
     playSound("error");
   }
 });
