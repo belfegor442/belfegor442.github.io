@@ -25,3 +25,4 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | probe_d6 (pre-fix) | LEAK | testuser1 read 200 alien rows of 634 total |
 | 10-21 | probe_d6 (post-fix) | 0/0 OK | testuser1 history count=0, alien=0 |
 | 10-21 | FULL battery (R35, post D-6) | 399/399 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 |
+| 10-21 | Server audit close (R36-40) | 0 defects | http_server/database/mutation/moderation/admin/apps/ops sweep all clean; no rebuild needed (no code change) |
