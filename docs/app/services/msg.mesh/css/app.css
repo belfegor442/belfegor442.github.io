@@ -593,7 +593,7 @@ input[type=checkbox]:checked{background-image:url("../assets/xp/sprites/checkbox
 .day-divider::before,.day-divider::after{
   content:"";flex:1;height:1px;background:#e0e4ea;
 }
-.list-empty{padding:24px 12px;text-align:center;color:#969696;font-size:13px;line-height:1.6}
+  .list-empty{padding:24px 12px;text-align:center;color:#6e6e6e;font-size:13px;line-height:1.6}
 .load-older{
   align-self:center;margin:0 0 8px;
   border:1px solid #5f5f5f;background:linear-gradient(180deg,#fff,#e4e4e4);

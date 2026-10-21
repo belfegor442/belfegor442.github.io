@@ -285,7 +285,7 @@
       <div class="profile-banner hidden" id="profileBannerStrip"><img class="profile-banner-img" id="profileBannerImg" alt=""></div>
       <div class="profile-id"><div class="conv-avatar" id="profileAvatar"><span id="profileAvatarText">?</span><img class="avatar-photo hidden" id="profileAvatarImg" alt=""></div><div><strong id="profileName">…</strong><small id="profileHandle">@…</small><small class="hint" id="profileStatusLine"></small></div></div>
       <label>DISPLAY NAME</label>
-      <div class="sunken"><input id="profileDisplayName" maxlength="64"></div>
+          <div class="sunken"><input id="profileDisplayName" aria-label="Display name" maxlength="64"></div>
       <label>STATUS</label>
       <div class="sunken"><input id="profileStatusText" maxlength="128" placeholder="Free-form status text" autocomplete="off"></div>
       <label>ABOUT</label>
@@ -398,11 +398,11 @@
     <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Key.png" alt=""><span class="win-title">Change Password</span><button class="win-cap close" value="cancel" id="changePwClose" aria-label="Close"></button></div>
     <form class="dlg-body" id="changePwForm">
       <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">CURRENT PASSWORD</label>
-      <div class="sunken"><input id="curPw" type="password" required maxlength="128" autocomplete="current-password"></div>
+        <div class="sunken"><input id="curPw" type="password" aria-label="Current password" required maxlength="128" autocomplete="current-password"></div>
       <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">NEW PASSWORD</label>
-      <div class="sunken"><input id="newPw" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+        <div class="sunken"><input id="newPw" type="password" aria-label="New password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
       <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">CONFIRM NEW PASSWORD</label>
-      <div class="sunken"><input id="newPw2" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+        <div class="sunken"><input id="newPw2" type="password" aria-label="Confirm new password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
       <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="changePwSave">Change</button></div>
       <p class="error" id="changePwError"></p>
     </form>

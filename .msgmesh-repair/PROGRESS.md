@@ -142,3 +142,22 @@
 
 ### Blockers
 - None.
+
+## R51 — dialog axe pass + D-11/D-12 (2026-10-21)
+
+- smoke_dialogs_a11y.py (new): axe WCAG A/AA over profile, settings, new-chat (real toolbar buttons) + new-group/change-pw (showModal). Found 3 violations → 2 defects: D-11 (unlabeled inputs: #profileDisplayName, #curPw, #newPw, #newPw2 — same visual-only-label pattern as D-7) and D-12 (.list-empty #969696 on white 2.95:1 — sibling of the D-8 .contact-time token, missed in that sweep). Fixed; dialogs now 5/5.
+
+### Defects
+- D-11 FIXED: aria-label on profile/change-password inputs.
+- D-12 FIXED: .list-empty contrast → #6e6e6e.
+
+### Modified files
+- index.html: 4 aria-labels (D-11)
+- css/app.css: .list-empty color (D-12)
+
+### Next rounds (52+)
+- Remaining optional spot reads (mesh_read, tenants) or deeper client surfaces (call dialog, admin panel, mute dialog axe when opened)
+- M50 final audit report when protocol closes (100 rounds or user stop)
+
+### Blockers
+- None.
