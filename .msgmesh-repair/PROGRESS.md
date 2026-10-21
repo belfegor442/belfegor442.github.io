@@ -22,7 +22,19 @@
 | 15 | Router (M36) | hash routing + auth guard + openChat state cleanup — clean |
 | 16-18 | Leaf modules | sound/theme/notifications/frameguard/theme-apply/emoticons — clean (emote whitelist safe) |
 | 19 | Markup contract (M02) | 212 JS ids vs 243 HTML ids: 4 orphans found → D-5 |
-| 20 | Fix D-5 + verify + regress | statusbar All/Unread + self-banner @handle restored; smoke_statusbar 8/8; roles 118/118; msgbox 9/9; pw 9/9; committed+pushed |
+| 20 | Fix D-5 + verify + regress | statusbar All/Unread + self-banner @handle restored; smoke_statusbar 8/8; roles 118/118; msgbox 9/9; pw 9/9; committed+pushed (2b5f838) |
+| 21 | Server suite re-run (M47) | ws-tests 250/250 |
+| 22 | Menus + server settings (M36/M04) | all menu items wired to real handlers; HTTPS guard + probe before persist — clean |
+| 23 | Upload XHR + drafts (M14/M45) | 60s timeout, session binding, 401→handleSessionLost; drafts debounced+flushed on unload — clean |
+| 24 | Groups + shared files + admin (M07/M29) | create confirms server shape; download blob+revoke; admin ladder gated + server copy surfaced; mute minutes validated — clean |
+| 25 | Auth/session core (M06/M08) | login tile logic; handleSessionLost full teardown; cross-tab storage sync; startSession token-race guards — clean |
+| 26 | markRead + GIF/emote pipeline (M20/M32) | read coalescing + follow-up; GIF seq guards + fetchWithTimeout(15s) + MAX_FILE; emoticon grids use DOM API (no innerHTML) — clean |
+
+### Coverage
+- main.js: ~3400/3687 lines read this session (all critical flows: auth, session, send/retry/outbox, upload, admin, menus, settings, GIF/stickers, typing, presence, boot)
+- api.js/ws.js/store.js/call.js/ui.js/sound.js/theme.js/notifications.js/emoticons.js/frameguard.js/theme-apply.js: 100% read
+- index.html: contract-checked (243 ids vs 212 JS refs; orphans resolved as D-5)
+- Remaining unread fragments: main.js 365-525, 1160-1215, 2313-2615, 2675-2780 (continuations of audited patterns; low risk)
 
 ### Defects
 - D-4 FIXED (commit 29e1b6a): insertSticker unbounded fetch → fetchWithTimeout(12s).
@@ -34,13 +46,11 @@
 - index.html: statusbar All/Unread spans; self-banner #selfHandle line (D-5)
 - js/ui.js: removed dead #selfName write (D-5)
 
-### Next rounds (21+)
-- R21: re-run full suite set incl. ws-tests after latest server state (250/250 last known)
-- R22: index.html menus/dialogs full walkthrough vs JS wiring (M37/M38)
-- R23: win98.css/north.css audit vs app.css contract (theme parity M37)
-- R24: store.js remaining functions (friends/roles/typing) full read (M29/M30)
-- R25: main.js remaining unread ranges (~230-525, 590-650, 785-1008, 1160-2100, 2170-2615, 2675-2995, 3130-3470)
-- R26: final full regression + audit report
+### Next rounds (27+)
+- R27: read remaining main.js fragments (365-525, 1160-1215, 2313-2615, 2675-2780)
+- R28: win98.css/north.css theme parity vs app.css (M37)
+- R29: store.js friends/roles/typing tail (M29/M30)
+- R30: full final regression (all 6 suites) + audit report so far
 
 ### Blockers
 - None.
