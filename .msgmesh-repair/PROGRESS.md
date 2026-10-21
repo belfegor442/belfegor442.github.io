@@ -112,3 +112,17 @@
 
 ### Blockers
 - None.
+
+## R47-48 — keys/activate/admin-auth sweep + D-10 (2026-10-21)
+
+- R47: handle_mesh_handshake + handle_nodes clean (auth required, 90s stale sweep, discovery directory is public-by-design for native nodes). handle_auth_reset_password, handle_auth_activate, handle_auth_generate_keys, handle_auth_validate_key all clean (activate: transaction + conditional key claim + changes()==1; validate: identical body for invalid/used keys, anti-enumeration, throttled per key_code).
+- R48: admin helpers audit — whitelist+quote_ident, typed binds, redaction suite (exact set + suffix heuristics, import rejects redacted dumps) all sound. Found D-10: admin_auth() used operator!= for the admin token (all other secret compares use ws::const_time_eq). Helper is dead code (handlers use authorize_admin) but hardened anyway (server 4aaf486). Full battery green post-rebuild.
+
+### Defects
+- D-10 FIXED (server 4aaf486): const-time compare in admin_auth (hardening, helper unreached).
+
+### Next rounds (49+)
+- Handler sweep continues: friends REST (4608+), groups/calls (5352+), group_manage/chat_audit (6340+), update (6546+), mesh_read (6962+), tenants (8881+)
+
+### Blockers
+- None.

@@ -33,3 +33,4 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | regression post D-7/D-8 | 17/17 | statusbar 8/8 + call msgbox 9/9 |
 | 10-21 | probe_d9_call (new, R45) | 8/8 | attacker end 403 + row untouched + no frame; ghost id 403; legit end works |
 | 10-21 | FULL battery (R46, post D-9) | 403/403 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 + a11y 2 + themes 2 |
+| 10-21 | FULL battery (R48, post D-10) | 399/399 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 + d9 probe 8 |
