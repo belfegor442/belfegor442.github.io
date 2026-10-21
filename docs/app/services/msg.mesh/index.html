@@ -409,23 +409,6 @@
   </div>
 </dialog>
 
-<dialog id="resetPwDialog">
-  <div class="win-frame dlg-frame">
-    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Login Question.png" alt=""><span class="win-title">Reset Password</span><button class="win-cap close" value="cancel" id="resetPwClose" aria-label="Close"></button></div>
-    <form class="dlg-body" id="resetPwForm">
-      <p class="hint">Password reset needs the server key: the 64-character <b>shutdown_token</b> value from server.local.conf on the machine that runs the server.</p>
-      <label class="lbl-ico"><img src="./assets/xp/icons/User Accounts.png" width="16" height="16" alt="">USERNAME</label>
-      <div class="sunken"><input id="resetPwUser" required maxlength="32" autocomplete="username" spellcheck="false"></div>
-      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">NEW PASSWORD</label>
-      <div class="sunken"><input id="resetPwNew" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
-      <label class="lbl-ico"><img src="./assets/xp/icons/Key.png" width="16" height="16" alt="">SERVER KEY</label>
-      <div class="sunken"><input id="resetPwKey" type="password" required maxlength="256" autocomplete="off" spellcheck="false" placeholder="shutdown_token"></div>
-      <div class="dlg-actions"><button class="xp-btn primary" type="submit" id="resetPwGo">Reset</button></div>
-      <p class="error" id="resetPwStatus"></p>
-    </form>
-  </div>
-</dialog>
-
 <!-- About dialog (native render_about_ui card + real Windows logo asset) -->
 <dialog id="aboutDialog">
   <div class="win-frame dlg-frame about-frame">
@@ -479,6 +462,23 @@
         <button class="xp-btn gray" type="button" id="muteCancel">Cancel</button>
       </div>
       <p class="error" id="muteStatus"></p>
+    </form>
+  </div>
+</dialog>
+
+<!-- Admin reset dialog (owner-only: set a new password for a user, no server key) -->
+<dialog id="adminResetPwDialog">
+  <div class="win-frame dlg-frame">
+    <div class="win-titlebar"><img class="win-title-ico" src="./assets/xp/icons/Key.png" alt=""><span class="win-title">Reset Password</span><button class="win-cap close" value="cancel" id="adminResetPwClose" aria-label="Close">✕</button></div>
+    <form class="dlg-body" id="adminResetPwForm">
+      <p class="hint" id="adminResetPwWho"></p>
+      <label>NEW PASSWORD</label>
+      <div class="sunken"><input id="adminResetPwNew" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></div>
+      <div class="dlg-actions">
+        <button class="xp-btn primary" type="submit" id="adminResetPwSubmit">Reset</button>
+        <button class="xp-btn gray" type="button" id="adminResetPwCancel">Cancel</button>
+      </div>
+      <p class="error" id="adminResetPwStatus"></p>
     </form>
   </div>
 </dialog>

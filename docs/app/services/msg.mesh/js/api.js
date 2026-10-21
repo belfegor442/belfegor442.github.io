@@ -331,13 +331,13 @@ export const api = {
   whoami: (opts = {}) => call("/api/v1/auth/whoami", {}, { idempotent: true, ...opts }),
   logout: () => call("/api/v1/auth/logout", { session_token: getToken() }, { allow401: true, idempotent: true }),
   // Password lifecycle. change_password rotates the signed-in account's
-  // password (server revokes every session for it). reset_password is the
-  // forgot-password escape hatch and needs the server's shutdown token from
-  // server.local.conf — nobody can reset an account over the public API alone.
+  // password (server revokes every session for it). reset_password is
+  // owner-only: the Admin Panel reuses the signed-in owner's session and the
+  // server rejects anyone below owner — no server-side key in the browser.
   changePassword: (old_password, new_password) =>
     call("/api/v1/users/change_password", { old_password, new_password }, { allow401: true }),
-  resetPassword: (username, new_password, server_key) =>
-    call("/api/v1/users/reset_password", { token: server_key, username, new_password }, { allow401: true }),
+  resetPassword: (username, new_password) =>
+    call("/api/v1/users/reset_password", { username, new_password }),
 
   history: (o = {}) => call("/api/v1/mesh/history", { limit: 200, ...o }, { idempotent: true }),
   // client_msg_id makes retries idempotent: re-sending the same id returns

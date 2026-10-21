@@ -163,57 +163,17 @@ $("#changePwForm")?.addEventListener("submit", async (e) => {
   }
 });
 
+// Forgot password: no self-service reset exists by design — only the server
+// administrator (owner, from the Admin Panel) or the operator with config
+// access can reset an account. Point the user there instead of asking for a
+// server key they cannot have.
 $("#forgotPwBtn")?.addEventListener("click", () => {
-  const d = $("#resetPwDialog");
-  if (!d || d.open) return;
-  showErr($("#resetPwStatus"), "");
-  $("#resetPwForm")?.reset();
-  const user = $("#authUsername")?.value?.trim();
-  if (user && $("#resetPwUser")) $("#resetPwUser").value = user;
-  d.showModal();
-});
-
-$("#resetPwForm")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const username = $("#resetPwUser").value.trim();
-  const newP = $("#resetPwNew").value;
-  const key = $("#resetPwKey").value;
-  const st = $("#resetPwStatus");
-  showErr(st, "");
-  if (!username || !newP || !key) {
-    showErr(st, "Username, new password and server key are required.");
-    playSound("error");
-    return;
-  }
-  if (newP.length < 8) { showErr(st, "Password must be 8-128 characters."); playSound("error"); return; }
-  try {
-    await api.resetPassword(username, newP, key);
-    $("#resetPwDialog").close();
-    ui.toast("Password updated - sign in");
-    if ($("#authUsername")) $("#authUsername").value = username;
-    $("#authPassword").value = "";
-    showErr($("#authError"), "");
-    const hint = $("#authHint");
-    if (hint) hint.textContent = "Password updated. Sign in with the new password.";
-    primeSound("logon");
-    $("#authPassword")?.focus();
-  } catch (err) {
-    // Surface the server's specific 403 reason: "unauthorized" means the
-    // shutdown token was wrong — the generic permission text hid that.
-    let msg = "Could not reset password.";
-    if (err instanceof ApiError) {
-      const e = err.payload && err.payload.error;
-      if (err.status === 403 && e === "unauthorized") {
-        msg = "Server key is incorrect. Copy the shutdown_token value from server.local.conf on the server machine.";
-      } else if (err.status === 403 && e === "password reset is disabled") {
-        msg = "Password reset is disabled on this server (no shutdown_token configured).";
-      } else {
-        msg = friendlyError(err);
-      }
-    }
-    showErr(st, msg);
-    playSound("error");
-  }
+  ui.msgBox({
+    title: "Reset Password",
+    icon: "info",
+    text: "Only the server administrator can reset a password. Contact them and ask them to reset your account — they can do it from the Admin Panel.",
+    cancelLabel: "",
+  });
 });
 
 // Win98 classic logon Cancel: clear both fields and return focus to user name.
@@ -3029,6 +2989,8 @@ function renderAdminUsers() {
     const underMe = target < myRank() && u.app_role !== "owner" && !isSelf;
     const canMute = hasChatPerm("chat.users.mute") && underMe;
     const canBan = hasChatPerm("chat.users.ban") && underMe;
+    // Password reset is owner-only (server enforces the same rule).
+    const canResetPw = myRank() >= 3 && underMe;
     const flags = [
       u.muted ? `<span class="role-badge badge-muted" title="${esc(u.muted_until || "")}">muted</span>` : "",
       u.banned ? `<span class="role-badge badge-banned" title="${esc(u.banned_reason || "")}">banned</span>` : "",
@@ -3042,6 +3004,7 @@ function renderAdminUsers() {
       </div>
       ${adminLadderSelect(u)}
       <span class="admin-user-acts">
+        <button type="button" class="xp-btn gray admin-reset-pw" data-user="${esc(id)}" ${canResetPw ? "" : "disabled"}>Reset pw</button>
         <button type="button" class="xp-btn gray admin-mute" data-user="${esc(id)}" ${canMute ? "" : "disabled"}>${u.muted ? "Unmute" : "Mute"}</button>
         <button type="button" class="xp-btn gray admin-ban" data-user="${esc(id)}" ${canBan ? "" : "disabled"}>${u.banned ? "Unban" : "Ban"}</button>
       </span>
@@ -3183,6 +3146,52 @@ $("#muteForm")?.addEventListener("submit", async (e) => {
   }
 });
 
+let adminResetPwId = null;
+
+function openAdminResetPwDialog(userId, rec) {
+  adminResetPwId = String(userId);
+  const who = $("#adminResetPwWho");
+  if (who) who.textContent = "Setting a new password for " + ((rec && rec.username) || "u" + userId) +
+    " - their sessions will be signed out.";
+  const pw = $("#adminResetPwNew");
+  if (pw) pw.value = "";
+  const st = $("#adminResetPwStatus");
+  if (st) st.textContent = "";
+  const d = $("#adminResetPwDialog");
+  if (d && !d.open) d.showModal();
+  pw?.focus();
+}
+
+$("#adminResetPwCancel")?.addEventListener("click", () => $("#adminResetPwDialog")?.close());
+$("#adminResetPwClose")?.addEventListener("click", () => $("#adminResetPwDialog")?.close());
+$("#adminResetPwForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!adminResetPwId) return;
+  const rec = state.roles.get(adminResetPwId);
+  const username = rec && rec.username;
+  if (!username) return;
+  const newP = $("#adminResetPwNew").value;
+  const st = $("#adminResetPwStatus");
+  if (st) st.textContent = "";
+  if (newP.length < 8) {
+    if (st) st.textContent = "Password must be 8-128 characters.";
+    playSound("error");
+    return;
+  }
+  const btn = $("#adminResetPwSubmit");
+  if (btn) btn.disabled = true;
+  try {
+    await api.resetPassword(username, newP);
+    $("#adminResetPwDialog").close();
+    ui.toast("Password reset for " + username);
+  } catch (err) {
+    if (st) st.textContent = adminError(err);
+    playSound("error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
 $("#adminUsersPane")?.addEventListener("change", (e) => {
   const sel = e.target.closest(".admin-role");
   if (!sel) return;
@@ -3203,6 +3212,10 @@ $("#adminUsersPane")?.addEventListener("click", (e) => {
   const id = btn.dataset.user;
   if (!id) return;
   const rec = state.roles.get(id);
+  if (btn.classList.contains("admin-reset-pw")) {
+    openAdminResetPwDialog(id, rec);
+    return;
+  }
   if (btn.classList.contains("admin-mute")) {
     if (rec && rec.muted) {
       adminAct(() => api.chatUserUnmute(id));
