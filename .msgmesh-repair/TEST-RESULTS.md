@@ -31,3 +31,5 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | smoke_themes_a11y (new, R43) pre-fix | 0/2 | win98 4 nodes + north 6 nodes contrast (D-8) |
 | 10-21 | smoke_a11y + themes post D-8 | 4/4 | logon+chat 0/0; win98+north 0/0 |
 | 10-21 | regression post D-7/D-8 | 17/17 | statusbar 8/8 + call msgbox 9/9 |
+| 10-21 | probe_d9_call (new, R45) | 8/8 | attacker end 403 + row untouched + no frame; ghost id 403; legit end works |
+| 10-21 | FULL battery (R46, post D-9) | 403/403 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 + a11y 2 + themes 2 |

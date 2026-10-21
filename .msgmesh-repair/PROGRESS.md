@@ -95,3 +95,20 @@
 
 ### Blockers
 - None.
+
+## R44-46 — call signaling audit + D-9 (2026-10-21)
+
+- R44: handle_mesh_signal read clean (type whitelist offer/answer/ice/candidate/bye, size caps, receiver-exists check, parameterized INSERT, 10-min expiry). handle_call_signal audit found D-9: call_id is client-chosen and only friendship(from,target) gated frames — call_log UPDATEs matched on call_id alone, so any friend of a participant could hang up/corrupt third-party calls (browser keys call state by call_id).
+- R45: D-9 fixed (server commit 0c4bfe9): participant binding on non-invite frames (row must exist with participants exactly {from,to}), invite upsert guards ON CONFLICT, accept/decline/end UPDATEs bind both participants. Server rebuilt (PID 117168) + keepalive re-enabled.
+- R46: probe_d9_call.py (3-browser WS triangle, testuser1↔qa1 call, attacker qa2): attacker end → 403, row untouched, no frame delivered; ghost id → 403; legit end works. 8/8. Full battery green: ws 250, roles 118, prod 5, pw 9, msgbox 9, statusbar 8, a11y 2, themes 2 (411 checks).
+- Notes: raw WSS from a page served by the API origin (https://127.0.0.1:8080) is closed by Chrome at construction; probes must run from the app page origin (http://127.0.0.1:8777). friendship request/accept responses nest payload under "request".
+
+### Defects
+- D-9 FIXED (server 0c4bfe9): call signaling bound to call_log participants.
+
+### Next rounds (47+)
+- Continue handler sweep: handshake/nodes (2479+), activate/keys (3021+), friends REST (4608+), groups/calls (5352+), group_manage/chat_audit (6340+), update (6546+), mesh_read (6962+), tenants (8881+)
+- Optional: axe pass over dialogs when opened; call_log cleanup of probe rows
+
+### Blockers
+- None.
