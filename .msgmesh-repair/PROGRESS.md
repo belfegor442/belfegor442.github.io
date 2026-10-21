@@ -33,6 +33,11 @@
 | 28 | Theme parity + assets (M37/M12) | all 3 CSS load as override layers (data-theme); win98/north missing admin selectors = intentional fallback to app.css; 48/48 CSS url() assets + 55/55 HTML assets + manifest icon exist (first script had a ../ path bug — retracted false alarm) — clean |
 | 29 | store.js tail (M29/M30) | typing TTL lazy expiry; primeUsers batched cache; friends/requests status filters; blocks/groups/roles offline fallbacks; ROLE_RANK mirrors server — clean; store.js now 100% read (619/619) |
 | 30 | Full final regression (M47/M50) | all 6 suites green: ws-tests 250/250, roles_test 118/118, prod_smoke 5/5, prod_smoke_pw 9/9, smoke_call_msgbox 9/9, smoke_statusbar 8/8 = 349 checks, 0 failures |
+| 31 | Perf baseline vs prod (M50) | send p50=12.7ms, history p50=15.7ms, login p50=128.5ms (PBKDF2 cost, deliberate), health/whoami/friends/roles all p50~15ms — PASS |
+| 32 | Server: rate_limiter.cpp + password.cpp | sliding-window limiter with carry + clock-backwards guard + mutex; PBKDF2-HMAC-SHA256, const-time compare, iterations bounds, legacy sha256 upgrade path — clean |
+| 33 | Server: login + identify_caller + session tokens | parameterized SQL, dummy-verify anti-timing, throttle, ban fence, const-time shutdown token, expiry inside session query, role ladder immutable owner — clean |
+| 34 | Server: mesh_send + files + history authz | dual auth (node/session), mute/ban fences, block/group checks, idempotency; files: blobs in DB (no path traversal possible), per-user grants, 1MB cap; **history: D-6 cross-user leak found** (see DEFECTS) |
+| 35 | D-6 fix + full server rebuild + verify | api_service.cpp tenant clause gated to personal tenants only; probe 200 alien rows → 0/0; battery 399/399 green; server rebuilt (ws-server target), restarted PID 100168, keepalive re-enabled; server repo commit 22a1a84 pushed 0/0 |
 
 ### Coverage
 - main.js: ~3620/3687 lines read (98%+; every critical flow: auth, session, send/retry/outbox, upload, admin, menus, settings, GIF/stickers, typing, presence, boot, profile migration, history paging, reconnect burst)

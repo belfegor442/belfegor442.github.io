@@ -21,3 +21,7 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | roles_test | 118/118 | post-D-5 regression |
 | 10-21 | ws-tests | 250/250 | R21 |
 | 10-21 | FULL battery (R30) | 349/349 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 |
+| 10-21 | perf_baseline | PASS | send p50 12.7ms, history p50 15.7ms, login p50 128.5ms (PBKDF2) |
+| 10-21 | probe_d6 (pre-fix) | LEAK | testuser1 read 200 alien rows of 634 total |
+| 10-21 | probe_d6 (post-fix) | 0/0 OK | testuser1 history count=0, alien=0 |
+| 10-21 | FULL battery (R35, post D-6) | 399/399 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 |
