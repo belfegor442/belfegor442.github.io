@@ -29,12 +29,17 @@
 | 24 | Groups + shared files + admin (M07/M29) | create confirms server shape; download blob+revoke; admin ladder gated + server copy surfaced; mute minutes validated — clean |
 | 25 | Auth/session core (M06/M08) | login tile logic; handleSessionLost full teardown; cross-tab storage sync; startSession token-race guards — clean |
 | 26 | markRead + GIF/emote pipeline (M20/M32) | read coalescing + follow-up; GIF seq guards + fetchWithTimeout(15s) + MAX_FILE; emoticon grids use DOM API (no innerHTML) — clean |
+| 27 | main.js remaining fragments (M03/M08/M19) | syncProfileFromServer account-scoped owner check + one-time legacy migration; logout full teardown incl PII/outbox/drafts; openAttachment forced-download (blob origin security); ensurePeerHistory + loadOlder session/scroll guards; reconnect burst max 20 idempotent retries — clean |
+| 28 | Theme parity + assets (M37/M12) | all 3 CSS load as override layers (data-theme); win98/north missing admin selectors = intentional fallback to app.css; 48/48 CSS url() assets + 55/55 HTML assets + manifest icon exist (first script had a ../ path bug — retracted false alarm) — clean |
+| 29 | store.js tail (M29/M30) | typing TTL lazy expiry; primeUsers batched cache; friends/requests status filters; blocks/groups/roles offline fallbacks; ROLE_RANK mirrors server — clean; store.js now 100% read (619/619) |
+| 30 | Full final regression (M47/M50) | all 6 suites green: ws-tests 250/250, roles_test 118/118, prod_smoke 5/5, prod_smoke_pw 9/9, smoke_call_msgbox 9/9, smoke_statusbar 8/8 = 349 checks, 0 failures |
 
 ### Coverage
-- main.js: ~3400/3687 lines read this session (all critical flows: auth, session, send/retry/outbox, upload, admin, menus, settings, GIF/stickers, typing, presence, boot)
-- api.js/ws.js/store.js/call.js/ui.js/sound.js/theme.js/notifications.js/emoticons.js/frameguard.js/theme-apply.js: 100% read
-- index.html: contract-checked (243 ids vs 212 JS refs; orphans resolved as D-5)
-- Remaining unread fragments: main.js 365-525, 1160-1215, 2313-2615, 2675-2780 (continuations of audited patterns; low risk)
+- main.js: ~3620/3687 lines read (98%+; every critical flow: auth, session, send/retry/outbox, upload, admin, menus, settings, GIF/stickers, typing, presence, boot, profile migration, history paging, reconnect burst)
+- api.js/ws.js/store.js/call.js/ui.js/sound.js/theme.js/notifications.js/emoticons.js/frameguard.js/theme-apply.js: 100% read (store.js closed this round: 619/619)
+- index.html: contract-checked (243 ids vs 212 JS refs; orphans resolved as D-5); 55/55 assets exist
+- CSS: all 3 themes audited as override layers; 48/48 url() assets exist
+- No defects found in rounds 27-30 (only one retracted false alarm: CSS asset script path bug)
 
 ### Defects
 - D-4 FIXED (commit 29e1b6a): insertSticker unbounded fetch → fetchWithTimeout(12s).
@@ -46,11 +51,9 @@
 - index.html: statusbar All/Unread spans; self-banner #selfHandle line (D-5)
 - js/ui.js: removed dead #selfName write (D-5)
 
-### Next rounds (27+)
-- R27: read remaining main.js fragments (365-525, 1160-1215, 2313-2615, 2675-2780)
-- R28: win98.css/north.css theme parity vs app.css (M37)
-- R29: store.js friends/roles/typing tail (M29/M30)
-- R30: full final regression (all 6 suites) + audit report so far
+### Next rounds (31+)
+- R31+: deepen areas with zero findings so far only where new evidence appears; optional: server-side api_service.cpp audit rounds (separate repo), perf timing baselines, axe accessibility pass
+- M50 final audit report when protocol closes (100 rounds or user stop)
 
 ### Blockers
 - None.
