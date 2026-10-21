@@ -2111,7 +2111,7 @@ async function insertSticker(name) {
   const path = "./assets/xp/gifs/sticker_" + name + ".gif";
   closeEmojiPanel();
   try {
-    const res = await fetch(path);
+    const res = await fetchWithTimeout(path, 12000);
     if (!res.ok) throw new Error("http " + res.status);
     const blob = await res.blob();
     const file = new File([blob], "sticker_" + name + ".gif", { type: "image/gif" });
