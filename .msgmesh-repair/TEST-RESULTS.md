@@ -15,3 +15,7 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | prod_smoke_pw | 9/9 | baseline re-run |
 | 10-21 | smoke_call_msgbox | 9/9 | baseline re-run |
 | 10-21 | smoke_call_msgbox | 9/9 | post-D-4 fix (edited main.js) |
+| 10-21 | smoke_statusbar (new, D-5) | 8/8 | @handle + All/Unread live counts |
+| 10-21 | smoke_call_msgbox | 9/9 | post-D-5 regression |
+| 10-21 | prod_smoke_pw | 9/9 | post-D-5 regression |
+| 10-21 | roles_test | 118/118 | post-D-5 regression |

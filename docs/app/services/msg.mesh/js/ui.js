@@ -183,7 +183,6 @@ export function renderProfile() {
   const name = u.display_name || u.username || "?";
   const p = state.profile || {};
   const inits = p.avatar || initials(name);
-  $("#selfName") && ($("#selfName").textContent = name);
   $("#selfHandle") && ($("#selfHandle").textContent = "@" + (u.username || "?"));
   const pt = $("#profileAvatarText");
   if (pt) pt.textContent = inits;

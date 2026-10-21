@@ -17,23 +17,30 @@
 | 10 | Fix D-4 + verify | insertSticker fetch→fetchWithTimeout(12s); syntax OK; smoke_call_msgbox 9/9 |
 | 11 | Send path (M15/M26) | outbox idempotent retry via client_msg_id; session binding on response; retryable gating |
 | 12 | Boot (M03) | startFromToken guard, 429 keep-token retry, server watch on netDown |
+| 13 | Auth handlers (M06) | register/change/reset pw: validation, 401=current-pw copy, specific 403 copy — clean |
+| 14 | Upload path (M14) | session+seq binding, size caps, image compression ladder, xhr abort — clean |
+| 15 | Router (M36) | hash routing + auth guard + openChat state cleanup — clean |
+| 16-18 | Leaf modules | sound/theme/notifications/frameguard/theme-apply/emoticons — clean (emote whitelist safe) |
+| 19 | Markup contract (M02) | 212 JS ids vs 243 HTML ids: 4 orphans found → D-5 |
+| 20 | Fix D-5 + verify + regress | statusbar All/Unread + self-banner @handle restored; smoke_statusbar 8/8; roles 118/118; msgbox 9/9; pw 9/9; committed+pushed |
 
 ### Defects
-- Found & fixed this session: D-4 (insertSticker unbounded fetch — could hang sticker send on dead network; fixed with existing fetchWithTimeout, verified).
-- Found false alarms cleared: 3× JSON.parse (guarded), fetch sites (all have timeouts or are local-asset with catch).
+- D-4 FIXED (commit 29e1b6a): insertSticker unbounded fetch → fetchWithTimeout(12s).
+- D-5 FIXED (commit this round): statusbar #allCount/#unreadCount + banner #selfHandle missing from markup; dead #selfName write removed. Legacy f13_web_test.py is obsolete (stale selectors) — not revived.
+- False alarms cleared: 3× JSON.parse (guarded), fetch sites (timeout or local+catch).
 
 ### Modified files
-- js/main.js: insertSticker uses fetchWithTimeout (1 line)
+- js/main.js: insertSticker → fetchWithTimeout (D-4)
+- index.html: statusbar All/Unread spans; self-banner #selfHandle line (D-5)
+- js/ui.js: removed dead #selfName write (D-5)
 
-### Next rounds (13+)
-- R13: login/register/change-password handlers (M06) — read + defect hunt
-- R14: file upload path (M14/M15) — size caps, error handling
-- R15: route()/hash navigation (M36)
-- R16: settings dialogs / server switch flow (M04)
-- R17: sound.js/theme.js/emoticons.js leaves (M37)
-- R18: notifications.js (M31)
-- R19: index.html contract vs JS ids (M02 deeper)
-- R20: full regression + commit + push
+### Next rounds (21+)
+- R21: re-run full suite set incl. ws-tests after latest server state (250/250 last known)
+- R22: index.html menus/dialogs full walkthrough vs JS wiring (M37/M38)
+- R23: win98.css/north.css audit vs app.css contract (theme parity M37)
+- R24: store.js remaining functions (friends/roles/typing) full read (M29/M30)
+- R25: main.js remaining unread ranges (~230-525, 590-650, 785-1008, 1160-2100, 2170-2615, 2675-2995, 3130-3470)
+- R26: final full regression + audit report
 
 ### Blockers
-- None. Server rebuilds blocked only while ws-server running (documented procedure).
+- None.
