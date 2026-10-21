@@ -1645,13 +1645,13 @@ async function startCallUI(kind) {
     return;
   }
   const r = await Call.startCall(peer, kind);
-  if (!r.ok) ui.toast("Call failed: " + r.error, true);
+  if (!r.ok) ui.msgBox({ title: "msg.mesh", text: "Call failed: " + r.error, icon: "error", cancelLabel: "" });
 }
 $("#chatCallBtn")?.addEventListener("click", () => startCallUI("audio"));
 $("#chatVideoBtn")?.addEventListener("click", () => startCallUI("video"));
 $("#callAcceptBtn")?.addEventListener("click", () => {
   Call.acceptCall().then((r) => {
-    if (!r.ok && r.error) ui.toast("Call failed: " + r.error, true);
+    if (!r.ok && r.error) ui.msgBox({ title: "msg.mesh", text: "Call failed: " + r.error, icon: "error", cancelLabel: "" });
   });
 });
 $("#callDeclineBtn")?.addEventListener("click", () => Call.declineCall());

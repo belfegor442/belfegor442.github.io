@@ -74,14 +74,29 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
 
-/* ---------- real XP scrollbar sprites (native tiles track, stretches thumb) ---------- */
+/* ---------- XP Luna scrollbars (pure CSS: the 15x88 sprite stretched to the
+   thumb length deformed into stacked tiles; these colors come from the
+   sprite pixels - white body, beige sunken track, blue-gray right bevel) ---------- */
 ::-webkit-scrollbar{width:16px;height:16px}
-::-webkit-scrollbar-track{background:url("../assets/xp/sprites/scrollbar_track.png") no-repeat;background-size:100% 100%}
-::-webkit-scrollbar-thumb{background:url("../assets/xp/sprites/scrollbar_thumb.png") no-repeat;background-size:100% 100%}
-::-webkit-scrollbar-thumb:hover{filter:brightness(1.06)}
+::-webkit-scrollbar-track{background:#fff;border-left:1px solid #eeede5;border-right:1px solid #c4c4af}
+::-webkit-scrollbar-thumb{
+  background:linear-gradient(90deg,#fff 0%,#fdfdfa 55%,#f0f0ea 80%,#e2e2d7 100%);
+  border-top:1px solid #d8d8c8;border-bottom:1px solid #d8d8c8;
+  box-shadow:inset -1px 0 0 #9fb5d2;
+}
+::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(90deg,#f2f7ff 0%,#e8f0fe 55%,#d9e6f8 80%,#cbd9ef 100%);
+}
 ::-webkit-scrollbar:horizontal{height:16px}
-::-webkit-scrollbar-track:horizontal{background:url("../assets/xp/sprites/scrollbar_htrack.png") repeat-x;background-size:auto 100%}
-::-webkit-scrollbar-thumb:horizontal{background:url("../assets/xp/sprites/scrollbar_thumb.png") no-repeat;background-size:100% 100%}
+::-webkit-scrollbar-track:horizontal{background:#fff;border-top:1px solid #eeede5;border-bottom:1px solid #c4c4af}
+::-webkit-scrollbar-thumb:horizontal{
+  background:linear-gradient(180deg,#fff 0%,#fdfdfa 55%,#f0f0ea 80%,#e2e2d7 100%);
+  border-left:1px solid #d8d8c8;border-right:1px solid #d8d8c8;
+  box-shadow:inset 0 -1px 0 #9fb5d2;
+}
+::-webkit-scrollbar-thumb:horizontal:hover{
+  background:linear-gradient(180deg,#f2f7ff 0%,#e8f0fe 55%,#d9e6f8 80%,#cbd9ef 100%);
+}
 ::-webkit-scrollbar-corner{background:var(--xp-bg)}
 ::-webkit-scrollbar-button{display:none}
 

@@ -130,7 +130,7 @@ function makePc() {
           stopRing();
           clearRingTimer();
           setPhase("in-call");
-          playSound("logon");
+          playSound("call");
           stopTick();
           tickTimer = setInterval(() => emit("callstate", callState()), 1000);
         }
