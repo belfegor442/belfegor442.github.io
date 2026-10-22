@@ -1,5 +1,11 @@
 export const $ = (s) => document.querySelector(s);
 
+export function showErr(box, text) {
+  if (!box) return;
+  box.textContent = text;
+  box.classList.toggle("hidden", !text);
+}
+
 export function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

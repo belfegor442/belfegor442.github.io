@@ -3,10 +3,13 @@ import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUs
 import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect, sendFrame as wsSendFrame } from "./infrastructure/ws/index.js";
 import { requestNotificationPermission, notifyIncoming } from "./infrastructure/notifications.js";
 import * as ui from "./ui.js";
+import { openAdminPanel, adminTabVisible, renderAdminUsers } from "./domains/admin/panel.js";
 import { playSound, primeSound } from "./infrastructure/sound.js";
 import { setTheme } from "./infrastructure/theme.js";
 import * as Call from "./call.js";
 import { EMOTICONS } from "./shared/emoticons.js";
+import { showErr } from "./shared/dom.js";
+import { startServerWatch, stopServerWatch } from "./infrastructure/server-watch.js";
 
 const $ = ui.$;
 const esc = ui.esc;
@@ -37,12 +40,6 @@ function normalizeUser(payload) {
     status: u.status || "online",
     app_role: resolved,
   };
-}
-
-function showErr(box, text) {
-  if (!box) return;
-  box.textContent = text;
-  box.classList.toggle("hidden", !text);
 }
 
 /* ---------------- auth (XP Welcome logon + register dialog) ---------------- */
@@ -115,7 +112,7 @@ $("#regForm")?.addEventListener("submit", async (e) => {
   } catch (err) {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Registration failed.");
     if (!(err instanceof ApiError) || err.status === 0 || err.status === 502 || err.status === 503) {
-      startServerWatch();
+      startServerWatch(() => { authNotice = ""; });
     }
     playSound("error");
   } finally {
@@ -235,7 +232,7 @@ $("#authForm").addEventListener("submit", async (e) => {
     showErr(errBox, err instanceof ApiError ? friendlyError(err) : "Sign-in failed.");
     if (hint) hint.textContent = "";
     if (!(err instanceof ApiError) || err.status === 0 || err.status === 502 || err.status === 503) {
-      startServerWatch();
+      startServerWatch(() => { authNotice = ""; });
     }
     playSound("error");
   } finally {
@@ -2908,381 +2905,6 @@ $("#sharedFiles").addEventListener("click", async (e) => {
   }
 });
 
-/* ---------------- Admin Panel (roles ladder: owner > admin > moderator > member) ---------------- */
-
-const ROLE_LABEL = { owner: "Owner", admin: "Admin", moderator: "Moderator", member: "Member" };
-
-// Ladder refusals come back as precise server copy ("the owner account is
-// protected", "only the owner can grant admin …"); the generic 403 text in
-// friendlyError() would hide them. Prefer payload.error for panel actions.
-function adminError(e) {
-  if (e && e.payload && typeof e.payload.error === "string" && e.payload.error) return e.payload.error;
-  return friendlyError(e);
-}
-
-function adminTabVisible(tab) {
-  if (tab === "users") return hasChatPerm("chat.users.roles") || hasChatPerm("chat.users.mute") || hasChatPerm("chat.users.ban");
-  if (tab === "moderation") return hasChatPerm("chat.messages.delete_any") || hasChatPerm("chat.users.mute");
-  if (tab === "audit") return hasChatPerm("chat.audit.read");
-  return false;
-}
-
-function showAdminPane(tab) {
-  document.querySelectorAll(".admin-tab").forEach((b) => b.classList.toggle("sel", b.dataset.adminTab === tab));
-  $("#adminUsersPane")?.classList.toggle("hidden", tab !== "users");
-  $("#adminModPane")?.classList.toggle("hidden", tab !== "moderation");
-  $("#adminAuditPane")?.classList.toggle("hidden", tab !== "audit");
-  refreshAdminPane(tab);
-}
-
-async function refreshAdminPane(tab) {
-  const status = $("#adminStatus");
-  if (status) status.textContent = "";
-  try {
-    if (tab === "users") {
-      await loadRoles();
-      renderAdminUsers();
-    } else if (tab === "moderation") {
-      renderAdminModLoading();
-      const r = await api.chatModRecent(30);
-      renderAdminMod(r && Array.isArray(r.items) ? r.items : []);
-    } else if (tab === "audit") {
-      renderAdminAuditLoading();
-      const r = await api.chatAudit(50);
-      renderAdminAudit(r && Array.isArray(r.items) ? r.items : []);
-    }
-  } catch (e) {
-    if (status) status.textContent = adminError(e);
-  }
-}
-
-function adminLadderSelect(u) {
-  const me = myRank();
-  const target = roleRank(u.app_role);
-  const canGrant = hasChatPerm("chat.users.roles");
-  // Ladder mirror: act strictly below your rank; owner is never offered.
-  const allowed = ["member", "moderator"];
-  if (me >= 3) allowed.push("admin");
-  const locked = !canGrant || u.app_role === "owner" || target >= me ||
-    !allowed.includes(u.app_role);
-  const opts = ["owner", "admin", "moderator", "member"].map((r) =>
-    `<option value="${r}"${r === u.app_role ? " selected" : ""}${(r === "owner" || (!allowed.includes(r) && r !== u.app_role)) ? " disabled" : ""}>${ROLE_LABEL[r]}</option>`
-  ).join("");
-  return `<select class="admin-role" data-user="${esc(u.user_id)}"${locked ? " disabled" : ""}>${opts}</select>`;
-}
-
-function renderAdminUsers() {
-  const pane = $("#adminUsersPane");
-  if (!pane) return;
-  const users = [...state.roles.values()];
-  const me = state.user ? String(state.user.user_id) : "";
-  const hint = $("#adminRoleHint");
-  if (hint) hint.textContent = "Your role: " + (ROLE_LABEL[state.myRole] || state.myRole);
-  if (!users.length) {
-    pane.innerHTML = '<div class="list-empty">No users.</div>';
-    return;
-  }
-  pane.innerHTML = users.map((u) => {
-    const id = String(u.user_id);
-    const isSelf = id === me;
-    const target = roleRank(u.app_role);
-    const underMe = target < myRank() && u.app_role !== "owner" && !isSelf;
-    const canMute = hasChatPerm("chat.users.mute") && underMe;
-    const canBan = hasChatPerm("chat.users.ban") && underMe;
-    // Password reset is owner-only (server enforces the same rule).
-    const canResetPw = myRank() >= 3 && underMe;
-    const flags = [
-      u.muted ? `<span class="role-badge badge-muted" title="${esc(u.muted_until || "")}">muted</span>` : "",
-      u.banned ? `<span class="role-badge badge-banned" title="${esc(u.banned_reason || "")}">banned</span>` : "",
-      u.online ? '<span class="role-badge badge-online">online</span>' : "",
-    ].join("");
-    return `<div class="admin-user-row" data-user="${esc(id)}">
-      <div class="admin-user-id">
-        <strong>${esc(u.username)}</strong>
-        <small class="hint">${esc(u.display_name || "")}</small>
-        ${flags}
-      </div>
-      ${adminLadderSelect(u)}
-      <span class="admin-user-acts">
-        <button type="button" class="xp-btn gray admin-reset-pw" data-user="${esc(id)}" ${canResetPw ? "" : "disabled"}>Reset pw</button>
-        <button type="button" class="xp-btn gray admin-mute" data-user="${esc(id)}" ${canMute ? "" : "disabled"}>${u.muted ? "Unmute" : "Mute"}</button>
-        <button type="button" class="xp-btn gray admin-ban" data-user="${esc(id)}" ${canBan ? "" : "disabled"}>${u.banned ? "Unban" : "Ban"}</button>
-      </span>
-    </div>`;
-  }).join("");
-}
-
-function renderAdminModLoading() {
-  const pane = $("#adminModPane");
-  if (pane) pane.innerHTML = '<div class="list-empty">Loading…</div>';
-}
-
-function renderAdminMod(items) {
-  const pane = $("#adminModPane");
-  if (!pane) return;
-  if (!items.length) {
-    pane.innerHTML = '<div class="list-empty">No recent messages.</div>';
-    return;
-  }
-  const canDelete = hasChatPerm("chat.messages.delete_any");
-  const canEdit = hasChatPerm("chat.messages.edit_any");
-  pane.innerHTML = items.map((it) => {
-    const senderUid = /^u(\d+)$/.exec(it.sender_node_id || "");
-    const rec = senderUid ? state.roles.get(senderUid[1]) : null;
-    const srank = roleRank(rec ? rec.app_role : "member");
-    const underMe = srank < myRank() || senderUid && senderUid[1] === (state.user && state.user.user_id);
-    const text = it.deleted
-      ? '<em class="hint">Message deleted</em>'
-      : esc(it.text || "(" + (it.message_type || "message") + ")");
-    return `<div class="admin-msg-row" data-mid="${esc(it.message_id)}">
-      <div class="admin-msg-meta"><strong>${esc((it.sender_node_id || "?"))}</strong><span class="hint">${esc(it.created_at || "")}</span></div>
-      <div class="admin-msg-text">${text}</div>
-      <span class="admin-user-acts">
-        <button type="button" class="xp-btn gray admin-mod-edit" data-mid="${esc(it.message_id)}" ${canEdit && !it.deleted && underMe ? "" : "disabled"}>Edit</button>
-        <button type="button" class="xp-btn gray admin-mod-del" data-mid="${esc(it.message_id)}" ${canDelete && !it.deleted && underMe ? "" : "disabled"}>Delete</button>
-      </span>
-    </div>`;
-  }).join("");
-}
-
-function renderAdminAuditLoading() {
-  const pane = $("#adminAuditPane");
-  if (pane) pane.innerHTML = '<div class="list-empty">Loading…</div>';
-}
-
-function renderAdminAudit(items) {
-  const pane = $("#adminAuditPane");
-  if (!pane) return;
-  if (!items.length) {
-    pane.innerHTML = '<div class="list-empty">The audit log is empty.</div>';
-    return;
-  }
-  pane.innerHTML = items.map((it) =>
-    `<div class="admin-audit-row">
-      <div class="admin-msg-meta"><strong>${esc(it.action)}</strong><span class="hint">${esc(it.created_at || "")}</span></div>
-      <div class="hint">${esc(it.actor || "")} — ${esc(it.detail || "")}</div>
-    </div>`
-  ).join("");
-}
-
-async function openAdminPanel() {
-  if (!adminTabVisible("users") && !adminTabVisible("moderation") && !adminTabVisible("audit")) {
-    ui.toast("Admin Panel requires moderator or higher.", true);
-    return;
-  }
-  const d = $("#adminPanelDialog");
-  if (!d) return;
-  await loadRoles();
-  const first = ["users", "moderation", "audit"].find((t) => adminTabVisible(t)) || "users";
-  document.querySelectorAll(".admin-tab").forEach((b) => {
-    b.classList.toggle("hidden", !adminTabVisible(b.dataset.adminTab));
-  });
-  if (!d.open) d.showModal();
-  showAdminPane(first);
-}
-
-$("#adminPanelClose")?.addEventListener("click", () => $("#adminPanelDialog")?.close());
-document.querySelectorAll(".admin-tab").forEach((b) =>
-  b.addEventListener("click", () => showAdminPane(b.dataset.adminTab)));
-$("#adminRefresh")?.addEventListener("click", () => {
-  const sel = document.querySelector(".admin-tab.sel");
-  refreshAdminPane(sel ? sel.dataset.adminTab : "users");
-});
-
-async function adminAct(run, reload = true) {
-  const status = $("#adminStatus");
-  if (status) status.textContent = "";
-  try {
-    await run();
-    await loadRoles();
-    if (reload) renderAdminUsers();
-    ui.toast("Done.");
-  } catch (e) {
-    if (status) status.textContent = adminError(e);
-    ui.toast(adminError(e), true);
-  }
-}
-
-let muteTargetId = null;
-
-function openMuteDialog(userId, rec) {
-  muteTargetId = String(userId);
-  const who = $("#muteWho");
-  if (who) who.textContent = "Muting " + ((rec && rec.username) || "u" + userId);
-  const mins = $("#muteMinutes");
-  if (mins) mins.value = "60";
-  const reason = $("#muteReason");
-  if (reason) reason.value = "";
-  const st = $("#muteStatus");
-  if (st) st.textContent = "";
-  const d = $("#muteDialog");
-  if (d && !d.open) d.showModal();
-}
-
-$("#muteCancel")?.addEventListener("click", () => $("#muteDialog")?.close());
-$("#muteClose")?.addEventListener("click", () => $("#muteDialog")?.close());
-$("#muteForm")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!muteTargetId) return;
-  const minutes = Math.floor(Number($("#muteMinutes").value));
-  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 525600) {
-    const st = $("#muteStatus");
-    if (st) st.textContent = "Minutes must be 1-525600.";
-    return;
-  }
-  const btn = $("#muteSubmit");
-  btn.disabled = true;
-  try {
-    await api.chatUserMute(muteTargetId, minutes, ($("#muteReason").value || "").trim());
-    $("#muteDialog").close();
-    await loadRoles();
-    renderAdminUsers();
-    ui.toast("User muted");
-  } catch (err) {
-    const st = $("#muteStatus");
-    if (st) st.textContent = adminError(err);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-let adminResetPwId = null;
-
-function openAdminResetPwDialog(userId, rec) {
-  adminResetPwId = String(userId);
-  const who = $("#adminResetPwWho");
-  if (who) who.textContent = "Setting a new password for " + ((rec && rec.username) || "u" + userId) +
-    " - their sessions will be signed out.";
-  const pw = $("#adminResetPwNew");
-  if (pw) pw.value = "";
-  const st = $("#adminResetPwStatus");
-  if (st) st.textContent = "";
-  const d = $("#adminResetPwDialog");
-  if (d && !d.open) d.showModal();
-  pw?.focus();
-}
-
-$("#adminResetPwCancel")?.addEventListener("click", () => $("#adminResetPwDialog")?.close());
-$("#adminResetPwClose")?.addEventListener("click", () => $("#adminResetPwDialog")?.close());
-$("#adminResetPwForm")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!adminResetPwId) return;
-  const rec = state.roles.get(adminResetPwId);
-  const username = rec && rec.username;
-  if (!username) return;
-  const newP = $("#adminResetPwNew").value;
-  const st = $("#adminResetPwStatus");
-  if (st) st.textContent = "";
-  if (newP.length < 8) {
-    if (st) st.textContent = "Password must be 8-128 characters.";
-    playSound("error");
-    return;
-  }
-  const btn = $("#adminResetPwSubmit");
-  if (btn) btn.disabled = true;
-  try {
-    await api.resetPassword(username, newP);
-    $("#adminResetPwDialog").close();
-    ui.toast("Password reset for " + username);
-  } catch (err) {
-    if (st) st.textContent = adminError(err);
-    playSound("error");
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-});
-
-$("#adminUsersPane")?.addEventListener("change", (e) => {
-  const sel = e.target.closest(".admin-role");
-  if (!sel) return;
-  const id = sel.dataset.user;
-  const role = sel.value;
-  adminAct(async () => {
-    await api.chatRoleSet(id, role);
-  }).then(() => {
-    // A changed grant may re-gate the panel itself (self-demotion etc.).
-    const still = adminTabVisible("users");
-    if (!still) $("#adminPanelDialog")?.close();
-  });
-});
-
-$("#adminUsersPane")?.addEventListener("click", (e) => {
-  const btn = e.target.closest("button");
-  if (!btn) return;
-  const id = btn.dataset.user;
-  if (!id) return;
-  const rec = state.roles.get(id);
-  if (btn.classList.contains("admin-reset-pw")) {
-    openAdminResetPwDialog(id, rec);
-    return;
-  }
-  if (btn.classList.contains("admin-mute")) {
-    if (rec && rec.muted) {
-      adminAct(() => api.chatUserUnmute(id));
-      return;
-    }
-    openMuteDialog(id, rec);
-    return;
-  }
-  if (btn.classList.contains("admin-ban")) {
-    if (rec && rec.banned) {
-      adminAct(() => api.chatUserUnban(id));
-      return;
-    }
-    const answer = ui.msgBox({ title: "msg.mesh", text: "Ban " + ((rec && rec.username) || "this user") + "? They will be signed out everywhere." });
-    answer.then((a) => { if (a === "ok") adminAct(() => api.chatUserBan(id, "banned from Admin Panel")); });
-  }
-});
-
-$("#adminModPane")?.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button");
-  if (!btn) return;
-  const mid = btn.dataset.mid;
-  if (!mid) return;
-  const status = $("#adminStatus");
-  if (btn.classList.contains("admin-mod-del")) {
-    const answer = await ui.msgBox({ title: "msg.mesh", text: "Delete this message for everyone?" });
-    if (answer !== "ok") return;
-    try {
-      await api.chatModMessage(mid, "delete");
-      await refreshAdminPane("moderation");
-      ui.toast("Message deleted");
-    } catch (err) {
-      if (status) status.textContent = adminError(err);
-      ui.toast(adminError(err), true);
-    }
-    return;
-  }
-  if (btn.classList.contains("admin-mod-edit")) {
-    const row = btn.closest(".admin-msg-row");
-    const textEl = row?.querySelector(".admin-msg-text");
-    if (!textEl || row.querySelector(".admin-edit-input")) return;
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "admin-edit-input";
-    input.maxLength = 4000;
-    input.value = textEl.textContent || "";
-    textEl.replaceWith(input);
-    input.focus();
-    const save = async () => {
-      const text = input.value;
-      if (!text.trim()) return;
-      try {
-        await api.chatModMessage(mid, "edit", text);
-        await refreshAdminPane("moderation");
-        ui.toast("Message edited");
-      } catch (err) {
-        if (status) status.textContent = adminError(err);
-        ui.toast(adminError(err), true);
-      }
-    };
-    input.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") { ev.preventDefault(); save(); }
-      if (ev.key === "Escape") refreshAdminPane("moderation");
-    });
-  }
-});
-
 /* ---------------- menu bar (native-style) ---------------- */
 
 // Icon files map 1:1 to the native client's kXpIcons entries (menu actions
@@ -3538,88 +3160,6 @@ if (window.visualViewport) {
   });
 }
 
-/* ---------------- server availability watch ---------------- */
-let serverWatchTimer = 0;
-
-function stopServerWatch() {
-  if (serverWatchTimer) {
-    clearInterval(serverWatchTimer);
-    serverWatchTimer = 0;
-  }
-}
-
-// Login/register/boot failed at the network level: re-probe the candidate
-// servers every few seconds so the screen heals itself when one comes back
-// (the funnel/host may have been rebooting) — no manual page reload needed.
-let serverWatchTries = 0;
-
-// Append a one-click probe to the unreachable note: opening /health in a new
-// tab shows plain JSON when the user's network reaches the server, or the
-// browser's own network error when it does not — separates "my app is broken"
-// from "my network cannot reach the funnel" without any support round-trip.
-function appendWatchDiag(box) {
-  if (!box) return;
-  const a = document.createElement("a");
-  a.href = (apiBase() || "") + "/health";
-  a.target = "_blank";
-  a.rel = "noopener";
-  a.textContent = " (open server status)";
-  box.appendChild(a);
-}
-
-function bumpWatchNote() {
-  serverWatchTries += 1;
-  const text = `Server unreachable — retrying automatically... (try ${serverWatchTries})`;
-  const hint = $("#authHint");
-  const regDlg = $("#registerDialog");
-  if (hint && !regDlg?.open && (!hint.textContent || hint.textContent.startsWith("Server unreachable"))) {
-    hint.textContent = text;
-    appendWatchDiag(hint);
-  }
-  if (regDlg?.open) {
-    const regErr = $("#regError");
-    if (regErr) {
-      regErr.classList.remove("error");
-      regErr.classList.add("note");
-      regErr.textContent = text;
-      regErr.classList.remove("hidden");
-      appendWatchDiag(regErr);
-    }
-  }
-}
-
-function startServerWatch() {
-  if (serverWatchTimer) return;
-  serverWatchTries = 0;
-  const hint = $("#authHint");
-  const regDlg = $("#registerDialog");
-  if (regDlg?.open || (hint && !hint.textContent)) bumpWatchNote();
-  serverWatchTimer = setInterval(async () => {
-    if (!serverWatchTimer) return;
-    try {
-      await resolveApiBase(); // re-probe all candidates, repoint if one is healthy
-      const h = await api.health();
-      if (!h.ok) { bumpWatchNote(); return; }
-      stopServerWatch();
-      authNotice = "";
-      showErr($("#authError"), "");
-      if (hint) hint.textContent = "Server is back online — sign in to continue.";
-      // The register dialog is a modal <dialog>: everything outside it (toast,
-      // auth hint) is stuck in the top-layer backdrop — surface recovery
-      // inside the dialog itself.
-      const regDlg = $("#registerDialog");
-      if (regDlg?.open) {
-        const regErr = $("#regError");
-        showErr(regErr, "Server is back online — try creating your account again.");
-        regErr?.classList.remove("error");
-        regErr?.classList.add("note");
-      }
-      ui.toast("Server is back online");
-      playSound("message");
-    } catch { bumpWatchNote(); }
-  }, 8000);
-}
-
 /* ---------------- boot ---------------- */
 
 let bootRetryTimer = 0;
@@ -3666,7 +3206,7 @@ async function startFromToken() {
     authNotice = e instanceof ApiError && e.status === 401
       ? "Session expired — please sign in again."
       : "Cannot reach the msg.mesh server. Check your connection and retry.";
-    if (netDown) startServerWatch();
+    if (netDown) startServerWatch(() => { authNotice = ""; });
     ui.showAuth("login");
     setMode("login");
     route();
