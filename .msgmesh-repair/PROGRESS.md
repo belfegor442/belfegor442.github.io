@@ -205,3 +205,25 @@
 
 ### Blockers
 - None.
+
+## R55 — user's password-reset integration audited + verified (2026-10-22)
+
+- User pushed the reset feature across both repos: server `1f95bca` (handle_users_reset_password now accepts shutdown_token OR an owner-ranked session) + client `7a0ea20` (server-key dialog dropped; Forgot points at the Admin Panel; owner gets a per-row "Reset pw" button behind myRank()>=3 && underMe).
+- Audit of the server change: 403-flat on any auth failure (no user enumeration); shutdown token still compared with ws::const_time_eq inside identify_caller; node identities rejected; rank ladder owner=3/admin=2/moderator=1/member=0 enforced via fetch_app_role; audit_log records the real actor (shutdown_token / user:N). No defect found — no D-number issued.
+- Rebuild + restart (keepalive cycle), health 200, PID 65040.
+- probe_reset_owner.py (new): 15/15 — member/no-cred/junk-token → 403; shutdown_token → 200 + victim login with new password; qa1 promoted to owner → 200 + login works; audit actors user:73 and shutdown_token both present; qa1 demoted back to member.
+- prod_smoke_pw.py rewritten for the new flow (old #resetPwDialog/server-key path no longer exists): 23/23 — change-password 401 copy, Forgot msgBox copy, legacy dialog gone, member Tools-slot hidden, full owner UI reset (promote qa1 → Tools → Admin Panel → Reset pw → dialog names target → submit → toast → victim logs in with new password) + demote restores the hidden slot.
+- Full battery green post-integration: ws 250/250, roles 118/118, prod 5/5, pw 23/23, msgbox 9/9, statusbar 8/8, a11y 2/2, dialogs 5/5, verify_logon_fix ALL PASS.
+
+### Defects
+- None (user's change verified clean).
+
+### Modified files
+- (repo) .msgmesh-repair/PROGRESS.md, TEST-RESULTS.md
+- (local %TEMP%\opencode) prod_smoke_pw.py rewritten, probe_reset_owner.py new
+
+### Next rounds (56+)
+- pendiente.md items: mesh_read/tenants spot-reads, axe of remaining dialogs, Brew decision, M50 report
+
+### Blockers
+- None.
