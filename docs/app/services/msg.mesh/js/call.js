@@ -7,7 +7,7 @@
 import { state, on, emit, isFriend } from "./store.js";
 import { sendFrame } from "./ws.js";
 import { api } from "./api.js";
-import { startRing, stopRing, playSound } from "./sound.js";
+import { startRing, stopRing, playSound } from "./infrastructure/sound.js";
 
 // Fallback until /calls/ice answers: public STUN only. The server config
 // (STUN + TURN with credentials) replaces this list per session.

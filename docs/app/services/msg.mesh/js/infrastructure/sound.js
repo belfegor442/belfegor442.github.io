@@ -13,7 +13,7 @@ const FILES = {
   call: "call.wav", // native assets/themes/WinXP/Sounds/call.wav
 };
 
-const BASE = new URL("../assets/xp/sounds/", import.meta.url);
+const BASE = new URL("../../assets/xp/sounds/", import.meta.url);
 const cache = new Map();
 
 function get(name) {

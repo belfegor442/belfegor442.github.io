@@ -1,12 +1,12 @@
 import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
 import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, loadBlocked, loadGroups, loadRoles, isFriend, isBlocked, isTyping, setTyping, clearTyping, peerOnline, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv, peerLabel, hasChatPerm, myRank, roleRank, isSelfMuted } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect, sendFrame as wsSendFrame } from "./ws.js";
-import { requestNotificationPermission, notifyIncoming } from "./notifications.js";
+import { requestNotificationPermission, notifyIncoming } from "./infrastructure/notifications.js";
 import * as ui from "./ui.js";
-import { playSound, primeSound } from "./sound.js";
-import { setTheme } from "./theme.js";
+import { playSound, primeSound } from "./infrastructure/sound.js";
+import { setTheme } from "./infrastructure/theme.js";
 import * as Call from "./call.js";
-import { EMOTICONS } from "./emoticons.js";
+import { EMOTICONS } from "./shared/emoticons.js";
 
 const $ = ui.$;
 const esc = ui.esc;

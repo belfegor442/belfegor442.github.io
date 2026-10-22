@@ -1,54 +1,55 @@
-# INVENTORY — msg.mesh (verified 2026-10-21)
+# INVENTORY — msg.mesh (re-verified 2026-10-22, R55)
 
 Source of truth: real files under `docs/app/services/msg.mesh/` in the site-mobile
-working tree (branch `main`, HEAD `a521de2` at inspection time).
+working tree (branch `main`, HEAD `584aa3c`). Supersedes the 2026-10-21 baseline
+(main.js grew 3456→3700 with D-13/14/15 and the password-reset rework).
 
 ## Counts (measured, not assumed)
-- Code files: **16** (12 .js, 3 .css, 1 .html), **9099 lines**
-- Assets: **238 files** (icons/sprites, emoticons, sounds, fonts, bliss.jpg)
-- Total on disk: 255 files (all tracked by git)
+- Code files: **16** (12 .js, 3 .css, 1 .html) + `manifest.webmanifest`, **9683 lines**
+- Assets: icons/sprites, emoticons (001-106), stickers, sounds (9 wav), fonts, gifs
+- Total tracked by git in the msg.mesh subtree.
 
-## Code files
+## Code files (lines = current disk)
 
-| File | Lines | Role | Imports (real) |
-|---|---|---|---|
-| main.js | 3456 | app entry, auth flows, chat UI, admin panel, menus, dialogs | api, store, ws, notifications, ui, sound, theme, call, emoticons |
-| ui.js | 818 | DOM rendering: sidebar, chat, contacts, msgBox, toast, avatars | store, sound, api, emoticons |
-| store.js | 562 | shared state, ingest/normalize, friends/groups/roles/typing | api |
-| api.js | 405 | HTTP client, token, api-base resolution, ApiError | (none) |
-| ws.js | 315 | WebSocket connect/dispatch/reconnect | api, store |
-| call.js | 443 | WebRTC voice/video + signaling | store, ws, api, sound |
-| emoticons.js | 114 | emoticon table + file names | (none) |
-| theme.js | 106 | theme set/persist | (none) |
-| sound.js | 68 | XP sounds + ring loop | (none) |
-| notifications.js | 29 | Notification API wrapper | (none) |
-| theme-apply.js | 13 | early theme bootstrap | (none) |
-| frameguard.js | 7 | clickjacking frame guard | (none) |
-| app.css | 1082 | XP Luna theme (default) | — |
-| win98.css | 684 | Win98 theme | — |
-| north.css | 502 | North dark theme | — |
-| index.html | 495 | single-page markup (dialogs, logon, app frame) | — |
+| File | Lines | Role |
+|---|---|---|
+| js/main.js | 3700 | Composition root: auth/session/router, send/outbox/drafts, uploads, dialogs (new chat, search, profile, settings, group, change/reset pw, call UI, admin panel), menu bar, presence/typing wiring, boot |
+| js/ui.js | 879 | Pure DOM rendering: sidebar/contacts/chat/details, msgBox, toast, msg lines, attachments image cache, emotes |
+| js/store.js | 619 | Shared mutable state + pub/sub (`on`/`emit`), ingest/normalize, friends/groups/roles/typing helpers |
+| js/call.js | 458 | WebRTC voice/video state machine + WS signaling (invite/accept/decline/offer/answer/candidate/end) |
+| js/api.js | 439 | HTTP client: base resolution/failover, token storage, ApiError, friendlyError, endpoint map |
+| js/ws.js | 338 | WebSocket connect/auth/dispatch, heartbeat/watchdog/poll, reconnect+failover |
+| js/emoticons.js | 116 | `EMOTICONS` file table + `emoteFile(id)` |
+| js/theme.js | 114 | Theme set/persist + XP→Win98 icon mapper, MutationObserver sweep |
+| js/sound.js | 73 | XP wav player + ring loop |
+| js/notifications.js | 35 | Notification API permission + notifyIncoming cooldown |
+| js/theme-apply.js | 13 | Early classic script: set `data-theme` pre-paint (CSP-safe) |
+| js/frameguard.js | 7 | Clickjacking bust-out (classic script) |
+| css/app.css | 1125 | XP Luna base theme + layout + dialogs |
+| css/win98.css | 706 | Windows 98 overrides |
+| css/north.css | 536 | North Assembly dark overrides |
+| index.html | 525 | Single-page markup: logon, app frame, 14 dialogs, toasts, ctx menu |
 
 ## Dependency graph (verified via import statements)
 ```
-api.js ────────────┬──────────────────────────┐
-   │               │                          │
-store.js ──┬── ws.js                         sound.js (leaf)
-   │       │          │                        │
-   │       └── call.js ├── ui.js ── emoticons.js (leaf)
-   │                   │
-   └────────────── main.js (imports all of the above + notifications, theme)
-theme.js (leaf) · theme-apply.js (leaf) · frameguard.js (leaf) · notifications.js (leaf)
+api.js (leaf)
+  ↑ store.js
+      ↑ ws.js ↔ api.js
+      ↑ call.js ↔ ws.js, api.js, sound.js
+      ↑ ui.js ↔ api.js, sound.js, emoticons.js
+          ↑ main.js (imports all + notifications, theme)
+theme.js · sound.js · notifications.js · emoticons.js · theme-apply.js · frameguard.js (leaves)
 ```
-Layers: leaves (api/theme/sound/emoticons/notifications/frameguard/theme-apply) →
-store → ws → ui/call → main (composition root).
+Layers: leaves → store → ws/ui/call → main (composition root). No import cycles.
 
-## Non-code runtime assets referenced by code
-- `assets/xp/sounds/*.wav` (9): strtup, logon, logoff, msg.recived, click, menu, error, notification, call
-- `assets/xp/sprites/*` (scrollbars no longer used by app.css; window chrome sprites still used)
-- `assets/xp/emoticons/*` (gif/png), `assets/xp/gifs/sticker_*.gif`
-- `manifest.webmanifest`
+## Entry points (index.html)
+- Classic scripts (before paint): `frameguard.js`, `theme-apply.js`
+- Module: `js/main.js` (imports everything else)
 
 ## Server counterpart (separate repo, S:\)
-- `server/src/api_service.cpp` (~9k lines) serves /api/v1/* used by api.js
-- migration 021: app_role/user_mutes/user_bans; e2e roles_test.py = 118 checks
+- `server/src/api_service.cpp` (~9.2k lines) serves `/api/v1/*` used by api.js
+- `http_server.cpp` serves static site + injects `X-Session-Token` fallback header
+- Health: `GET /health` → `{status:"ok"}`; DB `weirdstuff.sqlite`
+
+## Out of scope (per brief)
+External pages under `docs/` outside msg.mesh (Brew, etc.) — not inventoried here.
