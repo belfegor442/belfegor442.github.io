@@ -4,7 +4,7 @@
    the native mesh model (CALL <peer> — LAN voice, PacketType::PeerVoiceFrame
    reserved P2P). The invite carries media:"audio"|"video" so the callee knows
    whether to open the camera before Accept. One active call at a time. */
-import { state, on, emit, isFriend } from "./store.js";
+import { state, on, emit, isFriend } from "./core/state.js";
 import { sendFrame } from "./infrastructure/ws/index.js";
 import { api } from "./infrastructure/api/index.js";
 import { startRing, stopRing, playSound } from "./infrastructure/sound.js";

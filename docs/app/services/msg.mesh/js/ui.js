@@ -1,4 +1,4 @@
-import { state, conversationOrder, peerLabel, peerUser, peerOnline, isTyping, isFriend, incomingRequests, outgoingRequests } from "./store.js";
+import { state, conversationOrder, peerLabel, peerUser, peerOnline, isTyping, isFriend, incomingRequests, outgoingRequests } from "./core/state.js";
 import { playSound } from "./infrastructure/sound.js";
 import { api, getToken } from "./infrastructure/api/index.js";
 import { emoteFile } from "./shared/emoticons.js";
