@@ -270,8 +270,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
 }
 .logon-root{
   position:absolute;inset:0;
-  display:flex;align-items:center;justify-content:center;gap:clamp(24px,6vw,80px);
+  display:flex;align-items:safe center;justify-content:center;gap:clamp(24px,6vw,80px);
   padding:0 24px;
+  overflow-y:auto;
 }
 .logon-brand{
   width:clamp(160px,22vw,300px);height:auto;
@@ -309,8 +310,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .logon-fields{
-  position:absolute;right:24px;top:50%;transform:translateY(-50%);
-  width:min(320px,44vw);
+  position:static;transform:none;
+  width:100%;
   display:none;flex-direction:column;gap:10px;
 }
 .logon-fields.show{display:flex}
@@ -385,6 +386,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   .logon-add{left:16px;bottom:16px}
   .logon-add img{width:32px;height:32px}
   .logon-add span{font-size:14px}
+}
+/* short windows: tighten the stacked logon so the Other-User rows fit without scrolling */
+@media(max-height:560px){
+  .logon-col{gap:8px}
+  .logon-fields{gap:6px}
 }
 /* dialog close uses real btn_close sprite */
 dialog .win-cap.close{

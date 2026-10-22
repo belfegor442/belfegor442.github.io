@@ -161,3 +161,47 @@
 
 ### Blockers
 - None.
+
+## R52 — D-13 mojibake sweep (2026-10-22)
+
+- User report (screenshot): “Session expired â€” please sign in again.” on the logon screen. Byte dump of js/main.js found the corruption IN THE SOURCE: 43 double-encoded strings (23x “â€” = U+2014 em dash, 20x “â€…” = U+2026 ellipsis; classic UTF-8→CP1252→UTF-8 round-trip). Full-tree scan for the byte patterns: only main.js affected (0 hits elsewhere in js/css/html/json/svg).
+- Fix: byte-level replace in place (E28094 / E280A6 restored); utf-8 no-BOM preserved; node --check OK.
+- Verified: served source has U+2014/U+2026 and no â€; dead-token boot renders the notice with a real em dash.
+
+### Defects
+- D-13 FIXED: 43 mojibake strings in main.js.
+
+### Modified files
+- docs/app/services/msg.mesh/js/main.js (43 byte sequences)
+
+## R53 — D-14 logon password panel overlapping tiles (2026-10-22)
+
+- Root cause: .logon-fields was position:absolute;right:24px;top:50% against the full-bleed .logon-root. The centered brand+tiles group collides with the pinned panel whenever contentW+688 > W (≈ 650-1400px CSS). User screenshot = 958x447 CSS (DPR2 1916x893): password input sat on top of the selected tile name. north (880px card) overlapped at every width.
+- Fix: .logon-fields becomes static flow inside .logon-col (width:100%; win98 already did exactly this); .logon-root gains align-items:safe center + overflow-y:auto so short windows scroll instead of clipping; @media(max-height:560px) tightens gaps (col 14→8, fields 10→6).
+- Verified: verify_logon_fix.py — 5 viewports x 3 themes x known/other selection: intersection(fields,tiles)=0 in all 40 checks; fields visible or scroll-reachable; 958x360 extreme OK; qa1 login → statusbar; full client battery green (2/2 + 2/2 + 5/5 + 8/8 + 9/9 + 5/5).
+
+### Defects
+- D-14 FIXED: logon overlap eliminated at all widths; short windows scrollable.
+
+### Modified files
+- css/app.css (.logon-fields static, .logon-root safe center + overflow, max-height media)
+
+## R54 — D-15 north logon card left-anchored (2026-10-22)
+
+- Found while screenshotting the D-14 fix: north.css comment says “modern centered card” but the card hugged the left edge (inset:0 + width:min(880px,92vw) is over-constrained → left wins).
+- Fix: margin:auto on the north .logon-root override (canonical abs-positioning centering) + @media(max-height:560px) padding trim so the card fits short windows with less/no scroll.
+- Verified: card x-center error 0.0px at 800/1280/1916; 958x447 north visible-or-reachable; full verify_logon_fix.py ALL PASS.
+
+### Defects
+- D-15 FIXED: north card centered.
+
+### Modified files
+- css/north.css (margin:auto + short-height padding)
+
+### Next rounds (55+)
+- Remaining optional spot reads (mesh_read ~L6962, tenants ~L8881) per pendiente.md
+- Axe of the 7 unopened dialogs when reachable via UI
+- M50 final audit report when protocol closes
+
+### Blockers
+- None.

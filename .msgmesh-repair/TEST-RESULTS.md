@@ -36,3 +36,5 @@ Total automated checks: 341 pass / 0 fail
 | 10-21 | FULL battery (R48, post D-10) | 399/399 | ws 250 + roles 118 + prod 5 + pw 9 + msgbox 9 + statusbar 8 + d9 probe 8 |
 | 10-21 | smoke_dialogs_a11y (new, R51) pre-fix | 2/5 | D-11 (4 unlabeled inputs) + D-12 (.list-empty 2.95:1) |
 | 10-21 | R51 post-fix | 26/26 | dialogs 5/5 + a11y 2/2 + themes 2/2 + statusbar 8/8 + msgbox 9/9 |
+| 10-22 | verify_logon_fix (new, R52-54) | ALL PASS | D-13 source+notice; D-14 matrix 5 vp x 3 themes x 2 selections (overlap 0); D-15 card center err 0.0; 958x360 scroll OK; qa1 login → statusbar |
+| 10-22 | full client battery post D-13/D-14/D-15 | 31/31 | a11y 2/2 + themes 2/2 + dialogs 5/5 + statusbar 8/8 + msgbox 9/9 + prod 5/5 |

@@ -258,7 +258,7 @@ function handleSessionLost() {
   resetState();
   clearProfileCache();
   booted = false;
-  authNotice = "Session expired â€” please sign in again.";
+  authNotice = "Session expired — please sign in again.";
   ui.showAuth("login");
   setMode("login");
   $("#authUsername").value = lastUsername();
@@ -679,7 +679,7 @@ async function sendMessage() {
     }
     ui.renderMessages({ scroll: false });
     // The server's mute/ban fences carry specifics the generic 403 copy
-    // would hide ("muted until â€¦"); surface them verbatim.
+    // would hide ("muted until …"); surface them verbatim.
     const serverMsg = e && e.payload && (e.payload.muted || e.payload.banned) ? e.payload.error : "";
     ui.toast("Send failed: " + (serverMsg || friendlyError(e)), true);
     if (e && e.payload && e.payload.muted) loadRoles().catch(() => null);
@@ -993,7 +993,7 @@ async function handleFile(file) {
   const bar = $("#pendingFile");
   const label = $("#pendingFileName");
   if (bar) bar.classList.remove("hidden");
-  if (label) label.textContent = file.name + " â€” preparing";
+  if (label) label.textContent = file.name + " — preparing";
   try {
     const prepared = await prepareUploadFile(file);
     if (seq !== uploadSeq || !sessionIsCurrent()) return;
@@ -1013,7 +1013,7 @@ async function handleFile(file) {
       (loaded, total) => {
         if (seq === uploadSeq && sessionIsCurrent() && label && bar && !bar.classList.contains("hidden")) {
           const pct = Math.round((loaded / total) * 100);
-          label.textContent = file.name + " â€” " + pct + "%";
+          label.textContent = file.name + " — " + pct + "%";
         }
       },
       uploadToken
@@ -1129,7 +1129,7 @@ async function openAttachment(attachmentId, filename) {
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     // Security: always force save-to-disk via <a download>. Never window.open(blob)
-    // â€” blob URLs inherit the app origin and a hostile file (e.g. text/html with
+    // — blob URLs inherit the app origin and a hostile file (e.g. text/html with
     // script) could execute in our origin and steal the session token.
     const blob = new Blob([bytes], { type: r.content_type || "application/octet-stream" });
     const url = URL.createObjectURL(blob);
@@ -1171,8 +1171,8 @@ $("#newChatForm").addEventListener("submit", async (e) => {
   const q = $("#newChatInput").value.trim().replace(/^@/, "");
   if (!q) return;
   const box = $("#newChatResults");
-  showErr($("#newChatStatus"), "Searchingâ€¦");
-  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searchingâ€¦</p>';
+  showErr($("#newChatStatus"), "Searching…");
+  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searching…</p>';
   try {
     const r = await api.usersSearch(q);
     const users = (r.users || []).filter((u) => String(u.user_id) !== state.user.user_id);
@@ -1248,7 +1248,7 @@ $("#searchForm").addEventListener("submit", async (e) => {
   const q = $("#searchInput").value.trim();
   if (!q) return;
   const box = $("#searchResults");
-  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searchingâ€¦</p>';
+  box.innerHTML = '<p class="hint"><img class="hourglass" src="./assets/xp/gifs/hourglass.gif" alt=""> Searching…</p>';
   try {
     const r = await api.searchMessages(q);
     const items = r.items || [];
@@ -1535,24 +1535,24 @@ function renderCallState(st) {
   // avatar: hide while the video stage is visible
   if (av) av.classList.toggle("hidden", videoLive);
   if (st.phase === "preparing-in") {
-    if (status) status.textContent = "Preparing camera/microphoneâ€¦";
+    if (status) status.textContent = "Preparing camera/microphone…";
     if (btns.decline) btns.decline.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "preparing-out") {
-    if (status) status.textContent = "Requesting camera/microphone accessâ€¦";
+    if (status) status.textContent = "Requesting camera/microphone access…";
     if (btns.cancel) btns.cancel.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "ringing-in") {
-    if (status) status.textContent = st.media === "video" ? "Incoming video callâ€¦" : "Incoming callâ€¦";
+    if (status) status.textContent = st.media === "video" ? "Incoming video call…" : "Incoming call…";
     if (btns.accept) btns.accept.classList.remove("hidden");
     if (btns.decline) btns.decline.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "ringing-out") {
-    if (status) status.textContent = st.media === "video" ? "Ringing (video)â€¦" : "Ringingâ€¦";
+    if (status) status.textContent = st.media === "video" ? "Ringing (video)…" : "Ringing…";
     if (btns.cancel) btns.cancel.classList.remove("hidden");
     if (timer) timer.classList.add("hidden");
   } else if (st.phase === "connecting") {
-    if (status) status.textContent = st.media === "video" ? "Connecting videoâ€¦" : "Connectingâ€¦";
+    if (status) status.textContent = st.media === "video" ? "Connecting video…" : "Connecting…";
     if (btns.mute) btns.mute.classList.remove("hidden");
     if (videoLive && btns.camera) btns.camera.classList.remove("hidden");
     if (btns.hangup) btns.hangup.classList.remove("hidden");
@@ -1564,7 +1564,7 @@ function renderCallState(st) {
       bits.push(st.media === "video" ? "Video call" : "In call");
       if (st.muted) bits.push("muted");
       if (st.cameraOff) bits.push("camera off");
-      status.textContent = bits.join(" â€” ");
+      status.textContent = bits.join(" — ");
     }
     if (timer) {
       timer.textContent = String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
@@ -1627,7 +1627,7 @@ $("#callDialog")?.addEventListener("cancel", (e) => {
   e.preventDefault(); // ESC routes to the phase-correct teardown
   Call.dismissCall();
 });
-// Non-modal dialogs do not receive the "cancel" event on ESC â€” handle it globally.
+// Non-modal dialogs do not receive the "cancel" event on ESC — handle it globally.
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !Call.isCallActive()) return;
   if (e.key === "Escape" && $("#callDialog")?.open) {
@@ -1750,7 +1750,7 @@ function messagePlainText(line) {
   const body = line?.querySelector(".body");
   if (!body) return "";
   const clone = body.cloneNode(true);
-  // native emoticons render as <img alt=":eNNN:"> â€” keep the token on copy
+  // native emoticons render as <img alt=":eNNN:"> — keep the token on copy
   clone.querySelectorAll("img.emote").forEach((img) => {
     img.replaceWith(document.createTextNode(img.getAttribute("alt") || ""));
   });
@@ -1945,7 +1945,7 @@ $("#messageList")?.addEventListener("contextmenu", (e) => {
     text = (chip && chip.getAttribute("data-attname")) || "";
   }
   if (!m && !text) return;
-  // A tombstone has no copyable text and no actions â€” no menu at all.
+  // A tombstone has no copyable text and no actions — no menu at all.
   if (m && m.deleted) return;
   if (!ctxMenu) return;
   ctxText = text;
@@ -2011,7 +2011,7 @@ document.addEventListener("keydown", (e) => {
 // Dismiss on real user scroll intent only. A bare scroll listener also fires
 // for the app's own adjustments (history pagination, autoscroll to a new
 // message, focus scrollIntoView) and would blink the menu shut the instant it
-// opened â€” right-click was racing those internal scrolls. Wheel/touch cover
+// opened — right-click was racing those internal scrolls. Wheel/touch cover
 // gesture scrolling, and pointerdown-outside also catches scrollbar drags
 // (a scroll with no gesture before it is programmatic: leave the menu alone).
 document.addEventListener("wheel", hideCtxMenu, { passive: true, capture: true });
@@ -2082,7 +2082,7 @@ async function insertSticker(name) {
 }
 
 /* ---------------- online GIF search (keyless) ---------------- */
-/* Same public, CORS-open endpoint Discord's own GIF picker calls â€” no API key.
+/* Same public, CORS-open endpoint Discord's own GIF picker calls — no API key.
    Results are CDN hotlinks (static.klipy.com, ACAO=*) downloaded as blobs and
    pushed through the normal upload pipeline. */
 const GIF_API = "https://discord.com/api/v10/";
@@ -2284,7 +2284,7 @@ if (emojiPanel) {
     const nowHidden = emojiPanel.classList.toggle("hidden");
     emojiBtn.setAttribute("aria-expanded", String(!nowHidden));
   });
-  // Staying open on face picks (MSN-style) â€” panel closes on sticker, outside
+  // Staying open on face picks (MSN-style) — panel closes on sticker, outside
   // click or Esc; the sticker tap itself closes via insertSticker().
   document.addEventListener("click", (e) => {
     if (emojiPanel.classList.contains("hidden")) return;
@@ -2432,7 +2432,7 @@ on("conversations", () => {
 on("messages", (detail) => {
   ui.renderSidebar();
   // update: a control event (edit/delete/react/pin) for a message we already
-  // have â€” re-render it, but never beep or notify as if it were new mail.
+  // have — re-render it, but never beep or notify as if it were new mail.
   const isUpdate = !!(detail && detail.update);
   if (detail && detail.item && !isUpdate && detail.item.sender_node_id !== state.selfNode) {
     playSound("message");
@@ -2446,7 +2446,7 @@ on("messages", (detail) => {
     });
   }
   // Someone reacted to one of MY messages (1:1 or group): the server pushes
-  // the control frame back to the author too â€” surface it, don't just beep.
+  // the control frame back to the author too — surface it, don't just beep.
   // detail.item is the raw wire payload: the author field is sender_node_id.
   if (isUpdate && detail.item && detail.item.update === "react" &&
       detail.item.sender_node_id === state.selfNode && detail.item.reactions) {
@@ -2580,7 +2580,7 @@ on("presence.snapshot", (d) => {
   if (state.activePeer) ui.renderChatHead();
 });
 
-// Keep the "typingâ€¦" indicator alive while frames keep arriving; expire it
+// Keep the "typing…" indicator alive while frames keep arriving; expire it
 // shortly after the peer goes quiet (server does not send a stop frame).
 const typingTimers = new Map();
 function scheduleTypingExpiry(peer) {
@@ -2811,7 +2811,7 @@ async function openCallHistory() {
   const d = $("#callHistoryDialog");
   const list = $("#callHistoryList");
   if (!d) return;
-  if (list) list.innerHTML = '<div class="list-empty">Loadingâ€¦</div>';
+  if (list) list.innerHTML = '<div class="list-empty">Loading…</div>';
   if (!d.open) d.showModal();
   await renderCallHistory();
 }
@@ -2831,7 +2831,7 @@ function renderNewGroupMembers(selected) {
   if (!box) return;
   const ids = [...state.friends.keys()];
   if (!ids.length) {
-    box.innerHTML = '<div class="list-empty">Add contacts first â€” groups are made of your contacts.</div>';
+    box.innerHTML = '<div class="list-empty">Add contacts first — groups are made of your contacts.</div>';
     return;
   }
   const picked = new Set((selected || []).map(String));
@@ -2913,7 +2913,7 @@ $("#sharedFiles").addEventListener("click", async (e) => {
 const ROLE_LABEL = { owner: "Owner", admin: "Admin", moderator: "Moderator", member: "Member" };
 
 // Ladder refusals come back as precise server copy ("the owner account is
-// protected", "only the owner can grant admin â€¦"); the generic 403 text in
+// protected", "only the owner can grant admin …"); the generic 403 text in
 // friendlyError() would hide them. Prefer payload.error for panel actions.
 function adminError(e) {
   if (e && e.payload && typeof e.payload.error === "string" && e.payload.error) return e.payload.error;
@@ -3014,7 +3014,7 @@ function renderAdminUsers() {
 
 function renderAdminModLoading() {
   const pane = $("#adminModPane");
-  if (pane) pane.innerHTML = '<div class="list-empty">Loadingâ€¦</div>';
+  if (pane) pane.innerHTML = '<div class="list-empty">Loading…</div>';
 }
 
 function renderAdminMod(items) {
@@ -3047,7 +3047,7 @@ function renderAdminMod(items) {
 
 function renderAdminAuditLoading() {
   const pane = $("#adminAuditPane");
-  if (pane) pane.innerHTML = '<div class="list-empty">Loadingâ€¦</div>';
+  if (pane) pane.innerHTML = '<div class="list-empty">Loading…</div>';
 }
 
 function renderAdminAudit(items) {
@@ -3060,7 +3060,7 @@ function renderAdminAudit(items) {
   pane.innerHTML = items.map((it) =>
     `<div class="admin-audit-row">
       <div class="admin-msg-meta"><strong>${esc(it.action)}</strong><span class="hint">${esc(it.created_at || "")}</span></div>
-      <div class="hint">${esc(it.actor || "")} â€” ${esc(it.detail || "")}</div>
+      <div class="hint">${esc(it.actor || "")} — ${esc(it.detail || "")}</div>
     </div>`
   ).join("");
 }
@@ -3474,14 +3474,14 @@ $("#serverApply").addEventListener("click", async () => {
     hint.textContent = "Only HTTPS servers are allowed (or localhost for development).";
     return;
   }
-  hint.textContent = "Checking serverâ€¦";
+  hint.textContent = "Checking server…";
   const btn = $("#serverApply");
   btn.disabled = true;
   try {
     const next = await resolveApiBase(value);
     if (!next) throw new Error("unreachable");
     setApiBase(next);
-    hint.textContent = "Server saved. Reconnectingâ€¦";
+    hint.textContent = "Server saved. Reconnecting…";
     setToken("");
     wsDisconnect();
     resetState();
@@ -3550,12 +3550,12 @@ function stopServerWatch() {
 
 // Login/register/boot failed at the network level: re-probe the candidate
 // servers every few seconds so the screen heals itself when one comes back
-// (the funnel/host may have been rebooting) â€” no manual page reload needed.
+// (the funnel/host may have been rebooting) — no manual page reload needed.
 let serverWatchTries = 0;
 
 // Append a one-click probe to the unreachable note: opening /health in a new
 // tab shows plain JSON when the user's network reaches the server, or the
-// browser's own network error when it does not â€” separates "my app is broken"
+// browser's own network error when it does not — separates "my app is broken"
 // from "my network cannot reach the funnel" without any support round-trip.
 function appendWatchDiag(box) {
   if (!box) return;
@@ -3569,7 +3569,7 @@ function appendWatchDiag(box) {
 
 function bumpWatchNote() {
   serverWatchTries += 1;
-  const text = `Server unreachable â€” retrying automatically... (try ${serverWatchTries})`;
+  const text = `Server unreachable — retrying automatically... (try ${serverWatchTries})`;
   const hint = $("#authHint");
   const regDlg = $("#registerDialog");
   if (hint && !regDlg?.open && (!hint.textContent || hint.textContent.startsWith("Server unreachable"))) {
@@ -3603,14 +3603,14 @@ function startServerWatch() {
       stopServerWatch();
       authNotice = "";
       showErr($("#authError"), "");
-      if (hint) hint.textContent = "Server is back online â€” sign in to continue.";
+      if (hint) hint.textContent = "Server is back online — sign in to continue.";
       // The register dialog is a modal <dialog>: everything outside it (toast,
-      // auth hint) is stuck in the top-layer backdrop â€” surface recovery
+      // auth hint) is stuck in the top-layer backdrop — surface recovery
       // inside the dialog itself.
       const regDlg = $("#registerDialog");
       if (regDlg?.open) {
         const regErr = $("#regError");
-        showErr(regErr, "Server is back online â€” try creating your account again.");
+        showErr(regErr, "Server is back online — try creating your account again.");
         regErr?.classList.remove("error");
         regErr?.classList.add("note");
       }
@@ -3649,7 +3649,7 @@ async function startFromToken() {
     if (e instanceof ApiError && e.status === 429) {
       // Throttled, not dead: keep the token and keep retrying until the
       // server window clears instead of kicking the session to a fresh login.
-      authNotice = "Too many requests â€” slow down for a moment. Retryingâ€¦";
+      authNotice = "Too many requests — slow down for a moment. Retrying…";
       ui.showAuth("login");
       setMode("login");
       route();
@@ -3664,7 +3664,7 @@ async function startFromToken() {
     setToken("");
     const netDown = !(e instanceof ApiError) || e.status === 0 || e.status === 502 || e.status === 503;
     authNotice = e instanceof ApiError && e.status === 401
-      ? "Session expired â€” please sign in again."
+      ? "Session expired — please sign in again."
       : "Cannot reach the msg.mesh server. Check your connection and retry.";
     if (netDown) startServerWatch();
     ui.showAuth("login");
