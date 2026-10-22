@@ -1,4 +1,4 @@
-import { api } from "./api.js";
+import { api } from "./infrastructure/api/index.js";
 
 export const state = {
   user: null,            // {user_id, username, display_name, status, ...}

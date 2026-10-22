@@ -6,7 +6,7 @@
    whether to open the camera before Accept. One active call at a time. */
 import { state, on, emit, isFriend } from "./store.js";
 import { sendFrame } from "./ws.js";
-import { api } from "./api.js";
+import { api } from "./infrastructure/api/index.js";
 import { startRing, stopRing, playSound } from "./infrastructure/sound.js";
 
 // Fallback until /calls/ice answers: public STUN only. The server config

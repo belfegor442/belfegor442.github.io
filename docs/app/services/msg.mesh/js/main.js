@@ -1,4 +1,4 @@
-import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./api.js";
+import { api, getToken, setToken, ApiError, friendlyError, resolveApiBase, setApiBase, apiBase, setOnUnauthorized, setOnServerSwitch, lastUsername, rememberUsername } from "./infrastructure/api/index.js";
 import { state, on, ingest, ingestOne, pushLocal, findMessage, maxRowid, primeUsers, rememberUser, refreshUser, resetState, loadFriends, loadBlocked, loadGroups, loadRoles, isFriend, isBlocked, isTyping, setTyping, clearTyping, peerOnline, incomingFrom, outgoingTo, incomingRequests, peerUser, upsertFriend, loadProfile, saveProfile, refreshConversations, clearProfileCache, conv, peerLabel, hasChatPerm, myRank, roleRank, isSelfMuted } from "./store.js";
 import { connect as wsConnect, disconnect as wsDisconnect, forceReconnect as wsForceReconnect, sendFrame as wsSendFrame } from "./ws.js";
 import { requestNotificationPermission, notifyIncoming } from "./infrastructure/notifications.js";

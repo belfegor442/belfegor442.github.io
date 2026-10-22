@@ -1,6 +1,6 @@
 import { state, conversationOrder, peerLabel, peerUser, peerOnline, isTyping, isFriend, incomingRequests, outgoingRequests } from "./store.js";
 import { playSound } from "./infrastructure/sound.js";
-import { api, getToken } from "./api.js";
+import { api, getToken } from "./infrastructure/api/index.js";
 import { emoteFile } from "./shared/emoticons.js";
 
 export const $ = (s) => document.querySelector(s);

@@ -1,4 +1,4 @@
-import { wsEndpoint, getToken, api, failoverBase, notifyUnauthorized } from "./api.js";
+import { wsEndpoint, getToken, api, failoverBase, notifyUnauthorized } from "./infrastructure/api/index.js";
 import { state, emit, ingest, primeUsers, refreshConversations } from "./store.js";
 
 const HEARTBEAT_MS = 30000;   // text frame keeps proxies alive (server discards it)
