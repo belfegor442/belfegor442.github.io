@@ -3,13 +3,7 @@ import { api, getToken, friendlyError } from "../infrastructure/api/index.js";
 import { state, isFriend, outgoingTo, incomingFrom, loadFriends, primeUsers, ingest, loadBlocked, saveProfile } from "../core/state.js";
 import { $, esc, showErr } from "../shared/dom.js";
 import * as ui from "../ui.js";
-
-// main.js registers the router/session hooks (openChat, emitFriends, ...);
-// importing main from here would create an import cycle.
-const hooks = {};
-export function setDialogHooks(h) {
-  Object.assign(hooks, h);
-}
+import { hooks } from "../core/hooks.js";
 
 
 function wireDialogClose(sel) {
