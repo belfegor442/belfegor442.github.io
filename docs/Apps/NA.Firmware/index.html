@@ -2,118 +2,100 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#101114">
-<meta name="description" content="NA.Firmware — a North Assembly firmware project focused on POST diagnostics and hardware validation interfaces.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080b12">
+<meta name="description" content="NA.Firmware by North Assembly — a UEFI-oriented firmware project for pre-OS diagnostics, hardware validation and recovery workflows.">
 <title>NA.Firmware — North Assembly</title>
 <style>
-:root{color-scheme:dark;--bg:#101114;--panel:#17191d;--panel2:#1d2025;--ink:#f0f1f3;--muted:#a1a6af;--line:#363a42;--blue:#8eb4ff;--green:#9fc8ad;--amber:#d8c18a;--mono:Consolas,"Cascadia Mono","Courier New",monospace;--sans:"Inter Tight","Segoe UI",Arial,sans-serif}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-a:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
-.wrap{width:min(1120px,calc(100% - 40px));margin-inline:auto}
-.top{border-bottom:1px solid var(--line);font:11px/1.4 var(--mono);letter-spacing:.1em;color:var(--muted)}
-.top .wrap{display:flex;justify-content:space-between;gap:16px;padding:12px 0;flex-wrap:wrap}
-header{border-bottom:1px solid var(--line)}
-nav{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.brand{font-weight:750;letter-spacing:-.04em}
-.brand span{color:var(--muted);font-weight:400}
-.links{display:flex;gap:24px;color:var(--muted);font-size:13px}
-.links a:hover{color:var(--ink)}
-.hero{padding:clamp(60px,10vw,112px) 0 76px}
-.eyebrow,.label{font:11px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-h1{font-size:clamp(44px,8vw,88px);line-height:.98;letter-spacing:-.075em;font-weight:650;max-width:840px;margin:22px 0}
-h1 span{color:var(--muted)}
-.lead{max-width:660px;color:#c3c6cc;font-size:clamp(17px,2vw,20px);margin:0}
-.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
-.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:1px solid var(--line);font-size:13px;font-weight:600}
-.button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.button:hover{border-color:var(--blue)}
-.preview{border:1px solid #454b55;background:#08090b;box-shadow:0 18px 50px #0003;font:12px/1.55 var(--mono);overflow:hidden}
-.preview-head{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#1b1e23;border-bottom:1px solid #363a42;padding:12px 16px;flex-wrap:wrap}
-.preview-head strong{font-size:12px;letter-spacing:.08em}
-.sim{font-size:10px;letter-spacing:.12em;color:var(--amber)}
-.preview-body{padding:clamp(16px,3vw,28px)}
-.bootline{color:#c9cdd4}
-.bootline b{color:var(--blue);font-weight:500}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:24px 0}
-.stat{border:1px solid #2e3239;background:#101216;padding:13px;min-height:82px}
-.stat span{display:block;color:#858c97;font-size:10px;letter-spacing:.09em;margin-bottom:8px}
-.stat strong{font-weight:500;color:#e5e7eb}
-.good{color:var(--green)!important}
-.bootgrid{display:grid;grid-template-columns:1.2fr .8fr;gap:22px;margin-top:24px}
-.panel-title{border-bottom:1px solid #343942;padding-bottom:9px;margin-bottom:11px;color:#aeb5c0;font-size:10px;letter-spacing:.12em}
-.check{display:flex;justify-content:space-between;gap:16px;padding:7px 0;border-bottom:1px solid #202329;color:#c4c8d0}
-.check span:last-child{color:var(--green)}
-.memory{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
-.memory i{display:block;aspect-ratio:1.65;background:#252a32;border:1px solid #343b46}
-.memory i:nth-child(5n),.memory i:nth-child(7n+2){background:#3b4e68;border-color:#4c6280}
-.memory-caption{color:#767e8a;font-size:10px;margin-top:9px}
-section.content{padding:76px 0;border-top:1px solid var(--line)}
-.section-head{display:grid;grid-template-columns:.65fr 1.35fr;gap:40px;align-items:start}
-h2{font-size:clamp(28px,4vw,42px);line-height:1.08;letter-spacing:-.055em;margin:0}
-.section-copy{color:#b1b5bd;max-width:680px}
-.section-copy p{margin:0 0 16px}
-.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:40px}
-.feature{background:var(--bg);padding:24px;min-height:190px}
-.feature .n{font:11px var(--mono);color:var(--muted)}
-.feature h3{font-size:18px;letter-spacing:-.03em;margin:30px 0 8px}
-.feature p{font-size:14px;color:var(--muted);margin:0}
-.notice{display:flex;gap:14px;border-left:2px solid var(--amber);padding:14px 18px;margin-top:28px;background:#171713;color:#d0cbbd;font-size:13px}
-footer{border-top:1px solid var(--line);padding:22px 0;color:var(--muted);font-size:12px}
-footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
-@media(max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.bootgrid,.section-head{grid-template-columns:1fr;gap:24px}.features{grid-template-columns:1fr}.feature{min-height:150px}.feature h3{margin-top:20px}.hero{padding-top:64px}.links{gap:14px}}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+:root{color-scheme:dark;--bg:#080b12;--surface:#0d121d;--surface2:#111a29;--line:#27364a;--line2:#1b293b;--ink:#e8edf5;--muted:#92a2b8;--dim:#62738a;--blue:#9cc7ff;--blue2:#4c8edb;--green:#8fd7b1;--amber:#e4c27e;--red:#e58f8f;--mono:"Perfect DOS VGA 437",Consolas,"Cascadia Mono","Courier New",monospace;--sans:"Inter Tight","Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}a:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:4px}button{font:inherit}.wrap{width:min(1180px,calc(100% - 44px));margin:auto}.mono{font-family:var(--mono)}.topline{border-bottom:1px solid var(--line);background:#070a10;font:11px/1.4 var(--mono);letter-spacing:.08em;color:var(--muted)}.topline .wrap{display:flex;justify-content:space-between;gap:12px;padding:10px 0;flex-wrap:wrap}.status-dot{color:var(--amber)}header{position:sticky;top:0;z-index:20;background:#080b12ed;border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}nav{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:22px}.brand{font-weight:750;letter-spacing:-.04em}.brand em{font-style:normal;color:var(--muted);font-weight:400}.links{display:flex;gap:clamp(12px,2.6vw,30px);font-size:13px;color:var(--muted)}.links a:hover{color:var(--ink)}.nav-state{font:10px var(--mono);color:var(--green);border:1px solid #2a5747;padding:5px 8px;white-space:nowrap}
+.hero{padding:clamp(54px,8vw,100px) 0 54px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);gap:clamp(32px,6vw,76px);align-items:center}.eyebrow,.label{font:11px/1.5 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--blue)}h1{font-size:clamp(48px,7.4vw,94px);line-height:.91;letter-spacing:-.075em;font-weight:650;margin:22px 0 24px}h1 span{display:block;color:var(--muted);font-weight:400}.lead{max-width:620px;color:#b7c3d3;font-size:clamp(16px,1.7vw,19px);margin:0}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}.button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:0 15px;border:1px solid var(--line);font-size:13px;font-weight:600;transition:background .2s,border-color .2s,color .2s}.button.primary{background:var(--blue);color:#07101d;border-color:var(--blue)}.button:hover{border-color:var(--blue);background:#142238}.button.primary:hover{background:#c1dcff}.hero-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:26px;color:var(--muted);font:11px var(--mono)}.hero-meta span:before{content:"/ ";color:var(--blue)}
+.terminal{border:1px solid #344760;background:#070a10;box-shadow:0 22px 65px #0005;min-width:0}.term-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#111a29;border-bottom:1px solid var(--line);padding:12px 15px;font:10px var(--mono);letter-spacing:.07em}.term-head strong{font-size:11px;color:#dce8f7;font-weight:500}.live-label{color:var(--amber)}.term-body{padding:17px}.term-build{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font:11px var(--mono);padding-bottom:13px;border-bottom:1px solid var(--line2)}.term-build b{color:var(--blue);font-weight:500}.telemetry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0 18px}.metric{border:1px solid var(--line2);background:#0b1019;padding:11px;min-width:0}.metric .name{display:block;font:10px var(--mono);letter-spacing:.08em;color:var(--muted)}.metric strong{display:block;font:17px var(--mono);font-weight:500;margin:5px 0 8px}.bar{height:4px;background:#1d2b3e;overflow:hidden}.bar i{display:block;height:100%;width:var(--w);background:var(--blue2)}.term-lower{display:grid;grid-template-columns:1fr .85fr;gap:20px}.panel-title{font:10px var(--mono);letter-spacing:.1em;color:#a9bad0;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:7px}.logline{display:grid;grid-template-columns:54px 1fr;gap:7px;padding:5px 0;border-bottom:1px solid #111a26;font:10px/1.5 var(--mono);color:#aebbd0}.logline time{color:var(--dim)}.logline b{font-weight:400;color:var(--green)}.logline .wait{color:var(--amber)}.memmap{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}.memmap i{aspect-ratio:1.5;border:1px solid #29374a;background:#111a27}.memmap i:nth-child(7n+2),.memmap i:nth-child(11n+4){background:#294568;border-color:#45658d}.memmap i:nth-child(13n+6){background:#4a719d;border-color:#6994c3}.memmap i:nth-child(17n+8){background:#172c42}.mem-caption{margin-top:8px;color:var(--dim);font:9px/1.5 var(--mono)}.terminal-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 15px;border-top:1px solid var(--line);color:var(--dim);font:9px var(--mono)}
+.strip{border-block:1px solid var(--line);background:#0b1019}.strip .wrap{display:grid;grid-template-columns:repeat(4,1fr)}.strip-item{padding:19px 18px;border-right:1px solid var(--line)}.strip-item:first-child{padding-left:0}.strip-item:last-child{border:0}.strip-item span{display:block;font:10px var(--mono);color:var(--muted);letter-spacing:.08em}.strip-item strong{display:block;font-size:14px;font-weight:500;margin-top:5px}
+section.content{padding:clamp(58px,8vw,94px) 0;border-bottom:1px solid var(--line)}.section-head{display:grid;grid-template-columns:.65fr 1.35fr;gap:40px;align-items:start}.section-head h2{font-size:clamp(30px,4.4vw,48px);line-height:1.04;letter-spacing:-.06em;margin:12px 0 0}.section-copy{color:#aebbd0;max-width:720px}.section-copy p{margin:0 0 15px}.section-copy p:last-child{margin-bottom:0}.capabilities{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:42px}.cap{background:var(--bg);padding:23px;min-height:205px}.cap .n{font:11px var(--mono);color:var(--blue)}.cap h3{font-size:18px;letter-spacing:-.03em;margin:27px 0 8px}.cap p{font-size:13px;color:var(--muted);margin:0}.tag{display:inline-block;font:10px var(--mono);padding:3px 7px;border:1px solid var(--line);color:var(--muted)}
+.arch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:36px}.arch-step{position:relative;padding:18px 15px;border:1px solid var(--line);background:var(--surface)}.arch-step .n{font:10px var(--mono);color:var(--blue)}.arch-step strong{display:block;font-weight:550;margin:10px 0 4px}.arch-step p{font-size:12px;color:var(--muted);margin:0}.arch-step small{display:block;color:var(--dim);font:10px var(--mono);margin-top:14px}.notice{display:flex;gap:14px;border:1px solid #5c4b2c;border-left:3px solid var(--amber);padding:16px 18px;margin-top:30px;background:#17140e;color:#d6cbb4;font-size:13px}.notice strong{white-space:nowrap;font:11px var(--mono);color:var(--amber);padding-top:2px}.specs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--line);margin-top:36px}.spec{display:grid;grid-template-columns:minmax(110px,.6fr) 1fr;gap:18px;padding:15px 0;border-bottom:1px solid var(--line)}.spec:nth-child(odd){margin-right:24px}.spec span{font:11px var(--mono);color:var(--muted)}.spec strong{font-weight:450;font-size:13px}
+.roadmap{border-top:1px solid var(--line);margin-top:38px}.road-row{display:grid;grid-template-columns:90px 1fr 120px;gap:18px;align-items:start;padding:19px 0;border-bottom:1px solid var(--line)}.road-row .phase{font:11px var(--mono);color:var(--blue)}.road-row strong{font-weight:550}.road-row p{margin:4px 0 0;color:var(--muted);font-size:13px}.road-row .state{text-align:right;font:10px var(--mono);color:var(--amber)}
+footer{padding:24px 0;color:var(--muted);font-size:12px}footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}footer a:hover{color:var(--ink)}.footer-links{display:flex;gap:18px}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.hero-copy{max-width:760px}.terminal{max-width:760px}.section-head{grid-template-columns:1fr;gap:20px}.arch{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.wrap{width:min(100% - 28px,1180px)}nav{align-items:flex-start;padding:15px 0;flex-direction:column;gap:12px}.links{width:100%;flex-wrap:wrap}.nav-state{position:absolute;right:0;top:17px}.hero{padding-top:48px}.term-body{padding:12px}.term-lower{grid-template-columns:1fr}.memmap{grid-template-columns:repeat(8,minmax(0,1fr))}.strip .wrap{grid-template-columns:repeat(2,1fr)}.strip-item{padding:14px 10px;border-bottom:1px solid var(--line)}.strip-item:nth-child(odd){padding-left:0}.strip-item:nth-child(even){border-right:0}.strip-item:nth-child(n+3){border-bottom:0}.capabilities{grid-template-columns:1fr}.cap{min-height:0}.cap h3{margin-top:18px}.arch{grid-template-columns:1fr 1fr}.specs{grid-template-columns:1fr}.spec:nth-child(odd){margin-right:0}.road-row{grid-template-columns:60px 1fr;gap:10px}.road-row .state{grid-column:2;text-align:left}.notice{flex-direction:column;gap:6px}}
+@media(max-width:390px){.arch{grid-template-columns:1fr}.term-head{align-items:flex-start;flex-direction:column}.nav-state{font-size:9px}.links{gap:12px;font-size:12px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<div class="top"><div class="wrap"><span>NORTH ASSEMBLY / SYSTEMS</span><span>PROJECT PROFILE · BUILD 0.1-BIRTH</span></div></div>
-<header><nav class="wrap" aria-label="Main navigation"><a class="brand" href="/">NORTH ASSEMBLY <span>/ NA.Firmware</span></a><div class="links"><a href="/#apps">Applications</a><a href="/#systems">Systems</a></div></nav></header>
+<div class="topline"><div class="wrap"><span>NORTH ASSEMBLY <span aria-hidden="true">/</span> SYSTEMS DIVISION</span><span>PROJECT PROFILE <span aria-hidden="true">/</span> BUILD 0.1-BIRTH</span></div></div>
+<header><nav class="wrap" aria-label="Main navigation"><a class="brand" href="/">NORTH ASSEMBLY <em>/ NA.Firmware</em></a><div class="links"><a href="#overview">Overview</a><a href="#architecture">Architecture</a><a href="#roadmap">Roadmap</a><a href="/#apps">Application mural ↗</a></div><span class="nav-state">● DEVELOPMENT</span></nav></header>
 <main>
 <section class="hero wrap">
-<p class="eyebrow">Firmware / UEFI / Diagnostics</p>
-<h1>NA.Firmware<span><br>Before the OS.</span></h1>
-<p class="lead">A North Assembly firmware project exploring a custom POST diagnostic environment and clear hardware-validation interfaces—designed to make early system state readable before an operating system loads.</p>
-<div class="actions"><a class="button primary" href="#overview">Explore the project ↓</a><a class="button" href="/#apps">← Back to application mural</a></div>
-</section>
-<section class="wrap" aria-label="Diagnostic interface preview">
-<div class="preview">
-<div class="preview-head"><strong>NORTH ASSEMBLY / NA FIRMWARE :: POST DIAGNOSTIC ENVIRONMENT</strong><span class="sim">SIMULATED INTERFACE · NOT LIVE HARDWARE DATA</span></div>
-<div class="preview-body">
-<div class="bootline">BUILD <b>0.1-BIRTH</b> &nbsp;|&nbsp; SESSION 0001 &nbsp;|&nbsp; PHASE: HARDWARE VALIDATION</div>
-<div class="stats">
-<div class="stat"><span>PROCESSOR</span><strong class="good">DETECTION UI</strong></div>
-<div class="stat"><span>GRAPHICS</span><strong>DEVICE CHECK</strong></div>
-<div class="stat"><span>MEMORY</span><strong>REGION MAP</strong></div>
-<div class="stat"><span>STORAGE</span><strong>DEVICE CHECK</strong></div>
+<div class="hero-copy">
+<p class="eyebrow">Firmware engineering / UEFI / Pre-OS diagnostics</p>
+<h1>NA.Firmware<span>Before the OS.</span></h1>
+<p class="lead">A North Assembly firmware project exploring a purpose-built POST diagnostic environment, readable hardware validation and a controlled path into system maintenance—starting at the firmware layer, before an operating system takes over.</p>
+<div class="actions"><a class="button primary" href="#overview">Explore system design <span aria-hidden="true">↓</span></a><a class="button" href="#architecture">View architecture</a></div>
+<div class="hero-meta"><span>BUILD 0.1-BIRTH</span><span>UEFI / C</span><span>EARLY DEVELOPMENT</span></div>
 </div>
-<div class="bootgrid">
+<div class="terminal" aria-label="Illustrative POST diagnostic interface">
+<div class="term-head"><strong>NA.FIRMWARE :: POST DIAGNOSTIC ENVIRONMENT</strong><span class="live-label">CONCEPT PREVIEW</span></div>
+<div class="term-body">
+<div class="term-build"><span>BUILD <b>0.1-BIRTH</b> / SESSION 0001</span><span>PHASE: HARDWARE VALIDATION</span></div>
+<div class="telemetry">
+<div class="metric"><span class="name">PROCESSOR</span><strong>CPU / DETECT</strong><div class="bar"><i style="--w:78%"></i></div></div>
+<div class="metric"><span class="name">GRAPHICS</span><strong>GPU / ENUM</strong><div class="bar"><i style="--w:56%"></i></div></div>
+<div class="metric"><span class="name">MEMORY</span><strong>RAM / MAP</strong><div class="bar"><i style="--w:67%"></i></div></div>
+<div class="metric"><span class="name">STORAGE</span><strong>NVME / ENUM</strong><div class="bar"><i style="--w:88%"></i></div></div>
+</div>
+<div class="term-lower">
 <div><div class="panel-title">POST CHECKLIST / CONCEPT</div>
-<div class="check"><span>Firmware entry</span><span>PLANNED</span></div>
-<div class="check"><span>Hardware inventory</span><span>PLANNED</span></div>
-<div class="check"><span>Memory map view</span><span>PLANNED</span></div>
-<div class="check"><span>Diagnostic history</span><span>PLANNED</span></div>
-<div class="check"><span>Failure reporting</span><span>PLANNED</span></div>
+<div class="logline"><time>00.001</time><span><b>[PLAN]</b> Firmware entry</span></div>
+<div class="logline"><time>00.014</time><span><b>[PLAN]</b> Hardware inventory</span></div>
+<div class="logline"><time>00.026</time><span><b>[PLAN]</b> Memory region view</span></div>
+<div class="logline"><time>00.039</time><span><b>[PLAN]</b> Diagnostic history</span></div>
+<div class="logline"><time>00.051</time><span><b class="wait">[NEXT]</b> Failure reporting</span></div>
 </div>
-<div><div class="panel-title">MEMORY REGION MAP / VISUAL CONCEPT</div><div class="memory" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="memory-caption">Illustrative layout only · no physical memory is being inspected</div></div>
+<div><div class="panel-title">MEMORY REGION MAP</div><div class="memmap" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p class="mem-caption">64 BLOCKS / VISUAL MOCK-UP ONLY</p></div>
 </div>
 </div>
-</div>
-</section>
-<section class="content" id="overview">
-<div class="wrap">
-<div class="section-head"><div><p class="eyebrow">01 / Overview</p><h2>Diagnostics at the firmware layer.</h2></div><div class="section-copy"><p>NA.Firmware is focused on the pre-OS experience: a compact POST-style screen, readable hardware checks, and a structured view of system validation. The interface concept draws from real firmware setup and diagnostic environments rather than a conventional desktop dashboard.</p><p>The screen above is a static design preview. It does not run POST routines, query the visitor’s device, or represent a working firmware binary.</p></div></div>
-<div class="features">
-<article class="feature"><span class="n">01 / POST</span><h3>Boot diagnostics</h3><p>A compact status view for communicating the outcome and progress of early startup checks.</p></article>
-<article class="feature"><span class="n">02 / HARDWARE</span><h3>Validation interface</h3><p>A consistent place to present processor, graphics, memory and storage checks when implemented.</p></article>
-<article class="feature"><span class="n">03 / HISTORY</span><h3>Readable failures</h3><p>A direction for recording diagnostic results and making faults easier to inspect.</p></article>
-</div>
-<div class="notice"><strong>Development status</strong><span>NA.Firmware is in development. This page documents the project concept; it does not provide a downloadable or installable firmware release.</span></div>
+<div class="terminal-foot"><span>DISPLAY MODE: STATIC CONCEPT</span><span>HARDWARE TELEMETRY: NOT CONNECTED</span></div>
 </div>
 </section>
+<div class="strip"><div class="wrap"><div class="strip-item"><span>PROJECT</span><strong>NA.Firmware</strong></div><div class="strip-item"><span>FOCUS</span><strong>Pre-OS diagnostics</strong></div><div class="strip-item"><span>INTERFACE</span><strong>POST / UEFI-style</strong></div><div class="strip-item"><span>RELEASE STATE</span><strong>Not released</strong></div></div></div>
+<section class="content" id="overview"><div class="wrap">
+<div class="section-head"><div><p class="eyebrow">01 / Project overview</p><h2>Make early system state readable.</h2></div><div class="section-copy"><p>NA.Firmware explores a firmware-layer experience that communicates what the machine is doing before an operating system starts. The central design direction is a compact POST-style dashboard: clear checks, a hardware inventory, structured diagnostic output and a legible record of failures.</p><p>The goal is not to imitate a desktop application inside firmware. It is to build an interface appropriate to the constraints of the pre-OS environment, where reliability, compatibility and predictable recovery matter more than visual effects.</p></div></div>
+<div class="capabilities">
+<article class="cap"><span class="n">01 / POST</span><h3>Startup diagnostics</h3><p>A concise sequence of checks with explicit states, timings and useful failure messages—once the relevant routines are implemented.</p></article>
+<article class="cap"><span class="n">02 / INVENTORY</span><h3>Hardware visibility</h3><p>A structured presentation of detected components and available system information, with clear separation between detected data and unavailable values.</p></article>
+<article class="cap"><span class="n">03 / HISTORY</span><h3>Diagnostic records</h3><p>A direction for retaining useful results and making recurring faults easier to investigate without implying that persistent logging is already working.</p></article>
+</div>
+<div class="notice"><strong>DEVELOPMENT NOTICE</strong><span>This page is a project profile and static interface concept. The preview does not execute POST routines, inspect the visitor’s computer, display live telemetry or represent an installable firmware image. The project is not presented as ready for installation.</span></div>
+</div></section>
+<section class="content" id="architecture"><div class="wrap">
+<div class="section-head"><div><p class="eyebrow">02 / Design boundaries</p><h2>Keep the boot path small. Put heavy tools elsewhere.</h2></div><div class="section-copy"><p>The firmware core and the maintenance environment have different jobs. The core should initialize what is necessary, expose dependable diagnostics and hand off control safely. Larger utilities, recovery assets and detailed reports can live on a disk or recovery medium rather than being packed into the motherboard’s flash chip.</p><p>This separation keeps storage requirements realistic and avoids treating a large application bundle as if it were a conventional BIOS image.</p></div></div>
+<div class="arch">
+<div class="arch-step"><span class="n">LAYER 01</span><strong>UEFI entry</strong><p>Firmware-compatible entry point and controlled execution.</p><small>CORE / REQUIRED</small></div>
+<div class="arch-step"><span class="n">LAYER 02</span><strong>POST interface</strong><p>Readable status, checklist and error presentation.</p><small>CORE / IN DEVELOPMENT</small></div>
+<div class="arch-step"><span class="n">LAYER 03</span><strong>Diagnostics</strong><p>Hardware inventory and tests, implemented only where supported.</p><small>CAPABILITY / PLANNED</small></div>
+<div class="arch-step"><span class="n">LAYER 04</span><strong>Maintenance tools</strong><p>Optional larger utilities loaded from a disk or recovery medium.</p><small>EXTERNAL / FUTURE DIRECTION</small></div>
+</div>
+<div class="specs">
+<div class="spec"><span>PROJECT NAME</span><strong>North Assembly / NA.Firmware</strong></div>
+<div class="spec"><span>BUILD LABEL</span><strong>0.1-BIRTH</strong></div>
+<div class="spec"><span>TECHNICAL FOCUS</span><strong>UEFI application / C</strong></div>
+<div class="spec"><span>PRIMARY INTERFACE</span><strong>POST-style diagnostic display</strong></div>
+<div class="spec"><span>INSTALLATION STATUS</span><strong>Not validated for internal-disk installation</strong></div>
+<div class="spec"><span>HARDWARE VALIDATION</span><strong>Not yet confirmed on target motherboard</strong></div>
+</div>
+</div></section>
+<section class="content" id="roadmap"><div class="wrap">
+<div class="section-head"><div><p class="eyebrow">03 / Development direction</p><h2>Progress measured by verified behaviour.</h2></div><div class="section-copy"><p>The next milestones focus on proving the boot flow and diagnostic behaviour before expanding the interface. Hardware access, firmware compatibility and safe recovery are release gates—not assumptions based on a successful compile.</p></div></div>
+<div class="roadmap">
+<div class="road-row"><span class="phase">PHASE 01</span><div><strong>Build and validate the EFI application</strong><p>Confirm build output, architecture and basic execution in a controlled UEFI environment.</p></div><span class="state">IN PROGRESS</span></div>
+<div class="road-row"><span class="phase">PHASE 02</span><div><strong>Establish a dependable diagnostic flow</strong><p>Separate actual detection results, unsupported checks and failures; add clear error handling.</p></div><span class="state">PLANNED</span></div>
+<div class="road-row"><span class="phase">PHASE 03</span><div><strong>Validate boot and recovery behaviour</strong><p>Test entry selection, Windows Boot Manager preservation and a recovery path before any internal-disk installation is considered ready.</p></div><span class="state">NOT VALIDATED</span></div>
+<div class="road-row"><span class="phase">PHASE 04</span><div><strong>Expand diagnostics after validation</strong><p>Add supported hardware information and history without claiming unavailable sensors or unimplemented tests.</p></div><span class="state">FUTURE</span></div>
+</div>
+<div class="notice"><strong>SAFETY GATE</strong><span>NA.Firmware is not a replacement for the motherboard’s vendor firmware at this stage. Do not treat this project page or its visual preview as instructions to flash a motherboard BIOS. Any boot-entry or disk-install workflow must be separately tested and must preserve the existing Windows boot files.</span></div>
+</div></section>
 </main>
-<footer><div class="wrap"><span>NORTH ASSEMBLY · NA.Firmware</span><a href="/#apps">Return to North Assembly ↗</a></div></footer>
+<footer><div class="wrap"><span>NORTH ASSEMBLY <span aria-hidden="true">/</span> NA.Firmware <span aria-hidden="true">/</span> BUILD 0.1-BIRTH</span><div class="footer-links"><a href="/#apps">Application mural</a><a href="https://github.com/belfegor442/NA.firmware">Source repository ↗</a><a href="/">North Assembly ↗</a></div></div></footer>
 </body>
 </html>
