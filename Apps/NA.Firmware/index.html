@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080b12">
+<meta name="description" content="NA.Firmware by North Assembly — a UEFI-oriented POST and hardware diagnostics project. Development status, architecture, safety and compatibility.">
+<title>NA.Firmware — North Assembly</title>
+<link rel="icon" type="image/svg+xml" href="/na-mark.svg">
+<link rel="stylesheet" href="/styles.css">
+<style>
+:root{color-scheme:dark;--fw-bg:#080b12;--fw-panel:#0d1420;--fw-line:#263449;--fw-text:#d9e4f2;--fw-muted:#8b9bb1;--fw-blue:#79baff;--fw-green:#9cdbb0;--fw-amber:#f0c77c}
+body{background:var(--fw-bg);color:var(--fw-text);font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+a{color:var(--fw-blue)}a:focus-visible,button:focus-visible{outline:2px solid var(--fw-blue);outline-offset:4px}
+.site-header{background:rgba(8,11,18,.96);border-bottom:1px solid var(--fw-line)}
+.logo,.nav-links a{color:var(--fw-text)}.menu-button{color:var(--fw-text);border-color:var(--fw-line)}
+.fw-wrap{width:min(1120px,calc(100% - 40px));margin:auto}
+.fw-topline{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:18px 0;border-bottom:1px solid var(--fw-line);font-size:.72rem;letter-spacing:.09em;color:var(--fw-muted)}
+.fw-hero{padding:clamp(3.5rem,8vw,7rem) 0 3rem}
+.fw-kicker{color:var(--fw-blue);font-size:.76rem;letter-spacing:.15em;text-transform:uppercase}
+.fw-hero h1{font-size:clamp(3rem,9vw,7.4rem);line-height:.88;letter-spacing:-.085em;margin:1.2rem 0 1.5rem;color:#f3f7ff}
+.fw-hero h1 span{color:var(--fw-blue)}
+.fw-lead{max-width:690px;color:#b6c4d6;line-height:1.8;font-size:clamp(1rem,2vw,1.18rem)}
+.fw-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:2rem}
+.fw-btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;padding:.85rem 1.05rem;border:1px solid var(--fw-line);background:#111c2b;color:var(--fw-text);text-decoration:none;font:inherit;font-size:.82rem;letter-spacing:.04em;cursor:pointer}
+.fw-btn.primary{background:#dcecff;color:#08111e;border-color:#dcecff}.fw-btn:hover{filter:brightness(1.12)}
+.fw-statusbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--fw-line);margin:2rem 0 0}
+.fw-stat{padding:1rem;border-right:1px solid var(--fw-line)}.fw-stat:last-child{border:0}
+.fw-stat small{display:block;color:var(--fw-muted);font-size:.65rem;letter-spacing:.1em;margin-bottom:.6rem}.fw-stat strong{font-size:.92rem;font-weight:600}
+.fw-state{color:var(--fw-amber)}.fw-section{padding:4rem 0;border-top:1px solid var(--fw-line)}
+.fw-section-head{display:grid;grid-template-columns:.7fr 1.3fr;gap:2rem;margin-bottom:2rem}
+.fw-index{color:var(--fw-blue);font-size:.7rem;letter-spacing:.14em}.fw-section h2{font-size:clamp(1.7rem,4vw,2.8rem);line-height:1.05;letter-spacing:-.06em;margin:.5rem 0 1rem;color:#f3f7ff}
+.fw-section p{color:#adbbcd;line-height:1.75;margin:.5rem 0}
+.fw-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--fw-line);border:1px solid var(--fw-line)}
+.fw-card{background:var(--fw-panel);padding:1.4rem;min-width:0}.fw-card .tag{color:var(--fw-blue);font-size:.68rem;letter-spacing:.1em}.fw-card h3{font-size:1rem;margin:1rem 0 .7rem;color:#edf4ff}.fw-card p{font-size:.86rem;margin:0}
+.fw-terminal{border:1px solid #33445c;background:#05080d;box-shadow:0 18px 50px #0005}
+.fw-terminal-head{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:.8rem 1rem;background:#101a29;border-bottom:1px solid #33445c;font-size:.72rem;color:#b7c8dc}
+.fw-terminal-body{padding:1.2rem;min-height:210px;font-size:.82rem;line-height:1.85;color:#b5c7db;white-space:pre-wrap;overflow-wrap:anywhere}
+.fw-terminal-body .ok{color:var(--fw-green)}.fw-terminal-body .warn{color:var(--fw-amber)}.fw-terminal-body .dim{color:#72849b}
+.fw-demo-note{font-size:.75rem!important;color:var(--fw-amber)!important;margin-top:.8rem!important}
+.fw-table{width:100%;border-collapse:collapse;font-size:.82rem}.fw-table th,.fw-table td{text-align:left;padding:.9rem .75rem;border-bottom:1px solid var(--fw-line);vertical-align:top}.fw-table th{color:var(--fw-muted);font-weight:400;width:32%}.fw-table td{color:#d1dceb}
+.fw-callout{border-left:3px solid var(--fw-amber);background:#17150f;padding:1rem 1.2rem;margin-top:1.5rem}.fw-callout p{margin:0;color:#e4d5b8;font-size:.86rem}
+.fw-roadmap{list-style:none;padding:0;margin:0;border-top:1px solid var(--fw-line)}.fw-roadmap li{display:grid;grid-template-columns:130px 1fr;gap:1.5rem;padding:1.2rem 0;border-bottom:1px solid var(--fw-line)}.fw-roadmap strong{color:var(--fw-blue);font-size:.78rem;letter-spacing:.05em}.fw-roadmap span{color:#b6c4d6;line-height:1.65;font-size:.9rem}
+.fw-footer{border-top:1px solid var(--fw-line);padding:2rem 0;color:var(--fw-muted);font-size:.75rem}.fw-footer-inner{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+@media(max-width:760px){.fw-statusbar{grid-template-columns:repeat(2,minmax(0,1fr))}.fw-stat:nth-child(2){border-right:0}.fw-stat:nth-child(-n+2){border-bottom:1px solid var(--fw-line)}.fw-section-head{grid-template-columns:1fr;gap:.5rem}.fw-grid{grid-template-columns:1fr}.fw-roadmap li{grid-template-columns:1fr;gap:.45rem}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="site-header">
+ <div class="container nav">
+  <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span>NORTH ASSEMBLY</a>
+  <nav class="nav-links" id="nav-links" aria-label="Primary navigation"><a href="/">HOME</a><a href="/Apps/">APPLICATIONS</a><a href="#status">STATUS</a><a href="#safety">SAFETY</a></nav>
+  <button class="menu-button" type="button" aria-expanded="false" aria-controls="nav-links">MENU</button>
+ </div>
+</header>
+<main>
+ <div class="fw-wrap">
+  <div class="fw-topline"><span>NA / ENGINEERING SYSTEMS</span><span>PROJECT FILE 07 · BUILD 0.1-BIRTH</span></div>
+  <section class="fw-hero">
+   <p class="fw-kicker">NORTH ASSEMBLY / FIRMWARE LABORATORY</p>
+   <h1>NA<span>.</span><br>FIRMWARE</h1>
+   <p class="fw-lead">A UEFI-oriented pre-boot diagnostics project focused on hardware validation, structured POST reporting and a compact engineering interface. Built as a separate project — not a replacement for your motherboard firmware or BIOS setup.</p>
+   <div class="fw-actions"><a class="fw-btn primary" href="https://github.com/belfegor442/NA.firmware" target="_blank" rel="noopener noreferrer">VIEW SOURCE REPOSITORY ↗</a><a class="fw-btn" href="#demo">EXPLORE POST DEMO ↓</a></div>
+   <div class="fw-statusbar" id="status">
+    <div class="fw-stat"><small>BUILD</small><strong>0.1-BIRTH</strong></div>
+    <div class="fw-stat"><small>PROJECT PHASE</small><strong class="fw-state">IN DEVELOPMENT</strong></div>
+    <div class="fw-stat"><small>PLATFORM VALIDATION</small><strong>NOT CONFIRMED</strong></div>
+    <div class="fw-stat"><small>INSTALL SAFETY</small><strong class="fw-state">REVIEW REQUIRED</strong></div>
+   </div>
+  </section>
+  <section class="fw-section" aria-labelledby="overview-title">
+   <div class="fw-section-head"><div><span class="fw-index">01 / OVERVIEW</span><h2 id="overview-title">Diagnostics before the OS.</h2></div><div><p>NA.Firmware explores a structured pre-boot workflow: initialize diagnostic stages, report what has actually been checked, preserve useful error context and provide a clear route into diagnostics.</p><p>The page separates project intent from verified capability. A visual preview is illustrative; it is not proof that hardware has been tested or that the current build can boot on a physical machine.</p></div></div>
+   <div class="fw-grid">
+    <article class="fw-card"><span class="tag">01 / POST</span><h3>Power-on reporting</h3><p>Present startup stages, explicit pass/fail states and useful failure context rather than decorative activity alone.</p></article>
+    <article class="fw-card"><span class="tag">02 / DIAGNOSTICS</span><h3>Hardware validation</h3><p>Organize checks by component and platform capability. Unsupported checks must be reported as unsupported, never silently passed.</p></article>
+    <article class="fw-card"><span class="tag">03 / RECOVERY</span><h3>Safe hand-off</h3><p>Keep the existing Windows Boot Manager and motherboard setup reachable, with a recovery path planned before installation is considered ready.</p></article>
+   </div>
+  </section>
+  <section class="fw-section" id="demo" aria-labelledby="demo-title">
+   <div class="fw-section-head"><div><span class="fw-index">02 / INTERACTIVE PREVIEW</span><h2 id="demo-title">POST console.</h2></div><div><p>Run a short front-end demonstration of how diagnostic output could be presented. It runs only in this webpage and does not read your CPU, RAM, GPU, storage, motherboard or UEFI variables.</p></div></div>
+   <div class="fw-terminal">
+    <div class="fw-terminal-head"><span>NA.FIRMWARE / POST VIEWER</span><span id="demo-state">STATE: IDLE</span></div>
+    <div class="fw-terminal-body" id="terminal-output" aria-live="polite"><span class="dim">NA Firmware diagnostic viewer [WEB PREVIEW]</span>
+Build: 0.1-BIRTH
+Target: illustrative x86-64 platform
+Ready. Select RUN DEMO to display sample output.</div>
+   </div>
+   <div class="fw-actions"><button class="fw-btn primary" id="run-demo" type="button">RUN DEMO ▶</button><button class="fw-btn" id="reset-demo" type="button">RESET OUTPUT</button></div>
+   <p class="fw-demo-note">SIMULATION ONLY — sample output is generated by this page; it is not a real POST, benchmark or hardware compatibility test.</p>
+  </section>
+  <section class="fw-section" aria-labelledby="architecture-title">
+   <div class="fw-section-head"><div><span class="fw-index">03 / ENGINEERING</span><h2 id="architecture-title">Explicit layers. Honest states.</h2></div><div><p>The intended design favors a small, auditable pre-boot interface: phase-based initialization, explicit dependencies, structured errors and predictable control flow. Platform-specific functionality should remain isolated from generic diagnostic logic.</p></div></div>
+   <div class="fw-grid">
+    <article class="fw-card"><span class="tag">LAYER 01</span><h3>Platform interface</h3><p>Use firmware-provided services where available and detect capability limits instead of assuming every board exposes the same interfaces.</p></article>
+    <article class="fw-card"><span class="tag">LAYER 02</span><h3>Diagnostic core</h3><p>Run checks with defined outcomes: pass, fail, skipped or unsupported. Keep errors actionable and avoid claiming a successful check that never ran.</p></article>
+    <article class="fw-card"><span class="tag">LAYER 03</span><h3>Operator interface</h3><p>Compact monochrome-first text, readable status labels, keyboard navigation and logs designed for troubleshooting.</p></article>
+   </div>
+  </section>
+  <section class="fw-section" id="safety" aria-labelledby="safety-title">
+   <div class="fw-section-head"><div><span class="fw-index">04 / COMPATIBILITY & SAFETY</span><h2 id="safety-title">No unverified install claims.</h2></div><div><p>Pre-boot software operates in a sensitive part of the startup chain. Compatibility must be demonstrated on real hardware, and recovery must be tested before the installer can be described as safe for everyday use.</p></div></div>
+   <table class="fw-table">
+    <tbody>
+     <tr><th scope="row">Reference hardware</th><td>MSI PRO B650-S WIFI · AMD Ryzen 5 7600X · 32 GB DDR5 · Windows 11 x64</td></tr>
+     <tr><th scope="row">UEFI / BIOS</th><td>Existing motherboard firmware and Click BIOS 5 are not replaced by this project.</td></tr>
+     <tr><th scope="row">Boot entry</th><td>Independent UEFI entry and a reliable Windows hand-off are required before an internal-drive installation can be considered ready.</td></tr>
+     <tr><th scope="row">Secure Boot</th><td>Compatibility must be explicitly tested and documented; do not assume unsigned development builds will launch with Secure Boot enabled.</td></tr>
+     <tr><th scope="row">Current claim</th><td>Physical-device compatibility and installation safety are not confirmed by this webpage.</td></tr>
+    </tbody>
+   </table>
+   <div class="fw-callout"><p><strong>Safety boundary:</strong> do not flash the motherboard BIOS, change the default boot order, or install unverified EFI binaries as part of experimenting with this project. Keep Windows Boot Manager and a known recovery route available.</p></div>
+  </section>
+  <section class="fw-section" aria-labelledby="roadmap-title">
+   <div class="fw-section-head"><div><span class="fw-index">05 / ROADMAP</span><h2 id="roadmap-title">From build to verified boot.</h2></div><div><p>Readiness is earned through repeatable tests, not visual polish. These are engineering gates, not claims that every item is already complete.</p></div></div>
+   <ol class="fw-roadmap">
+    <li><strong>GATE 01 / BUILD</strong><span>Reproducible build, correct output paths, and automated checks passing.</span></li>
+    <li><strong>GATE 02 / TESTS</strong><span>Diagnostic logic, error paths, unsupported hardware cases and failure reporting validated.</span></li>
+    <li><strong>GATE 03 / BOOT</strong><span>Tested on the intended physical PC with clear logs and no reliance on an emulator as a substitute for device validation.</span></li>
+    <li><strong>GATE 04 / RECOVERY</strong><span>Independent boot entry, reliable Windows hand-off, uninstall path and recovery procedure verified.</span></li>
+    <li><strong>GATE 05 / RELEASE</strong><span>Document supported configurations, Secure Boot limitations, known issues and a verified release artifact.</span></li>
+   </ol>
+  </section>
+  <section class="fw-section" aria-labelledby="source-title">
+   <div class="fw-section-head"><div><span class="fw-index">06 / SOURCE</span><h2 id="source-title">Inspect the implementation.</h2></div><div><p>The repository is the source of truth for implementation details. Check the current build scripts, tests, documented limitations and release artifacts before trying any binary.</p><div class="fw-actions"><a class="fw-btn primary" href="https://github.com/belfegor442/NA.firmware" target="_blank" rel="noopener noreferrer">OPEN GITHUB REPOSITORY ↗</a><a class="fw-btn" href="/Apps/">BACK TO APPLICATIONS ↗</a></div></div></div>
+  </section>
+ </div>
+</main>
+<footer class="fw-footer"><div class="fw-wrap fw-footer-inner"><span>NORTH ASSEMBLY / NA.FIRMWARE / BUILD 0.1-BIRTH</span><span>PROJECT STATUS: IN DEVELOPMENT</span></div></footer>
+<script>
+const menu=document.querySelector(".menu-button"),nav=document.querySelector(".nav-links");
+if(menu&&nav){menu.addEventListener("click",()=>{const open=nav.classList.toggle("is-open");menu.setAttribute("aria-expanded",String(open));});}
+const output=document.getElementById("terminal-output"),state=document.getElementById("demo-state"),run=document.getElementById("run-demo"),reset=document.getElementById("reset-demo");
+const initial='<span class="dim">NA Firmware diagnostic viewer [WEB PREVIEW]</span>\nBuild: 0.1-BIRTH\nTarget: illustrative x86-64 platform\nReady. Select RUN DEMO to display sample output.';
+const sample=[
+ ['<span class="dim">NA.FIRMWARE / PRE-BOOT DIAGNOSTIC PREVIEW</span>',''],
+ ['[INFO] Session initialized: DEMO-0001',''],
+ ['[PASS] Interface layout loaded','ok'],
+ ['[PASS] Diagnostic state model loaded','ok'],
+ ['[SKIP] CPU identification — no hardware access in browser','warn'],
+ ['[SKIP] Memory test — no hardware access in browser','warn'],
+ ['[SKIP] Storage scan — no hardware access in browser','warn'],
+ ['[SKIP] UEFI variable access — unavailable to webpage','warn'],
+ ['[INFO] Result: PREVIEW COMPLETE; PHYSICAL HARDWARE NOT TESTED','']
+];
+run.addEventListener("click",()=>{output.innerHTML=sample.map(x=>'<span class="'+x[1]+'">'+x[0]+'</span>').join('\n');state.textContent="STATE: SIMULATION COMPLETE";run.disabled=true;run.textContent="DEMO COMPLETE";});
+reset.addEventListener("click",()=>{output.innerHTML=initial;state.textContent="STATE: IDLE";run.disabled=false;run.textContent="RUN DEMO ▶";});
+</script>
+</body>
+</html>
