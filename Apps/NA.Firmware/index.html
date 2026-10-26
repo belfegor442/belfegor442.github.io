@@ -79,6 +79,88 @@ a:focus-visible,button:focus-visible{outline:3px solid #5686ba;outline-offset:4p
 @media(max-width:800px){.fw-wrap{width:min(var(--fw-width),calc(100% - 40px))}.fw-statusbar{grid-template-columns:repeat(2,minmax(0,1fr))}.fw-stat:nth-child(2){border-right:0}.fw-stat:nth-child(-n+2){border-bottom:1px solid var(--fw-line)}.fw-section-head{grid-template-columns:1fr;gap:.5rem}.fw-section h2{max-width:650px}.fw-grid{grid-template-columns:1fr}.fw-card h3{margin-top:1rem}.fw-roadmap li{grid-template-columns:1fr;gap:.45rem}}
 @media(max-width:480px){.fw-wrap{width:calc(100% - 32px)}.fw-topline{font-size:.6rem}.fw-hero{padding-top:4rem}.fw-hero h1{font-size:clamp(3.5rem,17vw,5rem)}.fw-statusbar{margin-top:2.3rem}.fw-stat{padding:.85rem}.fw-stat strong{font-size:.78rem}.fw-actions{align-items:stretch}.fw-btn{width:100%;text-align:center}.fw-table th,.fw-table td{display:block;width:100%;padding:.75rem .8rem}.fw-table th{padding-bottom:.2rem;border-bottom:0}.fw-table td{padding-top:.25rem}.fw-footer-inner{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+/* NA.Firmware identity pass: firmware setup / POST diagnostic console */
+:root{
+ --fw-bg:#080d1b;--fw-surface:#0d1528;--fw-ink:#e4ecff;--fw-muted:#92a3c4;
+ --fw-line:#253858;--fw-blue:#72b7ff;--fw-blue-soft:#132d50;--fw-green:#8de2b0;
+ --fw-amber:#ffd37a;--fw-radius:0px;--fw-width:1240px;color-scheme:dark;
+}
+html{background:#080d1b;scroll-padding-top:82px}
+body{background:var(--fw-bg)!important;color:var(--fw-ink)!important;font-family:"IBM Plex Sans",Arial,sans-serif!important;line-height:1.65}
+.site-header{background:rgba(8,13,27,.96)!important;border-bottom:1px solid #253858!important;backdrop-filter:blur(12px)}
+.logo,.nav-links a,.menu-button{color:#e4ecff!important}
+.logo{font-family:"IBM Plex Mono",monospace;letter-spacing:.08em}
+.nav-links a{font-family:"IBM Plex Mono",monospace;letter-spacing:.06em}
+.menu-button{border-color:#253858!important;background:#0d1528!important}
+.fw-wrap{width:min(var(--fw-width),calc(100% - 72px))}
+.fw-topline{border-color:var(--fw-line);color:#92a3c4;font-size:.68rem}
+.fw-hero{padding:clamp(5rem,11vw,9rem) 0 4rem}
+.fw-hero:before{content:"";position:absolute;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(rgba(114,183,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(114,183,255,.045) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,#000,transparent 88%)}
+.fw-hero:after{content:"UEFI / POST";right:-.02em;top:17%;font:700 clamp(5rem,16vw,15rem)/.8 "IBM Plex Mono",monospace;letter-spacing:-.1em;color:rgba(114,183,255,.055)}
+.fw-kicker,.fw-index,.fw-card .tag,.fw-stat small,.fw-roadmap strong{font-family:"IBM Plex Mono",monospace}
+.fw-kicker{color:var(--fw-blue)}
+.fw-kicker:before{background:var(--fw-blue)}
+.fw-hero h1{font-family:"IBM Plex Sans",Arial,sans-serif!important;font-size:clamp(3.8rem,10.5vw,8.7rem);font-weight:700;line-height:.84;letter-spacing:-.085em;color:#f2f6ff}
+.fw-hero h1 span{color:var(--fw-blue)}
+.fw-lead{color:#aab9d3;font-size:clamp(1.05rem,1.7vw,1.2rem);max-width:640px}
+.fw-btn{font-family:"IBM Plex Mono",monospace;border-color:#385176;background:#0d1528;color:#dce8ff}
+.fw-btn.primary{background:#72b7ff;border-color:#72b7ff;color:#071020}
+.fw-btn:hover{background:#172746;border-color:#72b7ff;color:#fff}
+.fw-btn.primary:hover{background:#a0d0ff;border-color:#a0d0ff;color:#071020}
+.fw-statusbar{background:#0d1528;border-color:#253858}
+.fw-stat{border-color:#253858}
+.fw-stat small{color:#92a3c4}
+.fw-stat strong{color:#e4ecff;font-family:"IBM Plex Mono",monospace;font-size:.82rem}
+.fw-state{color:var(--fw-amber)}
+.fw-section{border-color:#253858}
+.fw-index{color:#72b7ff}
+.fw-section h2{font-family:"IBM Plex Sans",Arial,sans-serif!important;color:#f2f6ff;letter-spacing:-.065em}
+.fw-section p{color:#aab9d3}
+.fw-grid{background:#253858;border-color:#253858;gap:1px}
+.fw-card{background:#0d1528}
+.fw-card:hover{background:#111e36}
+.fw-card .tag{color:#72b7ff}
+.fw-card h3{font-family:"IBM Plex Sans",Arial,sans-serif!important;color:#f2f6ff}
+.fw-card p{color:#aab9d3}
+.fw-terminal{border:1px solid #385176;background:#050914;box-shadow:0 20px 60px rgba(0,0,0,.24)}
+.fw-terminal-head{background:#14233d;border-color:#385176;color:#dce8ff;font-family:"IBM Plex Mono",monospace}
+.fw-terminal-body{font-family:"IBM Plex Mono",monospace;color:#cbd9f2}
+.fw-terminal-body .ok{color:#8de2b0}.fw-terminal-body .warn{color:#ffd37a}.fw-terminal-body .dim{color:#7085aa}
+.fw-demo-note{color:#ffd37a!important}
+.fw-table{background:#0d1528}
+.fw-table th,.fw-table td{border-color:#253858}
+.fw-table th{color:#92a3c4;font-family:"IBM Plex Mono",monospace}
+.fw-table td{color:#c7d5ed}
+.fw-callout{border-left:3px solid #ffd37a;background:#201c17}
+.fw-callout p{color:#e6d5b2}
+.fw-roadmap{border-color:#253858}
+.fw-roadmap li{border-color:#253858}
+.fw-roadmap strong{color:#72b7ff}
+.fw-roadmap span{color:#aab9d3}
+.site-footer{border-top:1px solid #253858;background:#080d1b}
+.site-footer,.site-footer a,.site-footer p{color:#92a3c4}
+a:focus-visible,button:focus-visible{outline:2px solid #72b7ff!important;outline-offset:4px}
+@media(max-width:800px){
+ .fw-wrap{width:calc(100% - 32px)}
+ .fw-hero{padding:5rem 0 2.5rem}
+ .fw-hero:after{top:10%;right:-.1em}
+ .fw-statusbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .fw-stat:nth-child(2){border-right:0}
+ .fw-stat:nth-child(-n+2){border-bottom:1px solid #253858}
+ .fw-section-head{grid-template-columns:1fr;gap:.7rem}
+ .fw-grid{grid-template-columns:1fr}
+ .fw-roadmap li{grid-template-columns:1fr;gap:.35rem}
+}
+@media(max-width:480px){
+ .fw-hero h1{font-size:clamp(3.3rem,17vw,5rem)}
+ .fw-statusbar{margin-top:2.5rem}
+ .fw-stat{padding:.9rem}
+ .fw-table th,.fw-table td{padding:.8rem .55rem;font-size:.78rem}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.fw-btn,.fw-card{transition:none}}
+
 </style>
 </head>
 <body>
