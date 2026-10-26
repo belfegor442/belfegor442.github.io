@@ -41,21 +41,8 @@ h1 em{font-style:normal;color:#ffe66b}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
 .hero-actions .button.secondary{background:transparent;color:#fff;border-color:#b4ffff #003b3b #003b3b #b4ffff;box-shadow:1px 1px 0 #002b2b}
 .fineprint{font-size:12px;color:#d1eeee;margin-top:16px}
-.desktop-preview{position:relative;min-height:340px;padding:16px;background:#007c7c;border:1px solid #005d5d;box-shadow:8px 8px 0 rgba(0,0,0,.2)}
-.preview-window{position:absolute;top:18px;left:12px;width:90%;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:3px 3px 0 rgba(0,0,0,.35)}
-.preview-window.second{top:106px;left:44px;width:83%;z-index:2}
-.preview-title{height:25px;background:linear-gradient(90deg,#000080,#1084d0);color:white;font-size:12px;font-weight:bold;padding:4px 7px;display:flex;justify-content:space-between}
-.preview-menu{font-size:10px;padding:5px 7px;border-bottom:1px solid #888;word-spacing:9px}
-.preview-toolbar{display:flex;gap:5px;padding:8px;border-bottom:1px solid #888}
-.tool{width:30px;height:29px;display:grid;place-items:center;background:#c0c0c0;border:2px solid;border-color:#fff #555 #555 #fff;font-size:16px}
-.address{font-size:10px;background:#fff;border:1px inset #888;padding:5px;flex:1;color:#333;overflow:hidden;white-space:nowrap}
-.preview-content{padding:14px;background:#fff;min-height:115px}
-.fake-heading{font:bold 18px Georgia,serif;color:#000080;margin:0 0 8px}
-.fake-lines{height:6px;background:#d9d9d9;margin:8px 0;width:93%}.fake-lines.short{width:58%}
-.preview-status{background:#c0c0c0;padding:4px 7px;font-size:10px;border-top:1px solid #888}
-.preview-taskbar{position:absolute;bottom:0;left:0;right:0;background:#c0c0c0;border-top:2px solid #fff;padding:5px;display:flex;gap:7px}
-.start-chip,.task-chip{background:#c0c0c0;border:2px solid;border-color:#fff #555 #555 #fff;padding:4px 8px;font-size:10px;font-weight:bold}
-.task-chip{flex:1;font-weight:normal}
+.desktop-preview{position:relative;min-height:0;padding:0;background:#007c7c;border:1px solid #005d5d;box-shadow:8px 8px 0 rgba(0,0,0,.2);overflow:hidden}
+.demo-gif{display:block;width:100%;height:auto;max-height:520px;object-fit:contain}
 .section{padding:68px 0}
 .section.light{background:#d4d0c8;color:#111}
 .section.dark{background:#001c1c;color:#fff}
@@ -107,19 +94,8 @@ footer a{color:#fff}
       </div>
       <p class="fineprint">Version 0.1.0 · Windows x64 package · Open-source project</p>
     </div>
-    <div class="desktop-preview" role="img" aria-label="Illustration of Web98 browser windows styled after the Windows 98 desktop">
-      <div class="preview-window">
-        <div class="preview-title"><span>Web98 — Welcome</span><span>_ □ ×</span></div>
-        <div class="preview-menu">File Edit View Favorites Tools Help</div>
-        <div class="preview-toolbar"><span class="tool">←</span><span class="tool">→</span><span class="tool">↻</span><span class="tool">⌂</span><div class="address">https://the.world.wide.web/</div><span class="tool">↵</span></div>
-        <div class="preview-content"><p class="fake-heading">Welcome to the World Wide Web</p><div class="fake-lines"></div><div class="fake-lines"></div><div class="fake-lines short"></div></div>
-        <div class="preview-status">Done</div>
-      </div>
-      <div class="preview-window second">
-        <div class="preview-title"><span>Favorites</span><span>_ □ ×</span></div>
-        <div class="preview-content" style="min-height:104px;font:12px Tahoma,sans-serif"><p style="margin:0 0 10px">★ &nbsp; Favorite places</p><p style="margin:7px 0">🌐 &nbsp; Explore the web</p><p style="margin:7px 0">📁 &nbsp; Saved links</p></div>
-      </div>
-      <div class="preview-taskbar"><span class="start-chip">▣ Start</span><span class="task-chip">Web98</span><span class="start-chip">9:41 AM</span></div>
+    <div class="desktop-preview">
+      <img class="demo-gif" src="temp.gif" alt="Demostración animada de Web98">
     </div>
   </div>
 </section>
