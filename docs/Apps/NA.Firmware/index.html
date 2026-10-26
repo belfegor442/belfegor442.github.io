@@ -188,6 +188,12 @@ footer .wrap{display:flex;align-items:center;justify-content:space-between;gap:2
  .road-row>div{grid-row:3}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* Version 1.0 animated interface */
+.firmware-gif-frame{min-width:0;margin:0;overflow:hidden;border:2px solid var(--line-strong);background:#02060b;box-shadow:7px 7px 0 #101d2b}
+.firmware-gif-head{min-height:42px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:11px 14px;background:#10253a;border-bottom:1px solid var(--line-strong);color:var(--blue-bright);font:9px/1.5 var(--mono);letter-spacing:.045em}
+.firmware-gif-frame img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain;background:#02060b}
+@media(max-width:700px){.firmware-gif-head{padding:9px 10px;font-size:8px}}
 </style>
 </head>
 <body>
@@ -202,29 +208,10 @@ footer .wrap{display:flex;align-items:center;justify-content:space-between;gap:2
 <div class="actions"><a class="button primary" href="#overview">Explore system design <span aria-hidden="true">↓</span></a><a class="button" href="#architecture">View architecture</a></div>
 <div class="hero-meta"><span>BUILD 0.1-BIRTH</span><span>UEFI / C</span><span>EARLY DEVELOPMENT</span></div>
 </div>
-<div class="terminal" aria-label="Illustrative POST diagnostic interface">
-<div class="term-head"><strong>NA.FIRMWARE :: POST DIAGNOSTIC ENVIRONMENT</strong><span class="live-label">CONCEPT PREVIEW</span></div>
-<div class="term-body">
-<div class="term-build"><span>BUILD <b>0.1-BIRTH</b> / SESSION 0001</span><span>PHASE: HARDWARE VALIDATION</span></div>
-<div class="telemetry">
-<div class="metric"><span class="name">PROCESSOR</span><strong>CPU / DETECT</strong><div class="bar"><i style="--w:78%"></i></div></div>
-<div class="metric"><span class="name">GRAPHICS</span><strong>GPU / ENUM</strong><div class="bar"><i style="--w:56%"></i></div></div>
-<div class="metric"><span class="name">MEMORY</span><strong>RAM / MAP</strong><div class="bar"><i style="--w:67%"></i></div></div>
-<div class="metric"><span class="name">STORAGE</span><strong>NVME / ENUM</strong><div class="bar"><i style="--w:88%"></i></div></div>
-</div>
-<div class="term-lower">
-<div><div class="panel-title">POST CHECKLIST / CONCEPT</div>
-<div class="logline"><time>00.001</time><span><b>[PLAN]</b> Firmware entry</span></div>
-<div class="logline"><time>00.014</time><span><b>[PLAN]</b> Hardware inventory</span></div>
-<div class="logline"><time>00.026</time><span><b>[PLAN]</b> Memory region view</span></div>
-<div class="logline"><time>00.039</time><span><b>[PLAN]</b> Diagnostic history</span></div>
-<div class="logline"><time>00.051</time><span><b class="wait">[NEXT]</b> Failure reporting</span></div>
-</div>
-<div><div class="panel-title">MEMORY REGION MAP</div><div class="memmap" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><p class="mem-caption">64 BLOCKS / VISUAL MOCK-UP ONLY</p></div>
-</div>
-</div>
-<div class="terminal-foot"><span>DISPLAY MODE: STATIC CONCEPT</span><span>HARDWARE TELEMETRY: NOT CONNECTED</span></div>
-</div>
+<figure class="firmware-gif-frame" aria-label="NA.Firmware 1.0 animated interface">
+ <figcaption class="firmware-gif-head"><span>NA.FIRMWARE / VERSION 1.0</span><span>ANIMATED INTERFACE</span></figcaption>
+ <img src="https://raw.githubusercontent.com/belfegor442/belfegor442.github.io/main/Apps/NA.Firmware/1.0.gif" alt="NA.Firmware version 1.0 animation" decoding="async" fetchpriority="high">
+</figure>
 </section>
 <div class="strip"><div class="wrap"><div class="strip-item"><span>PROJECT</span><strong>NA.Firmware</strong></div><div class="strip-item"><span>FOCUS</span><strong>Pre-OS diagnostics</strong></div><div class="strip-item"><span>INTERFACE</span><strong>POST / UEFI-style</strong></div><div class="strip-item"><span>RELEASE STATE</span><strong>Not released</strong></div></div></div>
 <section class="content" id="overview"><div class="wrap">
