@@ -197,3 +197,49 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:
  .hint i{animation:none}
  .card,.ch,.fi{transition:none}
 }
+
+
+/* Typography refinement: industrial, editorial, and legible — no brutalist type */
+:root{
+ --f:"Inter",Arial,sans-serif;
+ --fm:"IBM Plex Mono",Consolas,monospace;
+ --display:"Barlow Condensed","Arial Narrow",sans-serif;
+}
+body{font-family:var(--f);font-size:15px;line-height:1.7;letter-spacing:-.012em;font-weight:400}
+nav a{font-family:var(--fm);font-size:10px;letter-spacing:.015em;font-weight:400}
+nav sup{font-family:var(--fm);font-size:8px}
+nav:after{font-size:8px;letter-spacing:.12em}
+.nav-name{font-family:var(--fm);font-size:9px;letter-spacing:.12em}
+.ht small,.section-number{font-family:var(--fm);font-size:10px;letter-spacing:.11em;font-weight:400}
+.ht h1{
+ font-family:var(--display);font-size:clamp(5rem,11vw,9.5rem);font-weight:500;
+ line-height:.82;letter-spacing:-.035em;text-transform:uppercase;text-shadow:none;
+}
+.ht h1 .w{padding-right:.025em}
+.ht p{font-family:var(--f);font-size:15px;line-height:1.8;letter-spacing:-.012em;font-weight:400}
+.ht li{font-family:var(--fm);font-size:9px;letter-spacing:0;font-weight:400}
+h2{font-family:var(--display);font-size:clamp(3rem,6vw,5.4rem);font-weight:500;letter-spacing:-.025em;line-height:.95}
+#apps h2:before,#systems h2:before,#team h2:before,#connect h2:before{font-family:var(--fm);font-size:9px;letter-spacing:.12em;font-weight:400}
+.lead{font-family:var(--f);font-size:15px;line-height:1.8;letter-spacing:-.01em;font-weight:400}
+.card .k{font-family:var(--fm);font-size:9px;letter-spacing:.015em;font-weight:400}
+.card h3{font-family:var(--display);font-size:clamp(2.1rem,3vw,2.65rem);font-weight:500;letter-spacing:-.015em;line-height:1;text-transform:uppercase}
+.card p{font-family:var(--f);font-size:13px;line-height:1.75;letter-spacing:0;font-weight:400}
+.card .pl{font-family:var(--fm);font-size:9px;letter-spacing:.025em;font-weight:400}
+.tag{font-family:var(--fm);font-size:8px;letter-spacing:.015em;font-weight:400}
+.sys b{font-family:var(--display);font-size:clamp(1.8rem,3.2vw,2.6rem);font-weight:500;letter-spacing:-.015em;text-transform:uppercase}
+.sys span{font-family:var(--f);font-size:13px;line-height:1.65;letter-spacing:0}
+.ln{font-family:var(--fm);font-size:12px;letter-spacing:0}
+.about .lead,.about p:not(.lead){font-family:var(--f);font-size:14px;line-height:1.85;letter-spacing:0}
+dt{font-family:var(--fm);font-size:9px;letter-spacing:.07em}
+dd{font-family:var(--f);font-size:13px;line-height:1.6;letter-spacing:0}
+.people b{font-family:var(--display);font-size:1.65rem;font-weight:500;letter-spacing:-.01em;text-transform:uppercase}
+.people span{font-family:var(--fm);font-size:9px;letter-spacing:.04em}
+.conn small{font-family:var(--fm);font-size:9px;letter-spacing:.08em}
+.conn b{font-family:var(--display);font-size:1.55rem;font-weight:500;letter-spacing:0;text-transform:uppercase}
+footer{font-family:var(--fm);font-size:9px;letter-spacing:.04em}
+@media(max-width:760px){
+ .ht h1{font-size:clamp(4.3rem,18vw,6.4rem);letter-spacing:-.03em}
+ .ht p,.lead{font-size:14px}
+ .card h3{font-size:2.2rem}
+ h2{font-size:clamp(3rem,12vw,4.3rem)}
+}
