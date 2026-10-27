@@ -53,7 +53,7 @@
     body::before {
       background:
         linear-gradient(180deg, rgba(5, 2, 4, 0.62), rgba(5, 2, 4, 0.94) 64%, #050204),
-        url("assets/img/wall.jpg") center / 520px auto;
+        radial-gradient(circle at 68% 48%, rgba(132, 24, 31, 0.38), transparent 28%), linear-gradient(135deg, #1a0a0d, #07080b 55%, #351016) center / cover;
       filter: saturate(1.16) contrast(1.08);
     }
 
@@ -112,7 +112,7 @@
       border: 1px solid rgba(243, 223, 189, 0.25);
       background:
         linear-gradient(145deg, rgba(210, 52, 47, 0.8), rgba(61, 7, 9, 0.92)),
-        url("assets/img/wall.jpg") center / cover;
+        radial-gradient(circle at 68% 48%, rgba(132, 24, 31, 0.38), transparent 28%), linear-gradient(135deg, #1a0a0d, #07080b 55%, #351016) center / cover;
       box-shadow: 0 0 28px rgba(210, 52, 47, 0.3);
     }
 
@@ -262,7 +262,7 @@
       border-radius: 8px;
       background:
         linear-gradient(180deg, rgba(5, 2, 4, 0.16), rgba(5, 2, 4, 0.72)),
-        url("assets/img/wall.jpg") center / cover;
+        radial-gradient(circle at 68% 48%, rgba(132, 24, 31, 0.38), transparent 28%), linear-gradient(135deg, #1a0a0d, #07080b 55%, #351016) center / cover;
       box-shadow:
         0 38px 120px rgba(0, 0, 0, 0.66),
         inset 0 0 80px rgba(5, 2, 4, 0.9);
@@ -336,6 +336,18 @@
     .weapon-knife img {
       width: 122%;
       max-width: none;
+    }
+
+    .weapon-knife::before {
+      content: "";
+      display: block;
+      width: 18px;
+      height: 78px;
+      border-radius: 3px 3px 8px 8px;
+      background: linear-gradient(90deg, #4c4a45, #d7cdbd 42%, #615a50);
+      clip-path: polygon(50% 0, 100% 25%, 67% 75%, 67% 100%, 30% 100%, 30% 75%, 0 25%);
+      filter: drop-shadow(0 8px 10px #000);
+      transform: rotate(18deg);
     }
 
     .live-readout {
@@ -460,6 +472,15 @@
       min-height: 420px;
       object-fit: cover;
       filter: saturate(1.06) contrast(1.08);
+    }
+
+    .image-panel .image-fallback {
+      width: 100%;
+      min-height: 420px;
+      background: radial-gradient(ellipse at 70% 45%, rgba(133, 20, 30, .42), transparent 30%), repeating-linear-gradient(135deg, #1b090d 0 18px, #250c11 18px 34px, #09090c 34px 52px);
+    }
+    .image-panel .image-fallback.escape {
+      background: radial-gradient(ellipse at 52% 38%, #050508 0 14%, transparent 15%), linear-gradient(90deg, #1b090d, #09090c 42%, #2b0b10);
     }
 
     .image-panel::after {
@@ -590,6 +611,11 @@
       min-height: 300px;
       object-fit: cover;
       filter: saturate(1.1) contrast(1.05);
+    }
+
+    .media-shot .image-fallback {
+      min-height: 300px;
+      background: repeating-linear-gradient(135deg, #1b090d 0 16px, #250c11 16px 31px, #09090c 31px 47px);
     }
 
     .media-shot.object img {
@@ -1280,7 +1306,7 @@
 
       <div class="hero-stage" aria-label="Arte del laberinto de carne">
         <div class="maze-frame"></div>
-        <img class="heart" src="assets/site/heart-cutout.png" alt="Corazon vivo del laberinto MEAT">
+        <img class="heart" src="Assets/site/heart-cutout.png" alt="Corazon vivo del laberinto MEAT">
         <div class="live-readout" aria-label="Estado del laberinto">
           <div class="readout-line"><span>Pulso</span><span>activo</span></div>
           <div class="readout-line"><span>Nucleo</span><span>vivo</span></div>
@@ -1288,10 +1314,10 @@
         </div>
         <div class="weapon-strip" aria-hidden="true">
           <div class="weapon weapon-knife">
-            <img src="assets/img/itemsprite/Clever/Picked/ATT/sheet.png" alt="">
+            
           </div>
           <div class="weapon">
-            <img src="assets/site/saw-cutout.png" alt="">
+            <img src="Assets/site/saw-cutout.png" alt="">
           </div>
         </div>
       </div>
@@ -1299,7 +1325,7 @@
 
     <section class="page-section signal-strip" aria-label="Caracteristicas rapidas">
       <div class="signal"><strong>33x33</strong><span>Laberinto procedural dificil</span></div>
-      <div class="signal"><strong>3D</strong><span>Raycasting en Java puro</span></div>
+      <div class="signal"><strong>C++20</strong><span>Motor nativo con OpenGL</span></div>
       <div class="signal"><strong>MP3</strong><span>Ambiente, susurros y peligro</span></div>
       <div class="signal"><strong>Auto</strong><span>Guardado cada 2 minutos</span></div>
     </section>
@@ -1314,13 +1340,13 @@
         <p class="quote-block">Despertaste en el laberinto. Ahora debes encontrar el nucleo vivo antes de que MEAT note tu presencia.</p>
       </div>
       <div class="image-panel">
-        <img src="assets/img/wall.jpg" alt="Textura organica roja de las paredes del laberinto">
+        <div class="image-fallback" role="img" aria-label="Textura oscura de paredes orgánicas rojas"></div>
       </div>
     </section>
 
     <section id="objetivos" class="page-section section-grid reverse">
       <div class="image-panel">
-        <img src="assets/img/lvl1.opnd.png" alt="Pared abierta hacia una salida oscura">
+        <div class="image-fallback escape" role="img" aria-label="Pared abierta hacia una salida oscura"></div>
       </div>
       <div>
         <h2 class="section-title">Arranca el nucleo</h2>
@@ -1396,15 +1422,15 @@
 
     <section class="page-section media-band" aria-label="Galeria del juego">
       <div class="media-shot">
-        <img src="assets/img/wall.jpg" alt="Pared de carne">
+        <div class="image-fallback" role="img" aria-label="Pared de carne"></div>
         <span>Pared viva</span>
       </div>
       <div class="media-shot object">
-        <img src="assets/site/heart-cutout.png" alt="Corazon del nucleo">
+        <img src="Assets/site/heart-cutout.png" alt="Corazon del nucleo">
         <span>Nucleo</span>
       </div>
       <div class="media-shot object">
-        <img src="assets/site/saw-cutout.png" alt="Sierra del juego">
+        <img src="Assets/site/saw-cutout.png" alt="Sierra del juego">
         <span>Sierra organica</span>
       </div>
     </section>
@@ -1412,16 +1438,15 @@
     <section id="jugar" class="page-section download">
       <div>
         <h2 class="section-title">Entra vivo. Sal si puedes.</h2>
-        <p>La beta puede ejecutarse desde PowerShell con el lanzador incluido. Tambien hay una build de Windows en la carpeta de distribucion del proyecto.</p>
+        <p>Esta página presenta el concepto y los sistemas de MEAT. La descarga ejecutable no está publicada en esta ruta; consulta la ficha del proyecto para conocer su estado.</p>
         <div class="download-actions">
-          <a class="button button-primary" href="dist/V.0.80/Meat/Meat.exe" download>
+          <a class="button button-primary" href="/docs/projects/meat/">
             <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3v12m0 0 5-5m-5 5-5-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M4 20h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path>
             </svg>
-            Descargar exe
+            Ver ficha del proyecto
           </a>
-          <a class="button" href="README.md">Leer README</a>
         </div>
       </div>
       <div class="command">
