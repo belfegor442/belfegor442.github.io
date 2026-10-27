@@ -63,3 +63,137 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:
 }
 @media(max-width:420px){nav div{gap:8px}nav div a{font-size:10px}.ht h1{font-size:4rem}.ht{padding-bottom:255px}.people{grid-template-columns:1fr}dl{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hint i{animation:none}.card,.ch,.fi{transition:none}}
+
+
+/* NORTH ASSEMBLY / INDUSTRIAL FUTURISM — precision, machinery, technical surfaces */
+:root{
+ --bg:#070a0d;--ink:#e8edf0;--mute:#84929b;--line:#28343b;--dot:#202b31;
+ --ac:#d2ff38;--metal:#11191e;--fm:"DM Mono",Consolas,monospace;
+}
+html{background:var(--bg);background-image:linear-gradient(rgba(143,170,180,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(143,170,180,.035) 1px,transparent 1px);background-size:32px 32px;scrollbar-color:#56656c #080c0f}
+body{background:linear-gradient(115deg,transparent 0 62%,rgba(210,255,56,.025) 62.1%,transparent 62.3%),radial-gradient(ellipse at 75% 28%,rgba(72,97,106,.13),transparent 43%),var(--bg);font-feature-settings:"ss01" on}
+body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.18;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.018) 4px);mix-blend-mode:screen}
+nav{background:rgba(7,10,13,.94);border-bottom:1px solid #354249;backdrop-filter:blur(16px);min-height:76px}
+nav:after{content:"NA / INDEPENDENT SYSTEMS";position:absolute;left:6vw;bottom:5px;font:8px var(--fm);letter-spacing:.2em;color:#627078}
+nav a{font-family:var(--fm);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+nav sup{color:var(--ac)}
+nav .pill{border:1px solid #65737a;border-radius:0;position:relative}
+nav .pill:after,.card:after{content:"";position:absolute;right:-1px;top:-1px;width:10px;height:10px;border-top:2px solid var(--ac);border-right:2px solid var(--ac)}
+.brand-banner{filter:grayscale(1) contrast(1.15);mix-blend-mode:screen}
+.nav-name{font:10px var(--fm);letter-spacing:.2em;color:#c2cdd1!important;text-transform:uppercase}
+.sec{isolation:isolate}
+.hero{min-height:800px}
+.hero:before{content:"";position:absolute;z-index:0;top:18%;right:6vw;width:38%;height:54%;border:1px solid #2a373e;background:linear-gradient(135deg,rgba(255,255,255,.025),transparent 45%),repeating-linear-gradient(135deg,transparent 0 23px,rgba(156,181,188,.055) 24px,transparent 25px);clip-path:polygon(0 0,100% 0,100% 86%,86% 100%,0 100%);pointer-events:none}
+.hero:after{content:"FIELD 01  /  SYSTEMS ONLINE";position:absolute;right:calc(6vw + 18px);top:calc(18% + 14px);font:9px var(--fm);letter-spacing:.18em;color:#718087}
+.ht{width:min(100%,1280px);padding-top:155px}
+.ht small,.section-number{font:10px var(--fm);letter-spacing:.22em;text-transform:uppercase;color:var(--ac)}
+.ht small:before{content:"[ 00 ] ";color:#718087}
+.ht h1{font-size:clamp(4.5rem,10.5vw,10.2rem);font-weight:700;letter-spacing:-.085em;line-height:.79;text-transform:uppercase;text-shadow:0 5px 34px rgba(0,0,0,.45);max-width:7ch}
+.ht h1 .w{padding-right:.06em}
+.ht p{font-size:clamp(.95rem,1.25vw,1.08rem);line-height:1.8;max-width:43ch;border-left:2px solid var(--ac);padding-left:18px;color:#a3b0b6}
+.ht ul{gap:0;border-top:1px solid #354249;border-bottom:1px solid #354249;width:max-content;max-width:100%}
+.ht li{border:0;border-right:1px solid #354249;border-radius:0;padding:10px 14px;background:transparent;font:9px var(--fm);letter-spacing:.06em;text-transform:uppercase}
+.ht li:last-child{border-right:0}
+.ht li b{color:var(--ac);font-weight:500}
+.hero-banner{right:0;top:50%;width:min(37vw,480px);border:1px solid #56666d;background:#0a1014;box-shadow:12px 12px 0 rgba(0,0,0,.22);clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%)}
+.hero-banner img{filter:grayscale(.75) contrast(1.12) brightness(.75);mix-blend-mode:screen}
+.hero-banner>span{border-top:1px solid #3a484e;font-size:8px;letter-spacing:.16em;background:#0b1115}
+.hero-banner>span b{color:var(--ac)}
+.hint{font:9px var(--fm);letter-spacing:.16em}
+.hint i{background:linear-gradient(var(--ac),transparent)}
+.mw{opacity:.18}
+.mw svg{stroke:#a5b6bb}
+.mw .ac{stroke:var(--ac)}
+h2{font-size:clamp(2.8rem,6vw,5.3rem);font-weight:650;letter-spacing:-.075em;text-transform:uppercase;line-height:.92}
+#apps h2:before,#systems h2:before,#team h2:before,#connect h2:before{display:block;margin-bottom:18px;font:9px var(--fm);font-weight:400;letter-spacing:.2em;color:var(--ac)}
+#apps h2:before{content:"01 / PRODUCT ARRAY"}
+#systems h2:before{content:"02 / SUPPORT INFRASTRUCTURE"}
+#team h2:before{content:"03 / PERSONNEL"}
+#connect h2:before{content:"04 / ACCESS POINTS"}
+.lead{font-size:.98rem;line-height:1.8;color:#9aa8ae;max-width:58ch}
+.stack{gap:1px;background:#29363c;border:1px solid #29363c}
+.card{position:relative;overflow:hidden;background:linear-gradient(140deg,#11191e,#0a0f12 70%);border:0;border-radius:0;min-height:245px;padding:24px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%);backdrop-filter:none}
+.card:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,rgba(255,255,255,.035),transparent 34%),repeating-linear-gradient(0deg,transparent 0 39px,rgba(143,165,172,.045) 40px);opacity:.7}
+.card:after{right:0;top:0;width:12px;height:12px;border-color:var(--ac)}
+.card.in:hover{border-color:transparent;box-shadow:inset 0 0 0 1px #7f969e,0 14px 35px #0008}
+.card .k{font:9px var(--fm);letter-spacing:.12em;text-transform:uppercase;color:#86979e}
+.card .k:first-child span:last-child{color:var(--ac)}
+.card h3{font-size:clamp(2rem,3vw,2.7rem);font-weight:650;text-transform:uppercase;letter-spacing:-.065em;margin:.9rem 0 .5rem}
+.card p{font-size:.9rem;line-height:1.7;color:#9aa7ac}
+.card .pl{border:1px solid #526169;border-radius:0;padding:5px 11px;font:9px var(--fm);letter-spacing:.08em;text-transform:uppercase}
+.card:hover .pl{background:var(--ac);border-color:var(--ac);color:#10150b}
+.tag{border-color:#5c6b70;border-radius:0;color:var(--ac);font:8px var(--fm);letter-spacing:.07em;text-transform:uppercase;padding:2px 6px}
+.sys a{position:relative;background:rgba(11,16,19,.76);border-color:#2d3a40;padding:23px 18px}
+.sys a:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent;transition:background .2s}
+.sys a:hover{padding-left:28px;border-color:#52666d}
+.sys a:hover:before{background:var(--ac)}
+.sys b{font-size:clamp(1.6rem,3.2vw,2.5rem);font-weight:600;text-transform:uppercase}
+.sys span{font-size:.88rem;color:#94a2a8}
+.pin{background:linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:48px 100%}
+.stk{border-top:1px solid #29363c;border-bottom:1px solid #29363c;background:rgba(8,12,15,.82)}
+.about h2{max-width:8ch}
+.about .lead{border-left:2px solid var(--ac);padding-left:16px}
+.about p:not(.lead){color:#b1bdc1;font-size:.94rem;line-height:1.85}
+dl div{border-color:#344249}
+dt{font:9px var(--fm);letter-spacing:.14em;text-transform:uppercase;color:#8c9ba1}
+dd{font-size:.9rem;color:#d8e0e2}
+.people{gap:1px;background:#29363c;border:1px solid #29363c}
+.people div{background:#0c1216;border:0;border-left:2px solid #35434a;padding:24px}
+.people div:first-child{border-left-color:var(--ac)}
+.people b{font-size:1.45rem;font-weight:600;text-transform:uppercase;letter-spacing:-.04em}
+.people span{font:9px var(--fm);letter-spacing:.1em;text-transform:uppercase;color:#94a4aa}
+.conn{gap:1px;background:#29363c;border:1px solid #29363c}
+.conn a{position:relative;background:#0c1216;border:0;border-radius:0;padding:25px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%)}
+.conn small{font:9px var(--fm);letter-spacing:.15em;text-transform:uppercase;color:#90a0a6}
+.conn b{font-size:1.25rem;font-weight:600;text-transform:uppercase}
+.conn a:hover{border-color:transparent;background:#131e23;transform:translateY(-3px)}
+footer{border-color:#354249;color:#87969c;font:9px var(--fm);letter-spacing:.1em;text-transform:uppercase}
+footer a:hover{color:var(--ac)}
+.pg{height:2px;background:var(--ac)}
+.gl span{color:#b5c7cc}
+.gl span:nth-child(5n){color:var(--ac)!important}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:4px}
+@media(max-width:900px){
+ .hero:before{right:5vw;width:43%;height:42%;top:20%}
+ .hero-banner{width:42vw;bottom:17vh;top:auto;transform:none}
+ .ht h1{font-size:clamp(4.5rem,12vw,8rem)}
+}
+@media(max-width:760px){
+ nav{min-height:66px;padding:10px 12px 13px 0}
+ nav:after{display:none}
+ nav div{gap:8px}
+ nav div a{font-size:9px;letter-spacing:0}
+ .hero{min-height:790px;padding-top:90px}
+ .hero:before{top:17%;right:5vw;width:90%;height:28%;opacity:.65}
+ .hero:after{top:calc(17% + 12px);right:calc(5vw + 12px);font-size:7px}
+ .ht{padding:85px 0 300px}
+ .ht h1{font-size:clamp(4rem,18vw,6.5rem);max-width:6ch}
+ .ht p{max-width:36ch;margin:1.2rem 0}
+ .ht ul{width:100%;display:grid;grid-template-columns:1fr 1fr}
+ .ht li{border-bottom:1px solid #354249;padding:8px;font-size:8px}
+ .ht li:nth-child(2){border-right:0}
+ .hero-banner{left:0;right:0;bottom:45px;top:auto;width:100%;max-width:520px}
+ .hero-banner>span{font-size:7px}
+ .sec{padding:100px 6vw 75px}
+ .stack{grid-template-columns:1fr}
+ .card{min-height:205px}
+ .sys a{grid-template-columns:1fr auto}
+ .sys a span:nth-child(2){grid-column:1/-1;grid-row:2}
+ .stk{padding:24px 6vw;height:auto;min-height:100svh}
+ .stk .about{grid-template-columns:1fr}
+ .stk .mw{display:none}
+ .people{grid-template-columns:1fr}
+ .conn{grid-template-columns:1fr}
+ footer{margin-top:70px}
+}
+@media(max-width:420px){
+ .brand-banner{width:112px;height:53px}
+ nav div a:nth-child(2){display:none}
+ .ht h1{font-size:3.7rem}
+ .ht{padding-bottom:285px}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ .hint i{animation:none}
+ .card,.ch,.fi{transition:none}
+}
