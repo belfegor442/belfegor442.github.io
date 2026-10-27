@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>North Assembly — Software / Systems / Infrastructure</title>
-<meta name="description" content="North Assembly — software, systems and digital infrastructure.">
+<meta name="description" content="North Assembly — independent software, applications and systems architecture.">
+<meta name="theme-color" content="#080a0e">
+<link rel="canonical" href="https://northassembly.work.gd/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="/na-mark.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300..700&family=STIX+Two+Text:ital@1&display=swap" rel="stylesheet">
@@ -112,12 +117,79 @@ footer a:hover{color:var(--ink)}
 }
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
-.header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}.brand-banner{position:absolute;left:0;top:0;width:245px;height:82px;display:block;overflow:hidden;border-radius:0}.brand-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:left center}.brand-banner-label{display:flex;align-items:center;width:100%;height:100%;padding:12px 16px;background:#11110f;color:#f4f3ef;font:600 13px/1.05 monospace;letter-spacing:2px}.nav-name{position:absolute;left:calc(6vw + 265px);top:calc(env(safe-area-inset-top,0px) + 18px)}@media(max-width:900px){.brand-banner{width:185px;height:70px}.nav-name{left:calc(6vw + 205px)}}@media(max-width:620px){.brand-banner{left:0;width:135px;height:58px}.nav-name{display:none}nav{padding-left:0}}</style>
+.header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}.brand-banner{position:absolute;left:0;top:0;width:245px;height:82px;display:block;overflow:hidden;border-radius:0}.brand-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:left center}.brand-banner-label{display:flex;align-items:center;width:100%;height:100%;padding:12px 16px;background:#11110f;color:#f4f3ef;font:600 13px/1.05 monospace;letter-spacing:2px}.nav-name{position:absolute;left:calc(6vw + 265px);top:calc(env(safe-area-inset-top,0px) + 18px)}@media(max-width:900px){.brand-banner{width:185px;height:70px}.nav-name{left:calc(6vw + 205px)}}@media(max-width:620px){.brand-banner{left:0;width:135px;height:58px}.nav-name{display:none}nav{padding-left:0}}
+/* NORTH ASSEMBLY — restrained futuristic visual system */
+:root{color-scheme:dark;--f:"Manrope",Inter,Arial,sans-serif;--fm:"DM Mono",Consolas,monospace;--bg:#080a0e;--ink:#edf2f8;--mute:#929eaf;--line:#252d39;--dot:#19222e;--ac:#7de3ff}
+html{background:var(--bg);scroll-behavior:smooth;scroll-padding-top:100px}
+body{background:radial-gradient(ellipse at 78% 12%,rgba(28,91,125,.12),transparent 34%),var(--bg);color:var(--ink);font-size:16px}
+.gl{opacity:.08}
+.gl span{color:#7de3ff}
+nav{padding:16px max(5vw,24px);background:rgba(8,10,14,.86);border-bottom:1px solid rgba(125,227,255,.12);backdrop-filter:blur(18px)}
+nav a{color:var(--mute)}nav a:hover,nav a.on{color:var(--ink)}
+nav sup{color:var(--ac)}
+nav .pill{border-color:var(--line);color:var(--ink);border-radius:2px}
+nav .pill:hover{background:var(--ac);border-color:var(--ac);color:#071017}
+.brand-banner{width:205px;height:72px;left:5vw;top:4px}
+.brand-banner img{object-fit:cover;object-position:left center}
+.nav-name{left:calc(5vw + 220px);top:25px;color:var(--mute);font:10px var(--fm);letter-spacing:.16em;text-transform:uppercase}
+nav div{gap:clamp(12px,2vw,28px);font-size:.8rem}
+.sec{padding:15vh 6vw 12vh}
+.hero{min-height:760px;height:100svh;align-items:center}
+.ht{width:min(100%,1200px);padding:110px 0 8vh}
+.ht small,.section-number{font:11px var(--fm);letter-spacing:.17em;text-transform:uppercase;color:var(--ac)}
+.ht h1{font-size:clamp(4.5rem,11vw,10rem);line-height:.86;letter-spacing:-.075em;font-weight:600;margin:0;max-width:8ch}
+.ht p{max-width:46ch;color:var(--mute);font-size:clamp(1rem,1.6vw,1.2rem);margin:1.8rem 0}
+.ht ul{gap:8px}
+.ht li{background:transparent;border:1px solid var(--line);border-radius:2px;padding:6px 11px;color:var(--mute);font:10px var(--fm);letter-spacing:.03em}
+.ht li b{color:var(--ink)}
+.hero-banner{position:absolute;right:0;top:50%;transform:translateY(-38%);width:min(42vw,520px);border:1px solid var(--line);background:#0b1017;padding:0;opacity:1}
+.hero-banner img{display:block;width:100%;height:auto;aspect-ratio:1600/560;object-fit:cover}
+.hero-banner>span{display:flex;justify-content:space-between;gap:12px;padding:10px 13px;border-top:1px solid var(--line);font:9px var(--fm);letter-spacing:.12em;color:var(--mute)}
+.hero-banner>span b{font-weight:400;color:var(--ac)}
+.hint{color:var(--mute);font:10px var(--fm);letter-spacing:.12em;text-transform:uppercase}
+.hint i{background:linear-gradient(var(--ac),transparent)}
+.mw{opacity:.12}.mw svg{stroke:#8fa7bb}.mw .ac{stroke:var(--ac)}
+h2{font-size:clamp(2.8rem,6vw,5.5rem);font-weight:500;letter-spacing:-.065em}
+.lead{color:var(--mute);max-width:54ch}
+.stack{gap:10px}
+.card{background:linear-gradient(145deg,#0e131b,#0a0d12);border:1px solid var(--line);border-radius:2px;min-height:225px;padding:22px;box-shadow:none}
+.card.in:hover{border-color:rgba(125,227,255,.65);box-shadow:0 18px 50px -35px rgba(125,227,255,.35)}
+.card .k{font:10px var(--fm);letter-spacing:.05em;color:var(--mute)}
+.card h3{font-size:2.1rem;font-weight:500;letter-spacing:-.06em}
+.card p{color:var(--mute);line-height:1.6}
+.card .pl{border-color:var(--line);border-radius:2px}
+.card:hover .pl{background:var(--ac);color:#071017;border-color:var(--ac)}
+.tag{border-color:rgba(125,227,255,.45);color:var(--ac);border-radius:2px}
+.sys a,.people div{background:transparent;border-color:var(--line)}
+.sys a:hover{padding-left:12px;border-color:var(--ac)}
+.sys b,.people b{font-weight:500}
+.conn a{background:#0d1118;border-color:var(--line);border-radius:2px}
+.conn a:hover{border-color:var(--ac);transform:translateY(-2px)}
+footer{border-color:var(--line);font:10px var(--fm);letter-spacing:.04em}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:4px}
+@media(max-width:900px){.hero{min-height:700px}.ht{padding-top:140px}.hero-banner{width:42vw;top:auto;bottom:18vh;transform:none}.brand-banner{width:165px;height:60px}.nav-name{left:calc(5vw + 178px);top:24px}}
+@media(max-width:760px){
+ nav{padding:12px 14px 12px 0;min-height:68px}nav div{justify-content:flex-end;gap:10px;font-size:.72rem}nav div a:nth-child(2){display:none}
+ .brand-banner{left:0;top:4px;width:122px;height:54px}.nav-name{display:none}
+ .hero{min-height:760px;height:auto;padding-top:100px;align-items:flex-start}.ht{padding:90px 0 260px}
+ .ht h1{font-size:clamp(4.2rem,19vw,7rem)}.ht p{max-width:38ch}
+ .hero-banner{left:0;right:0;bottom:44px;top:auto;width:100%;max-width:520px;transform:none}
+ .hero .mw{display:none}.hint{right:6vw;bottom:18px}
+ .sec{padding:110px 6vw 80px}.stack{grid-template-columns:1fr}
+ .card{min-height:200px}.sys a{grid-template-columns:1fr auto}.sys a span:nth-child(2){grid-column:1/-1;grid-row:2}
+ .pin{height:auto}.stk{position:relative;height:auto;min-height:0;padding:0}.stk .about{grid-template-columns:1fr}.stk .mw{display:none}
+ dl{grid-template-columns:1fr 1fr}.people{grid-template-columns:1fr 1fr}
+ footer{margin-top:70px}
+}
+@media(max-width:420px){nav div{gap:8px}nav div a{font-size:10px}.ht h1{font-size:4rem}.ht{padding-bottom:255px}.people{grid-template-columns:1fr}dl{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hint i{animation:none}.card,.ch,.fi{transition:none}}
+
+</style>
 </head>
 <body>
 <div class="gl" aria-hidden="true"></div>
 <div class="pg"></div>
-<nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><span class="brand-banner-label">NORTH<br>ASSEMBLY</span></a><b class="nav-name">North Assembly</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="/docs/hub/">Hub</a></div></nav>
+<nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><img src="/banner.svg?v=20261027-2" alt=""></a><b class="nav-name">North Assembly</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="/docs/hub/">Hub</a></div></nav>
 
 <main>
 <section class="sec hero" id="top">
@@ -127,6 +199,7 @@ footer a:hover{color:var(--ink)}
   <h1 class="rv" data-split="North|Assembly" aria-label="North Assembly"></h1>
   <p class="fi">A connected software organization building applications, infrastructure and operational tools with a common technical language.</p>
   <ul class="fi"><li><b>Software</b> / Applications</li><li><b>Systems</b> / Infrastructure</li><li><b>2026</b> / Active</li></ul>
+  <div class="hero-banner fi"><img src="/banner.svg?v=20261027-2" alt="North Assembly abstract architectural banner"><span>NA / SYSTEMS ARCHITECTURE <b>001</b></span></div>
  </div>
  <div class="hint"><span>Scroll</span><i></i></div>
 </section>
@@ -142,7 +215,7 @@ footer a:hover{color:var(--ink)}
   <div class="cw"><a class="card" style="--i:1" href="https://northassembly.work.gd/Apps/telenet/"><div class="k"><span>Network</span><span>05.</span></div><h3>TeleNet</h3><p>Teletext-inspired network and information interface.</p><div class="k"><span>Web</span><span class="pl">Open ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:2" href="https://northassembly.work.gd/Apps/Vault/"><div class="k"><span>Utilities</span><span>06.</span></div><h3>Vault</h3><p>Storage and utility tooling for the application ecosystem.</p><div class="k"><span>Application</span><span class="pl">Open ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:0" href="https://northassembly.work.gd/Apps/Brew/"><div class="k"><span>Game</span><span>07.</span></div><h3>Brew</h3><p>Two-player coinflip duel played in the browser through shared room codes.</p><div class="k"><span>Web Game <span class="tag">Beta</span></span><span class="pl">Open ↗</span></div></a></div>
-  <div class="cw"><a class="card" style="--i:1" href="https://northassembly.work.gd/app/services/msg.mesh/"><div class="k"><span>Messaging</span><span>08.</span></div><h3>msg.mesh</h3><p>Real-time messaging with accounts, contacts and live conversations synchronized across clients.</p><div class="k"><span>Web</span><span class="pl">Open ↗</span></div></a></div>
+  <div class="cw"><a class="card" style="--i:1" href="/Apps/msg.mesh/"><div class="k"><span>Messaging</span><span>08.</span></div><h3>msg.mesh</h3><p>Real-time messaging with accounts, contacts and live conversations synchronized across clients.</p><div class="k"><span>Web</span><span class="pl">Open ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:2" href="https://northassembly.work.gd/Apps/Web98/"><div class="k"><span>Browser</span><span>09.</span></div><h3>Web98</h3><p>A desktop web browser with a classic Windows 98 and Internet Explorer 5 interface, built for the modern web.</p><div class="k"><span>Desktop / Electron <span class="tag">v0.1.0</span></span><span class="pl">Open ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:0" href="https://northassembly.work.gd/Apps/NA.Firmware/" rel="noopener noreferrer"><div class="k"><span>Firmware / Systems</span><span>10.</span></div><h3>NA.Firmware</h3><p>Custom firmware project with a POST diagnostic environment and hardware-validation interfaces.</p><div class="k"><span>UEFI / C <span class="tag">In development</span></span><span class="pl">Open project ↗</span></div></a></div>
  </div>
@@ -178,10 +251,8 @@ footer a:hover{color:var(--ink)}
  <p class="lead fi">The people currently forming the organization.</p>
  <div class="people">
   <div class="fi"><b>belfegor442</b><span>CEO / Director</span></div>
-  <div class="fi"><b>Acrid</b><span>Manager</span></div>
-  <div class="fi"><b>Anti</b><span>Director</span></div>
-  <div class="fi"><b>xtccy / Terrorendi</b><span>Graphic Designer</span></div>
-  <div class="fi"><b>Aneley_567</b><span>Tester</span></div>
+  <div class="fi"><b>Anti</b><span>CEO / Director</span></div>
+  <div class="fi"><b>Doughtking12</b><span>Manager</span></div>
  </div>
 </div></section>
 
