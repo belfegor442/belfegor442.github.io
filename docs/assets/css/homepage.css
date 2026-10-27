@@ -1,0 +1,65 @@
+/* NORTH ASSEMBLY — restrained futuristic visual system */
+:root{color-scheme:dark;--f:"Manrope",Inter,Arial,sans-serif;--fm:"DM Mono",Consolas,monospace;--bg:#080a0e;--ink:#edf2f8;--mute:#929eaf;--line:#252d39;--dot:#19222e;--ac:#7de3ff}
+html{background:var(--bg);scroll-behavior:smooth;scroll-padding-top:100px}
+body{background:radial-gradient(ellipse at 78% 12%,rgba(28,91,125,.12),transparent 34%),var(--bg);color:var(--ink);font-size:16px}
+.gl{opacity:.08}
+.gl span{color:#7de3ff}
+nav{padding:16px max(5vw,24px);background:rgba(8,10,14,.86);border-bottom:1px solid rgba(125,227,255,.12);backdrop-filter:blur(18px)}
+nav a{color:var(--mute)}nav a:hover,nav a.on{color:var(--ink)}
+nav sup{color:var(--ac)}
+nav .pill{border-color:var(--line);color:var(--ink);border-radius:2px}
+nav .pill:hover{background:var(--ac);border-color:var(--ac);color:#071017}
+.brand-banner{width:205px;height:72px;left:5vw;top:4px}
+.brand-banner img{object-fit:cover;object-position:left center}
+.nav-name{left:calc(5vw + 220px);top:25px;color:var(--mute);font:10px var(--fm);letter-spacing:.16em;text-transform:uppercase}
+nav div{gap:clamp(12px,2vw,28px);font-size:.8rem}
+.sec{padding:15vh 6vw 12vh}
+.hero{min-height:760px;height:100svh;align-items:center}
+.ht{width:min(100%,1200px);padding:110px 0 8vh}
+.ht small,.section-number{font:11px var(--fm);letter-spacing:.17em;text-transform:uppercase;color:var(--ac)}
+.ht h1{font-size:clamp(4.5rem,11vw,10rem);line-height:.86;letter-spacing:-.075em;font-weight:600;margin:0;max-width:8ch}
+.ht p{max-width:46ch;color:var(--mute);font-size:clamp(1rem,1.6vw,1.2rem);margin:1.8rem 0}
+.ht ul{gap:8px}
+.ht li{background:transparent;border:1px solid var(--line);border-radius:2px;padding:6px 11px;color:var(--mute);font:10px var(--fm);letter-spacing:.03em}
+.ht li b{color:var(--ink)}
+.hero-banner{position:absolute;right:0;top:50%;transform:translateY(-38%);width:min(42vw,520px);border:1px solid var(--line);background:#0b1017;padding:0;opacity:1}
+.hero-banner img{display:block;width:100%;height:auto;aspect-ratio:1600/560;object-fit:cover}
+.hero-banner>span{display:flex;justify-content:space-between;gap:12px;padding:10px 13px;border-top:1px solid var(--line);font:9px var(--fm);letter-spacing:.12em;color:var(--mute)}
+.hero-banner>span b{font-weight:400;color:var(--ac)}
+.hint{color:var(--mute);font:10px var(--fm);letter-spacing:.12em;text-transform:uppercase}
+.hint i{background:linear-gradient(var(--ac),transparent)}
+.mw{opacity:.12}.mw svg{stroke:#8fa7bb}.mw .ac{stroke:var(--ac)}
+h2{font-size:clamp(2.8rem,6vw,5.5rem);font-weight:500;letter-spacing:-.065em}
+.lead{color:var(--mute);max-width:54ch}
+.stack{gap:10px}
+.card{background:linear-gradient(145deg,#0e131b,#0a0d12);border:1px solid var(--line);border-radius:2px;min-height:225px;padding:22px;box-shadow:none}
+.card.in:hover{border-color:rgba(125,227,255,.65);box-shadow:0 18px 50px -35px rgba(125,227,255,.35)}
+.card .k{font:10px var(--fm);letter-spacing:.05em;color:var(--mute)}
+.card h3{font-size:2.1rem;font-weight:500;letter-spacing:-.06em}
+.card p{color:var(--mute);line-height:1.6}
+.card .pl{border-color:var(--line);border-radius:2px}
+.card:hover .pl{background:var(--ac);color:#071017;border-color:var(--ac)}
+.tag{border-color:rgba(125,227,255,.45);color:var(--ac);border-radius:2px}
+.sys a,.people div{background:transparent;border-color:var(--line)}
+.sys a:hover{padding-left:12px;border-color:var(--ac)}
+.sys b,.people b{font-weight:500}
+.conn a{background:#0d1118;border-color:var(--line);border-radius:2px}
+.conn a:hover{border-color:var(--ac);transform:translateY(-2px)}
+footer{border-color:var(--line);font:10px var(--fm);letter-spacing:.04em}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:4px}
+@media(max-width:900px){.hero{min-height:700px}.ht{padding-top:140px}.hero-banner{width:42vw;top:auto;bottom:18vh;transform:none}.brand-banner{width:165px;height:60px}.nav-name{left:calc(5vw + 178px);top:24px}}
+@media(max-width:760px){
+ nav{padding:12px 14px 12px 0;min-height:68px}nav div{justify-content:flex-end;gap:10px;font-size:.72rem}nav div a:nth-child(2){display:none}
+ .brand-banner{left:0;top:4px;width:122px;height:54px}.nav-name{display:none}
+ .hero{min-height:760px;height:auto;padding-top:100px;align-items:flex-start}.ht{padding:90px 0 260px}
+ .ht h1{font-size:clamp(4.2rem,19vw,7rem)}.ht p{max-width:38ch}
+ .hero-banner{left:0;right:0;bottom:44px;top:auto;width:100%;max-width:520px;transform:none}
+ .hero .mw{display:none}.hint{right:6vw;bottom:18px}
+ .sec{padding:110px 6vw 80px}.stack{grid-template-columns:1fr}
+ .card{min-height:200px}.sys a{grid-template-columns:1fr auto}.sys a span:nth-child(2){grid-column:1/-1;grid-row:2}
+ .pin{height:auto}.stk{position:relative;height:auto;min-height:0;padding:0}.stk .about{grid-template-columns:1fr}.stk .mw{display:none}
+ dl{grid-template-columns:1fr 1fr}.people{grid-template-columns:1fr 1fr}
+ footer{margin-top:70px}
+}
+@media(max-width:420px){nav div{gap:8px}nav div a{font-size:10px}.ht h1{font-size:4rem}.ht{padding-bottom:255px}.people{grid-template-columns:1fr}dl{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hint i{animation:none}.card,.ch,.fi{transition:none}}
