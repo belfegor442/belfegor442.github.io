@@ -201,3 +201,44 @@ footer a:hover{color:var(--ac-2)}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
   .card,.ch,.fi{opacity:1;transform:none}
 }
+
+
+/* Typography correction: precise, modern, less compressed */
+:root{
+  --f:"Manrope",sans-serif;
+  --display:"Space Grotesk",sans-serif;
+  --fm:"IBM Plex Mono",monospace;
+}
+body{font-family:var(--f);letter-spacing:-.018em}
+nav div,.ht small,.ht li,.hero-banner>span,.card .k,.card .pl,.tag,.sys small,dt,.people span,.conn small,footer{font-family:var(--fm)}
+.ht h1{
+  font-family:var(--display);
+  font-weight:500;
+  letter-spacing:-.075em;
+  line-height:.91;
+  text-wrap:balance;
+}
+h2{
+  font-family:var(--display);
+  font-weight:500;
+  letter-spacing:-.065em;
+  line-height:1.02;
+}
+.card h3,.sys b,.people b,.conn b{
+  font-family:var(--display);
+  font-weight:500;
+  letter-spacing:-.045em;
+}
+.ht p,.lead,.card p,.sys span,.about p:not(.lead),dd{
+  font-family:var(--f);
+  letter-spacing:-.018em;
+  line-height:1.8;
+}
+.ht li{font-size:9px;letter-spacing:.015em}
+@media(max-width:760px){
+  .ht h1{font-size:clamp(4rem,16.5vw,6.2rem);letter-spacing:-.075em;line-height:.92}
+  .ht p{font-size:15px;line-height:1.8}
+}
+@media(max-width:420px){
+  .ht h1{font-size:clamp(3.45rem,15.5vw,4.1rem)}
+}
