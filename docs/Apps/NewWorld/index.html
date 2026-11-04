@@ -2,64 +2,63 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#111711"><meta name="description" content="NEW WORLD — a living territorial and city-building simulation by North Assembly.">
-<title>NEW WORLD — North Assembly</title>
-<link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./game.css">
+<meta name="theme-color" content="#202a32"><meta name="description" content="NEW WORLD — a grand strategy and civilization simulation by North Assembly.">
+<title>NEW WORLD — North Assembly</title><link rel="icon" href="/na-mark.svg" type="image/svg+xml"><link rel="stylesheet" href="./game.css">
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="/">NORTH ASSEMBLY <span>/</span> NEW WORLD</a>
-  <div class="top-meta"><span class="live-dot"></span> WORLD SIMULATION <span id="date-label">YEAR 01 / SPRING</span></div>
-  <button id="save-btn" class="quiet-btn">SAVE</button>
+<header class="game-top">
+ <a class="brand" href="/">NORTH ASSEMBLY <b>/</b> NEW WORLD</a>
+ <div class="country"><span class="flag">✦</span><span><strong id="country-name">BELELAND</strong><small>PLAYER NATION · CAPITAL GOVERNMENT</small></span></div>
+ <div class="resources">
+  <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong><em id="treasury-delta">+85</em></div>
+  <div><small>POPULATION</small><strong id="population">82,400</strong></div>
+  <div><small>GDP</small><strong id="gdp">¤ 4.82M</strong></div>
+  <div><small>STABILITY</small><strong id="stability">72%</strong></div>
+  <div><small>POLITICAL POWER</small><strong id="political">45</strong></div>
+ </div>
+ <button id="save-btn" class="top-action">SAVE GAME</button>
 </header>
-<main class="shell">
-  <section class="game-head">
-    <div><p class="kicker">BELELAND / WORLD 001</p><h1>NEW <i>WORLD</i></h1><p class="subhead">A territorial economy. A growing civilization.</p></div>
-    <div class="head-stats"><div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div><div><small>POPULATION</small><strong id="population">82,400</strong></div><div><small>MONTHLY BALANCE</small><strong id="balance">+¤ 85</strong></div></div>
-  </section>
-  <nav class="toolbar" aria-label="Game views">
-    <button class="tab active" data-view="world">WORLD MAP</button><button class="tab" data-view="city">CITY MANAGEMENT</button><button class="tab" data-view="ledger">ECONOMY</button>
-    <span class="toolbar-spacer"></span><button id="next-month" class="advance">ADVANCE MONTH <b>→</b></button>
-  </nav>
-  <section id="world-view" class="view active">
-    <div class="world-layout">
-      <div class="map-frame">
-        <div class="map-tools"><span>BELELAND / POLITICAL MAP</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="reset-map">RESET</button></div></div>
-        <div id="map-viewport" class="map-viewport"><div id="map-stage" class="map-stage"><object id="world-map" data="./beleland.svg" type="image/svg+xml" aria-label="Map of Beleland"></object><div id="map-fallback" class="map-fallback" hidden></div></div></div>
-        <div class="map-foot"><span><i class="legend owned"></i> YOUR ADMINISTRATION</span><span><i class="legend other"></i> OTHER STATES</span><span>SELECT A TERRITORY TO INSPECT</span></div>
-      </div>
-      <aside class="side-panel" id="territory-panel">
-        <p class="panel-kicker">TERRITORY / INSPECTION</p><h2 id="state-name">Select a territory</h2><p id="state-description" class="muted">Choose one of the 16 states on the map to inspect its economy and administration.</p>
-        <div class="metric-grid"><div><small>POPULATION</small><strong id="state-pop">—</strong></div><div><small>PROSPERITY</small><strong id="state-prosperity">—</strong></div><div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div><div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div></div>
-        <div class="panel-divider"></div><div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
-        <button id="claim-btn" class="action-btn" disabled>ESTABLISH ADMINISTRATION <span>¤ 450</span></button>
-        <p class="microcopy">Expansion costs treasury. States under your administration contribute monthly revenue.</p>
-      </aside>
+<div class="datebar"><span id="date-label">1 JANUARY, YEAR 1</span><span class="world-status"><i></i> WORLD SIMULATION ONLINE</span><span class="date-spacer"></span><button id="pause-btn">Ⅱ PAUSE</button><button data-speed="1" class="speed active">1×</button><button data-speed="2" class="speed">2×</button><button data-speed="4" class="speed">4×</button><button data-speed="8" class="speed">8×</button></div>
+<div class="layout">
+ <aside class="left-rail">
+  <div class="rail-label">GOVERNMENT</div>
+  <button class="nav active" data-view="world"><b>▦</b> Strategic map</button>
+  <button class="nav" data-view="politics"><b>⚑</b> Politics</button>
+  <button class="nav" data-view="economy"><b>▤</b> Economy</button>
+  <button class="nav" data-view="population"><b>♟</b> Population</button>
+  <button class="nav" data-view="diplomacy"><b>⇄</b> Diplomacy</button>
+  <button class="nav" data-view="infrastructure"><b>⌂</b> Infrastructure</button>
+  <div class="rail-divider"></div><div class="rail-label">WORLD</div>
+  <button class="nav" data-view="history"><b>◷</b> Chronicle</button>
+  <div class="rail-bottom"><span>NA / NEW WORLD</span><small>WORLD BUILD 0.2 · LOCAL PROTOTYPE</small></div>
+ </aside>
+ <main class="main-area">
+  <section id="world-view" class="screen active">
+   <div class="map-heading"><div><small>WORLD 001 / BELELAND</small><h1>Strategic overview</h1></div><div class="map-controls"><button id="zoom-out">−</button><button id="zoom-in">+</button><button id="reset-map">⌖ RESET</button></div></div>
+   <div class="map-workspace">
+    <div class="map-column">
+     <div class="map-modes" id="map-modes"><button class="selected" data-mode="political">POLITICAL</button><button data-mode="population">POPULATION</button><button data-mode="economy">ECONOMY</button><button data-mode="resources">RESOURCES</button><button data-mode="infrastructure">INFRASTRUCTURE</button></div>
+     <div id="map-viewport"><div id="map-stage"><object id="world-map" data="./beleland.svg" type="image/svg+xml" aria-label="Beleland strategic map"></object><div id="map-fallback" hidden></div></div><div class="map-compass">N<br>▲</div><div class="map-scale">BELELAND · STRATEGIC THEATRE</div></div>
+     <div class="map-legend"><span><i class="dot yours"></i> PLAYER GOVERNMENT</span><span><i class="dot independent"></i> INDEPENDENT STATES</span><span><i class="dot contested"></i> SELECTED TERRITORY</span></div>
     </div>
+    <aside class="intel-panel">
+     <div class="intel-title"><small>INTELLIGENCE / TERRITORIAL REPORT</small><span id="state-code">NO SELECTION</span></div>
+     <h2 id="state-name">Beleland</h2><p id="state-description">Select a state on the strategic map to inspect its political and economic situation.</p>
+     <div class="intel-grid"><div><small>POPULATION</small><strong id="state-pop">—</strong></div><div><small>PROSPERITY</small><strong id="state-prosperity">—</strong></div><div><small>MONTHLY REVENUE</small><strong id="state-revenue">—</strong></div><div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div></div>
+     <div class="intel-rule"></div><div class="intel-row"><span>STATE AUTHORITY</span><strong id="state-owner">—</strong></div><div class="intel-row"><span>GOVERNMENT</span><strong id="state-government">—</strong></div><div class="intel-row"><span>CONTROL</span><strong id="state-control">—</strong></div>
+     <button id="claim-btn" disabled>ESTABLISH ADMINISTRATION <span>¤450</span></button>
+     <p class="intel-note">Territorial administration is a prototype action. Diplomatic, political and military systems are not yet simulated.</p>
+    </aside>
+   </div>
+   <div class="bottom-grid"><section class="briefing"><header><span>DAILY BRIEFING</span><small>WORLD INTELLIGENCE</small></header><div id="activity" class="activity-list"><p>Government established. The world simulation is ready.</p></div></section><section class="briefing"><header><span>NATIONAL INDICATORS</span><small>LIVE ESTIMATES</small></header><div class="indicator"><span>Fiscal balance</span><strong id="balance">+¤ 85 / month</strong></div><div class="indicator"><span>National stability</span><strong>72 / 100</strong></div><div class="indicator"><span>Administrative reach</span><strong id="admin-reach">1 / 16 states</strong></div></section></div>
   </section>
-  <section id="city-view" class="view">
-    <div class="city-layout">
-      <div class="city-main">
-        <div class="section-bar"><div><p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p><h2 id="city-title">Capital district</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
-        <div id="city-grid" class="city-grid" aria-label="Isometric city construction grid"></div>
-        <div class="city-legend"><span>SELECT A PLOT TO BUILD</span><span>16 × 12 DEVELOPMENT AREA</span></div>
-      </div>
-      <aside class="side-panel">
-        <p class="panel-kicker">CONSTRUCTION OFFICE</p><h2 id="plot-title">Available plots</h2><p class="muted" id="plot-description">Select an empty plot, then choose a building.</p>
-        <div id="building-options" class="building-options"></div>
-        <div class="panel-divider"></div><div class="ownership-row"><span>MONTHLY CITY INCOME</span><strong id="city-income">¤ 85</strong></div>
-      </aside>
-    </div>
-  </section>
-  <section id="ledger-view" class="view">
-    <div class="ledger-layout">
-      <div class="ledger-card"><p class="panel-kicker">PUBLIC FINANCE</p><h2>Economic overview</h2><div class="ledger-row"><span>Treasury</span><strong id="ledger-treasury">¤ 1,200</strong></div><div class="ledger-row"><span>Territorial revenue</span><strong id="ledger-territory">¤ 0</strong></div><div class="ledger-row"><span>City production</span><strong id="ledger-city">¤ 85</strong></div><div class="ledger-row"><span>Maintenance</span><strong id="ledger-cost">−¤ 0</strong></div><div class="ledger-row total"><span>Net monthly balance</span><strong id="ledger-balance">+¤ 85</strong></div></div>
-      <div class="ledger-card"><p class="panel-kicker">SIMULATION RECORD</p><h2>Recent activity</h2><div id="activity" class="activity-list"><p>World initialized. Your administration controls the capital district.</p></div></div>
-    </div>
-  </section>
-  <footer class="game-footer"><span>NA / INTERACTIVE SYSTEMS</span><span>PROTOTYPE 0.1.0 — LOCAL SAVE</span><a href="/Apps/">APPLICATION DIRECTORY ↗</a></footer>
-</main>
-<div id="toast" role="status" aria-live="polite"></div>
+  <section id="politics-view" class="screen"><div class="page-title"><small>NATIONAL ADMINISTRATION</small><h1>Politics & government</h1><p>Institutions, legitimacy and public administration.</p></div><div class="placeholder-grid"><article><small>EXECUTIVE</small><h2>National government</h2><p>Government structure and executive authority will be managed here.</p><strong>FOUNDATION STAGE</strong></article><article><small>LEGISLATURE</small><h2>Parliament</h2><p>Representation, parties, elections and legislation.</p><strong>FOUNDATION STAGE</strong></article><article><small>PUBLIC ORDER</small><h2>Stability</h2><p>Public confidence, institutional legitimacy and internal conditions.</p><strong>72 / 100</strong></article></div></section>
+  <section id="economy-view" class="screen"><div class="page-title"><small>NATIONAL ACCOUNTS</small><h1>Economy</h1><p>Public finance and the productive base of the nation.</p></div><div class="finance-grid"><article><small>GOVERNMENT TREASURY</small><strong id="ledger-treasury">¤ 1,200</strong><p>Available public funds</p></article><article><small>MONTHLY REVENUE</small><strong id="ledger-revenue">¤ 85</strong><p>Territorial and city income</p></article><article><small>MONTHLY EXPENDITURE</small><strong id="ledger-cost">¤ 0</strong><p>Recorded maintenance costs</p></article><article><small>NET FISCAL BALANCE</small><strong id="ledger-balance">+¤ 85</strong><p>Estimated monthly balance</p></article></div><div class="briefing"><header><span>ECONOMIC LEDGER</span><small>RECENT TRANSACTIONS</small></header><div id="ledger-entries"></div></div></section>
+  <section id="population-view" class="screen"><div class="page-title"><small>DEMOGRAPHIC REGISTER</small><h1>Population</h1><p>Population distribution and demographic indicators.</p></div><div class="placeholder-grid"><article><small>REGISTERED POPULATION</small><h2 id="population-large">82,400</h2><p>Population under current administration.</p></article><article><small>DEMOGRAPHIC MODEL</small><h2>Not yet active</h2><p>Migration, births, mortality and age structure require the simulation backend.</p></article></div></section>
+  <section id="diplomacy-view" class="screen"><div class="page-title"><small>FOREIGN AFFAIRS</small><h1>Diplomacy</h1><p>International relations and state-to-state affairs.</p></div><div class="briefing"><header><span>INTERNATIONAL REGISTER</span><small>BELELAND</small></header><div id="diplomacy-list"></div></div></section>
+  <section id="infrastructure-view" class="screen"><div class="page-title"><small>PUBLIC WORKS</small><h1>Infrastructure</h1><p>Transport, utilities and public development.</p></div><div class="placeholder-grid"><article><small>TRANSPORT NETWORK</small><h2>Roads & connections</h2><p>Regional connectivity and logistics.</p></article><article><small>URBAN DEVELOPMENT</small><h2>Settlements</h2><p>City-level construction and municipal administration.</p></article></div></section>
+  <section id="history-view" class="screen"><div class="page-title"><small>WORLD CHRONICLE</small><h1>History</h1><p>A record of decisions and events in the current world.</p></div><div class="briefing"><header><span>CHRONOLOGY</span><small>WORLD 001</small></header><div id="history-list"></div></div></section>
+ </main>
+</div>
 <script src="./game.js"></script>
 </body></html>
