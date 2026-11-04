@@ -11,7 +11,13 @@ $env:POSTGRES_PASSWORD = "choose-a-long-random-password"
 docker compose up --build
 ```
 
-Open the New World page, select **PLAYERS**, enter `http://localhost:5000` as the server URL, and test the connection. Create a world and share its invitation code. Players join in the lobby; the host assigns a state to each player before starting the game. New players cannot join after a world has started in this MVP.
+Open the New World page, select **PLAYERS**, enter `http://localhost:5000` as the server URL, and test the connection. Create a world and share its invitation code. Players join in the lobby; the host assigns a state to each player before starting the game. Once started, connected players can vote to pause or resume the simulation; a strict majority of all currently connected players is required. Pending votes reset whenever the connected player set changes. New players cannot join after a world has started in this MVP.
+
+Run the deterministic simulation tests from the repository root:
+
+```powershell
+dotnet test .\Apps\NewWorld\Server.Tests\Server.Tests.csproj
+```
 
 ## Deploy
 
@@ -22,6 +28,6 @@ Deploy this server and a PostgreSQL database on a host that supports long-runnin
 
 Expose the API over HTTPS/WSS and enter its origin in the browser's **SERVER URL** field. Check `GET /api/health` before inviting players. GitHub Pages only hosts the browser files; it does not deploy this API or its database.
 
-Run a single server instance for this MVP: WebSocket presence and the five-minute world clock are process-local. PostgreSQL persists game state, but horizontal scaling, database backup automation, identity accounts, diplomacy, and moderation are not implemented yet.
+Run a single server instance for this MVP: WebSocket presence and the five-minute world clock are process-local. PostgreSQL persists game state, including fractional daily economic accrual, but horizontal scaling, database backup automation, identity accounts, diplomacy, and moderation are not implemented yet.
 
 Invitation codes and player tokens are generated with cryptographic randomness; only their hashes are stored in PostgreSQL. Player tokens are kept by the browser for reconnection. Disconnecting a device does not delete its player or pause a world while another player remains connected. The world clock pauses when no player is connected.

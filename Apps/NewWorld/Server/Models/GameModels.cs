@@ -5,8 +5,10 @@ public sealed class WorldState
     public Guid Id { get; set; }
     public Guid HostPlayerId { get; set; }
     public bool Started { get; set; }
+    public bool Paused { get; set; }
     public int Day { get; set; } = 1;
     public DateTimeOffset LastTickUtc { get; set; }
+    public HashSet<Guid> PauseVotes { get; set; } = [];
     public List<PlayerState> Players { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
     public List<string> Activity { get; set; } = [];
@@ -20,6 +22,7 @@ public sealed class PlayerState
     public bool IsHost { get; set; }
     public int? CountryIndex { get; set; }
     public int Treasury { get; set; } = 1200;
+    public int DailyBalanceRemainder { get; set; }
     public Dictionary<int, BuildingState> Buildings { get; set; } = [];
 }
 
@@ -45,6 +48,8 @@ public sealed record GameSnapshot(
     bool Started,
     int Day,
     Guid HostPlayerId,
+    bool Paused,
+    IReadOnlyList<Guid> PauseVotePlayerIds,
     IReadOnlyList<PlayerView> Players,
     IReadOnlyList<TerritoryView> Territories,
     IReadOnlyList<string> Activity);

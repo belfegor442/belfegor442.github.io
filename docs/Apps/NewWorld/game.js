@@ -139,7 +139,9 @@
     $('next-month').hidden = isOnline();
     $('world-time').hidden = !isOnline();
     $('world-time').textContent = isOnline()
-      ? onlineGame?.started ? '1 DAY / 5 MIN · SERVER CLOCK' : 'LOBBY · CLOCK PAUSED'
+      ? onlineGame?.started
+        ? onlineGame.paused ? 'PAUSED · SERVER CLOCK' : '1 DAY / 5 MIN · SERVER CLOCK'
+        : 'LOBBY · CLOCK PAUSED'
       : '';
     renderCity();
     renderOptions();
@@ -592,6 +594,7 @@
       if (socket === currentSocket) socket = null;
       if (!onlineSession || manuallyDisconnected) return;
       $('server-status').textContent = 'Disconnected — reconnecting…';
+      renderMultiplayer();
       clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(restoreSession, 3000);
     });
@@ -701,12 +704,30 @@
       const startButton = $('start-world');
       startButton.hidden = !isHost || onlineGame.started;
       startButton.disabled = onlineGame.players.some(player => player.countryIndex === null);
+
+      const pauseControls = $('pause-controls');
+      pauseControls.hidden = !onlineGame.started;
+      if (onlineGame.started) {
+        const connectedCount = onlineGame.players.filter(player => player.connected).length;
+        const voteIds = onlineGame.pauseVotePlayerIds || [];
+        const voteCount = voteIds.filter(playerId =>
+          onlineGame.players.some(player => player.id === playerId && player.connected)).length;
+        const hasVoted = voteIds.includes(onlineSession.playerId);
+        const voteAction = onlineGame.paused ? 'resume' : 'pause';
+        $('pause-status').textContent = voteCount + '/' + connectedCount +
+          ' connected votes to ' + voteAction + ' · more than half required.';
+        const voteButton = $('pause-vote');
+        voteButton.textContent = hasVoted ? 'WITHDRAW VOTE' :
+          onlineGame.paused ? 'VOTE TO RESUME' : 'VOTE TO PAUSE';
+        voteButton.disabled = !currentPlayer()?.connected || socket?.readyState !== WebSocket.OPEN;
+      }
     } else {
       const status = document.createElement('p');
       status.className = 'muted';
       status.textContent = 'Waiting for the server to restore the lobby.';
       list.appendChild(status);
       $('start-world').hidden = true;
+      $('pause-controls').hidden = true;
     }
   }
 
@@ -746,6 +767,10 @@
     log('Administration established in ' + state.states[index].name + '.');
     update();
     toast('TERRITORY ADDED TO YOUR ADMINISTRATION');
+  });
+  $('pause-vote').addEventListener('click', () => {
+    if (!onlineGame?.started) return;
+    sendAction({type: onlineGame.paused ? 'resume' : 'pause'});
   });
 
   $('next-month').addEventListener('click', () => {

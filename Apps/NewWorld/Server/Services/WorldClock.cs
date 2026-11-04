@@ -20,13 +20,14 @@ public sealed class WorldClock(GameStore store, GameHub hub, ILogger<WorldClock>
                 var now = DateTimeOffset.UtcNow;
                 var result = await store.MutateSystemAsync(gameId, game =>
                 {
-                    if (!game.Started || now - game.LastTickUtc < DayLength)
+                    if (!game.Started || game.Paused || now - game.LastTickUtc < DayLength)
                         return "No tick is due.";
 
                     game.Day++;
                     game.LastTickUtc = now;
                     foreach (var player in game.Players)
-                        player.Treasury += Math.Max(-player.Treasury, CalculateMonthlyBalance(game, player) / 30);
+                        SimulationRules.AccrueDailyBalance(
+                            player, SimulationRules.CalculateMonthlyBalance(game, player));
                     if ((game.Day - 1) % 365 == 0)
                     {
                         foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))
@@ -44,12 +45,4 @@ public sealed class WorldClock(GameStore store, GameHub hub, ILogger<WorldClock>
         }
     }
 
-    private static int CalculateMonthlyBalance(WorldState game, PlayerState player)
-    {
-        var territoryIncome = game.Territories
-            .Where(territory => territory.OwnerPlayerId == player.Id)
-            .Sum(territory => (int)Math.Round(territory.Population / 1500d * (territory.Prosperity / 100d)));
-        var cityIncome = 85 + player.Buildings.Values.Sum(building => building.Income);
-        return territoryIncome + cityIncome - player.Buildings.Count * 2;
-    }
 }

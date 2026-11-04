@@ -214,6 +214,8 @@ a { color: inherit; }
 .multiplayer-actions .action-btn { margin-top: 5px; }
 .secondary-action { margin-bottom: 8px; }
 .multiplayer-session[hidden], .invite-panel[hidden], #start-world[hidden] { display: none; }
+.pause-controls { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pause-controls[hidden] { display: none; }
 .invite-panel { margin: 10px 0; }
 .player-list { display: grid; gap: 5px; }
 .player-row { padding: 8px; border: 1px solid var(--line-soft); background: #ffffff04; }

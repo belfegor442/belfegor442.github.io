@@ -64,6 +64,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
             if (wasEmpty)
                 await ResetClockAsync(gameId, context.RequestAborted);
+            await ResetPauseVotesAsync(gameId, context.RequestAborted);
             await SendSnapshotAsync(connection, authorized.Game, context.RequestAborted);
             await BroadcastAsync(gameId, context.RequestAborted);
             while (socket.State == WebSocketState.Open && !context.RequestAborted.IsCancellationRequested)
@@ -95,6 +96,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             if (connection is not null && _games.TryGetValue(gameId, out var connections))
             {
                 connections.TryRemove(connection.PlayerId, out _);
+                await ResetPauseVotesAsync(gameId, CancellationToken.None);
                 if (connections.IsEmpty)
                 {
                     _games.TryRemove(gameId, out _);
@@ -135,6 +137,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             game.Started,
             game.Day,
             game.HostPlayerId,
+            game.Paused,
+            game.PauseVotes.Where(connectedPlayers.Contains).ToList(),
             game.Players.Select(player => new PlayerView(
                 player.Id, player.Name, player.IsHost, player.CountryIndex, player.Treasury,
                 player.Buildings, connectedPlayers.Contains(player.Id))).ToList(),
@@ -146,6 +150,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
     private async Task HandleMessageAsync(
         Guid gameId, string token, Connection connection, ClientMessage message, CancellationToken cancellationToken)
     {
+        var connectedPlayers = ConnectedPlayers(gameId);
         var result = await store.MutateAsync(gameId, token, (game, player) =>
         {
             if (!game.Started)
@@ -155,6 +160,34 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
             switch (message.Type)
             {
+                case "pause":
+                case "resume":
+                    var shouldPause = message.Type == "pause";
+                    if (game.Paused == shouldPause)
+                        return shouldPause ? "The world is already paused." : "The world is not paused.";
+                    if (!connectedPlayers.Contains(player.Id))
+                        return "Only connected players can vote.";
+
+                    var voteResult = PauseVoteRules.Toggle(game, player.Id, connectedPlayers);
+                    switch (voteResult)
+                    {
+                        case PauseVoteResult.Added:
+                            GameStore.AddActivity(game,
+                                $"{player.Name} voted to {(shouldPause ? "pause" : "resume")} the world.");
+                            break;
+                        case PauseVoteResult.Withdrawn:
+                            GameStore.AddActivity(game,
+                                $"{player.Name} withdrew their vote to {(shouldPause ? "pause" : "resume")} the world.");
+                            break;
+                        case PauseVoteResult.Paused:
+                            GameStore.AddActivity(game, "The connected players voted to pause the world.");
+                            break;
+                        case PauseVoteResult.Resumed:
+                            GameStore.AddActivity(game, "The connected players voted to resume the world.");
+                            break;
+                    }
+                    return null;
+
                 case "claim":
                     if (message.TerritoryIndex is not int territoryIndex ||
                         territoryIndex < 0 || territoryIndex >= game.Territories.Count)
@@ -195,6 +228,20 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             return;
         }
         await BroadcastAsync(gameId, cancellationToken);
+    }
+
+    private async Task ResetPauseVotesAsync(Guid gameId, CancellationToken cancellationToken)
+    {
+        var result = await store.MutateSystemAsync(gameId, game =>
+        {
+            if (game.PauseVotes.Count == 0)
+                return null;
+            game.PauseVotes.Clear();
+            GameStore.AddActivity(game, "The pause vote was reset because the connected players changed.");
+            return null;
+        }, cancellationToken);
+        if (result.Error is not null)
+            logger.LogWarning("Could not reset pause votes for {GameId}: {Reason}", gameId, result.Error);
     }
 
     private async Task SendSnapshotAsync(Connection connection, WorldState game, CancellationToken cancellationToken)
