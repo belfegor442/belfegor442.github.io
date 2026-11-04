@@ -3,49 +3,146 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101010">
-  <title>New World — Coming Soon</title>
-  <style>
-    * { box-sizing: border-box; }
-    html, body { min-height: 100%; margin: 0; }
-    body {
-      display: grid;
-      min-height: 100vh;
-      place-items: center;
-      padding: 32px;
-      background: #101010;
-      color: #f1f1ed;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    main { width: min(100%, 760px); text-align: center; }
-    .eyebrow {
-      margin: 0 0 28px;
-      color: #85857f;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .28em;
-      text-transform: uppercase;
-    }
-    h1 {
-      margin: 0;
-      font-size: clamp(42px, 9vw, 88px);
-      font-weight: 600;
-      letter-spacing: -.065em;
-      line-height: 1;
-    }
-    .rule {
-      width: 42px;
-      height: 1px;
-      margin: 34px auto 0;
-      background: #77776f;
-    }
-  </style>
+  <meta name="theme-color" content="#171a17">
+  <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
+  <title>NEW WORLD — North Assembly</title>
+  <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./game.css">
 </head>
 <body>
-  <main>
-    <p class="eyebrow">North Assembly</p>
-    <h1>Coming Soon</h1>
-    <div class="rule" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="/">NORTH ASSEMBLY <span>/</span> NEW WORLD</a>
+    <div class="world-tag"><span class="live-dot"></span> BELELAND <span class="world-number">WORLD 001</span></div>
+    <div class="top-stats">
+      <div><small>SIMULATION DATE</small><strong id="date-label">YEAR 01 / SPRING</strong></div>
+      <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
+      <div><small>POPULATION</small><strong id="population">—</strong></div>
+      <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
+    </div>
+    <button id="save-btn" class="quiet-btn">SAVE</button>
+  </header>
+
+  <main class="game-shell">
+    <nav class="nav-rail" aria-label="National administration">
+      <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
+      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>CITY</span></button>
+      <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
+      <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
+      <div class="nav-rail-foot">NA</div>
+    </nav>
+
+    <div class="play-area">
+      <section class="map-frame" aria-label="Beleland political map">
+        <div class="map-tools">
+          <div class="map-title"><span class="panel-kicker">WORLD MAP</span><span class="map-divider">/</span><span id="map-layer-label">POLITICAL</span></div>
+          <div class="map-controls">
+            <button id="zoom-out" aria-label="Zoom out">−</button>
+            <button id="zoom-in" aria-label="Zoom in">+</button>
+            <button id="reset-map">RESET VIEW</button>
+          </div>
+        </div>
+        <div id="map-viewport" class="map-viewport">
+          <div id="map-stage" class="map-stage">
+            <object id="world-map" data="./map.svg" type="image/svg+xml" aria-label="Interactive map of Beleland"></object>
+            <div id="map-fallback" class="map-fallback" hidden></div>
+          </div>
+          <div id="map-tooltip" class="map-tooltip" hidden></div>
+          <div class="map-compass" aria-hidden="true">N<br>▲</div>
+        </div>
+        <div class="map-foot">
+          <span><i class="legend owned"></i> YOUR ADMINISTRATION</span>
+          <span><i class="legend other"></i> INDEPENDENT STATES</span>
+          <span>SELECT A STATE TO INSPECT</span>
+        </div>
+      </section>
+
+      <aside class="command-panel" aria-live="polite">
+        <section id="world-view" class="view active">
+          <p class="panel-kicker">TERRITORY / INSPECTION</p>
+          <h1 id="state-name">Select a territory</h1>
+          <p id="state-description" class="muted">Choose one of the 16 states on the map to inspect its administration and economy.</p>
+          <div class="metric-grid">
+            <div><small>POPULATION</small><strong id="state-pop">—</strong></div>
+            <div><small>PROSPERITY</small><strong id="state-prosperity">—</strong></div>
+            <div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div>
+            <div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div>
+          </div>
+          <div class="panel-divider"></div>
+          <div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
+          <button id="claim-btn" class="action-btn" disabled>ESTABLISH ADMINISTRATION <span>¤ 450</span></button>
+          <p class="microcopy">Establishing an administration costs treasury. Administered states contribute revenue.</p>
+        </section>
+
+        <section id="city-view" class="view">
+          <div class="section-bar"><div><p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p><h2 id="city-title">Capital district</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
+          <p class="muted city-intro">Select an empty plot and choose a building to develop the capital.</p>
+          <div id="city-grid" class="city-grid" aria-label="Capital construction plots"></div>
+          <div class="city-legend"><span>144 DEVELOPMENT PLOTS</span><span>SELECT TO BUILD</span></div>
+          <div class="construction-panel">
+            <h3 id="plot-title">Available plots</h3>
+            <p class="muted" id="plot-description">Select an empty plot, then choose a building.</p>
+            <div id="building-options" class="building-options"></div>
+          </div>
+          <div class="panel-divider"></div>
+          <div class="ownership-row"><span>MONTHLY CITY INCOME</span><strong id="city-income">¤ 85</strong></div>
+        </section>
+
+        <section id="ledger-view" class="view">
+          <p class="panel-kicker">PUBLIC FINANCE</p>
+          <h2>Economic overview</h2>
+          <div class="ledger-row"><span>Treasury</span><strong id="ledger-treasury">¤ 1,200</strong></div>
+          <div class="ledger-row"><span>Territorial revenue</span><strong id="ledger-territory">¤ 0</strong></div>
+          <div class="ledger-row"><span>City production</span><strong id="ledger-city">¤ 85</strong></div>
+          <div class="ledger-row"><span>Maintenance</span><strong id="ledger-cost">−¤ 0</strong></div>
+          <div class="ledger-row total"><span>Net monthly balance</span><strong id="ledger-balance">+¤ 85</strong></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SIMULATION RECORD</p>
+          <h2>Recent activity</h2>
+          <div id="activity" class="activity-list"><p>World initialized. Your administration controls the capital district.</p></div>
+        </section>
+
+        <section id="multiplayer-view" class="view">
+          <p class="panel-kicker">PRIVATE WORLD / NETWORK</p>
+          <h2>Multiplayer</h2>
+          <p class="muted">Create a private world or join one with an invitation. The server validates actions and keeps the shared world.</p>
+          <label class="field-label" for="api-url">SERVER URL</label>
+          <div class="field-row"><input id="api-url" type="url" autocomplete="url" placeholder="https://your-game-server.example"><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
+          <p id="server-status" class="connection-status" role="status">Server not connected.</p>
+          <label class="field-label" for="player-name">PLAYER NAME</label>
+          <input id="player-name" class="text-field" maxlength="24" autocomplete="nickname" placeholder="2–24 characters">
+          <div id="multiplayer-actions" class="multiplayer-actions">
+            <button id="create-world" class="action-btn" type="button">CREATE PRIVATE WORLD</button>
+            <label class="field-label" for="invite-code">INVITATION CODE</label>
+            <input id="invite-code" class="text-field" maxlength="64" autocomplete="off" placeholder="Paste an invitation code">
+            <button id="join-world" class="action-btn secondary-action" type="button">JOIN WORLD</button>
+          </div>
+          <div id="multiplayer-session" class="multiplayer-session" hidden>
+            <div class="panel-divider"></div>
+            <p class="panel-kicker">CURRENT WORLD</p>
+            <p id="session-summary" class="muted"></p>
+            <button id="reconnect-world" class="quiet-btn" type="button">RECONNECT</button>
+            <div id="invite-panel" class="invite-panel" hidden>
+              <label class="field-label" for="invite-share">PRIVATE INVITATION — SHARE ONLY WITH FRIENDS</label>
+              <div class="field-row"><input id="invite-share" class="text-field" readonly><button id="copy-invite" class="quiet-btn" type="button">COPY</button></div>
+            </div>
+            <p class="field-label">PLAYERS / STATE ASSIGNMENT</p>
+            <div id="player-list" class="player-list"></div>
+            <button id="start-world" class="action-btn" type="button" hidden>START WORLD</button>
+            <button id="leave-world" class="quiet-btn leave-world" type="button">DISCONNECT ON THIS DEVICE</button>
+          </div>
+          <p id="multiplayer-message" class="multiplayer-message" role="status" aria-live="polite"></p>
+        </section>
+      </aside>
+    </div>
+
+    <footer class="game-footer">
+      <div class="world-status"><span>NA / INTERACTIVE SYSTEMS</span><span id="world-mode">LOCAL PROTOTYPE 0.1.0</span></div>
+      <span id="world-time" class="world-time" hidden></span>
+      <button id="next-month" class="advance">ADVANCE MONTH <b>→</b></button>
+      <a href="/Apps/">APPLICATION DIRECTORY ↗</a>
+    </footer>
   </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./game.js"></script>
 </body>
 </html>
