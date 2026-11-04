@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111711"><meta name="description" content="NEW WORLD — a living territorial and city-building simulation by North Assembly.">
+<title>NEW WORLD — North Assembly</title>
+<link rel="icon" href="/na-mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./game.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">NORTH ASSEMBLY <span>/</span> NEW WORLD</a>
+  <div class="top-meta"><span class="live-dot"></span> WORLD SIMULATION <span id="date-label">YEAR 01 / SPRING</span></div>
+  <button id="save-btn" class="quiet-btn">SAVE</button>
+</header>
+<main class="shell">
+  <section class="game-head">
+    <div><p class="kicker">BELELAND / WORLD 001</p><h1>NEW <i>WORLD</i></h1><p class="subhead">A territorial economy. A growing civilization.</p></div>
+    <div class="head-stats"><div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div><div><small>POPULATION</small><strong id="population">82,400</strong></div><div><small>MONTHLY BALANCE</small><strong id="balance">+¤ 85</strong></div></div>
+  </section>
+  <nav class="toolbar" aria-label="Game views">
+    <button class="tab active" data-view="world">WORLD MAP</button><button class="tab" data-view="city">CITY MANAGEMENT</button><button class="tab" data-view="ledger">ECONOMY</button>
+    <span class="toolbar-spacer"></span><button id="next-month" class="advance">ADVANCE MONTH <b>→</b></button>
+  </nav>
+  <section id="world-view" class="view active">
+    <div class="world-layout">
+      <div class="map-frame">
+        <div class="map-tools"><span>BELELAND / POLITICAL MAP</span><div><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="reset-map">RESET</button></div></div>
+        <div id="map-viewport" class="map-viewport"><div id="map-stage" class="map-stage"><object id="world-map" data="./beleland.svg" type="image/svg+xml" aria-label="Map of Beleland"></object><div id="map-fallback" class="map-fallback" hidden></div></div></div>
+        <div class="map-foot"><span><i class="legend owned"></i> YOUR ADMINISTRATION</span><span><i class="legend other"></i> OTHER STATES</span><span>SELECT A TERRITORY TO INSPECT</span></div>
+      </div>
+      <aside class="side-panel" id="territory-panel">
+        <p class="panel-kicker">TERRITORY / INSPECTION</p><h2 id="state-name">Select a territory</h2><p id="state-description" class="muted">Choose one of the 16 states on the map to inspect its economy and administration.</p>
+        <div class="metric-grid"><div><small>POPULATION</small><strong id="state-pop">—</strong></div><div><small>PROSPERITY</small><strong id="state-prosperity">—</strong></div><div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div><div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div></div>
+        <div class="panel-divider"></div><div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
+        <button id="claim-btn" class="action-btn" disabled>ESTABLISH ADMINISTRATION <span>¤ 450</span></button>
+        <p class="microcopy">Expansion costs treasury. States under your administration contribute monthly revenue.</p>
+      </aside>
+    </div>
+  </section>
+  <section id="city-view" class="view">
+    <div class="city-layout">
+      <div class="city-main">
+        <div class="section-bar"><div><p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p><h2 id="city-title">Capital district</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
+        <div id="city-grid" class="city-grid" aria-label="Isometric city construction grid"></div>
+        <div class="city-legend"><span>SELECT A PLOT TO BUILD</span><span>16 × 12 DEVELOPMENT AREA</span></div>
+      </div>
+      <aside class="side-panel">
+        <p class="panel-kicker">CONSTRUCTION OFFICE</p><h2 id="plot-title">Available plots</h2><p class="muted" id="plot-description">Select an empty plot, then choose a building.</p>
+        <div id="building-options" class="building-options"></div>
+        <div class="panel-divider"></div><div class="ownership-row"><span>MONTHLY CITY INCOME</span><strong id="city-income">¤ 85</strong></div>
+      </aside>
+    </div>
+  </section>
+  <section id="ledger-view" class="view">
+    <div class="ledger-layout">
+      <div class="ledger-card"><p class="panel-kicker">PUBLIC FINANCE</p><h2>Economic overview</h2><div class="ledger-row"><span>Treasury</span><strong id="ledger-treasury">¤ 1,200</strong></div><div class="ledger-row"><span>Territorial revenue</span><strong id="ledger-territory">¤ 0</strong></div><div class="ledger-row"><span>City production</span><strong id="ledger-city">¤ 85</strong></div><div class="ledger-row"><span>Maintenance</span><strong id="ledger-cost">−¤ 0</strong></div><div class="ledger-row total"><span>Net monthly balance</span><strong id="ledger-balance">+¤ 85</strong></div></div>
+      <div class="ledger-card"><p class="panel-kicker">SIMULATION RECORD</p><h2>Recent activity</h2><div id="activity" class="activity-list"><p>World initialized. Your administration controls the capital district.</p></div></div>
+    </div>
+  </section>
+  <footer class="game-footer"><span>NA / INTERACTIVE SYSTEMS</span><span>PROTOTYPE 0.1.0 — LOCAL SAVE</span><a href="/Apps/">APPLICATION DIRECTORY ↗</a></footer>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="./game.js"></script>
+</body></html>
