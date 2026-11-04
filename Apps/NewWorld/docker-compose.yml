@@ -1,0 +1,34 @@
+services:
+  database:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newworld
+      POSTGRES_USER: newworld
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - new-world-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newworld -d newworld"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  server:
+    build:
+      context: ./Server
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__NewWorld: Host=database;Port=5432;Database=newworld;Username=newworld;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting}
+      NEW_WORLD_ALLOWED_ORIGINS: "${NEW_WORLD_ALLOWED_ORIGINS:-http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io}"
+    ports:
+      - "127.0.0.1:5000:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+
+volumes:
+  new-world-data:
