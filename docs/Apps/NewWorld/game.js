@@ -216,6 +216,8 @@
     list.replaceChildren();
     const marketsList = $('market-list');
     marketsList.replaceChildren();
+    const populationList = $('population-group-list');
+    populationList.replaceChildren();
     const routesList = $('trade-route-list');
     routesList.replaceChildren();
     $('economy-setup-panel').hidden = !onlineGame ||
@@ -224,6 +226,7 @@
     if (!onlineGame) {
       addPoliticalRow(list, 'No production data', 'Connect to a multiplayer world to load server-authoritative inventories.');
       addPoliticalRow(marketsList, 'No market data', 'Connect to a multiplayer world to load prices, supply, and demand.');
+      addPoliticalRow(populationList, 'No population data', 'Connect to a multiplayer world to load configured population needs.');
       addPoliticalRow(routesList, 'No trade routes', 'Trade routes are configured as part of the pre-game economic scenario.');
       return;
     }
@@ -274,10 +277,28 @@
           ' · Budget: ' + money(market.dailyConsumerBudget) + ' ' + currencyName +
           ' · Price bounds: ' + money(market.minimumPrice) + '–' + money(market.maximumPrice) +
           (latest
-            ? ' · Last clearing ' + formatWorldDate(latest.worldDate) + ': ' +
+            ? ' · Population demand: ' + latest.populationDemand + ' ' + unit +
+              ' · Last clearing ' + formatWorldDate(latest.worldDate) + ': ' +
               latest.quantitySold + ' sold, ' + latest.unmetDemand + ' unmet; ' +
               latest.domesticSupply + ' domestic / ' + latest.importedSupply + ' imported'
-            : ' · Awaiting first daily clearing'));
+            : ' · Population needs are added per 1,000 residents at each daily clearing; awaiting first clearing'));
+    }
+
+    const populationGroups = onlineGame.populationGroups?.filter(item =>
+      item.stateId === territory?.stateId) || [];
+    if (!populationGroups.length) {
+      addPoliticalRow(populationList, 'No population groups configured', 'Population-derived market demand requires explicit scenario groups and per-good need rates.');
+    } else for (const group of populationGroups) {
+      const needs = (group.needs || []).map(need => {
+        const good = onlineGame.goods?.find(item => item.id === need.goodId);
+        return (good?.name || need.goodId) + ': ' +
+          need.dailyQuantityPerThousandPeople + ' ' + (good?.unit || 'units') +
+          ' per 1,000 residents/day';
+      });
+      addPoliticalRow(
+        populationList,
+        group.name + ' · ' + Number(group.population).toLocaleString('en-US') + ' residents',
+        'Configured needs: ' + (needs.join(', ') || 'none'));
     }
 
     const routes = (onlineGame.tradeRoutes || []).filter(route =>
@@ -325,7 +346,8 @@
         }))
       })),
       markets: onlineGame.markets || [],
-      tradeRoutes: onlineGame.tradeRoutes || []
+      tradeRoutes: onlineGame.tradeRoutes || [],
+      populationGroups: onlineGame.populationGroups || []
     };
     $('economy-config').value = JSON.stringify(configuration, null, 2);
   }
@@ -345,9 +367,11 @@
         (error instanceof Error ? error.message : 'parse error'), true);
       return;
     }
-    const collections = ['goods', 'productionRecipes', 'companies', 'markets', 'tradeRoutes'];
+    const collections = [
+      'goods', 'productionRecipes', 'companies', 'markets', 'tradeRoutes', 'populationGroups'
+    ];
     if (!configuration || collections.some(key => !Array.isArray(configuration[key]))) {
-      showMessage('The scenario must include goods, productionRecipes, companies, markets, and tradeRoutes arrays.', true);
+      showMessage('The scenario must include goods, productionRecipes, companies, markets, tradeRoutes, and populationGroups arrays.', true);
       return;
     }
 

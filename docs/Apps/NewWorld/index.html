@@ -107,11 +107,14 @@
           <p class="panel-kicker">MARKETS / DAILY CLEARING</p>
           <div id="market-list" class="political-list"></div>
           <div class="panel-divider"></div>
+          <p class="panel-kicker">POPULATION GROUPS / CONSUMER NEEDS</p>
+          <div id="population-group-list" class="political-list"></div>
+          <div class="panel-divider"></div>
           <p class="panel-kicker">TRADE ROUTES / IMPORTS AND EXPORTS</p>
           <div id="trade-route-list" class="political-list"></div>
           <details id="economy-setup-panel" hidden>
             <summary>Technical economic scenario setup · lobby only</summary>
-            <p class="microcopy">The host can load or replace goods, recipes, NPC companies, markets, and bilateral trade routes before starting. This is technical scenario setup, not political authority. No official Beleland economic data is preloaded.</p>
+            <p class="microcopy">The host can load or replace goods, recipes, NPC companies, markets, bilateral trade routes, and population groups with per-good daily needs before starting. Population needs add demand at a rate per 1,000 residents. This is technical scenario setup, not political authority. No official Beleland economic data is preloaded.</p>
             <button id="load-economy-config" class="secondary-button" type="button">Load current configuration</button>
             <textarea id="economy-config" class="text-field" rows="12" spellcheck="false" aria-label="Economic scenario JSON"></textarea>
             <button id="save-economy-config" class="primary-button" type="button">Validate and save scenario</button>

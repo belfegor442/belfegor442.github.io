@@ -19,6 +19,24 @@ public static class MarketClearingRules
         var marketBlockedInventory = game.Companies.ToDictionary(
             company => company.Id,
             _ => new Dictionary<string, long>(StringComparer.Ordinal));
+        var populationRemainders = game.PopulationGroups.ToDictionary(
+            group => group.Id,
+            group => new Dictionary<string, long>(group.DailyDemandRemainders, StringComparer.Ordinal));
+        var populationDemand = new Dictionary<(Guid StateId, string GoodId), BigInteger>();
+        foreach (var group in game.PopulationGroups)
+        foreach (var need in group.Needs)
+        {
+            var remainder = populationRemainders[group.Id].GetValueOrDefault(need.GoodId);
+            var dailyAmount =
+                (BigInteger)group.Population * need.DailyQuantityPerThousandPeople + remainder;
+            var quantity = dailyAmount / 1000;
+            if (quantity > long.MaxValue)
+                return ([], "Population demand exceeds the supported market limit.");
+            populationRemainders[group.Id][need.GoodId] = (long)(dailyAmount % 1000);
+            var marketKey = (group.StateId, need.GoodId);
+            populationDemand[marketKey] = populationDemand.GetValueOrDefault(marketKey) + quantity;
+        }
+
         var companiesByStateAndGood = game.Companies
             .SelectMany(company => company.Inventory
                 .Where(stock => stock.Value > 0)
@@ -73,13 +91,18 @@ public static class MarketClearingRules
                 .Where(offer => offer.TradeRouteId is not null)
                 .Select(offer => offer.Quantity));
             var marketKey = (market.StateId, market.GoodId);
+            var groupDemand = populationDemand.GetValueOrDefault(marketKey);
+            var totalDemand = (BigInteger)market.DailyDemand + groupDemand;
+            if (totalDemand > long.MaxValue)
+                return ([], "Population demand exceeds the supported market limit.");
+            var demand = (long)totalDemand;
             var priceBefore = marketPrices[marketKey];
-            var priceAfter = CalculatePrice(market, priceBefore, totalSupply);
+            var priceAfter = CalculatePrice(market, priceBefore, demand, totalSupply);
             marketPrices[marketKey] = priceAfter;
 
             var affordableDemand = market.DailyConsumerBudget / priceAfter;
             var quantitySold = (long)BigInteger.Min(
-                market.DailyDemand,
+                demand,
                 BigInteger.Min(totalSupply, affordableDemand));
             var allocations = Allocate(offers, quantitySold);
             var spending = checked(quantitySold * priceAfter);
@@ -125,15 +148,16 @@ public static class MarketClearingRules
                 market.GoodId,
                 currencyId,
                 game.WorldDate,
-                market.DailyDemand,
+                demand,
                 domesticSupply,
                 importedSupply,
                 quantitySold,
-                market.DailyDemand - quantitySold,
+                demand - quantitySold,
                 priceBefore,
                 priceAfter,
                 market.DailyConsumerBudget,
-                spending);
+                spending,
+                (long)groupDemand);
             settlements.Add(settlement);
         }
 
@@ -142,6 +166,8 @@ public static class MarketClearingRules
             company.Inventory = inventories[company.Id];
             company.CashBalances = cashBalances[company.Id];
         }
+        foreach (var group in game.PopulationGroups)
+            group.DailyDemandRemainders = populationRemainders[group.Id];
         foreach (var market in game.Markets)
             market.CurrentPrice = marketPrices[(market.StateId, market.GoodId)];
         game.CompanyFinancialTransactions.AddRange(transactionWorld.CompanyFinancialTransactions);
@@ -340,16 +366,17 @@ public static class MarketClearingRules
         return allocations;
     }
 
-    private static long CalculatePrice(EconomicMarket market, long currentPrice, BigInteger supply)
+    private static long CalculatePrice(
+        EconomicMarket market, long currentPrice, long demand, BigInteger supply)
     {
         BigInteger target;
-        if (market.DailyDemand == 0)
+        if (demand == 0)
             target = market.MinimumPrice;
         else if (supply == 0)
             target = market.MaximumPrice;
         else
             target = BigInteger.Clamp(
-                (BigInteger)market.BasePrice * market.DailyDemand / supply,
+                (BigInteger)market.BasePrice * demand / supply,
                 market.MinimumPrice,
                 market.MaximumPrice);
 

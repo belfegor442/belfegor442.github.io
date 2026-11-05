@@ -238,6 +238,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             }).ToList(),
             game.Goods,
             game.ProductionRecipes,
+            game.PopulationGroups,
             game.Markets,
             game.TradeRoutes,
             game.Currencies,

@@ -135,7 +135,8 @@ public sealed record MarketSettlement(
     long PriceBefore,
     long PriceAfter,
     long ConsumerBudget,
-    long ConsumerSpending);
+    long ConsumerSpending,
+    long PopulationDemand = 0);
 
 public sealed record EconomyScenarioRequest(
     long ExpectedWorldVersion,
@@ -143,7 +144,8 @@ public sealed record EconomyScenarioRequest(
     IReadOnlyList<ProductionRecipe> ProductionRecipes,
     IReadOnlyList<EconomicCompany> Companies,
     IReadOnlyList<EconomicMarket> Markets,
-    IReadOnlyList<EconomicTradeRoute> TradeRoutes);
+    IReadOnlyList<EconomicTradeRoute> TradeRoutes,
+    IReadOnlyList<PopulationGroup>? PopulationGroups = null);
 
 public sealed class ProductionFacility
 {

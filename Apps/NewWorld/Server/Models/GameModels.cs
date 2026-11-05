@@ -27,6 +27,7 @@ public sealed class WorldState
     public List<StatePoliticalSystem> PoliticalSystems { get; set; } = [];
     public List<EconomicGood> Goods { get; set; } = [];
     public List<ProductionRecipe> ProductionRecipes { get; set; } = [];
+    public List<PopulationGroup> PopulationGroups { get; set; } = [];
     public List<EconomicCompany> Companies { get; set; } = [];
     public List<EconomicMarket> Markets { get; set; } = [];
     public List<EconomicTradeRoute> TradeRoutes { get; set; } = [];
@@ -191,6 +192,7 @@ public sealed record GameSnapshot(
     IReadOnlyList<PoliticalStateView> PoliticalSystems,
     IReadOnlyList<EconomicGood> Goods,
     IReadOnlyList<ProductionRecipe> ProductionRecipes,
+    IReadOnlyList<PopulationGroup> PopulationGroups,
     IReadOnlyList<EconomicMarket> Markets,
     IReadOnlyList<EconomicTradeRoute> TradeRoutes,
     IReadOnlyList<StateCurrency> Currencies,

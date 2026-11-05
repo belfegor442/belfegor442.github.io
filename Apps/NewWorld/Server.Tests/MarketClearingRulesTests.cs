@@ -417,6 +417,88 @@ public sealed class MarketClearingRulesTests
     }
 
     [Fact]
+    public void PopulationNeedsContributeDemandAndCarryFractionalQuantitiesAcrossDays()
+    {
+        var (game, company, market) = CreateMarketWorld();
+        company.Inventory["flour"] = 10;
+        market.DailyDemand = 1;
+        market.DailyConsumerBudget = 100;
+        game.PopulationGroups.Add(new PopulationGroup
+        {
+            Id = Guid.NewGuid(),
+            StateId = market.StateId,
+            Name = "Rural households",
+            Population = 500,
+            Needs =
+            [
+                new PopulationNeed
+                {
+                    GoodId = "flour",
+                    DailyQuantityPerThousandPeople = 3
+                }
+            ]
+        });
+        WorldStateCompatibility.Normalize(game);
+
+        var firstDay = MarketClearingRules.ClearDailyMarkets(game);
+        var firstSettlement = Assert.Single(firstDay.Settlements);
+
+        Assert.Null(firstDay.Error);
+        Assert.Equal(1, firstSettlement.PopulationDemand);
+        Assert.Equal(2, firstSettlement.Demand);
+        Assert.Equal(2, firstSettlement.QuantitySold);
+        Assert.Equal(500, game.PopulationGroups[0].DailyDemandRemainders["flour"]);
+
+        game.WorldDate = game.WorldDate.AddDays(1);
+        var secondDay = MarketClearingRules.ClearDailyMarkets(game);
+        var secondSettlement = Assert.Single(secondDay.Settlements);
+
+        Assert.Null(secondDay.Error);
+        Assert.Equal(2, secondSettlement.PopulationDemand);
+        Assert.Equal(3, secondSettlement.Demand);
+        Assert.Equal(3, secondSettlement.QuantitySold);
+        Assert.Equal(0, game.PopulationGroups[0].DailyDemandRemainders["flour"]);
+        WorldStateCompatibility.Normalize(game);
+        var snapshot = GameHub.BuildSnapshot(game, new HashSet<Guid>());
+        Assert.Equal(500, Assert.Single(snapshot.PopulationGroups).Population);
+        Assert.Equal(2, snapshot.MarketHistory.Count);
+    }
+
+    [Fact]
+    public void ExcessivePopulationDemandDoesNotPartiallyAdvanceRemaindersOrMarkets()
+    {
+        var (game, company, market) = CreateMarketWorld();
+        company.Inventory["flour"] = 4;
+        market.DailyDemand = 1;
+        market.DailyConsumerBudget = 100;
+        var group = new PopulationGroup
+        {
+            Id = Guid.NewGuid(),
+            StateId = market.StateId,
+            Name = "Oversized group",
+            Population = long.MaxValue,
+            Needs =
+            [
+                new PopulationNeed
+                {
+                    GoodId = "flour",
+                    DailyQuantityPerThousandPeople = long.MaxValue
+                }
+            ]
+        };
+        group.DailyDemandRemainders["flour"] = 999;
+        game.PopulationGroups.Add(group);
+
+        var result = MarketClearingRules.ClearDailyMarkets(game);
+
+        Assert.Equal("Population demand exceeds the supported market limit.", result.Error);
+        Assert.Equal(4, company.Inventory["flour"]);
+        Assert.Equal(10, market.CurrentPrice);
+        Assert.Equal(999, group.DailyDemandRemainders["flour"]);
+        Assert.Empty(game.MarketHistory);
+    }
+
+    [Fact]
     public void FailedSettlementDoesNotPartiallyMutateMarketsOrCompanyAccounts()
     {
         var (game, company, market) = CreateMarketWorld();

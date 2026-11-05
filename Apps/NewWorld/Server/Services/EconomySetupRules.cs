@@ -20,13 +20,16 @@ public static class EconomySetupRules
             request.ProductionRecipes.Any(item => item is null) ||
             request.Companies.Any(item => item is null) ||
             request.Markets.Any(item => item is null) ||
-            request.TradeRoutes.Any(item => item is null))
+            request.TradeRoutes.Any(item => item is null) ||
+            request.PopulationGroups?.Any(item => item is null) == true)
             return "Economic scenario collections cannot contain null entries.";
         if (request.Goods.Count > 500 ||
             request.ProductionRecipes.Count > 2000 ||
             request.Companies.Count > 10000 ||
             request.Markets.Count > 8000 ||
             request.TradeRoutes.Count > 50000 ||
+            request.PopulationGroups?.Count > 100000 ||
+            request.PopulationGroups?.Sum(group => (long)(group.Needs?.Count ?? 0)) > 1_000_000 ||
             request.Companies.Sum(company => (long)(company.Inventory?.Count ?? 0)) > 1_000_000 ||
             request.Companies.Sum(company => (long)(company.Facilities?.Count ?? 0)) > 100_000)
             return "The economic scenario exceeds a supported collection limit.";
@@ -37,6 +40,8 @@ public static class EconomySetupRules
         candidate.Companies = request.Companies.ToList();
         candidate.Markets = request.Markets.ToList();
         candidate.TradeRoutes = request.TradeRoutes.ToList();
+        if (request.PopulationGroups is not null)
+            candidate.PopulationGroups = request.PopulationGroups.ToList();
         candidate.CompanyFinancialTransactions = [];
         candidate.MarketHistory = [];
         candidate.EconomyVersion = 2;
@@ -54,6 +59,7 @@ public static class EconomySetupRules
         game.Companies = candidate.Companies;
         game.Markets = candidate.Markets;
         game.TradeRoutes = candidate.TradeRoutes;
+        game.PopulationGroups = candidate.PopulationGroups;
         game.CompanyFinancialTransactions = candidate.CompanyFinancialTransactions;
         game.MarketHistory = candidate.MarketHistory;
         game.EconomyVersion = candidate.EconomyVersion;

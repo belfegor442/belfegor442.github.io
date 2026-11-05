@@ -32,6 +32,7 @@ public static class WorldStateCompatibility
         game.PoliticalSystems ??= [];
         game.Goods ??= [];
         game.ProductionRecipes ??= [];
+        game.PopulationGroups ??= [];
         game.Companies ??= [];
         game.Markets ??= [];
         game.TradeRoutes ??= [];
@@ -165,6 +166,51 @@ public static class WorldStateCompatibility
                 market.PriceSmoothingPercent is < 1 or > 100 ||
                 !markets.Add((market.StateId, market.GoodId)))
                 throw new InvalidDataException("The saved world contains an invalid economic market.");
+        }
+
+        var populationGroupIds = new HashSet<Guid>();
+        var populationDemandByMarket = new Dictionary<(Guid StateId, string GoodId), BigInteger>();
+        foreach (var group in game.PopulationGroups)
+        {
+            group.Needs ??= [];
+            group.DailyDemandRemainders ??= new Dictionary<string, long>(StringComparer.Ordinal);
+            if (group.Id == Guid.Empty ||
+                !stateIds.Contains(group.StateId) ||
+                group.Population <= 0 ||
+                string.IsNullOrWhiteSpace(group.Name) ||
+                group.Needs.Count == 0 ||
+                group.Needs.Any(need => need is null) ||
+                !populationGroupIds.Add(group.Id))
+                throw new InvalidDataException("The saved world contains an invalid population group.");
+
+            var groupNeedIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var need in group.Needs)
+            {
+                if (string.IsNullOrWhiteSpace(need.GoodId) ||
+                    !goodIds.Contains(need.GoodId) ||
+                    need.DailyQuantityPerThousandPeople <= 0 ||
+                    !markets.Contains((group.StateId, need.GoodId)) ||
+                    !groupNeedIds.Add(need.GoodId))
+                    throw new InvalidDataException("The saved world contains an invalid population need.");
+                group.DailyDemandRemainders.TryAdd(need.GoodId, 0);
+                var marketKey = (group.StateId, need.GoodId);
+                populationDemandByMarket[marketKey] =
+                    populationDemandByMarket.GetValueOrDefault(marketKey) +
+                    ((BigInteger)group.Population * need.DailyQuantityPerThousandPeople + 999) / 1000;
+            }
+
+            if (group.DailyDemandRemainders.Any(remainder =>
+                    !groupNeedIds.Contains(remainder.Key) || remainder.Value is < 0 or >= 1000))
+                throw new InvalidDataException("The saved world contains an invalid population demand remainder.");
+        }
+
+        foreach (var market in game.Markets)
+        {
+            var maximumDemand =
+                (BigInteger)market.DailyDemand +
+                populationDemandByMarket.GetValueOrDefault((market.StateId, market.GoodId));
+            if (maximumDemand > long.MaxValue)
+                throw new InvalidDataException("Population demand exceeds the supported market limit.");
         }
 
         var tradeRouteIds = new HashSet<Guid>();
@@ -865,6 +911,7 @@ public static class WorldStateCompatibility
                 settlement.WorldDate == default ||
                 settlement.WorldDate > game.WorldDate ||
                 settlement.Demand < 0 ||
+                settlement.PopulationDemand < 0 ||
                 settlement.DomesticSupply < 0 ||
                 settlement.ImportedSupply < 0 ||
                 settlement.QuantitySold < 0 ||

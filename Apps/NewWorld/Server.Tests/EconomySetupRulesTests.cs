@@ -57,6 +57,60 @@ public sealed class EconomySetupRulesTests
         Assert.Empty(game.Companies);
     }
 
+    [Fact]
+    public void ConfigureValidatesAndPersistsPopulationNeedsWithTheEconomicScenario()
+    {
+        var (game, company, market) = CreateWorld();
+        var group = new PopulationGroup
+        {
+            Id = Guid.NewGuid(),
+            StateId = market.StateId,
+            Name = "Households",
+            Population = 1000,
+            Needs =
+            [
+                new PopulationNeed
+                {
+                    GoodId = market.GoodId,
+                    DailyQuantityPerThousandPeople = 2
+                }
+            ]
+        };
+        var request = new EconomyScenarioRequest(
+            game.WorldVersion,
+            game.Goods,
+            game.ProductionRecipes,
+            [company],
+            [market],
+            [],
+            [group]);
+
+        var error = EconomySetupRules.Configure(game, request);
+
+        Assert.Null(error);
+        var configuredGroup = Assert.Single(game.PopulationGroups);
+        Assert.Equal(group.Id, configuredGroup.Id);
+        Assert.Equal(0, configuredGroup.DailyDemandRemainders[market.GoodId]);
+        WorldStateCompatibility.Normalize(game);
+
+        request = request with
+        {
+            PopulationGroups =
+            [
+                new PopulationGroup
+                {
+                    Id = group.Id,
+                    StateId = group.StateId,
+                    Name = "",
+                    Population = group.Population,
+                    Needs = group.Needs
+                }
+            ]
+        };
+        Assert.Contains("Invalid economic scenario", EconomySetupRules.Configure(game, request));
+        Assert.Equal(group.Id, Assert.Single(game.PopulationGroups).Id);
+    }
+
     private static (WorldState Game, EconomicCompany Company, EconomicMarket Market) CreateWorld()
     {
         var stateId = Guid.NewGuid();
