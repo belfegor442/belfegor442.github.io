@@ -212,8 +212,26 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
     private async Task HandleMessageAsync(
         Guid gameId, string token, Connection connection, ClientMessage message, CancellationToken cancellationToken)
     {
+        if (message.OrderId is not Guid orderId || orderId == Guid.Empty)
+        {
+            await SendAsync(connection, new ServerMessage("error", "A non-empty order ID is required."),
+                cancellationToken);
+            return;
+        }
+
         var connectedPlayers = ConnectedPlayers(gameId);
-        var result = await store.MutateAsync(gameId, token, (game, player) =>
+        var orderType = message.Type switch
+        {
+            "claim" => GameOrderType.EstablishAdministration,
+            "build" => GameOrderType.ConstructBuilding,
+            "pause" => GameOrderType.PauseWorld,
+            "resume" => GameOrderType.ResumeWorld,
+            _ => GameOrderType.Unsupported
+        };
+        var payload = new GameOrderPayload(
+            message.TerritoryIndex, message.PlotIndex, message.BuildingId);
+        var result = await store.ExecuteOrderAsync(
+            gameId, token, orderId, orderType, payload, (game, player) =>
         {
             if (!game.Started)
                 return "The host must start the world before actions are allowed.";
@@ -305,7 +323,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             await SendAsync(connection, new ServerMessage("error", result.Error), cancellationToken);
             return;
         }
-        await BroadcastAsync(gameId, cancellationToken);
+        await SendAsync(connection, new ServerMessage("orderResult", Order: result.Order), cancellationToken);
+        if (result.Order?.Replayed != true)
+            await BroadcastAsync(gameId, cancellationToken);
     }
 
     private async Task ResetPauseVotesAsync(Guid gameId, CancellationToken cancellationToken)

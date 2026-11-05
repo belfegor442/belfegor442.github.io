@@ -108,4 +108,47 @@ public sealed class WorldStateCompatibilityTests
 
         Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
     }
+
+    [Fact]
+    public void NormalizePreservesValidPersistentOrderHistory()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, Guid.NewGuid(), playerId, stateId, GameOrderType.ConstructBuilding,
+            new GameOrderPayload(null, 2, "farm"),
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), false, "Insufficient treasury.", 4);
+        var game = new WorldState
+        {
+            Id = gameId,
+            Players = [new PlayerState { Id = playerId }],
+            Territories = [new TerritoryState { StateId = stateId }],
+            Orders = [order]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(order, Assert.Single(game.Orders));
+    }
+
+    [Fact]
+    public void NormalizeRejectsDuplicateOrderIdsForOnePlayer()
+    {
+        var playerId = Guid.NewGuid();
+        var gameId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var firstOrder = new GameOrder(
+            gameId, orderId, playerId, null, GameOrderType.PauseWorld,
+            new GameOrderPayload(null, null, null),
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), true, null, 2);
+        var game = new WorldState
+        {
+            Id = gameId,
+            Players = [new PlayerState { Id = playerId }],
+            Orders = [firstOrder, firstOrder with { Type = GameOrderType.ResumeWorld }]
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+    }
 }

@@ -82,6 +82,20 @@ public static class WorldStateCompatibility
                 player.Treasury < 0 || player.DailyBalanceRemainder is < 0 or >= 30))
             throw new InvalidDataException("The saved world contains invalid legacy player finances.");
 
+        var orderKeys = new HashSet<(Guid PlayerId, Guid OrderId)>();
+        foreach (var order in game.Orders)
+        {
+            if (order.GameId != game.Id ||
+                order.Id == Guid.Empty ||
+                !playerIds.Contains(order.PlayerId) ||
+                order.StateId is Guid stateId && !stateIds.Contains(stateId) ||
+                order.Payload is null ||
+                !Enum.IsDefined(order.Type) ||
+                !orderKeys.Add((order.PlayerId, order.Id)) ||
+                order.Accepted == (order.Result is not null))
+                throw new InvalidDataException("The saved world contains an invalid order record.");
+        }
+
         if (game.EconomyVersion < 1)
         {
             foreach (var player in game.Players)

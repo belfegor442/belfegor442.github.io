@@ -17,9 +17,11 @@ The browser's sample figures are preview-only. There is no single-player simulat
 
 The State treasury and monthly balance are shared by all members. Each member's construction plots remain separate for now, while their building income and upkeep contribute to their selected government's finances.
 
-Economic actions now check the active membership's permission set; unknown permission-set IDs fail closed. Current memberships receive the existing `government-member` permission set, and configurable roles and permission management are not available yet. Pause voting remains a game-wide vote by connected players.
+Every multiplayer action now requires a client-generated order ID. Accepted and rejected results are written to the persistent world history; retrying the same ID for the same player returns its original result without applying it again. The authenticated `GET /api/games/{gameId}/orders` endpoint reads that history. The browser persists unsent orders and retries them after reconnecting.
 
-This is only the Phase A foundation. Typed orders, durable accepted/rejected order history and idempotency, political institutions, late-join approval, atomic backup recovery, and most economic, social, military, and diplomatic systems are not implemented.
+Economic actions check the active membership's permission set; unknown permission-set IDs fail closed. Current memberships receive the existing `government-member` permission set, and configurable roles and permission management are not available yet. Pause voting remains a game-wide vote by connected players.
+
+This is only the Phase A foundation. Constitutional permissions and configurable roles, political institutions, late-join approval, atomic backup recovery, and most economic, social, military, and diplomatic systems are not implemented.
 
 Run the deterministic simulation tests from the repository root:
 

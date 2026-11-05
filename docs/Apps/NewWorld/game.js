@@ -34,6 +34,7 @@
   const SESSION_KEY = 'new-world-session-v1';
   const API_KEY = 'new-world-api-v1';
   const NAME_KEY = 'new-world-player-name-v1';
+  const PENDING_ORDERS_KEY = 'new-world-pending-orders-v1';
 
   function readJson(key) {
     try {
@@ -42,6 +43,47 @@
     } catch (error) {
       console.error('[new-world] Could not read browser storage:', error);
       return null;
+    }
+  }
+
+  function getPendingOrders() {
+    const orders = readJson(PENDING_ORDERS_KEY);
+    return Array.isArray(orders) ? orders : [];
+  }
+
+  function savePendingOrders(orders) {
+    try {
+      localStorage.setItem(PENDING_ORDERS_KEY, JSON.stringify(orders));
+      return true;
+    } catch (error) {
+      console.error('[new-world] Could not persist pending orders:', error);
+      showMessage('Cannot safely queue this order in browser storage.', true);
+      return false;
+    }
+  }
+
+  function ordersForCurrentSession() {
+    return getPendingOrders().filter(order =>
+      order.gameId === onlineSession?.gameId && order.playerId === onlineSession?.playerId);
+  }
+
+  function removePendingOrder(orderId) {
+    const remaining = getPendingOrders().filter(order => order.orderId !== orderId);
+    if (savePendingOrders(remaining)) sentOrderIds.delete(orderId);
+  }
+
+  function replayPendingOrders(currentSocket) {
+    if (currentSocket !== socket || currentSocket.readyState !== WebSocket.OPEN) return;
+    for (const order of ordersForCurrentSession()) {
+      if (sentOrderIds.has(order.orderId)) continue;
+      try {
+        currentSocket.send(JSON.stringify(order));
+        sentOrderIds.add(order.orderId);
+      } catch (error) {
+        console.error('[new-world] Could not resend pending order:', error);
+        showMessage('An order is queued and will be retried after reconnecting.', true);
+        return;
+      }
     }
   }
 
@@ -55,6 +97,7 @@
   let socket = null;
   let reconnectTimer = null;
   let manuallyDisconnected = false;
+  let sentOrderIds = new Set();
   let selectedPlot = null;
   let zoom = 1;
   let pan = {x: 0, y: 0};
@@ -596,6 +639,7 @@
     const socketUrl = base.replace(/^http/, 'ws') + '/ws';
     const currentSocket = new WebSocket(socketUrl);
     socket = currentSocket;
+    sentOrderIds = new Set();
     $('server-status').textContent = 'Connecting to the world…';
     currentSocket.addEventListener('open', () => {
       currentSocket.send(JSON.stringify({
@@ -615,8 +659,16 @@
       }
       if (message.type === 'snapshot' && message.game) {
         applySnapshot(message.game);
+        replayPendingOrders(currentSocket);
         $('server-status').textContent = 'Connected to the shared world.';
         $('server-status').classList.remove('error');
+      } else if (message.type === 'orderResult' && message.order) {
+        removePendingOrder(message.order.id);
+        if (message.order.accepted) {
+          showMessage(message.order.replayed ? 'Order already applied; world state synchronized.' : 'Order accepted.');
+        } else {
+          showMessage(message.order.error || 'The server rejected the order.', true);
+        }
       } else if (message.type === 'error') {
         showMessage(message.error || 'The server rejected the request.', true);
       }
@@ -640,7 +692,15 @@
       showMessage('Not connected to the game server. Reconnect before acting.', true);
       return;
     }
-    socket.send(JSON.stringify(action));
+    const order = {
+      ...action,
+      orderId: crypto.randomUUID(),
+      gameId: onlineSession.gameId,
+      playerId: onlineSession.playerId
+    };
+    const queued = [...getPendingOrders(), order];
+    if (!savePendingOrders(queued)) return;
+    replayPendingOrders(socket);
   }
 
   async function assignCountry(playerId, countryIndex) {

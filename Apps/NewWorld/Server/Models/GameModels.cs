@@ -23,6 +23,7 @@ public sealed class WorldState
     public List<PlayerState> Players { get; set; } = [];
     public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
+    public List<GameOrder> Orders { get; set; } = [];
     public List<string> Activity { get; set; } = [];
 }
 
@@ -42,6 +43,32 @@ public enum MembershipStatus
     Suspended,
     Left
 }
+
+public enum GameOrderType
+{
+    EstablishAdministration,
+    ConstructBuilding,
+    PauseWorld,
+    ResumeWorld,
+    Unsupported
+}
+
+public sealed record GameOrder(
+    Guid GameId,
+    Guid Id,
+    Guid PlayerId,
+    Guid? StateId,
+    GameOrderType Type,
+    GameOrderPayload Payload,
+    DateTimeOffset SubmittedAtUtc,
+    DateOnly SubmittedOnWorldDate,
+    bool Accepted,
+    string? Result,
+    long WorldVersion);
+
+public sealed record GameOrderPayload(int? TerritoryIndex, int? PlotIndex, string? BuildingId);
+
+public sealed record GameOrderResult(Guid Id, bool Accepted, string? Error, bool Replayed);
 
 public sealed class GovernmentMembership
 {
@@ -113,8 +140,11 @@ public sealed record GovernmentMembershipView(
 public sealed record TerritoryView(
     Guid StateId, int Index, string Name, int Treasury, int TerritoryIncome, int CityIncome, int Upkeep,
     int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
-public sealed record ClientMessage(string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex, string? BuildingId);
-public sealed record ServerMessage(string Type, string? Error = null, GameSnapshot? Game = null);
+public sealed record ClientMessage(
+    string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
+    string? BuildingId, Guid? OrderId);
+public sealed record ServerMessage(
+    string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 
 public static class GameCatalog
 {
