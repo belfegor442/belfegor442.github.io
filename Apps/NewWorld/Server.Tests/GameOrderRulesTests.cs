@@ -5,6 +5,29 @@ namespace NewWorld.Server.Tests;
 
 public sealed class GameOrderRulesTests
 {
+    [Theory]
+    [InlineData(GameOrderType.ConstructBuilding, GameStatus.Paused, "WORLD_NOT_RUNNING")]
+    [InlineData(GameOrderType.ConstructBuilding, GameStatus.Closed, "WORLD_NOT_RUNNING")]
+    [InlineData(GameOrderType.PauseWorld, GameStatus.Paused, "PAUSE_STATE_CONFLICT")]
+    [InlineData(GameOrderType.ResumeWorld, GameStatus.Running, "PAUSE_STATE_CONFLICT")]
+    public void WorldAvailabilityRejectsOrdersInIncompatibleStates(
+        GameOrderType orderType, GameStatus status, string expectedCode)
+    {
+        var result = GameOrderRules.CheckWorldAvailability(
+            new WorldState { Started = true, Status = status }, orderType);
+
+        Assert.Equal(expectedCode, result?.Code);
+    }
+
+    [Fact]
+    public void WorldAvailabilityRejectsOrdersBeforeTheWorldStarts()
+    {
+        var result = GameOrderRules.CheckWorldAvailability(
+            new WorldState { Status = GameStatus.Lobby }, GameOrderType.ConstructBuilding);
+
+        Assert.Equal("WORLD_NOT_STARTED", result?.Code);
+    }
+
     [Fact]
     public void StaleWorldVersionsAreRejectedWithStableCode()
     {

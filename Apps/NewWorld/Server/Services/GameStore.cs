@@ -152,20 +152,17 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             return (game, player, replay, null);
         }
 
-        OrderRejection? rejection = null;
-        if (!game.Started)
-            rejection = new OrderRejection(
-                "WORLD_NOT_STARTED", "The host must start the world before actions are allowed.");
-        else if (!game.Memberships.Any(membership =>
+        OrderRejection? rejection = GameOrderRules.CheckWorldAvailability(game, orderType);
+        if (rejection is null && !game.Memberships.Any(membership =>
                      membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
             rejection = new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
-        else if (stateId is not Guid selectedStateId ||
+        else if (rejection is null && (stateId is not Guid selectedStateId ||
                  !game.Memberships.Any(membership =>
                      membership.PlayerId == player.Id &&
                      membership.StateId == selectedStateId &&
-                     membership.Status == MembershipStatus.Active))
+                     membership.Status == MembershipStatus.Active)))
             rejection = new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
-        else
+        else if (rejection is null)
             rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
 
         if (rejection is null)
@@ -195,7 +192,10 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             game.Id,
             orderId,
             player.Id,
-            stateId,
+            stateId is Guid eventStateId &&
+            game.Territories.Any(territory => territory.StateId == eventStateId)
+                ? eventStateId
+                : null,
             rejection is null ? "order.executed" : "order.rejected",
             rejection?.Code,
             order.SubmittedAtUtc,
@@ -214,7 +214,10 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         new(orderId, false, code, message, replayed);
 
     public async Task<(WorldState? Game, string? Error)> MutateSystemAsync(
-        Guid gameId, Func<WorldState, string?> mutation, CancellationToken cancellationToken)
+        Guid gameId,
+        Func<WorldState, string?> mutation,
+        CancellationToken cancellationToken,
+        Func<WorldState, bool>? shouldAdvanceWorldVersion = null)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -226,7 +229,8 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         if (error is not null)
             return (game, error);
 
-        game.WorldVersion++;
+        if (shouldAdvanceWorldVersion?.Invoke(game) ?? true)
+            game.WorldVersion++;
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (game, null);

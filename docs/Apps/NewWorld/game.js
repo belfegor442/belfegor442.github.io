@@ -719,6 +719,7 @@
   function orderErrorMessage(code) {
     const messages = {
       WORLD_NOT_STARTED: 'The host must start the world before actions are allowed.',
+      WORLD_NOT_RUNNING: 'This action is unavailable while the world is paused or closed.',
       NOT_MEMBER: 'You are not a member of the selected government.',
       INSUFFICIENT_PERMISSION: 'Your government permissions do not allow this action.',
       INVALID_PAYLOAD: 'The order contains invalid details.',

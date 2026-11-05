@@ -72,7 +72,7 @@ public sealed class WorldClock(
                     didAdvance = daysDue > 0;
                     nextAnchor = new ClockAnchor(nowTimestamp, game.LastTickUtc);
                     return null;
-                }, stoppingToken);
+                }, stoppingToken, _ => didAdvance);
 
                 if (result.Error is null)
                 {

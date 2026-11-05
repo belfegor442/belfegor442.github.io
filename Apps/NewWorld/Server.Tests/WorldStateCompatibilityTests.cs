@@ -231,4 +231,67 @@ public sealed class WorldStateCompatibilityTests
 
         Assert.Equal(order, Assert.Single(game.Orders));
     }
+
+    [Fact]
+    public void NormalizeMigratesLegacyOrdersIntoStableWorldEvents()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, Guid.NewGuid(), playerId, stateId, GameOrderType.ConstructBuilding,
+            GameOrderStatus.Rejected, new GameOrderPayload(null, 2, "farm"), 1,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1),
+            "INSUFFICIENT_FUNDS", "Insufficient treasury.", 2);
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 2,
+            Players = [new PlayerState { Id = playerId }],
+            Territories = [new TerritoryState { StateId = stateId }],
+            Orders = [order]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        var worldEvent = Assert.Single(game.Events);
+        Assert.Equal(order.Id, worldEvent.OrderId);
+        Assert.Equal(order.PlayerId, worldEvent.ActorPlayerId);
+        Assert.Equal(order.StateId, worldEvent.StateId);
+        Assert.Equal("order.rejected", worldEvent.Type);
+        Assert.Equal("INSUFFICIENT_FUNDS", worldEvent.ResultCode);
+
+        var eventId = worldEvent.Id;
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(eventId, Assert.Single(game.Events).Id);
+    }
+
+    [Fact]
+    public void NormalizeKeepsRejectedOrdersWithUnknownStateReferencesAuditable()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var unknownStateId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, Guid.NewGuid(), playerId, unknownStateId, GameOrderType.ConstructBuilding,
+            GameOrderStatus.Rejected, new GameOrderPayload(null, 2, "farm"), 1,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1),
+            "NOT_MEMBER", "You are not a member of the selected government.", 2);
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 2,
+            Players = [new PlayerState { Id = playerId }],
+            Territories = [new TerritoryState { StateId = Guid.NewGuid() }],
+            Orders = [order]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        var worldEvent = Assert.Single(game.Events);
+        Assert.Equal(order.Id, worldEvent.OrderId);
+        Assert.Null(worldEvent.StateId);
+        Assert.Equal(unknownStateId, Assert.Single(game.Orders).StateId);
+    }
 }

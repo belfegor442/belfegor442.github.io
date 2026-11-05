@@ -123,7 +123,9 @@ public static class WorldStateCompatibility
                 worldEvent.WorldVersion > game.WorldVersion ||
                 linkedOrder is not null &&
                 (worldEvent.ActorPlayerId != linkedOrder.PlayerId ||
-                 worldEvent.StateId != linkedOrder.StateId ||
+                 worldEvent.StateId != (linkedOrder.StateId is Guid linkedStateId && stateIds.Contains(linkedStateId)
+                     ? linkedStateId
+                     : null) ||
                  worldEvent.WorldVersion != linkedOrder.WorldVersion ||
                  worldEvent.ResultCode != linkedOrder.ResultCode ||
                  worldEvent.Type != (linkedOrder.Status == GameOrderStatus.Executed
@@ -131,6 +133,29 @@ public static class WorldStateCompatibility
                      : "order.rejected")) ||
                 !eventIds.Add(worldEvent.Id))
                 throw new InvalidDataException("The saved world contains an invalid world event.");
+        }
+
+        foreach (var order in game.Orders)
+        {
+            if (!eventOrderIds.Add(order.Id))
+                continue;
+            Guid? stateId = order.StateId is Guid requestedStateId && stateIds.Contains(requestedStateId)
+                ? requestedStateId
+                : null;
+            game.Events.Add(new WorldEvent(
+                CreateStableId($"{game.Id:N}:order-event:{order.Id:N}"),
+                game.Id,
+                order.Id,
+                order.PlayerId,
+                stateId,
+                order.Status == GameOrderStatus.Executed ? "order.executed" : "order.rejected",
+                order.ResultCode,
+                order.SubmittedAtUtc,
+                order.SubmittedOnWorldDate,
+                order.WorldVersion,
+                order.Status == GameOrderStatus.Executed
+                    ? $"Executed {order.Type}."
+                    : order.Result!));
         }
 
         if (game.EconomyVersion < 1)

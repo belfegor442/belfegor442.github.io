@@ -4,6 +4,25 @@ namespace NewWorld.Server.Services;
 
 public static class GameOrderRules
 {
+    public static OrderRejection? CheckWorldAvailability(WorldState game, GameOrderType orderType)
+    {
+        if (!game.Started)
+            return new OrderRejection(
+                "WORLD_NOT_STARTED", "The host must start the world before actions are allowed.");
+
+        if (orderType == GameOrderType.PauseWorld && game.Status != GameStatus.Running ||
+            orderType == GameOrderType.ResumeWorld && game.Status != GameStatus.Paused)
+            return new OrderRejection(
+                "PAUSE_STATE_CONFLICT", "The world pause state changed before this order was processed.");
+
+        if (orderType is not (GameOrderType.PauseWorld or GameOrderType.ResumeWorld) &&
+            game.Status != GameStatus.Running)
+            return new OrderRejection(
+                "WORLD_NOT_RUNNING", "This action is unavailable while the world is not running.");
+
+        return null;
+    }
+
     public static OrderRejection? CheckWorldVersion(long expectedWorldVersion, long currentWorldVersion) =>
         expectedWorldVersion == currentWorldVersion
             ? null
