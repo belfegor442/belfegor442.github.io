@@ -103,6 +103,18 @@ public sealed class MarketClearingRulesTests
         });
         WorldStateCompatibility.Normalize(game);
         var importingCurrency = game.Territories.Single(item => item.StateId == importingState).CurrencyId;
+        game.Markets.Add(new EconomicMarket
+        {
+            StateId = importingState,
+            GoodId = "flour",
+            DailyDemand = 3,
+            DailyConsumerBudget = 100,
+            BasePrice = 10,
+            CurrentPrice = 10,
+            MinimumPrice = 1,
+            MaximumPrice = 100,
+            PriceSmoothingPercent = 100
+        });
         var importer = new EconomicCompany
         {
             Id = Guid.NewGuid(),
@@ -113,20 +125,43 @@ public sealed class MarketClearingRulesTests
             CashBalances = new Dictionary<Guid, long> { [importingCurrency] = 20 },
             Inventory = new Dictionary<string, long> { ["flour"] = 0 }
         };
-        exporter.Inventory["flour"] = 8;
-        game.Companies.Add(importer);
-        game.TradeRoutes.Add(new EconomicTradeRoute
+        var secondExporter = new EconomicCompany
         {
             Id = Guid.NewGuid(),
-            ExportStateId = exporter.StateId,
-            ImportStateId = importingState,
-            GoodId = "flour",
-            DailyCapacity = 5,
-            ExporterCompanyId = exporter.Id,
-            ImporterCompanyId = importer.Id,
-            DailyQuantity = 4,
-            UnitPrice = 3
-        });
+            StateId = exporter.StateId,
+            CurrencyId = exporter.CurrencyId,
+            Name = "Second Exporter",
+            Sector = "Food processing",
+            Inventory = new Dictionary<string, long> { ["flour"] = 2 }
+        };
+        exporter.Inventory["flour"] = 8;
+        game.Companies.AddRange([importer, secondExporter]);
+        game.TradeRoutes.AddRange([
+            new EconomicTradeRoute
+            {
+                Id = Guid.NewGuid(),
+                ExportStateId = exporter.StateId,
+                ImportStateId = importingState,
+                GoodId = "flour",
+                DailyCapacity = 5,
+                ExporterCompanyId = exporter.Id,
+                ImporterCompanyId = importer.Id,
+                DailyQuantity = 4,
+                UnitPrice = 3
+            },
+            new EconomicTradeRoute
+            {
+                Id = Guid.NewGuid(),
+                ExportStateId = exporter.StateId,
+                ImportStateId = importingState,
+                GoodId = "flour",
+                DailyCapacity = 2,
+                ExporterCompanyId = secondExporter.Id,
+                ImporterCompanyId = importer.Id,
+                DailyQuantity = 2,
+                UnitPrice = 3
+            }
+        ]);
         game.EconomyVersion = 2;
         WorldStateCompatibility.Normalize(game);
 
@@ -134,17 +169,26 @@ public sealed class MarketClearingRulesTests
 
         Assert.Null(result.Error);
         Assert.Equal(4, exporter.Inventory["flour"]);
-        Assert.Equal(4, importer.Inventory["flour"]);
-        Assert.Equal(8, importer.CashBalances[importingCurrency]);
+        Assert.Equal(0, secondExporter.Inventory["flour"]);
+        Assert.Equal(6, importer.Inventory["flour"]);
+        Assert.Equal(2, importer.CashBalances[importingCurrency]);
         Assert.Equal(12, exporter.CashBalances[importingCurrency]);
-        var purchase = Assert.Single(game.CompanyFinancialTransactions, item =>
-            item.Type == CompanyTransactionType.TradePurchase);
-        var sale = Assert.Single(game.CompanyFinancialTransactions, item =>
-            item.Type == CompanyTransactionType.TradeSale);
-        Assert.Equal(-12, purchase.Amount);
-        Assert.Equal(12, sale.Amount);
-        Assert.Equal(0, purchase.Amount + sale.Amount);
-        Assert.Equal(1, game.Events.Count(item => item.Type == "economy.trade_completed"));
+        Assert.Equal(6, secondExporter.CashBalances[importingCurrency]);
+        var purchases = game.CompanyFinancialTransactions.Where(item =>
+            item.Type == CompanyTransactionType.TradePurchase).ToList();
+        var sales = game.CompanyFinancialTransactions.Where(item =>
+            item.Type == CompanyTransactionType.TradeSale).ToList();
+        Assert.Equal(2, purchases.Count);
+        Assert.Equal(2, sales.Count);
+        Assert.DoesNotContain(game.CompanyFinancialTransactions, item =>
+            item.Type == CompanyTransactionType.MarketSale);
+        var importingSettlement = Assert.Single(result.Settlements, item =>
+            item.StateId == importingState);
+        Assert.Equal(0, importingSettlement.ImportedSupply);
+        Assert.Equal(0, importingSettlement.QuantitySold);
+        Assert.Equal(-18, purchases.Sum(item => item.Amount));
+        Assert.Equal(18, sales.Sum(item => item.Amount));
+        Assert.Equal(2, game.Events.Count(item => item.Type == "economy.trade_completed"));
 
         game.WorldVersion++;
         WorldStateCompatibility.Normalize(game);

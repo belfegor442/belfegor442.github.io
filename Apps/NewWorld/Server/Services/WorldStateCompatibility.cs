@@ -214,11 +214,21 @@ public static class WorldStateCompatibility
         }
 
         var tradeRouteIds = new HashSet<Guid>();
-        var tradeRouteKeys = new HashSet<(Guid ExportStateId, Guid ImportStateId, string GoodId)>();
+        var marketTradeRouteKeys = new HashSet<(Guid ExportStateId, Guid ImportStateId, string GoodId)>();
+        var companyTradeRouteKeys = new HashSet<(Guid ExporterId, Guid ImporterId, string GoodId)>();
         foreach (var route in game.TradeRoutes)
         {
             var companyTrade = route.ExporterCompanyId is not null &&
                                route.ImporterCompanyId is not null;
+            var uniqueRoute = companyTrade
+                ? companyTradeRouteKeys.Add((
+                    route.ExporterCompanyId!.Value,
+                    route.ImporterCompanyId!.Value,
+                    route.GoodId))
+                : marketTradeRouteKeys.Add((
+                    route.ExportStateId,
+                    route.ImportStateId,
+                    route.GoodId));
             if (route.Id == Guid.Empty ||
                 !tradeRouteIds.Add(route.Id) ||
                 !stateIds.Contains(route.ExportStateId) ||
@@ -237,7 +247,7 @@ public static class WorldStateCompatibility
                  route.DailyQuantity <= 0 ||
                  route.DailyQuantity > route.DailyCapacity ||
                  route.UnitPrice <= 0) ||
-                !tradeRouteKeys.Add((route.ExportStateId, route.ImportStateId, route.GoodId)))
+                !uniqueRoute)
                 throw new InvalidDataException("The saved world contains an invalid economic trade route.");
         }
 

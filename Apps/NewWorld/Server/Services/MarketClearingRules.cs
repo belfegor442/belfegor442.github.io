@@ -46,7 +46,7 @@ public static class MarketClearingRules
                 group => group.Key,
                 group => group.Select(item => item.Company).OrderBy(company => company.Id).ToList());
         var routesByImportMarket = game.TradeRoutes
-            .Where(route => route.Enabled)
+            .Where(route => route.Enabled && route.ExporterCompanyId is null)
             .GroupBy(route => (route.ImportStateId, route.GoodId))
             .ToDictionary(
                 group => group.Key,
