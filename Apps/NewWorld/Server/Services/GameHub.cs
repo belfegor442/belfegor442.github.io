@@ -261,6 +261,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     return null;
 
                 case "claim":
+                    if (!GovernmentPermissionRules.Allows(
+                            governmentMembership.PermissionSetId, GovernmentAction.EstablishAdministration))
+                        return "Your government permissions do not allow establishing an administration.";
                     if (message.TerritoryIndex is not int territoryIndex ||
                         territoryIndex < 0 || territoryIndex >= game.Territories.Count)
                         return "Invalid territory.";
@@ -276,6 +279,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     return null;
 
                 case "build":
+                    if (!GovernmentPermissionRules.Allows(
+                            governmentMembership.PermissionSetId, GovernmentAction.ConstructBuilding))
+                        return "Your government permissions do not allow construction.";
                     if (message.PlotIndex is not int plot || plot < 0 || plot >= 144)
                         return "Invalid construction plot.";
                     if (message.BuildingId is null || !GameCatalog.Buildings.TryGetValue(message.BuildingId, out var building))
