@@ -79,6 +79,8 @@ public sealed class LobbyRulesTests
         Assert.Equal(1, player.LegacyCountryIndex);
         var snapshot = GameHub.BuildSnapshot(game, new HashSet<Guid> { player.Id });
         Assert.Equal(2, Assert.Single(snapshot.Players).Memberships.Count);
+        Assert.All(snapshot.Players.Single().Memberships, membership =>
+            Assert.Equal(GovernmentPermissionRules.MemberPermissionSetId, membership.PermissionSetId));
         Assert.Equal(new DateOnly(1500, 1, 1), snapshot.WorldDate);
         Assert.Equal(1200, game.Territories[0].Treasury);
         Assert.Equal(0, game.Territories[1].Treasury);

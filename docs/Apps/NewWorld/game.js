@@ -798,9 +798,13 @@
         summary.className = 'player-summary';
         const playerLabel = document.createElement('span');
         playerLabel.textContent = player.name + (player.isHost ? ' · HOST' : '');
-        const memberStates = membershipsFor(player).map(membership =>
-          onlineGame.territories.find(territory => territory.stateId === membership.stateId)?.name
-        ).filter(Boolean);
+        const memberStates = membershipsFor(player).map(membership => {
+          const territoryName = onlineGame.territories
+            .find(territory => territory.stateId === membership.stateId)?.name;
+          if (!territoryName) return null;
+          const role = membership.permissionSetId.replaceAll('-', ' ').toUpperCase();
+          return territoryName + ' · ' + role;
+        }).filter(Boolean);
         const stateLabel = document.createElement('span');
         stateLabel.textContent = (player.connected ? '● ONLINE · ' : '○ OFFLINE · ') +
           (memberStates.join(', ') || 'STATE UNASSIGNED');

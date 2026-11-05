@@ -23,6 +23,9 @@ public sealed class PauseVoteRulesTests
         Assert.Equal(GameStatus.Paused, game.Status);
         Assert.Equal(now, game.LastTickUtc);
         Assert.Empty(game.PauseVotes);
+        var worldEvent = Assert.Single(game.Events);
+        Assert.Equal("world.paused.no_players", worldEvent.Type);
+        Assert.Equal(game.WorldVersion + 1, worldEvent.WorldVersion);
     }
 
     [Fact]
@@ -39,6 +42,7 @@ public sealed class PauseVoteRulesTests
 
         Assert.False(PauseVoteRules.PauseForNoConnectedPlayers(game, DateTimeOffset.UtcNow));
         Assert.Equal(lastTick, game.LastTickUtc);
+        Assert.Empty(game.Events);
     }
 
     [Fact]

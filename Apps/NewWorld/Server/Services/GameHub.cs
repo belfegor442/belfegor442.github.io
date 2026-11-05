@@ -114,20 +114,20 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
     private async Task ResetClockAsync(
         Guid gameId, CancellationToken cancellationToken, bool pauseIfEmpty = false)
     {
+        var worldStateChanged = false;
         var result = await store.MutateSystemAsync(gameId, game =>
         {
             if (pauseIfEmpty)
             {
-                return PauseVoteRules.PauseForNoConnectedPlayers(game, DateTimeOffset.UtcNow)
-                    ? null
-                    : "No pause state change is required.";
+                worldStateChanged = PauseVoteRules.PauseForNoConnectedPlayers(game, DateTimeOffset.UtcNow);
+                return worldStateChanged ? null : "No pause state change is required.";
             }
 
             if (!game.Started)
                 return "The world clock has not started.";
             game.LastTickUtc = DateTimeOffset.UtcNow;
             return null;
-        }, cancellationToken);
+        }, cancellationToken, _ => worldStateChanged);
         if (result.Error is not null && result.Error != "The world clock has not started." &&
             result.Error != "No pause state change is required.")
             logger.LogWarning("Could not reset the world clock for {GameId}: {Reason}", gameId, result.Error);
@@ -339,15 +339,30 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
     private async Task ResetPauseVotesAsync(Guid gameId, CancellationToken cancellationToken)
     {
+        var votesChanged = false;
         var result = await store.MutateSystemAsync(gameId, game =>
         {
             if (game.PauseVotes.Count == 0)
-                return null;
+                return "No pause votes need resetting.";
             game.PauseVotes.Clear();
-            GameStore.AddActivity(game, "The pause vote was reset because the connected players changed.");
+            const string description = "The pause vote was reset because the connected players changed.";
+            game.Events.Add(new WorldEvent(
+                Guid.NewGuid(),
+                game.Id,
+                null,
+                null,
+                null,
+                "world.pause_votes_reset",
+                null,
+                DateTimeOffset.UtcNow,
+                game.WorldDate,
+                game.WorldVersion + 1,
+                description));
+            GameStore.AddActivity(game, description);
+            votesChanged = true;
             return null;
-        }, cancellationToken);
-        if (result.Error is not null)
+        }, cancellationToken, _ => votesChanged);
+        if (result.Error is not null && result.Error != "No pause votes need resetting.")
             logger.LogWarning("Could not reset pause votes for {GameId}: {Reason}", gameId, result.Error);
     }
 
