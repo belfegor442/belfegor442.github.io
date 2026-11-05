@@ -925,9 +925,11 @@ public static class WorldStateCompatibility
                 settlement.PopulationDemand > settlement.Demand ||
                 settlement.PopulationQuantitySold < 0 ||
                 settlement.PopulationQuantitySold > settlement.PopulationDemand ||
+                settlement.PopulationQuantitySold > settlement.QuantitySold ||
                 settlement.PopulationUnmetDemand < 0 ||
                 settlement.PopulationUnmetDemand !=
                 settlement.PopulationDemand - settlement.PopulationQuantitySold ||
+                settlement.PopulationUnmetDemand > settlement.UnmetDemand ||
                 settlement.DomesticSupply < 0 ||
                 settlement.ImportedSupply < 0 ||
                 settlement.QuantitySold < 0 ||

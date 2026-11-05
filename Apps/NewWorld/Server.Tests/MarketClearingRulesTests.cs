@@ -547,6 +547,38 @@ public sealed class MarketClearingRulesTests
     }
 
     [Fact]
+    public void NormalizeRejectsPopulationSatisfactionThatExceedsPhysicalSales()
+    {
+        var (game, company, market) = CreateMarketWorld();
+        company.Inventory["flour"] = 1;
+        market.DailyConsumerBudget = 100;
+        game.PopulationGroups.Add(new PopulationGroup
+        {
+            Id = Guid.NewGuid(),
+            StateId = market.StateId,
+            Name = "Households",
+            Population = 1000,
+            Needs =
+            [
+                new PopulationNeed
+                {
+                    GoodId = "flour",
+                    DailyQuantityPerThousandPeople = 3
+                }
+            ]
+        });
+        WorldStateCompatibility.Normalize(game);
+        MarketClearingRules.ClearDailyMarkets(game);
+        game.MarketHistory[0] = game.MarketHistory[0] with
+        {
+            PopulationQuantitySold = 2,
+            PopulationUnmetDemand = 1
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+    }
+
+    [Fact]
     public void ExcessivePopulationDemandDoesNotPartiallyAdvanceRemaindersOrMarkets()
     {
         var (game, company, market) = CreateMarketWorld();
