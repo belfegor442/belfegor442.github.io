@@ -64,6 +64,26 @@ public sealed class WorldStateCompatibilityTests
         Assert.Equal(20, game.MaxHumanPlayers);
     }
 
+    [Theory]
+    [InlineData(true, false, GameStatus.Paused, GameStatus.Running, false)]
+    [InlineData(true, true, GameStatus.Running, GameStatus.Paused, true)]
+    [InlineData(false, true, GameStatus.Paused, GameStatus.Lobby, false)]
+    public void NormalizeKeepsStartedPausedAndSessionStatusConsistent(
+        bool started, bool paused, GameStatus savedStatus, GameStatus expectedStatus, bool expectedPaused)
+    {
+        var game = new WorldState
+        {
+            Started = started,
+            Paused = paused,
+            Status = savedStatus
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(expectedStatus, game.Status);
+        Assert.Equal(expectedPaused, game.Paused);
+    }
+
     [Fact]
     public void NormalizeRejectsMembershipsReferencingAnotherGame()
     {

@@ -37,14 +37,21 @@ public static class WorldStateCompatibility
 
         if (game.WorldVersion < 1)
             game.WorldVersion = 1;
+        if (!Enum.IsDefined(game.Status))
+            throw new InvalidDataException("The saved world has an invalid session status.");
         if (game.ClockAccumulatorTicks < 0 ||
             game.ClockAccumulatorTicks >= TimeSpan.FromMinutes(5).Ticks)
             throw new InvalidDataException("The saved world has an invalid clock accumulator.");
         if (game.MaxHumanPlayers < 1)
             game.MaxHumanPlayers = GameCatalog.MaxHumanPlayers;
         game.MaxHumanPlayers = Math.Min(game.MaxHumanPlayers, GameCatalog.MaxHumanPlayers);
-        if (game.Started && game.Status == GameStatus.Lobby)
+        if (game.Started && game.Status is GameStatus.Lobby or GameStatus.Running or GameStatus.Paused)
             game.Status = game.Paused ? GameStatus.Paused : GameStatus.Running;
+        else if (!game.Started && game.Status is (GameStatus.Running or GameStatus.Paused))
+        {
+            game.Status = GameStatus.Lobby;
+            game.Paused = false;
+        }
 
         foreach (var territory in game.Territories)
         {
@@ -86,6 +93,7 @@ public static class WorldStateCompatibility
             if (membership.GameId != game.Id ||
                 !playerIds.Contains(membership.PlayerId) ||
                 !stateIds.Contains(membership.StateId) ||
+                !Enum.IsDefined(membership.Status) ||
                 string.IsNullOrWhiteSpace(membership.PermissionSetId) ||
                 !membershipIds.Add(membership.Id) ||
                 membership.Status == MembershipStatus.Active &&

@@ -37,6 +37,23 @@ public static class GameOrderRules
         return null;
     }
 
+    public static OrderRejection? CheckMembership(
+        WorldState game, Guid playerId, Guid? stateId)
+    {
+        if (!game.Memberships.Any(membership =>
+                membership.PlayerId == playerId && membership.Status == MembershipStatus.Active))
+            return new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
+
+        if (stateId is not Guid selectedStateId ||
+            !game.Memberships.Any(membership =>
+                membership.PlayerId == playerId &&
+                membership.StateId == selectedStateId &&
+                membership.Status == MembershipStatus.Active))
+            return new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
+
+        return null;
+    }
+
     public static OrderRejection? CheckWorldVersion(long expectedWorldVersion, long currentWorldVersion) =>
         expectedWorldVersion == currentWorldVersion
             ? null

@@ -78,6 +78,58 @@ public sealed class GameOrderRulesTests
     }
 
     [Fact]
+    public void MembershipAuthorizationUsesPlayerAndSelectedStateWithoutHostPrivilege()
+    {
+        var hostId = Guid.NewGuid();
+        var otherPlayerId = Guid.NewGuid();
+        var firstStateId = Guid.NewGuid();
+        var secondStateId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            HostPlayerId = hostId,
+            Players =
+            [
+                new PlayerState { Id = hostId, IsHost = true },
+                new PlayerState { Id = otherPlayerId }
+            ],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = hostId, StateId = firstStateId, Status = MembershipStatus.Active
+                },
+                new GovernmentMembership
+                {
+                    PlayerId = otherPlayerId, StateId = secondStateId, Status = MembershipStatus.Active
+                }
+            ]
+        };
+
+        Assert.Null(GameOrderRules.CheckMembership(game, hostId, firstStateId));
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, hostId, secondStateId)?.Code);
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, otherPlayerId, firstStateId)?.Code);
+    }
+
+    [Fact]
+    public void MembershipAuthorizationRejectsLeftGovernmentMembers()
+    {
+        var playerId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = playerId, StateId = stateId, Status = MembershipStatus.Left
+                }
+            ]
+        };
+
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, playerId, stateId)?.Code);
+    }
+
+    [Fact]
     public void StaleWorldVersionsAreRejectedWithStableCode()
     {
         Assert.Null(GameOrderRules.CheckWorldVersion(4, 4));

@@ -153,16 +153,9 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         }
 
         OrderRejection? rejection = GameOrderRules.CheckWorldAvailability(game, orderType);
-        if (rejection is null && !game.Memberships.Any(membership =>
-                     membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
-            rejection = new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
-        else if (rejection is null && (stateId is not Guid selectedStateId ||
-                 !game.Memberships.Any(membership =>
-                     membership.PlayerId == player.Id &&
-                     membership.StateId == selectedStateId &&
-                     membership.Status == MembershipStatus.Active)))
-            rejection = new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
-        else if (rejection is null)
+        if (rejection is null)
+            rejection = GameOrderRules.CheckMembership(game, player.Id, stateId);
+        if (rejection is null)
             rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
 
         if (rejection is null)
