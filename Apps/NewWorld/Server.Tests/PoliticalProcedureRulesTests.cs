@@ -74,6 +74,44 @@ public sealed class PoliticalProcedureRulesTests
     }
 
     [Fact]
+    public void PoliticalConfigurationMustCoverEveryStateExactlyOnce()
+    {
+        var stateA = Guid.NewGuid();
+        var stateB = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 1,
+            Territories =
+            [
+                new TerritoryState { StateId = stateA, Index = 0, Name = "North" },
+                new TerritoryState { StateId = stateB, Index = 1, Name = "South" }
+            ]
+        };
+
+        var duplicate = PoliticalSetupRules.Configure(
+            game,
+            new PoliticalScenarioRequest(1,
+            [
+                new StatePoliticalSystem { StateId = stateA },
+                new StatePoliticalSystem { StateId = stateA }
+            ]));
+        Assert.Equal(
+            "Invalid political configuration: Political configuration entries cannot repeat the same State.",
+            duplicate);
+
+        var missingState = PoliticalSetupRules.Configure(
+            game,
+            new PoliticalScenarioRequest(1,
+            [
+                new StatePoliticalSystem { StateId = stateA }
+            ]));
+        Assert.Equal(
+            "Invalid political configuration: Each State must have exactly one political system configured.",
+            missingState);
+    }
+
+    [Fact]
     public void LawProposalRequiresAnExplicitConstitutionalCompetence()
     {
         var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
