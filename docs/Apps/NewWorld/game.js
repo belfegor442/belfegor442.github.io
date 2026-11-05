@@ -589,7 +589,12 @@
     manuallyDisconnected = false;
     try {
       if (!offlineBackup) offlineBackup = structuredClone(state);
-      const game = await apiRequest('/api/games/' + encodeURIComponent(onlineSession.gameId), {}, onlineSession.playerToken);
+      const lastEventSequence = Number(onlineSession.lastEventSequence) || 0;
+      const game = await apiRequest(
+        '/api/games/' + encodeURIComponent(onlineSession.gameId) +
+          '?afterEventSequence=' + encodeURIComponent(lastEventSequence),
+        {},
+        onlineSession.playerToken);
       applySnapshot(game);
       openSocket();
     } catch (error) {
@@ -599,11 +604,22 @@
   }
 
   function applySnapshot(game) {
+    const lastEventSequence = Number(onlineSession?.lastEventSequence) || 0;
+    const recoveredEvents = (game.events || []).filter(event => event.sequence > lastEventSequence);
+    if (recoveredEvents.length) {
+      game.activity = [
+        ...recoveredEvents.map(event => formatWorldDate(event.worldDate) + ' · ' + event.description),
+        ...(game.activity || [])
+      ].slice(0, 20);
+    }
     onlineGame = game;
     const player = currentPlayer();
     if (!player) {
       showMessage('Your player record is not in this world. Rejoin using a valid invitation.', true);
       return;
+    }
+    if (onlineSession && game.eventSequence > lastEventSequence) {
+      storeSession({...onlineSession, lastEventSequence: game.eventSequence});
     }
     const governmentIndex = player.countryIndex ?? membershipsFor(player)[0]?.stateIndex;
     const governmentFinance = game.territories.find(territory => territory.index === governmentIndex) || null;
@@ -647,7 +663,8 @@
       currentSocket.send(JSON.stringify({
         type: 'authenticate',
         gameId: onlineSession.gameId,
-        token: onlineSession.playerToken
+        token: onlineSession.playerToken,
+        lastEventSequence: Number(onlineSession.lastEventSequence) || 0
       }));
     });
     currentSocket.addEventListener('message', event => {

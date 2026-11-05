@@ -130,8 +130,27 @@ public static class WorldStateCompatibility
                 throw new InvalidDataException("The saved world contains an invalid order record.");
         }
 
+        if (game.EventSequence < 0)
+            throw new InvalidDataException("The saved world has an invalid event sequence.");
+        var knownEventSequences = new HashSet<long>();
+        foreach (var worldEvent in game.Events)
+        {
+            if (worldEvent.Sequence < 0 ||
+                worldEvent.Sequence > 0 && !knownEventSequences.Add(worldEvent.Sequence))
+                throw new InvalidDataException("The saved world contains duplicate event sequences.");
+            game.EventSequence = Math.Max(game.EventSequence, worldEvent.Sequence);
+        }
+        for (var index = 0; index < game.Events.Count; index++)
+        {
+            if (game.Events[index].Sequence != 0)
+                continue;
+            game.EventSequence++;
+            game.Events[index] = game.Events[index] with { Sequence = game.EventSequence };
+        }
+
         var eventIds = new HashSet<Guid>();
         var eventOrderIds = new HashSet<Guid>();
+        var validatedEventSequences = new HashSet<long>();
         foreach (var worldEvent in game.Events)
         {
             var linkedOrder = worldEvent.OrderId is Guid eventOrderId
@@ -145,6 +164,9 @@ public static class WorldStateCompatibility
                 worldEvent.OrderId is Guid linkedOrderId && !eventOrderIds.Add(linkedOrderId) ||
                 string.IsNullOrWhiteSpace(worldEvent.Type) ||
                 string.IsNullOrWhiteSpace(worldEvent.Description) ||
+                worldEvent.Sequence < 1 ||
+                worldEvent.Sequence > game.EventSequence ||
+                !validatedEventSequences.Add(worldEvent.Sequence) ||
                 worldEvent.WorldVersion < 1 ||
                 worldEvent.WorldVersion > game.WorldVersion ||
                 linkedOrder is not null &&
@@ -181,7 +203,8 @@ public static class WorldStateCompatibility
                 order.WorldVersion,
                 order.Status == GameOrderStatus.Executed
                     ? $"Executed {order.Type}."
-                    : order.Result!));
+                    : order.Result!,
+                ++game.EventSequence));
         }
 
         if (game.EconomyVersion < 1)

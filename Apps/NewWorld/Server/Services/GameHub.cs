@@ -56,7 +56,11 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             }
 
             gameId = auth.GameId.Value;
-            connection = new Connection(authorized.Player.Id, socket);
+            connection = new Connection(
+                authorized.Player.Id,
+                socket,
+                Math.Clamp(auth.LastEventSequence ?? 0, 0, authorized.Game.EventSequence),
+                authorized.Game.WorldVersion);
             var connections = _games.GetOrAdd(gameId, _ => new ConcurrentDictionary<Guid, Connection>());
             var wasEmpty = connections.IsEmpty;
             if (!connections.TryAdd(connection.PlayerId, connection))
@@ -140,12 +144,15 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var (game, _) = await store.GetAuthorizedAsync(gameId, "", cancellationToken);
         if (game is null)
             return;
-        var snapshot = BuildSnapshot(game, ConnectedPlayers(gameId));
+        var connectedPlayers = ConnectedPlayers(gameId);
         await Task.WhenAll(connections.Values.Select(connection =>
-            SendAsync(connection, new ServerMessage("snapshot", Game: snapshot), cancellationToken)));
+            SendAsync(connection, new ServerMessage(
+                "snapshot", Game: BuildSnapshot(game, connectedPlayers, connection.LastEventSequence)),
+                cancellationToken)));
     }
 
-    public static GameSnapshot BuildSnapshot(WorldState game, IReadOnlySet<Guid> connectedPlayers)
+    public static GameSnapshot BuildSnapshot(
+        WorldState game, IReadOnlySet<Guid> connectedPlayers, long afterEventSequence = 0)
     {
         var stateIndices = game.Territories.ToDictionary(territory => territory.StateId, territory => territory.Index);
         var memberships = game.Memberships
@@ -206,7 +213,11 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             game.WorldVersion,
             game.ScenarioId,
             game.ScenarioVersion,
-            memberships);
+            memberships,
+            game.EventSequence,
+            game.Events.Where(worldEvent => worldEvent.Sequence > afterEventSequence)
+                .OrderBy(worldEvent => worldEvent.Sequence)
+                .ToList());
     }
 
     private async Task HandleMessageAsync(
@@ -351,7 +362,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 DateTimeOffset.UtcNow,
                 game.WorldDate,
                 game.WorldVersion + 1,
-                description));
+                description,
+                ++game.EventSequence));
             GameStore.AddActivity(game, description);
             votesChanged = true;
             return null;
@@ -362,7 +374,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
     private async Task SendSnapshotAsync(Connection connection, WorldState game, CancellationToken cancellationToken)
     {
-        var snapshot = BuildSnapshot(game, ConnectedPlayers(game.Id));
+        var snapshot = BuildSnapshot(game, ConnectedPlayers(game.Id), connection.LastEventSequence);
         await SendAsync(connection, new ServerMessage("snapshot", Game: snapshot), cancellationToken);
     }
 
@@ -396,8 +408,21 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         await connection.SendLock.WaitAsync(cancellationToken);
         try
         {
-            if (connection.Socket.State == WebSocketState.Open)
+            if (connection.Socket.State == WebSocketState.Open &&
+                (message.Game is not GameSnapshot snapshot ||
+                 snapshot.WorldVersion > connection.LastWorldVersion ||
+                 snapshot.WorldVersion == connection.LastWorldVersion &&
+                 snapshot.EventSequence >= connection.LastEventSequence))
+            {
                 await SendAsync(connection.Socket, message, cancellationToken);
+                if (message.Game is not null)
+                {
+                    connection.LastWorldVersion = Math.Max(
+                        connection.LastWorldVersion, message.Game.WorldVersion);
+                    connection.LastEventSequence = Math.Max(
+                        connection.LastEventSequence, message.Game.EventSequence);
+                }
+            }
         }
         catch (WebSocketException)
         {
@@ -408,10 +433,13 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         }
     }
 
-    private sealed class Connection(Guid playerId, WebSocket socket)
+    private sealed class Connection(
+        Guid playerId, WebSocket socket, long lastEventSequence, long lastWorldVersion)
     {
         public Guid PlayerId { get; } = playerId;
         public WebSocket Socket { get; } = socket;
+        public long LastEventSequence { get; set; } = lastEventSequence;
+        public long LastWorldVersion { get; set; } = lastWorldVersion;
         public SemaphoreSlim SendLock { get; } = new(1, 1);
     }
 }

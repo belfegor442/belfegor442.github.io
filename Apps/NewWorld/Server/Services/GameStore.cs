@@ -152,6 +152,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
                 ? requestedStateId
                 : (Guid?)null;
             var occurredAtUtc = DateTimeOffset.UtcNow;
+            var eventSequence = ++game.EventSequence;
             game.Events.Add(new WorldEvent(
                 Guid.NewGuid(),
                 game.Id,
@@ -163,11 +164,12 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
                 occurredAtUtc,
                 game.WorldDate,
                 game.WorldVersion,
-                $"Rejected reused order ID {orderId:N}: {replayError}"));
+                $"Rejected reused order ID {orderId:N}: {replayError}",
+                eventSequence));
             AddActivity(game, $"{player.Name}'s order was rejected (ORDER_ID_REUSED).");
             await SaveAsync(connection, transaction, game, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return (game, player, CreateRejectedOrderResult(orderId, "ORDER_ID_REUSED", replayError, true), null);
+            return (game, player, CreateRejectedOrderResult(orderId, "ORDER_ID_REUSED", replayError), null);
         }
         if (replay is not null)
         {
@@ -204,8 +206,8 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
     }
 
     private static GameOrderResult CreateRejectedOrderResult(
-        Guid orderId, string code, string message, bool replayed = false) =>
-        new(orderId, false, code, message, replayed);
+        Guid orderId, string code, string message) =>
+        new(orderId, false, code, message, false);
 
     public async Task<(WorldState? Game, string? Error)> MutateSystemAsync(
         Guid gameId,

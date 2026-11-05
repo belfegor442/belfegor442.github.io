@@ -19,6 +19,7 @@ public sealed class WorldState
     public int MaxHumanPlayers { get; set; } = GameCatalog.MaxHumanPlayers;
     public DateTimeOffset LastTickUtc { get; set; }
     public long ClockAccumulatorTicks { get; set; }
+    public long EventSequence { get; set; }
     public HashSet<Guid> PauseVotes { get; set; } = [];
     public List<PlayerState> Players { get; set; } = [];
     public List<GovernmentMembership> Memberships { get; set; } = [];
@@ -94,7 +95,8 @@ public sealed record WorldEvent(
     DateTimeOffset OccurredAtUtc,
     DateOnly WorldDate,
     long WorldVersion,
-    string Description);
+    string Description,
+    long Sequence = 0);
 
 public sealed record GameOrderPayload(int? TerritoryIndex, int? PlotIndex, string? BuildingId);
 
@@ -161,7 +163,9 @@ public sealed record GameSnapshot(
     long WorldVersion,
     string ScenarioId,
     string ScenarioVersion,
-    IReadOnlyList<GovernmentMembershipView> Memberships);
+    IReadOnlyList<GovernmentMembershipView> Memberships,
+    long EventSequence,
+    IReadOnlyList<WorldEvent> Events);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
     IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected,
@@ -174,7 +178,7 @@ public sealed record TerritoryView(
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
     string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId,
-    DateOnly? TargetWorldDate = null);
+    DateOnly? TargetWorldDate = null, long? LastEventSequence = null);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 

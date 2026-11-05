@@ -201,7 +201,8 @@ public sealed class WorldStateCompatibilityTests
 
         WorldStateCompatibility.Normalize(game);
 
-        Assert.Equal(worldEvent, Assert.Single(game.Events));
+        Assert.Equal(worldEvent with { Sequence = 1 }, Assert.Single(game.Events));
+        Assert.Equal(1, game.EventSequence);
     }
 
     [Fact]
@@ -283,9 +284,11 @@ public sealed class WorldStateCompatibilityTests
         Assert.Equal("INSUFFICIENT_FUNDS", worldEvent.ResultCode);
 
         var eventId = worldEvent.Id;
+        var eventSequence = worldEvent.Sequence;
         WorldStateCompatibility.Normalize(game);
 
         Assert.Equal(eventId, Assert.Single(game.Events).Id);
+        Assert.Equal(eventSequence, Assert.Single(game.Events).Sequence);
     }
 
     [Fact]
@@ -314,5 +317,25 @@ public sealed class WorldStateCompatibilityTests
         Assert.Equal(order.Id, worldEvent.OrderId);
         Assert.Null(worldEvent.StateId);
         Assert.Equal(unknownStateId, Assert.Single(game.Orders).StateId);
+    }
+
+    [Fact]
+    public void NormalizeRejectsDuplicateWorldEventSequences()
+    {
+        var gameId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 2,
+            Events =
+            [
+                new WorldEvent(Guid.NewGuid(), gameId, null, null, null, "world.changed",
+                    null, DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), 2, "First.", 1),
+                new WorldEvent(Guid.NewGuid(), gameId, null, null, null, "world.changed",
+                    null, DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), 2, "Second.", 1)
+            ]
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
     }
 }

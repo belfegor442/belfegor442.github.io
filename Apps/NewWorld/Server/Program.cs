@@ -82,7 +82,9 @@ app.MapPost("/api/games/join", async (JoinGameRequest request, GameStore gameSto
     return Results.Ok(new SessionResponse(game.Id, "", player.Id, playerToken!, snapshot));
 }).RequireRateLimiting("lobby");
 
-app.MapGet("/api/games/{gameId:guid}", async (Guid gameId, HttpContext context, GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+app.MapGet("/api/games/{gameId:guid}", async (
+    Guid gameId, long? afterEventSequence, HttpContext context, GameStore gameStore, GameHub hub,
+    CancellationToken cancellationToken) =>
 {
     var token = GetBearerToken(context);
     if (token is null)
@@ -90,7 +92,9 @@ app.MapGet("/api/games/{gameId:guid}", async (Guid gameId, HttpContext context, 
     var (game, player) = await gameStore.GetAuthorizedAsync(gameId, token, cancellationToken);
     if (game is null || player is null)
         return Results.Unauthorized();
-    return Results.Ok(GameHub.BuildSnapshot(game, hub.ConnectedPlayers(gameId)));
+    return Results.Ok(GameHub.BuildSnapshot(
+        game, hub.ConnectedPlayers(gameId),
+        Math.Clamp(afterEventSequence ?? 0, 0, game.EventSequence)));
 });
 
 app.MapGet("/api/games/{gameId:guid}/orders", async (

@@ -41,7 +41,8 @@ public static class PauseVoteRules
             game.WorldVersion + 1,
             shouldPause
                 ? "The world paused because no players are connected."
-                : "Pending pause votes were cleared because no players are connected."));
+                : "Pending pause votes were cleared because no players are connected.",
+            ++game.EventSequence));
         GameStore.AddActivity(game, shouldPause
             ? "The world paused because no players are connected."
             : "Pending pause votes were cleared because no players are connected.");

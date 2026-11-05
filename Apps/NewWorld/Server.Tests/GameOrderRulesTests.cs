@@ -109,6 +109,8 @@ public sealed class GameOrderRulesTests
         Assert.Equal(orderId, worldEvent.OrderId);
         Assert.Equal("INSUFFICIENT_FUNDS", worldEvent.ResultCode);
         Assert.Equal(4, worldEvent.WorldVersion);
+        Assert.Equal(1, game.EventSequence);
+        Assert.Equal(1, worldEvent.Sequence);
     }
 
     [Fact]
@@ -144,6 +146,8 @@ public sealed class GameOrderRulesTests
         Assert.Equal(5, order.WorldVersion);
         Assert.Equal(GovernmentPermissionRules.MemberPermissionSetId, order.PermissionSetId);
         Assert.Equal(5, Assert.Single(game.Events).WorldVersion);
+        Assert.Equal(1, game.EventSequence);
+        Assert.Equal(1, game.Events[0].Sequence);
     }
 
     [Theory]

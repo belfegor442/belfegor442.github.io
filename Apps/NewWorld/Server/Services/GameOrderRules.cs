@@ -79,6 +79,7 @@ public static class GameOrderRules
                            game.Territories.Any(territory => territory.StateId == requestedStateId)
             ? requestedStateId
             : (Guid?)null;
+        var eventSequence = ++game.EventSequence;
         game.Events.Add(new WorldEvent(
             Guid.NewGuid(),
             game.Id,
@@ -90,7 +91,8 @@ public static class GameOrderRules
             submittedAtUtc,
             game.WorldDate,
             game.WorldVersion,
-            rejection is null ? $"Executed {orderType}." : rejection.Message));
+            rejection is null ? $"Executed {orderType}." : rejection.Message,
+            eventSequence));
 
         return new GameOrderResult(
             orderId, rejection is null, rejection?.Code, rejection?.Message, false);

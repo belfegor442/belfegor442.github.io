@@ -85,4 +85,29 @@ public sealed class LobbyRulesTests
         Assert.Equal(1200, game.Territories[0].Treasury);
         Assert.Equal(0, game.Territories[1].Treasury);
     }
+
+    [Fact]
+    public void ReconnectedSnapshotReturnsOnlyEventsAfterTheSavedSequence()
+    {
+        var gameId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 3,
+            EventSequence = 2,
+            Events =
+            [
+                new WorldEvent(Guid.NewGuid(), gameId, null, null, null, "world.changed",
+                    null, DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), 2, "Earlier event.", 1),
+                new WorldEvent(Guid.NewGuid(), gameId, null, null, null, "world.changed",
+                    null, DateTimeOffset.UtcNow, new DateOnly(1500, 1, 2), 3, "Missed event.", 2)
+            ]
+        };
+
+        var snapshot = GameHub.BuildSnapshot(game, new HashSet<Guid>(), afterEventSequence: 1);
+
+        Assert.Equal(2, snapshot.EventSequence);
+        Assert.Equal("Missed event.", Assert.Single(snapshot.Events).Description);
+        Assert.Equal(2, snapshot.Events[0].Sequence);
+    }
 }
