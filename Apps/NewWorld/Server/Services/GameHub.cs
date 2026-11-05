@@ -351,19 +351,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 return "No pause votes need resetting.";
             game.PauseVotes.Clear();
             const string description = "The pause vote was reset because the connected players changed.";
-            game.Events.Add(new WorldEvent(
-                Guid.NewGuid(),
-                game.Id,
-                null,
-                null,
-                null,
-                "world.pause_votes_reset",
-                null,
-                DateTimeOffset.UtcNow,
-                game.WorldDate,
-                game.WorldVersion + 1,
-                description,
-                ++game.EventSequence));
+            GameStore.AddWorldEvent(
+                game, "world.pause_votes_reset", null, null, null, description,
+                worldVersion: game.WorldVersion + 1);
             GameStore.AddActivity(game, description);
             votesChanged = true;
             return null;

@@ -67,7 +67,11 @@ public sealed class WorldClock(
                             foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))
                                 territory.Population = (int)Math.Round(territory.Population * 1.003);
                         }
-                        GameStore.AddActivity(game, $"{game.WorldDate:yyyy-MM-dd} began (day {game.Day}).");
+                        var description = $"{game.WorldDate:yyyy-MM-dd} began (day {game.Day}).";
+                        GameStore.AddActivity(game, description);
+                        GameStore.AddWorldEvent(
+                            game, "world.day_advanced", null, null, null, description,
+                            worldVersion: game.WorldVersion + 1);
                     }
                     didAdvance = daysDue > 0;
                     nextAnchor = new ClockAnchor(nowTimestamp, game.LastTickUtc);

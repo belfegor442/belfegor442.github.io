@@ -338,4 +338,29 @@ public sealed class WorldStateCompatibilityTests
 
         Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
     }
+
+    [Fact]
+    public void AddWorldEventAssignsMonotonicSequenceAndCurrentWorldMetadata()
+    {
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldDate = new DateOnly(1500, 1, 2),
+            WorldVersion = 7,
+            EventSequence = 4
+        };
+        var occurredAt = DateTimeOffset.UtcNow;
+
+        var worldEvent = GameStore.AddWorldEvent(
+            game, "world.day_advanced", null, null, null, "Day advanced.",
+            occurredAtUtc: occurredAt, worldVersion: 8);
+
+        Assert.Equal(5, game.EventSequence);
+        Assert.Equal(5, worldEvent.Sequence);
+        Assert.Equal(game.Id, worldEvent.GameId);
+        Assert.Equal(game.WorldDate, worldEvent.WorldDate);
+        Assert.Equal(8, worldEvent.WorldVersion);
+        Assert.Equal(occurredAt, worldEvent.OccurredAtUtc);
+        Assert.Same(worldEvent, Assert.Single(game.Events));
+    }
 }

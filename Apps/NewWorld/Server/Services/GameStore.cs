@@ -56,6 +56,9 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             }).ToList(),
             Activity = [$"{playerName} created a private world."]
         };
+        AddWorldEvent(
+            game, "world.created", playerId, null, null,
+            "A private multiplayer world was created.");
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
@@ -84,6 +87,8 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         game.Players.Add(new PlayerState { Id = Guid.NewGuid(), Name = playerName, TokenHash = Hash(playerToken) });
         game.WorldVersion++;
         AddActivity(game, $"{playerName} joined the world.");
+        AddWorldEvent(game, "player.joined", game.Players[^1].Id, null, null,
+            $"{playerName} joined the world.");
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (game, playerToken, null);
@@ -100,7 +105,9 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         Guid gameId,
         string token,
         Func<WorldState, PlayerState, string?> mutation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string eventType,
+        Guid? eventStateId = null)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -111,11 +118,20 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         if (player is null)
             return (null, null, "Invalid player token.");
 
-        var error = mutation(game, player);
+        var result = GameOrderRules.ApplyMutationAtomically(game, player.Id, (candidate, candidatePlayer) =>
+        {
+            var error = mutation(candidate, candidatePlayer);
+            return error is null ? null : new OrderRejection("MUTATION_REJECTED", error);
+        });
+        var error = result.Rejection?.Message;
         if (error is not null)
             return (game, player, error);
 
+        game = result.Game;
+        player = result.Player;
         game.WorldVersion++;
+        var description = game.Activity.FirstOrDefault() ?? $"World state changed ({eventType}).";
+        AddWorldEvent(game, eventType, player.Id, eventStateId, null, description);
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (game, player, null);
@@ -152,20 +168,10 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
                 ? requestedStateId
                 : (Guid?)null;
             var occurredAtUtc = DateTimeOffset.UtcNow;
-            var eventSequence = ++game.EventSequence;
-            game.Events.Add(new WorldEvent(
-                Guid.NewGuid(),
-                game.Id,
-                null,
-                player.Id,
-                auditStateId,
-                "order.rejected",
-                "ORDER_ID_REUSED",
-                occurredAtUtc,
-                game.WorldDate,
-                game.WorldVersion,
+            AddWorldEvent(
+                game, "order.rejected", player.Id, auditStateId, null,
                 $"Rejected reused order ID {orderId:N}: {replayError}",
-                eventSequence));
+                "ORDER_ID_REUSED", occurredAtUtc);
             AddActivity(game, $"{player.Name}'s order was rejected (ORDER_ID_REUSED).");
             await SaveAsync(connection, transaction, game, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -316,5 +322,33 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         game.Activity.Insert(0, activity);
         if (game.Activity.Count > 20)
             game.Activity.RemoveAt(game.Activity.Count - 1);
+    }
+
+    public static WorldEvent AddWorldEvent(
+        WorldState game,
+        string type,
+        Guid? actorPlayerId,
+        Guid? stateId,
+        Guid? orderId,
+        string description,
+        string? resultCode = null,
+        DateTimeOffset? occurredAtUtc = null,
+        long? worldVersion = null)
+    {
+        var worldEvent = new WorldEvent(
+            Guid.NewGuid(),
+            game.Id,
+            orderId,
+            actorPlayerId,
+            stateId,
+            type,
+            resultCode,
+            occurredAtUtc ?? DateTimeOffset.UtcNow,
+            game.WorldDate,
+            worldVersion ?? game.WorldVersion,
+            description,
+            ++game.EventSequence);
+        game.Events.Add(worldEvent);
+        return worldEvent;
     }
 }

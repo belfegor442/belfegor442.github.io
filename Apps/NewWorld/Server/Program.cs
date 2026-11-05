@@ -145,7 +145,7 @@ app.MapPost("/api/games/{gameId:guid}/assign", async (
             ? $"{actor.Name} assigned {game.Territories[request.CountryIndex.Value].Name} to {target.Name}."
             : $"{actor.Name} unassigned {target.Name}.");
         return null;
-    }, cancellationToken);
+    }, cancellationToken, "government.membership_changed");
 
     if (result.Error is not null)
         return Results.BadRequest(new ApiError(result.Error));
@@ -173,7 +173,7 @@ app.MapPost("/api/games/{gameId:guid}/start", async (
         game.LastTickUtc = DateTimeOffset.UtcNow;
         GameStore.AddActivity(game, "The world began.");
         return null;
-    }, cancellationToken);
+    }, cancellationToken, "world.started");
 
     if (result.Error is not null)
         return Results.BadRequest(new ApiError(result.Error));

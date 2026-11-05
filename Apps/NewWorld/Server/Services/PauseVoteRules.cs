@@ -28,21 +28,17 @@ public static class PauseVoteRules
         game.Paused = true;
         game.Status = GameStatus.Paused;
         game.LastTickUtc = now;
-        game.Events.Add(new WorldEvent(
-            Guid.NewGuid(),
-            game.Id,
-            null,
-            null,
-            null,
+        GameStore.AddWorldEvent(
+            game,
             shouldPause ? "world.paused.no_players" : "world.pause_votes_cleared",
             null,
-            now,
-            game.WorldDate,
-            game.WorldVersion + 1,
+            null,
+            null,
             shouldPause
                 ? "The world paused because no players are connected."
                 : "Pending pause votes were cleared because no players are connected.",
-            ++game.EventSequence));
+            occurredAtUtc: now,
+            worldVersion: game.WorldVersion + 1);
         GameStore.AddActivity(game, shouldPause
             ? "The world paused because no players are connected."
             : "Pending pause votes were cleared because no players are connected.");

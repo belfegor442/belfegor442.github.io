@@ -79,20 +79,15 @@ public static class GameOrderRules
                            game.Territories.Any(territory => territory.StateId == requestedStateId)
             ? requestedStateId
             : (Guid?)null;
-        var eventSequence = ++game.EventSequence;
-        game.Events.Add(new WorldEvent(
-            Guid.NewGuid(),
-            game.Id,
-            orderId,
+        GameStore.AddWorldEvent(
+            game,
+            rejection is null ? "order.executed" : "order.rejected",
             player.Id,
             eventStateId,
-            rejection is null ? "order.executed" : "order.rejected",
-            rejection?.Code,
-            submittedAtUtc,
-            game.WorldDate,
-            game.WorldVersion,
+            orderId,
             rejection is null ? $"Executed {orderType}." : rejection.Message,
-            eventSequence));
+            rejection?.Code,
+            submittedAtUtc);
 
         return new GameOrderResult(
             orderId, rejection is null, rejection?.Code, rejection?.Message, false);
