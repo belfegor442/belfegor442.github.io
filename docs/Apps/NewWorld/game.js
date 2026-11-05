@@ -214,8 +214,17 @@
   function renderEconomy() {
     const list = $('company-list');
     list.replaceChildren();
+    const marketsList = $('market-list');
+    marketsList.replaceChildren();
+    const routesList = $('trade-route-list');
+    routesList.replaceChildren();
+    $('economy-setup-panel').hidden = !onlineGame ||
+      onlineGame.started ||
+      onlineGame.hostPlayerId !== onlineSession?.playerId;
     if (!onlineGame) {
       addPoliticalRow(list, 'No production data', 'Connect to a multiplayer world to load server-authoritative inventories.');
+      addPoliticalRow(marketsList, 'No market data', 'Connect to a multiplayer world to load prices, supply, and demand.');
+      addPoliticalRow(routesList, 'No trade routes', 'Trade routes are configured as part of the pre-game economic scenario.');
       return;
     }
 
@@ -223,10 +232,7 @@
     const companies = onlineGame.companies?.filter(company => company.stateId === territory?.stateId) || [];
     if (!companies.length) {
       addPoliticalRow(list, 'No companies configured', 'This State has no configured production facilities.');
-      return;
-    }
-
-    for (const company of companies) {
+    } else for (const company of companies) {
       const inventory = Object.entries(company.inventory || {}).map(([goodId, quantity]) => {
         const good = onlineGame.goods?.find(item => item.id === goodId);
         const capacity = good?.storageCapacity
@@ -236,17 +242,139 @@
       });
       const facilities = (company.facilities || []).map(facility =>
         facility.recipeName + ' · ' + facility.progressDays + '/' + facility.daysPerBatch + ' day(s)');
+      const cash = Object.entries(company.cashBalances || {}).map(([currencyId, amount]) => {
+        const currency = onlineGame.currencies?.find(item => item.id === currencyId);
+        const currencyName = currency?.code || currency?.name || 'currency ' + currencyId.slice(0, 8);
+        return money(amount) + ' ' + currencyName;
+      });
       addPoliticalRow(
         list,
         company.name + ' · ' + company.sector,
         'Inventory: ' + (inventory.join(', ') || 'empty') +
-        ' · Production: ' + (facilities.join(', ') || 'no active facilities'));
+        ' · Production: ' + (facilities.join(', ') || 'no active facilities') +
+        ' · Cash: ' + (cash.join(', ') || 'no recorded balance'));
+    }
+
+    const markets = onlineGame.markets?.filter(item => item.stateId === territory?.stateId) || [];
+    if (!markets.length) {
+      addPoliticalRow(marketsList, 'No markets configured', 'The world has no configured market data for this State.');
+    } else for (const market of markets) {
+      const good = onlineGame.goods?.find(item => item.id === market.goodId);
+      const currency = onlineGame.currencies?.find(item => item.stateId === market.stateId);
+      const latest = (onlineGame.marketHistory || [])
+        .filter(item => item.stateId === market.stateId && item.goodId === market.goodId)
+        .slice()
+        .sort((left, right) => right.worldDate.localeCompare(left.worldDate))[0];
+      const unit = good?.unit || 'units';
+      const currencyName = currency?.code || currency?.name || 'State currency units';
+      addPoliticalRow(
+        marketsList,
+        (good?.name || market.goodId) + ' · ' + money(market.currentPrice) + ' / ' + unit,
+        'Daily demand: ' + market.dailyDemand + ' ' + unit +
+          ' · Budget: ' + money(market.dailyConsumerBudget) + ' ' + currencyName +
+          ' · Price bounds: ' + money(market.minimumPrice) + '–' + money(market.maximumPrice) +
+          (latest
+            ? ' · Last clearing ' + formatWorldDate(latest.worldDate) + ': ' +
+              latest.quantitySold + ' sold, ' + latest.unmetDemand + ' unmet; ' +
+              latest.domesticSupply + ' domestic / ' + latest.importedSupply + ' imported'
+            : ' · Awaiting first daily clearing'));
+    }
+
+    const routes = (onlineGame.tradeRoutes || []).filter(route =>
+      route.exportStateId === territory?.stateId || route.importStateId === territory?.stateId);
+    if (!routes.length) {
+      addPoliticalRow(routesList, 'No trade routes configured', 'No inter-State goods routes are active.');
+    } else for (const route of routes) {
+      const origin = onlineGame.territories.find(item => item.stateId === route.exportStateId);
+      const destination = onlineGame.territories.find(item => item.stateId === route.importStateId);
+      const good = onlineGame.goods?.find(item => item.id === route.goodId);
+      const exporterCompany = onlineGame.companies?.find(item => item.id === route.exporterCompanyId);
+      const importerCompany = onlineGame.companies?.find(item => item.id === route.importerCompanyId);
+      const bilateralTerms = exporterCompany && importerCompany
+        ? ' · ' + exporterCompany.name + ' → ' + importerCompany.name +
+          ' · contracted daily quantity ' + route.dailyQuantity +
+          ' at ' + money(route.unitPrice) + ' per ' + (good?.unit || 'unit')
+        : ' · daily capacity ' + route.dailyCapacity + ' ' + (good?.unit || 'units') +
+          ' · exporter receives proceeds in the importing market currency';
+      addPoliticalRow(
+        routesList,
+        (origin?.name || 'Unknown State') + ' → ' + (destination?.name || 'Unknown State') +
+          ' · ' + (good?.name || route.goodId),
+        (route.enabled ? 'Active' : 'Suspended') + bilateralTerms);
+    }
+  }
+
+  function loadEconomyConfiguration() {
+    if (!onlineGame) return;
+    const configuration = {
+      goods: onlineGame.goods || [],
+      productionRecipes: onlineGame.productionRecipes || [],
+      companies: (onlineGame.companies || []).map(company => ({
+        id: company.id,
+        stateId: company.stateId,
+        currencyId: company.currencyId,
+        cashBalances: company.cashBalances || {},
+        name: company.name,
+        sector: company.sector,
+        inventory: company.inventory || {},
+        facilities: (company.facilities || []).map(facility => ({
+          id: facility.id,
+          recipeId: facility.recipeId,
+          batchesPerCycle: facility.batchesPerCycle,
+          progressDays: facility.progressDays
+        }))
+      })),
+      markets: onlineGame.markets || [],
+      tradeRoutes: onlineGame.tradeRoutes || []
+    };
+    $('economy-config').value = JSON.stringify(configuration, null, 2);
+  }
+
+  async function saveEconomyConfiguration() {
+    if (!onlineSession || !onlineGame || onlineGame.started ||
+        onlineGame.hostPlayerId !== onlineSession.playerId) {
+      showMessage('Only the host can configure the technical economy before the world starts.', true);
+      return;
+    }
+
+    let configuration;
+    try {
+      configuration = JSON.parse($('economy-config').value);
+    } catch (error) {
+      showMessage('Economic scenario JSON is invalid: ' +
+        (error instanceof Error ? error.message : 'parse error'), true);
+      return;
+    }
+    const collections = ['goods', 'productionRecipes', 'companies', 'markets', 'tradeRoutes'];
+    if (!configuration || collections.some(key => !Array.isArray(configuration[key]))) {
+      showMessage('The scenario must include goods, productionRecipes, companies, markets, and tradeRoutes arrays.', true);
+      return;
+    }
+
+    try {
+      const game = await apiRequest(
+        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/economy',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...configuration,
+            expectedWorldVersion: onlineGame.worldVersion
+          })
+        },
+        onlineSession.playerToken);
+      applySnapshot(game);
+      $('economy-config').value = '';
+      showMessage('Economic scenario validated and saved. Markets and trade routes are now active configuration.');
+    } catch (error) {
+      showServerError(error);
     }
   }
 
   function renderFinancialLedger() {
     const list = $('transaction-list');
     list.replaceChildren();
+    const companyList = $('company-transaction-list');
+    companyList.replaceChildren();
     if (!onlineGame) {
       $('state-currency').textContent = 'Connect to a multiplayer world to load currency and transaction data.';
       return;
@@ -273,6 +401,25 @@
           ' · ' + formatWorldDate(transaction.worldDate),
         transaction.description + ' · ' + sign + money(Math.abs(transaction.amount)) +
           ' · balance ' + money(transaction.balanceAfter));
+    }
+
+    const companyTransactions = (onlineGame.companyFinancialTransactions || [])
+      .filter(item => item.stateId === territory?.stateId)
+      .slice()
+      .reverse();
+    if (!companyTransactions.length) {
+      addPoliticalRow(companyList, 'No company sales recorded', 'Market revenue appears after a configured market clears.');
+      return;
+    }
+    for (const transaction of companyTransactions) {
+      const company = onlineGame.companies?.find(item => item.id === transaction.companyId);
+      const currency = onlineGame.currencies?.find(item => item.id === transaction.currencyId);
+      addPoliticalRow(
+        company?.name || 'Company',
+        formatWorldDate(transaction.worldDate) + ' · ' + transaction.quantity + ' ' +
+        transaction.goodId + ' × ' + money(transaction.unitPrice) + ' · +' +
+        money(transaction.amount) + ' ' + (currency?.code || currency?.name || 'currency units') +
+        (transaction.tradeRouteId ? ' · trade route ' + transaction.tradeRouteId.slice(0, 8) : ' · domestic sale'));
     }
   }
 
@@ -1296,6 +1443,8 @@
   $('reconnect-world').addEventListener('click', restoreSession);
   $('start-world').addEventListener('click', startWorld);
   $('leave-world').addEventListener('click', disconnect);
+  $('load-economy-config').addEventListener('click', loadEconomyConfiguration);
+  $('save-economy-config').addEventListener('click', saveEconomyConfiguration);
   $('copy-invite').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText($('invite-share').value);

@@ -92,6 +92,31 @@ public sealed class WorldClock(
                                 game, "economy.production_completed", null, company.StateId, null,
                                 productionDescription, worldVersion: game.WorldVersion + 1);
                         }
+                        var (marketSettlements, marketError) =
+                            MarketClearingRules.ClearDailyMarkets(game);
+                        if (marketError is not null)
+                            return marketError;
+                        foreach (var settlement in marketSettlements)
+                        {
+                            var market = game.Markets.Single(item =>
+                                item.StateId == settlement.StateId &&
+                                item.GoodId == settlement.GoodId);
+                            var good = game.Goods.Single(item => item.Id == settlement.GoodId);
+                            var state = game.Territories.Single(item => item.StateId == settlement.StateId);
+                            var marketDescription =
+                                $"{state.Name} market cleared {good.Name}: sold {settlement.QuantitySold} " +
+                                $"of {settlement.Demand} {good.Unit} demanded at {market.CurrentPrice} " +
+                                $"per {good.Unit}; {settlement.UnmetDemand} demand unmet.";
+                            GameStore.AddActivity(game, marketDescription);
+                            GameStore.AddWorldEvent(
+                                game,
+                                "economy.market_cleared",
+                                null,
+                                settlement.StateId,
+                                null,
+                                marketDescription,
+                                worldVersion: game.WorldVersion + 1);
+                        }
                         if (game.WorldDate.Month == 1 && game.WorldDate.Day == 1)
                         {
                             foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))

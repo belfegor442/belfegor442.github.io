@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Numerics;
 using NewWorld.Server.Models;
 
 namespace NewWorld.Server.Services;
@@ -32,8 +33,12 @@ public static class WorldStateCompatibility
         game.Goods ??= [];
         game.ProductionRecipes ??= [];
         game.Companies ??= [];
+        game.Markets ??= [];
+        game.TradeRoutes ??= [];
         game.Currencies ??= [];
         game.FinancialTransactions ??= [];
+        game.CompanyFinancialTransactions ??= [];
+        game.MarketHistory ??= [];
         game.Orders ??= [];
         game.Events ??= [];
         game.Activity ??= [];
@@ -143,14 +148,69 @@ public static class WorldStateCompatibility
                 throw new InvalidDataException("The saved world contains an invalid production recipe.");
         }
 
+        var markets = new HashSet<(Guid StateId, string GoodId)>();
+        foreach (var market in game.Markets)
+        {
+            if (!stateIds.Contains(market.StateId) ||
+                !goodIds.Contains(market.GoodId) ||
+                market.DailyDemand < 0 ||
+                market.DailyConsumerBudget < 0 ||
+                market.BasePrice <= 0 ||
+                market.MinimumPrice <= 0 ||
+                market.MaximumPrice < market.MinimumPrice ||
+                market.BasePrice < market.MinimumPrice ||
+                market.BasePrice > market.MaximumPrice ||
+                market.CurrentPrice < market.MinimumPrice ||
+                market.CurrentPrice > market.MaximumPrice ||
+                market.PriceSmoothingPercent is < 1 or > 100 ||
+                !markets.Add((market.StateId, market.GoodId)))
+                throw new InvalidDataException("The saved world contains an invalid economic market.");
+        }
+
+        var tradeRouteIds = new HashSet<Guid>();
+        var tradeRouteKeys = new HashSet<(Guid ExportStateId, Guid ImportStateId, string GoodId)>();
+        foreach (var route in game.TradeRoutes)
+        {
+            var companyTrade = route.ExporterCompanyId is not null &&
+                               route.ImporterCompanyId is not null;
+            if (route.Id == Guid.Empty ||
+                !tradeRouteIds.Add(route.Id) ||
+                !stateIds.Contains(route.ExportStateId) ||
+                !stateIds.Contains(route.ImportStateId) ||
+                route.ExportStateId == route.ImportStateId ||
+                !goodIds.Contains(route.GoodId) ||
+                route.DailyCapacity <= 0 ||
+                route.ExporterCompanyId.HasValue != route.ImporterCompanyId.HasValue ||
+                !companyTrade &&
+                (!markets.Contains((route.ImportStateId, route.GoodId)) ||
+                 route.DailyQuantity != 0 ||
+                 route.UnitPrice != 0) ||
+                companyTrade &&
+                (route.ExporterCompanyId == Guid.Empty ||
+                 route.ImporterCompanyId == Guid.Empty ||
+                 route.DailyQuantity <= 0 ||
+                 route.DailyQuantity > route.DailyCapacity ||
+                 route.UnitPrice <= 0) ||
+                !tradeRouteKeys.Add((route.ExportStateId, route.ImportStateId, route.GoodId)))
+                throw new InvalidDataException("The saved world contains an invalid economic trade route.");
+        }
+
         var companyIds = new HashSet<Guid>();
         var facilityIds = new HashSet<Guid>();
         foreach (var company in game.Companies)
         {
             company.Inventory ??= new Dictionary<string, long>(StringComparer.Ordinal);
             company.Facilities ??= [];
+            company.CashBalances ??= [];
+            var companyState = game.Territories.SingleOrDefault(item => item.StateId == company.StateId);
+            if (companyState is null)
+                throw new InvalidDataException("The saved world contains an invalid economic company.");
+            var stateCurrencyId = companyState.CurrencyId;
+            if (company.CurrencyId == Guid.Empty)
+                company.CurrencyId = stateCurrencyId;
             if (company.Id == Guid.Empty ||
                 !stateIds.Contains(company.StateId) ||
+                company.CurrencyId != stateCurrencyId ||
                 string.IsNullOrWhiteSpace(company.Name) ||
                 string.IsNullOrWhiteSpace(company.Sector) ||
                 !companyIds.Add(company.Id) ||
@@ -158,8 +218,11 @@ public static class WorldStateCompatibility
                     !goodIds.Contains(stock.Key) ||
                     stock.Value < 0 ||
                     game.Goods.Single(item => item.Id == stock.Key).StorageCapacity is long capacity &&
-                    stock.Value > capacity))
+                    stock.Value > capacity) ||
+                company.CashBalances.Any(balance =>
+                    !currencyIds.Contains(balance.Key) || balance.Value < 0))
                 throw new InvalidDataException("The saved world contains an invalid economic company.");
+            company.CashBalances.TryAdd(company.CurrencyId, 0);
 
             foreach (var facility in company.Facilities)
             {
@@ -174,6 +237,43 @@ public static class WorldStateCompatibility
                     throw new InvalidDataException("The saved world contains an invalid production facility.");
             }
         }
+
+        foreach (var route in game.TradeRoutes.Where(item => item.ExporterCompanyId is not null))
+        {
+            var exporter = game.Companies.SingleOrDefault(company => company.Id == route.ExporterCompanyId);
+            var importer = game.Companies.SingleOrDefault(company => company.Id == route.ImporterCompanyId);
+            if (exporter is null ||
+                importer is null ||
+                exporter.StateId != route.ExportStateId ||
+                importer.StateId != route.ImportStateId)
+                throw new InvalidDataException("The saved world contains a trade route with invalid companies.");
+        }
+
+        if (game.EconomyVersion < 3)
+        {
+            foreach (var company in game.Companies)
+            foreach (var balance in company.CashBalances.Where(item => item.Value > 0))
+            {
+                if (game.CompanyFinancialTransactions.Any(transaction =>
+                        transaction.CompanyId == company.Id && transaction.CurrencyId == balance.Key))
+                    continue;
+                GameStore.AddCompanyFinancialTransaction(
+                    game,
+                    company,
+                    balance.Key,
+                    0,
+                    balance.Value,
+                    "",
+                    0,
+                    0,
+                    null,
+                    "Opening company balance imported when market accounting was introduced.",
+                    CompanyTransactionType.OpeningBalance);
+            }
+        }
+
+        ValidateCompanyTransactions(game, companyIds, stateIds, goodIds, tradeRouteIds);
+        ValidateMarketHistory(game, markets, currencyIds);
 
         foreach (var territory in game.Territories)
         {
@@ -574,6 +674,8 @@ public static class WorldStateCompatibility
             }
             game.EconomyVersion = 2;
         }
+        if (game.EconomyVersion < 3)
+            game.EconomyVersion = 3;
 
         foreach (var territory in game.Territories)
         {
@@ -626,6 +728,159 @@ public static class WorldStateCompatibility
         if (game.Territories.Any(territory =>
                 territory.Treasury > 0 && !lastBalances.ContainsKey(territory.StateId)))
             throw new InvalidDataException("A State treasury is missing its opening financial transaction.");
+    }
+
+    private static void ValidateCompanyTransactions(
+        WorldState game,
+        HashSet<Guid> companyIds,
+        HashSet<Guid> stateIds,
+        HashSet<string> goodIds,
+        HashSet<Guid> tradeRouteIds)
+    {
+        var companiesById = game.Companies.ToDictionary(company => company.Id);
+        var territoriesByState = game.Territories.ToDictionary(territory => territory.StateId);
+        var transactionIds = new HashSet<Guid>();
+        var lastBalances = new Dictionary<(Guid CompanyId, Guid CurrencyId), long>();
+        var openingBalances = new HashSet<(Guid CompanyId, Guid CurrencyId)>();
+        foreach (var transaction in game.CompanyFinancialTransactions)
+        {
+            if (transaction.Id == Guid.Empty ||
+                !transactionIds.Add(transaction.Id) ||
+                !companyIds.Contains(transaction.CompanyId) ||
+                !stateIds.Contains(transaction.StateId) ||
+                !companiesById.TryGetValue(transaction.CompanyId, out var company) ||
+                company.StateId != transaction.StateId ||
+                !game.Currencies.Any(currency =>
+                    currency.Id == transaction.CurrencyId &&
+                    (currency.StateId == transaction.StateId ||
+                     transaction.Type == CompanyTransactionType.OpeningBalance ||
+                     transaction.TradeRouteId is Guid foreignRouteId &&
+                     game.TradeRoutes.Any(route =>
+                         route.Id == foreignRouteId &&
+                         route.ExportStateId == transaction.StateId &&
+                         route.ImportStateId == currency.StateId))) ||
+                !Enum.IsDefined(transaction.Type) ||
+                transaction.Amount != transaction.BalanceAfter - transaction.BalanceBefore ||
+                transaction.BalanceBefore < 0 ||
+                transaction.BalanceAfter < 0 ||
+                transaction.WorldDate == default ||
+                transaction.WorldDate > game.WorldDate ||
+                transaction.Type == CompanyTransactionType.OpeningBalance &&
+                (transaction.BalanceBefore != 0 ||
+                 transaction.Amount <= 0 ||
+                 transaction.TradeRouteId is not null ||
+                 !string.IsNullOrEmpty(transaction.GoodId) ||
+                 transaction.Quantity != 0 ||
+                 transaction.UnitPrice != 0 ||
+                 !openingBalances.Add((transaction.CompanyId, transaction.CurrencyId))) ||
+                transaction.Type == CompanyTransactionType.MarketSale &&
+                (!goodIds.Contains(transaction.GoodId) ||
+                 transaction.Quantity <= 0 ||
+                 transaction.UnitPrice <= 0 ||
+                 (BigInteger)transaction.Quantity * transaction.UnitPrice != transaction.Amount ||
+                 transaction.TradeRouteId is Guid saleRouteId &&
+                 (!tradeRouteIds.Contains(saleRouteId) ||
+                  !game.TradeRoutes.Any(route =>
+                      route.Id == saleRouteId &&
+                      route.ExporterCompanyId is null &&
+                      route.ExportStateId == transaction.StateId &&
+                      route.GoodId == transaction.GoodId &&
+                      game.Markets.Any(market =>
+                          market.StateId == route.ImportStateId &&
+                          market.GoodId == route.GoodId &&
+                          territoriesByState[market.StateId].CurrencyId == transaction.CurrencyId))) ||
+                 transaction.TradeRouteId is null &&
+                 (transaction.CurrencyId != company.CurrencyId ||
+                  !game.Markets.Any(market =>
+                      market.StateId == transaction.StateId &&
+                      market.GoodId == transaction.GoodId))) ||
+                transaction.Type == CompanyTransactionType.TradeSale &&
+                (!goodIds.Contains(transaction.GoodId) ||
+                  transaction.Quantity <= 0 ||
+                  transaction.UnitPrice <= 0 ||
+                  transaction.Amount <= 0 ||
+                  (BigInteger)transaction.Quantity * transaction.UnitPrice != transaction.Amount ||
+                  transaction.TradeRouteId is not Guid tradeSaleRouteId ||
+                  !game.TradeRoutes.Any(route =>
+                      route.Id == tradeSaleRouteId &&
+                      route.ExporterCompanyId == company.Id &&
+                      route.ExportStateId == transaction.StateId &&
+                      route.GoodId == transaction.GoodId &&
+                      game.Currencies.Any(currency =>
+                          currency.Id == transaction.CurrencyId &&
+                          currency.StateId == route.ImportStateId))) ||
+                transaction.Type == CompanyTransactionType.TradePurchase &&
+                (!goodIds.Contains(transaction.GoodId) ||
+                  transaction.Quantity <= 0 ||
+                  transaction.UnitPrice <= 0 ||
+                  transaction.Amount >= 0 ||
+                  (BigInteger)transaction.Quantity * transaction.UnitPrice != -(BigInteger)transaction.Amount ||
+                  transaction.TradeRouteId is not Guid tradePurchaseRouteId ||
+                  !game.TradeRoutes.Any(route =>
+                      route.Id == tradePurchaseRouteId &&
+                      route.ImporterCompanyId == company.Id &&
+                      route.ImportStateId == transaction.StateId &&
+                      route.GoodId == transaction.GoodId &&
+                      game.Currencies.Any(currency =>
+                          currency.Id == transaction.CurrencyId &&
+                          currency.StateId == route.ImportStateId))) ||
+                string.IsNullOrWhiteSpace(transaction.Description) ||
+                lastBalances.TryGetValue(
+                    (transaction.CompanyId, transaction.CurrencyId), out var previousBalance) &&
+                previousBalance != transaction.BalanceBefore)
+                throw new InvalidDataException("The saved world contains an invalid company financial transaction.");
+
+            lastBalances[(transaction.CompanyId, transaction.CurrencyId)] = transaction.BalanceAfter;
+        }
+
+        foreach (var company in game.Companies)
+        foreach (var balance in company.CashBalances)
+        {
+            if (lastBalances.TryGetValue((company.Id, balance.Key), out var lastBalance))
+            {
+                if (lastBalance != balance.Value)
+                    throw new InvalidDataException("A company cash balance does not match its financial history.");
+            }
+            else if (balance.Value != 0)
+                throw new InvalidDataException("A company cash balance is missing its opening transaction.");
+        }
+    }
+
+    private static void ValidateMarketHistory(
+        WorldState game,
+        HashSet<(Guid StateId, string GoodId)> marketKeys,
+        HashSet<Guid> currencyIds)
+    {
+        var historyKeys = new HashSet<(Guid StateId, string GoodId, DateOnly WorldDate)>();
+        foreach (var settlement in game.MarketHistory)
+        {
+            var market = game.Markets.SingleOrDefault(item =>
+                item.StateId == settlement.StateId && item.GoodId == settlement.GoodId);
+            var territory = game.Territories.SingleOrDefault(item => item.StateId == settlement.StateId);
+            if (!marketKeys.Contains((settlement.StateId, settlement.GoodId)) ||
+                market is null ||
+                territory is null ||
+                !currencyIds.Contains(settlement.CurrencyId) ||
+                settlement.CurrencyId != territory.CurrencyId ||
+                settlement.WorldDate == default ||
+                settlement.WorldDate > game.WorldDate ||
+                settlement.Demand < 0 ||
+                settlement.DomesticSupply < 0 ||
+                settlement.ImportedSupply < 0 ||
+                settlement.QuantitySold < 0 ||
+                settlement.UnmetDemand < 0 ||
+                (BigInteger)settlement.QuantitySold + settlement.UnmetDemand != settlement.Demand ||
+                settlement.PriceBefore < market.MinimumPrice ||
+                settlement.PriceBefore > market.MaximumPrice ||
+                settlement.PriceAfter < market.MinimumPrice ||
+                settlement.PriceAfter > market.MaximumPrice ||
+                settlement.ConsumerBudget < 0 ||
+                (BigInteger)settlement.ConsumerSpending !=
+                (BigInteger)settlement.QuantitySold * settlement.PriceAfter ||
+                settlement.ConsumerSpending > settlement.ConsumerBudget ||
+                !historyKeys.Add((settlement.StateId, settlement.GoodId, settlement.WorldDate)))
+                throw new InvalidDataException("The saved world contains an invalid market settlement.");
+        }
     }
 
     public static Guid CreateStableId(string value)

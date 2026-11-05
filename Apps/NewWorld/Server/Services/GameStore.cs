@@ -41,7 +41,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         {
             Id = id,
             WorldDate = new DateOnly(1500, 1, 1),
-            EconomyVersion = 2,
+            EconomyVersion = 3,
             HostPlayerId = playerId,
             LastTickUtc = DateTimeOffset.UtcNow,
             Players = [new PlayerState { Id = playerId, Name = playerName, IsHost = true, TokenHash = Hash(playerToken) }],
@@ -364,6 +364,64 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             recordedAtUtc ?? DateTimeOffset.UtcNow,
             orderId,
             membershipId,
+            description));
+    }
+
+    public static void AddCompanyFinancialTransaction(
+        WorldState game,
+        EconomicCompany company,
+        Guid currencyId,
+        long balanceBefore,
+        long balanceAfter,
+        string goodId,
+        long quantity,
+        long unitPrice,
+        Guid? tradeRouteId,
+        string description,
+        CompanyTransactionType type = CompanyTransactionType.MarketSale)
+    {
+        if (company.Id == Guid.Empty ||
+            company.StateId == Guid.Empty ||
+            currencyId == Guid.Empty ||
+            balanceBefore < 0 ||
+            balanceAfter < 0 ||
+            (type is CompanyTransactionType.OpeningBalance or
+                CompanyTransactionType.MarketSale or CompanyTransactionType.TradeSale) &&
+            balanceAfter < balanceBefore ||
+            type == CompanyTransactionType.TradePurchase && balanceAfter > balanceBefore ||
+            company.CashBalances.GetValueOrDefault(currencyId) != balanceAfter ||
+            !Enum.IsDefined(type) ||
+            type == CompanyTransactionType.OpeningBalance &&
+            (balanceBefore != 0 || balanceAfter <= 0 ||
+             !string.IsNullOrEmpty(goodId) || quantity != 0 || unitPrice != 0 || tradeRouteId is not null) ||
+            (type is CompanyTransactionType.MarketSale or
+                CompanyTransactionType.TradeSale or CompanyTransactionType.TradePurchase) &&
+            (string.IsNullOrWhiteSpace(goodId) || quantity <= 0 || unitPrice <= 0 ||
+             tradeRouteId is null && type != CompanyTransactionType.MarketSale ||
+             tradeRouteId is Guid routeId && !game.TradeRoutes.Any(route => route.Id == routeId) ||
+             type == CompanyTransactionType.MarketSale &&
+             balanceAfter - balanceBefore != checked(quantity * unitPrice) ||
+             type == CompanyTransactionType.TradeSale &&
+             balanceAfter - balanceBefore != checked(quantity * unitPrice) ||
+             type == CompanyTransactionType.TradePurchase &&
+             balanceAfter - balanceBefore != -checked(quantity * unitPrice)) ||
+            string.IsNullOrWhiteSpace(description))
+            throw new InvalidDataException("A company financial transaction is invalid.");
+
+        game.CompanyFinancialTransactions.Add(new CompanyFinancialTransaction(
+            Guid.NewGuid(),
+            company.Id,
+            company.StateId,
+            currencyId,
+            type,
+            balanceAfter - balanceBefore,
+            balanceBefore,
+            balanceAfter,
+            game.WorldDate,
+            tradeRouteId,
+            goodId,
+            quantity,
+            unitPrice,
             description));
     }
 

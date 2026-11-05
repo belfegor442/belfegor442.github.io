@@ -28,8 +28,12 @@ public sealed class WorldState
     public List<EconomicGood> Goods { get; set; } = [];
     public List<ProductionRecipe> ProductionRecipes { get; set; } = [];
     public List<EconomicCompany> Companies { get; set; } = [];
+    public List<EconomicMarket> Markets { get; set; } = [];
+    public List<EconomicTradeRoute> TradeRoutes { get; set; } = [];
     public List<StateCurrency> Currencies { get; set; } = [];
     public List<EconomicTransaction> FinancialTransactions { get; set; } = [];
+    public List<CompanyFinancialTransaction> CompanyFinancialTransactions { get; set; } = [];
+    public List<MarketSettlement> MarketHistory { get; set; } = [];
     public List<GameOrder> Orders { get; set; } = [];
     public List<WorldEvent> Events { get; set; } = [];
     public List<string> Activity { get; set; } = [];
@@ -187,8 +191,12 @@ public sealed record GameSnapshot(
     IReadOnlyList<PoliticalStateView> PoliticalSystems,
     IReadOnlyList<EconomicGood> Goods,
     IReadOnlyList<ProductionRecipe> ProductionRecipes,
+    IReadOnlyList<EconomicMarket> Markets,
+    IReadOnlyList<EconomicTradeRoute> TradeRoutes,
     IReadOnlyList<StateCurrency> Currencies,
     IReadOnlyList<EconomicTransaction> FinancialTransactions,
+    IReadOnlyList<CompanyFinancialTransaction> CompanyFinancialTransactions,
+    IReadOnlyList<MarketSettlement> MarketHistory,
     IReadOnlyList<EconomicCompanyView> Companies);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,

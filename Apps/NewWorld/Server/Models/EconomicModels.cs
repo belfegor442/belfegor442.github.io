@@ -18,6 +18,41 @@ public enum EconomicTransactionType
     DailyBalance
 }
 
+public enum CompanyTransactionType
+{
+    OpeningBalance,
+    MarketSale,
+    TradeSale,
+    TradePurchase
+}
+
+public sealed class EconomicMarket
+{
+    public Guid StateId { get; set; }
+    public string GoodId { get; set; } = "";
+    public long DailyDemand { get; set; }
+    public long DailyConsumerBudget { get; set; }
+    public long BasePrice { get; set; }
+    public long CurrentPrice { get; set; }
+    public long MinimumPrice { get; set; }
+    public long MaximumPrice { get; set; }
+    public int PriceSmoothingPercent { get; set; } = 100;
+}
+
+public sealed class EconomicTradeRoute
+{
+    public Guid Id { get; set; }
+    public Guid ExportStateId { get; set; }
+    public Guid ImportStateId { get; set; }
+    public string GoodId { get; set; } = "";
+    public long DailyCapacity { get; set; }
+    public Guid? ExporterCompanyId { get; set; }
+    public Guid? ImporterCompanyId { get; set; }
+    public long DailyQuantity { get; set; }
+    public long UnitPrice { get; set; }
+    public bool Enabled { get; set; } = true;
+}
+
 public sealed class StateCurrency
 {
     public Guid Id { get; set; }
@@ -63,11 +98,52 @@ public sealed class EconomicCompany
 {
     public Guid Id { get; set; }
     public Guid StateId { get; set; }
+    public Guid CurrencyId { get; set; }
+    public Dictionary<Guid, long> CashBalances { get; set; } = [];
     public string Name { get; set; } = "";
     public string Sector { get; set; } = "";
     public Dictionary<string, long> Inventory { get; set; } = [];
     public List<ProductionFacility> Facilities { get; set; } = [];
 }
+
+public sealed record CompanyFinancialTransaction(
+    Guid Id,
+    Guid CompanyId,
+    Guid StateId,
+    Guid CurrencyId,
+    CompanyTransactionType Type,
+    long Amount,
+    long BalanceBefore,
+    long BalanceAfter,
+    DateOnly WorldDate,
+    Guid? TradeRouteId,
+    string GoodId,
+    long Quantity,
+    long UnitPrice,
+    string Description);
+
+public sealed record MarketSettlement(
+    Guid StateId,
+    string GoodId,
+    Guid CurrencyId,
+    DateOnly WorldDate,
+    long Demand,
+    long DomesticSupply,
+    long ImportedSupply,
+    long QuantitySold,
+    long UnmetDemand,
+    long PriceBefore,
+    long PriceAfter,
+    long ConsumerBudget,
+    long ConsumerSpending);
+
+public sealed record EconomyScenarioRequest(
+    long ExpectedWorldVersion,
+    IReadOnlyList<EconomicGood> Goods,
+    IReadOnlyList<ProductionRecipe> ProductionRecipes,
+    IReadOnlyList<EconomicCompany> Companies,
+    IReadOnlyList<EconomicMarket> Markets,
+    IReadOnlyList<EconomicTradeRoute> TradeRoutes);
 
 public sealed class ProductionFacility
 {
@@ -88,6 +164,8 @@ public sealed record ProductionResult(
 public sealed record EconomicCompanyView(
     Guid Id,
     Guid StateId,
+    Guid CurrencyId,
+    IReadOnlyDictionary<Guid, long> CashBalances,
     string Name,
     string Sector,
     IReadOnlyDictionary<string, long> Inventory,

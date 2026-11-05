@@ -181,6 +181,30 @@ app.MapPost("/api/games/{gameId:guid}/start", async (
     return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
 });
 
+app.MapPut("/api/games/{gameId:guid}/economy", async (
+    Guid gameId, EconomyScenarioRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can configure the technical scenario before it starts.";
+            return EconomySetupRules.Configure(game, request);
+        },
+        cancellationToken,
+        "economy.scenario_configured");
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
 app.Map("/ws", (HttpContext context, GameHub hub) => hub.HandleAsync(context, allowedOrigins));
 
 app.Run();
