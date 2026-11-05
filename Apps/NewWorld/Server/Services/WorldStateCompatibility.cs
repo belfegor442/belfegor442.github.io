@@ -25,6 +25,15 @@ public static class WorldStateCompatibility
 
     public static void Normalize(WorldState game)
     {
+        game.Players ??= [];
+        game.Memberships ??= [];
+        game.Territories ??= [];
+        game.PoliticalSystems ??= [];
+        game.Orders ??= [];
+        game.Events ??= [];
+        game.Activity ??= [];
+        game.PauseVotes ??= [];
+
         if (game.Day < 1)
             game.Day = 1;
         if (game.WorldDate == default)
@@ -61,6 +70,188 @@ public static class WorldStateCompatibility
 
         var stateIds = game.Territories.Select(territory => territory.StateId).ToHashSet();
         var playerIds = game.Players.Select(player => player.Id).ToHashSet();
+        foreach (var territory in game.Territories)
+        {
+            if (game.PoliticalSystems.All(system => system.StateId != territory.StateId))
+                game.PoliticalSystems.Add(new StatePoliticalSystem { StateId = territory.StateId });
+        }
+
+        var politicalStateIds = new HashSet<Guid>();
+        foreach (var system in game.PoliticalSystems)
+        {
+            if (!stateIds.Contains(system.StateId) || !politicalStateIds.Add(system.StateId))
+                throw new InvalidDataException("The saved world contains an invalid State political system.");
+
+            system.Institutions ??= [];
+            system.Offices ??= [];
+            system.Parties ??= [];
+            system.Laws ??= [];
+            system.Decisions ??= [];
+            if (system.Constitution is not null)
+            {
+                system.Constitution.CompetenceRules ??= [];
+                foreach (var rule in system.Constitution.CompetenceRules)
+                {
+                    rule.ProposerPermissionSetIds ??= [];
+                    rule.VoterPermissionSetIds ??= [];
+                }
+            }
+
+            var institutionIds = new HashSet<Guid>();
+            foreach (var institution in system.Institutions)
+            {
+                institution.OfficeIds ??= [];
+                if (institution.Id == Guid.Empty ||
+                    string.IsNullOrWhiteSpace(institution.Name) ||
+                    !Enum.IsDefined(institution.Branch) ||
+                    !institutionIds.Add(institution.Id))
+                    throw new InvalidDataException("The saved world contains an invalid political institution.");
+            }
+
+            if (system.Regime is not null &&
+                (system.Regime.Id == Guid.Empty || string.IsNullOrWhiteSpace(system.Regime.Name)))
+                throw new InvalidDataException("The saved world contains an invalid political regime.");
+
+            if (system.Constitution is not null)
+            {
+                var constitution = system.Constitution;
+                var ruleIds = new HashSet<Guid>();
+                var competences = new HashSet<PoliticalCompetence>();
+                if (constitution.Id == Guid.Empty || constitution.Version < 1 ||
+                    constitution.EffectiveFrom == default ||
+                    constitution.CompetenceRules.Any(rule =>
+                        rule.Id == Guid.Empty ||
+                        !Enum.IsDefined(rule.Competence) ||
+                        !competences.Add(rule.Competence) ||
+                        !ruleIds.Add(rule.Id) ||
+                        !institutionIds.Contains(rule.InstitutionId) ||
+                        string.IsNullOrWhiteSpace(rule.LegalBasis) ||
+                        rule.ProposerPermissionSetIds.Count == 0 ||
+                        rule.ProposerPermissionSetIds.Any(string.IsNullOrWhiteSpace) ||
+                        rule.ApprovalRequired &&
+                        (rule.MinimumVotes < 1 ||
+                         rule.ApprovalThresholdPercent is < 1 or > 100 ||
+                         rule.ApprovalThresholdBasis is not (ApprovalThresholdBasis.VotesCast or ApprovalThresholdBasis.EligibleVoters) ||
+                         rule.VoterPermissionSetIds.Count == 0 ||
+                         rule.VoterPermissionSetIds.Any(string.IsNullOrWhiteSpace))))
+                    throw new InvalidDataException("The saved world contains an invalid constitution.");
+            }
+
+            if (system.Government is PoliticalGovernment government &&
+                (government.Id == Guid.Empty ||
+                 government.Budget < 0 ||
+                 government.Legitimacy is < 0 or > 100 ||
+                 government.InstitutionalSupport is < 0 or > 100 ||
+                 government.Tensions is < 0 or > 100 ||
+                 government.EconomicCondition is < 0 or > 100 ||
+                 government.ConflictPressure is < 0 or > 100 ||
+                 government.Compliance is < 0 or > 100))
+                throw new InvalidDataException("The saved world contains an invalid government.");
+            if (system.Constitution?.StabilityWeights is StabilityWeights weights &&
+                (weights.Legitimacy < 0 || weights.InstitutionalSupport < 0 ||
+                 weights.Tensions < 0 || weights.EconomicCondition < 0 ||
+                 weights.ConflictPressure < 0 || weights.Compliance < 0 ||
+                 (long)weights.Legitimacy + weights.InstitutionalSupport + weights.Tensions +
+                 weights.EconomicCondition + weights.ConflictPressure + weights.Compliance == 0))
+                throw new InvalidDataException("The saved world contains invalid stability weights.");
+
+            var officeIds = new HashSet<Guid>();
+            foreach (var office in system.Offices)
+            {
+                office.Competences ??= [];
+                if (office.Id == Guid.Empty ||
+                    string.IsNullOrWhiteSpace(office.Name) ||
+                    !institutionIds.Contains(office.InstitutionId) ||
+                    office.HolderPlayerId is Guid holderId && !playerIds.Contains(holderId) ||
+                    office.TermStartsOn is DateOnly starts &&
+                    office.TermEndsOn is DateOnly ends && ends < starts ||
+                    office.Competences.Any(competence => !Enum.IsDefined(competence)) ||
+                    !officeIds.Add(office.Id))
+                    throw new InvalidDataException("The saved world contains an invalid political office.");
+            }
+
+            foreach (var party in system.Parties)
+                party.MemberPlayerIds ??= [];
+
+            if (system.Institutions.Any(institution =>
+                    institution.OfficeIds.Any(officeId =>
+                        !officeIds.Contains(officeId) ||
+                        system.Offices.Single(office => office.Id == officeId).InstitutionId != institution.Id)) ||
+                system.Parties.Any(party =>
+                    party.Id == Guid.Empty ||
+                    string.IsNullOrWhiteSpace(party.Name) ||
+                    party.Seats < 0 ||
+                    party.MemberPlayerIds.Any(playerId => !playerIds.Contains(playerId))) ||
+                system.Parties.Select(party => party.Id).Distinct().Count() != system.Parties.Count)
+                throw new InvalidDataException("The saved world contains invalid political representation.");
+
+            var decisionIds = new HashSet<Guid>();
+            foreach (var decision in system.Decisions)
+            {
+                decision.Votes ??= [];
+                if (decision.Id == Guid.Empty ||
+                    decision.StateId != system.StateId ||
+                    !Enum.IsDefined(decision.Competence) ||
+                    !Enum.IsDefined(decision.Status) ||
+                    !playerIds.Contains(decision.ProposerPlayerId) ||
+                    !institutionIds.Contains(decision.InstitutionId) ||
+                    string.IsNullOrWhiteSpace(decision.Title) ||
+                    string.IsNullOrWhiteSpace(decision.Text) ||
+                    string.IsNullOrWhiteSpace(decision.LegalBasis) ||
+                    decision.ConstitutionVersion < 1 ||
+                    decision.ProposedOnWorldDate == default ||
+                    decision.ProposedOnWorldDate > game.WorldDate ||
+                    decision.Status == PoliticalDecisionStatus.PendingApproval &&
+                    decision.ResolvedOnWorldDate is not null ||
+                    decision.Status != PoliticalDecisionStatus.PendingApproval &&
+                    (decision.ResolvedOnWorldDate is not DateOnly resolvedOn ||
+                     resolvedOn < decision.ProposedOnWorldDate || resolvedOn > game.WorldDate) ||
+                    !decisionIds.Add(decision.Id) ||
+                    decision.Votes.Any(vote =>
+                        !playerIds.Contains(vote.PlayerId) ||
+                        !Enum.IsDefined(vote.Choice) ||
+                        vote.CastOnWorldDate < decision.ProposedOnWorldDate ||
+                        vote.CastOnWorldDate > game.WorldDate ||
+                        !game.Memberships.Any(membership =>
+                            membership.Id == vote.MembershipId &&
+                            membership.PlayerId == vote.PlayerId &&
+                            membership.StateId == system.StateId)) ||
+                    decision.Votes.Select(vote => vote.PlayerId).Distinct().Count() != decision.Votes.Count)
+                    throw new InvalidDataException("The saved world contains an invalid political decision.");
+            }
+
+            var decisionsById = system.Decisions.ToDictionary(decision => decision.Id);
+            var lawIds = new HashSet<Guid>();
+            foreach (var law in system.Laws)
+            {
+                if (law.Id == Guid.Empty ||
+                    law.StateId != system.StateId ||
+                    !playerIds.Contains(law.ProposerPlayerId) ||
+                    !decisionsById.TryGetValue(law.DecisionId, out var decision) ||
+                    law.Id != decision.Id ||
+                    law.ProposerPlayerId != decision.ProposerPlayerId ||
+                    law.Title != decision.Title ||
+                    law.Text != decision.Text ||
+                    law.LegalBasis != decision.LegalBasis ||
+                    !Enum.IsDefined(law.Status) ||
+                    law.ProposedOnWorldDate != decision.ProposedOnWorldDate ||
+                    !lawIds.Add(law.Id) ||
+                    decision.Status == PoliticalDecisionStatus.PendingApproval &&
+                    (law.Status != PoliticalLawStatus.Proposed || law.EffectiveFrom is not null) ||
+                    decision.Status == PoliticalDecisionStatus.Approved &&
+                    (law.Status != PoliticalLawStatus.InForce ||
+                     law.EffectiveFrom is null ||
+                     law.EffectiveFrom != decision.ResolvedOnWorldDate) ||
+                    decision.Status == PoliticalDecisionStatus.Rejected &&
+                    (law.Status != PoliticalLawStatus.Rejected || law.EffectiveFrom is not null) ||
+                    law.EffectiveFrom is DateOnly effectiveFrom &&
+                    (effectiveFrom < law.ProposedOnWorldDate || effectiveFrom > game.WorldDate))
+                    throw new InvalidDataException("The saved world contains an invalid political law.");
+            }
+            if (lawIds.Count != decisionIds.Count)
+                throw new InvalidDataException("The saved world contains a decision without a corresponding law.");
+        }
+
         var membershipIds = new HashSet<Guid>();
         var activePlayerStates = new HashSet<(Guid PlayerId, Guid StateId)>();
         foreach (var player in game.Players)

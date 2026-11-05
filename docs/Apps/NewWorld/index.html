@@ -27,6 +27,7 @@
       <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
       <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>CITY</span></button>
       <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
+      <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
       <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
       <div class="nav-rail-foot">NA</div>
     </nav>
@@ -99,6 +100,33 @@
           <p class="panel-kicker">SIMULATION RECORD</p>
           <h2>Recent activity</h2>
           <div id="activity" class="activity-list"><p>World initialized. Your administration controls the capital district.</p></div>
+        </section>
+
+        <section id="government-view" class="view">
+          <p class="panel-kicker">STATE / INSTITUTIONS</p>
+          <h2 id="government-title">Government</h2>
+          <p id="government-status" class="muted" role="status">Connect to a multiplayer world to load constitutional data.</p>
+          <div id="government-summary" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INSTITUTIONS / OFFICES</p>
+          <div id="institution-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">POLITICAL PARTIES</p>
+          <div id="party-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">LEGISLATION</p>
+          <div id="law-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">LEGISLATIVE DECISIONS</p>
+          <div id="decision-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PROPOSE A LAW</p>
+          <label class="field-label" for="law-title">TITLE</label>
+          <input id="law-title" class="text-field" maxlength="120" autocomplete="off">
+          <label class="field-label" for="law-text">PROPOSAL TEXT</label>
+          <textarea id="law-text" class="text-field" rows="5" maxlength="4000"></textarea>
+          <button id="propose-law" class="action-btn" type="button" disabled>SUBMIT FOR CONSTITUTIONAL REVIEW</button>
+          <p id="law-restriction" class="microcopy">Law-making requires an explicitly configured Constitution and permitted government membership.</p>
         </section>
 
         <section id="multiplayer-view" class="view">

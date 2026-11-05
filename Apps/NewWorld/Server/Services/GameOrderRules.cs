@@ -14,6 +14,7 @@ public static class GameOrderRules
         "negotiateTreaty" => GameOrderType.NegotiateTreaty,
         "mobilizeUnit" => GameOrderType.MobilizeUnit,
         "startProject" => GameOrderType.StartProject,
+        "voteDecision" => GameOrderType.VotePoliticalDecision,
         "pause" => GameOrderType.PauseWorld,
         "resume" => GameOrderType.ResumeWorld,
         _ => GameOrderType.Unsupported
@@ -79,13 +80,16 @@ public static class GameOrderRules
                            game.Territories.Any(territory => territory.StateId == requestedStateId)
             ? requestedStateId
             : (Guid?)null;
+        var description = rejection?.Message ??
+                          game.Activity.FirstOrDefault() ??
+                          $"Executed {orderType}.";
         GameStore.AddWorldEvent(
             game,
             rejection is null ? "order.executed" : "order.rejected",
             player.Id,
             eventStateId,
             orderId,
-            rejection is null ? $"Executed {orderType}." : rejection.Message,
+            description,
             rejection?.Code,
             submittedAtUtc);
 

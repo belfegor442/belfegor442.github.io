@@ -217,7 +217,25 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             game.EventSequence,
             game.Events.Where(worldEvent => worldEvent.Sequence > afterEventSequence)
                 .OrderBy(worldEvent => worldEvent.Sequence)
-                .ToList());
+                .ToList(),
+            game.PoliticalSystems.Select(system =>
+            {
+                var constitution = system.Constitution;
+                var configurationPending =
+                    system.Regime is null || constitution is null || system.Government is null;
+                return new PoliticalStateView(
+                    system.StateId,
+                    configurationPending,
+                    system.Regime,
+                    constitution,
+                    system.Government,
+                    system.Institutions,
+                    system.Offices,
+                    system.Parties,
+                    system.Laws,
+                    system.Decisions,
+                    PoliticalProcedureRules.CalculateStability(system));
+            }).ToList());
     }
 
     private async Task HandleMessageAsync(
@@ -234,7 +252,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var connectedPlayers = ConnectedPlayers(gameId);
         var orderType = GameOrderRules.ParseType(message.Type);
         var payload = new GameOrderPayload(
-            message.TerritoryIndex, message.PlotIndex, message.BuildingId);
+            message.TerritoryIndex, message.PlotIndex, message.BuildingId,
+            message.DecisionId, message.DecisionTitle, message.DecisionText, message.VoteChoice);
         var result = await store.ExecuteOrderAsync(
             gameId, token, orderId, message.StateId, orderType, payload,
             message.TargetWorldDate, expectedWorldVersion, (game, player) =>
@@ -326,6 +345,15 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     player.Buildings.Add(plot, building);
                     GameStore.AddActivity(game, $"{player.Name} constructed a {building.Name.ToLowerInvariant()}.");
                     return null;
+
+                case "proposeLaw":
+                    return PoliticalProcedureRules.ProposeLaw(
+                        game, player, orderId, message.StateId,
+                        message.DecisionTitle, message.DecisionText);
+
+                case "voteDecision":
+                    return PoliticalProcedureRules.VoteOnDecision(
+                        game, player, message.StateId, message.DecisionId, message.VoteChoice);
 
                 default:
                     return new OrderRejection("UNSUPPORTED_ORDER", "Unsupported action.");

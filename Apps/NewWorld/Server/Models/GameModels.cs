@@ -24,6 +24,7 @@ public sealed class WorldState
     public List<PlayerState> Players { get; set; } = [];
     public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
+    public List<StatePoliticalSystem> PoliticalSystems { get; set; } = [];
     public List<GameOrder> Orders { get; set; } = [];
     public List<WorldEvent> Events { get; set; } = [];
     public List<string> Activity { get; set; } = [];
@@ -56,6 +57,7 @@ public enum GameOrderType
     NegotiateTreaty,
     MobilizeUnit,
     StartProject,
+    VotePoliticalDecision,
     PauseWorld,
     ResumeWorld,
     Unsupported
@@ -98,7 +100,14 @@ public sealed record WorldEvent(
     string Description,
     long Sequence = 0);
 
-public sealed record GameOrderPayload(int? TerritoryIndex, int? PlotIndex, string? BuildingId);
+public sealed record GameOrderPayload(
+    int? TerritoryIndex,
+    int? PlotIndex,
+    string? BuildingId,
+    Guid? DecisionId = null,
+    string? DecisionTitle = null,
+    string? DecisionText = null,
+    PoliticalVoteChoice? VoteChoice = null);
 
 public sealed record OrderRejection(string Code, string Message);
 public sealed record GameOrderResult(Guid Id, bool Accepted, string? Code, string? Error, bool Replayed);
@@ -165,7 +174,8 @@ public sealed record GameSnapshot(
     string ScenarioVersion,
     IReadOnlyList<GovernmentMembershipView> Memberships,
     long EventSequence,
-    IReadOnlyList<WorldEvent> Events);
+    IReadOnlyList<WorldEvent> Events,
+    IReadOnlyList<PoliticalStateView> PoliticalSystems);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
     IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected,
@@ -178,7 +188,9 @@ public sealed record TerritoryView(
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
     string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId,
-    DateOnly? TargetWorldDate = null, long? LastEventSequence = null);
+    DateOnly? TargetWorldDate = null, long? LastEventSequence = null,
+    Guid? DecisionId = null, string? DecisionTitle = null, string? DecisionText = null,
+    PoliticalVoteChoice? VoteChoice = null);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 

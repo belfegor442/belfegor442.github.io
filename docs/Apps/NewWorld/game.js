@@ -205,7 +205,147 @@
     renderCity();
     renderOptions();
     renderMultiplayer();
+    renderGovernment();
     if (state.selected !== null) selectState(state.selected, false);
+  }
+
+  function addPoliticalRow(container, title, detail) {
+    const row = document.createElement('div');
+    row.className = 'political-row';
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const description = document.createElement('span');
+    description.textContent = detail;
+    row.append(heading, description);
+    container.appendChild(row);
+    return row;
+  }
+
+  function renderGovernment() {
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    const system = onlineGame?.politicalSystems
+      ?.find(item => item.stateId === territory?.stateId);
+    const summary = $('government-summary');
+    const institutions = $('institution-list');
+    const parties = $('party-list');
+    const laws = $('law-list');
+    const decisions = $('decision-list');
+    for (const list of [summary, institutions, parties, laws, decisions]) list.replaceChildren();
+
+    $('government-title').textContent = territory?.name || 'Government';
+    if (!onlineGame || !territory || !system) {
+      $('government-status').textContent =
+        'Connect to a multiplayer world to load authoritative constitutional data.';
+      $('propose-law').disabled = true;
+      $('law-restriction').textContent = 'Law-making requires an explicitly configured Constitution and permitted government membership.';
+      addPoliticalRow(summary, 'No political data', 'No authoritative State political system is available.');
+      return;
+    }
+
+    const constitution = system.constitution;
+    $('government-status').textContent = system.configurationPending
+      ? 'Political configuration is incomplete; powers are available only where constitutional procedures are explicitly configured.'
+      : 'Political powers and procedures are governed by this State’s configured constitution.';
+    addPoliticalRow(summary, 'REGIME', system.regime?.name || 'Pending definition');
+    addPoliticalRow(summary, 'CONSTITUTION',
+      constitution ? 'Version ' + constitution.version + ' · effective ' + formatWorldDate(constitution.effectiveFrom) : 'Pending definition');
+    if (system.government) {
+      const stability = system.stability === null || system.stability === undefined
+        ? 'Not configured'
+        : system.stability + '/100';
+      addPoliticalRow(summary, 'GOVERNMENT',
+        (system.government.program || 'No program recorded') +
+        ' · budget ' + money(system.government.budget) +
+        ' · legitimacy ' + system.government.legitimacy + '/100 · stability ' + stability);
+    } else {
+      addPoliticalRow(summary, 'GOVERNMENT', 'No government composition is defined.');
+    }
+
+    if (system.institutions.length) {
+      for (const institution of system.institutions) {
+        const officeDetails = (system.offices || [])
+          .filter(office => office.institutionId === institution.id)
+          .map(office => {
+            const holder = onlineGame.players.find(player => player.id === office.holderPlayerId);
+            return office.name + ': ' + (holder?.name || 'vacant');
+          }).join(' · ');
+        addPoliticalRow(
+          institutions,
+          institution.name + ' · ' + String(institution.branch).toUpperCase(),
+          officeDetails || 'No offices are configured.');
+      }
+    } else {
+      addPoliticalRow(institutions, 'No institutions defined', 'Institutional design remains pending.');
+    }
+
+    if (system.parties.length) {
+      for (const party of system.parties) {
+        addPoliticalRow(parties, party.name,
+          party.seats + ' seats · ' + (party.program || 'No program recorded'));
+      }
+    } else {
+      addPoliticalRow(parties, 'No parties defined', 'No party structure is assumed.');
+    }
+
+    if (system.laws?.length) {
+      for (const law of [...system.laws].reverse()) {
+        const status = String(law.status).replaceAll(/([A-Z])/g, ' $1').toUpperCase();
+        const effectiveDate = law.effectiveFrom
+          ? ' · effective ' + formatWorldDate(law.effectiveFrom)
+          : '';
+        addPoliticalRow(laws, law.title + ' · ' + status,
+          law.text + ' · ' + law.legalBasis + effectiveDate);
+      }
+    } else {
+      addPoliticalRow(laws, 'No legislation recorded', 'Only proposals completing the configured constitutional procedure enter into force.');
+    }
+
+    const player = currentPlayer();
+    const membership = membershipsFor(player).find(item => item.stateId === system.stateId);
+    const lawRule = constitution?.competenceRules
+      ?.find(rule => rule.competence === 'proposeLaw');
+    if (system.decisions.length) {
+      for (const decision of [...system.decisions].reverse()) {
+        const row = addPoliticalRow(
+          decisions,
+          decision.title + ' · ' + String(decision.status).replaceAll(/([A-Z])/g, ' $1').toUpperCase(),
+          decision.text + ' · ' + decision.votes.length + ' vote(s) · ' + decision.legalBasis);
+        const canVote = onlineGame.status === 'running' &&
+          lawRule?.approvalRequired &&
+          decision.status === 'pendingApproval' &&
+          membership &&
+          lawRule?.voterPermissionSetIds?.includes(membership.permissionSetId) &&
+          !decision.votes.some(vote => vote.playerId === onlineSession.playerId);
+        if (canVote) {
+          for (const [choice, label] of [['approve', 'APPROVE'], ['reject', 'REJECT']]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.addEventListener('click', () => sendAction({
+              type: 'voteDecision',
+              stateId: system.stateId,
+              decisionId: decision.id,
+              voteChoice: choice
+            }));
+            row.appendChild(button);
+          }
+        }
+      }
+    } else {
+      addPoliticalRow(decisions, 'No pending decisions', 'This State has no recorded legislative decisions.');
+    }
+
+    const canProposeLaw = onlineGame.status === 'running' &&
+      membership &&
+      lawRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
+    $('propose-law').disabled = !canProposeLaw;
+    $('law-restriction').textContent = canProposeLaw
+      ? 'Authority: ' + lawRule.legalBasis + (lawRule.approvalRequired
+        ? '. Approval requires ' + lawRule.minimumVotes + ' vote(s) and ' +
+          lawRule.approvalThresholdPercent + '% of ' +
+          String(lawRule.approvalThresholdBasis).replaceAll(/([A-Z])/g, ' $1').toLowerCase() + '.'
+        : '. This configured procedure does not require approval.')
+      : 'Law proposals are unavailable: the Constitution, State membership, or configured permission does not authorize this action.';
   }
 
   function escapeHtml(value) {
@@ -713,17 +853,20 @@
       return;
     }
     const player = currentPlayer();
-    const selectedMembership = membershipsFor(player).find(membership =>
-      membership.stateIndex === player?.countryIndex) || membershipsFor(player)[0];
+    const activeMemberships = membershipsFor(player);
+    const selectedMembership = action.stateId
+      ? activeMemberships.find(membership => membership.stateId === action.stateId)
+      : activeMemberships.find(membership => membership.stateIndex === player?.countryIndex) ||
+        activeMemberships[0];
     const order = {
       ...action,
       orderId: crypto.randomUUID(),
       gameId: onlineSession.gameId,
       playerId: onlineSession.playerId,
       expectedWorldVersion: onlineGame?.worldVersion,
-      stateId: selectedMembership?.stateId ?? null
+      stateId: selectedMembership?.stateId ?? action.stateId ?? null
     };
-    if (!order.expectedWorldVersion || (['claim', 'build'].includes(action.type) && !order.stateId)) {
+    if (!order.expectedWorldVersion || !order.stateId) {
       showMessage('The authoritative world version or government membership is unavailable.', true);
       return;
     }
@@ -748,6 +891,15 @@
       PAUSE_STATE_CONFLICT: 'The world pause state changed before this vote was processed.',
       NOT_CONNECTED: 'Reconnect before voting on the world clock.',
       UNSUPPORTED_ORDER: 'This order type is not supported.',
+      CONSTITUTION_NOT_CONFIGURED: 'This State has no configured constitution for that procedure.',
+      COMPETENCE_NOT_CONFIGURED: 'This constitutional competence has not been defined.',
+      INVALID_CONSTITUTION: 'The State constitutional procedure is incomplete or invalid.',
+      DECISION_NOT_FOUND: 'That political decision is no longer available.',
+      DECISION_CLOSED: 'That political decision is closed.',
+      APPROVAL_NOT_REQUIRED: 'This constitutional procedure does not require a vote.',
+      DECISION_ID_CONFLICT: 'This decision identifier is already in use.',
+      CONSTITUTION_CHANGED: 'The State constitution changed; review the decision before continuing.',
+      ALREADY_VOTED: 'You have already voted on this decision.',
       ORDER_ID_REUSED: 'This order ID was already used for a different request.'
     };
     return messages[code] || 'The server rejected the order.';
@@ -921,6 +1073,16 @@
   $('pause-vote').addEventListener('click', () => {
     if (!onlineGame?.started) return;
     sendAction({type: onlineGame.paused ? 'resume' : 'pause'});
+  });
+  $('propose-law').addEventListener('click', () => {
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    if (!territory || $('propose-law').disabled) return;
+    sendAction({
+      type: 'proposeLaw',
+      stateId: territory.stateId,
+      decisionTitle: $('law-title').value,
+      decisionText: $('law-text').value
+    });
   });
 
   document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {

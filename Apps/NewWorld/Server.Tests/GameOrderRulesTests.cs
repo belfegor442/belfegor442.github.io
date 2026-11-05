@@ -10,6 +10,7 @@ public sealed class GameOrderRulesTests
     [InlineData("build", GameOrderType.ConstructBuilding)]
     [InlineData("approveBudget", GameOrderType.ApproveBudget)]
     [InlineData("proposeLaw", GameOrderType.ProposeLaw)]
+    [InlineData("voteDecision", GameOrderType.VotePoliticalDecision)]
     [InlineData("appointOffice", GameOrderType.AppointOffice)]
     [InlineData("negotiateTreaty", GameOrderType.NegotiateTreaty)]
     [InlineData("mobilizeUnit", GameOrderType.MobilizeUnit)]

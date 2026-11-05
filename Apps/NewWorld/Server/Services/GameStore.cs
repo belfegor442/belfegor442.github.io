@@ -56,6 +56,8 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             }).ToList(),
             Activity = [$"{playerName} created a private world."]
         };
+        game.PoliticalSystems = game.Territories.Select(territory =>
+            new StatePoliticalSystem { StateId = territory.StateId }).ToList();
         AddWorldEvent(
             game, "world.created", playerId, null, null,
             "A private multiplayer world was created.");
