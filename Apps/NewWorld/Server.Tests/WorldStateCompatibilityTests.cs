@@ -153,4 +153,82 @@ public sealed class WorldStateCompatibilityTests
 
         Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
     }
+
+    [Fact]
+    public void NormalizePreservesValidEventsLinkedToTheirOrder()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, orderId, playerId, stateId, GameOrderType.ConstructBuilding,
+            GameOrderStatus.Executed, new GameOrderPayload(null, 2, "farm"), 3,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), null, null, 4);
+        var worldEvent = new WorldEvent(
+            Guid.NewGuid(), gameId, orderId, playerId, stateId, "order.executed", null,
+            order.SubmittedAtUtc, order.SubmittedOnWorldDate, order.WorldVersion, "Executed ConstructBuilding.");
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 4,
+            Players = [new PlayerState { Id = playerId }],
+            Territories = [new TerritoryState { StateId = stateId }],
+            Orders = [order],
+            Events = [worldEvent]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(worldEvent, Assert.Single(game.Events));
+    }
+
+    [Fact]
+    public void NormalizeRejectsEventsWithMismatchedOrderVersions()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, Guid.NewGuid(), playerId, stateId, GameOrderType.ConstructBuilding,
+            GameOrderStatus.Executed, new GameOrderPayload(null, 2, "farm"), 3,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), null, null, 4);
+        var worldEvent = new WorldEvent(
+            Guid.NewGuid(), gameId, order.Id, playerId, stateId, "order.executed", null,
+            order.SubmittedAtUtc, order.SubmittedOnWorldDate, 3, "Executed ConstructBuilding.");
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 4,
+            Players = [new PlayerState { Id = playerId }],
+            Territories = [new TerritoryState { StateId = stateId }],
+            Orders = [order],
+            Events = [worldEvent]
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+    }
+
+    [Fact]
+    public void NormalizeAllowsRejectedOrdersThatExpectedAFutureWorldVersion()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var order = new GameOrder(
+            gameId, Guid.NewGuid(), playerId, null, GameOrderType.PauseWorld,
+            GameOrderStatus.Rejected, new GameOrderPayload(null, null, null), 5,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1),
+            "STALE_WORLD_VERSION", "The world changed.", 2);
+        var game = new WorldState
+        {
+            Id = gameId,
+            WorldVersion = 2,
+            Players = [new PlayerState { Id = playerId }],
+            Orders = [order]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(order, Assert.Single(game.Orders));
+    }
 }

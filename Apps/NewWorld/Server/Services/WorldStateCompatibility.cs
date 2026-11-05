@@ -82,7 +82,7 @@ public static class WorldStateCompatibility
                 player.Treasury < 0 || player.DailyBalanceRemainder is < 0 or >= 30))
             throw new InvalidDataException("The saved world contains invalid legacy player finances.");
 
-        var orderIds = new HashSet<Guid>();
+        var ordersById = new Dictionary<Guid, GameOrder>();
         foreach (var order in game.Orders)
         {
             if (order.GameId != game.Id ||
@@ -92,16 +92,45 @@ public static class WorldStateCompatibility
                 !Enum.IsDefined(order.Type) ||
                 !Enum.IsDefined(order.Status) ||
                 order.ExpectedWorldVersion < 1 ||
-                !orderIds.Add(order.Id) ||
+                !ordersById.TryAdd(order.Id, order) ||
                 (order.Status == GameOrderStatus.Executed &&
                     order.StateId is Guid executedStateId && !stateIds.Contains(executedStateId)) ||
                 (order.Status == GameOrderStatus.Executed &&
                     (order.ResultCode is not null || order.Result is not null)) ||
                 (order.Status == GameOrderStatus.Rejected &&
                     (string.IsNullOrWhiteSpace(order.ResultCode) || string.IsNullOrWhiteSpace(order.Result))) ||
-                order.WorldVersion < order.ExpectedWorldVersion ||
+                order.WorldVersion < 1 ||
                 order.WorldVersion > game.WorldVersion)
                 throw new InvalidDataException("The saved world contains an invalid order record.");
+        }
+
+        var eventIds = new HashSet<Guid>();
+        var eventOrderIds = new HashSet<Guid>();
+        foreach (var worldEvent in game.Events)
+        {
+            var linkedOrder = worldEvent.OrderId is Guid eventOrderId
+                ? ordersById.GetValueOrDefault(eventOrderId)
+                : null;
+            if (worldEvent.Id == Guid.Empty ||
+                worldEvent.GameId != game.Id ||
+                worldEvent.ActorPlayerId is Guid actorId && !playerIds.Contains(actorId) ||
+                worldEvent.StateId is Guid eventStateId && !stateIds.Contains(eventStateId) ||
+                worldEvent.OrderId is not null && linkedOrder is null ||
+                worldEvent.OrderId is Guid linkedOrderId && !eventOrderIds.Add(linkedOrderId) ||
+                string.IsNullOrWhiteSpace(worldEvent.Type) ||
+                string.IsNullOrWhiteSpace(worldEvent.Description) ||
+                worldEvent.WorldVersion < 1 ||
+                worldEvent.WorldVersion > game.WorldVersion ||
+                linkedOrder is not null &&
+                (worldEvent.ActorPlayerId != linkedOrder.PlayerId ||
+                 worldEvent.StateId != linkedOrder.StateId ||
+                 worldEvent.WorldVersion != linkedOrder.WorldVersion ||
+                 worldEvent.ResultCode != linkedOrder.ResultCode ||
+                 worldEvent.Type != (linkedOrder.Status == GameOrderStatus.Executed
+                     ? "order.executed"
+                     : "order.rejected")) ||
+                !eventIds.Add(worldEvent.Id))
+                throw new InvalidDataException("The saved world contains an invalid world event.");
         }
 
         if (game.EconomyVersion < 1)

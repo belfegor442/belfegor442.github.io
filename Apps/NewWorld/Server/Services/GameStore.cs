@@ -159,10 +159,10 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         else if (!game.Memberships.Any(membership =>
                      membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
             rejection = new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
-        else if (orderType is GameOrderType.EstablishAdministration or GameOrderType.ConstructBuilding &&
+        else if (stateId is not Guid selectedStateId ||
                  !game.Memberships.Any(membership =>
                      membership.PlayerId == player.Id &&
-                     membership.StateId == stateId &&
+                     membership.StateId == selectedStateId &&
                      membership.Status == MembershipStatus.Active))
             rejection = new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
         else
@@ -190,6 +190,18 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         AddActivity(game, rejection is null
             ? $"{player.Name} submitted {orderType} (order {orderId:N})."
             : $"{player.Name}'s {orderType} order was rejected ({rejection.Code}): {rejection.Message}");
+        game.Events.Add(new WorldEvent(
+            Guid.NewGuid(),
+            game.Id,
+            orderId,
+            player.Id,
+            stateId,
+            rejection is null ? "order.executed" : "order.rejected",
+            rejection?.Code,
+            order.SubmittedAtUtc,
+            game.WorldDate,
+            game.WorldVersion,
+            rejection is null ? $"Executed {orderType}." : rejection.Message));
 
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);

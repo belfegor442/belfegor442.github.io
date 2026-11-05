@@ -704,7 +704,7 @@
       gameId: onlineSession.gameId,
       playerId: onlineSession.playerId,
       expectedWorldVersion: onlineGame?.worldVersion,
-      stateId: ['claim', 'build'].includes(action.type) ? selectedMembership?.stateId : null
+      stateId: selectedMembership?.stateId ?? null
     };
     if (!order.expectedWorldVersion || (['claim', 'build'].includes(action.type) && !order.stateId)) {
       showMessage('The authoritative world version or government membership is unavailable.', true);

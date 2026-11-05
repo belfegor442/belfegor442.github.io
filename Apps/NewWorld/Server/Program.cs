@@ -105,6 +105,18 @@ app.MapGet("/api/games/{gameId:guid}/orders", async (
     return Results.Ok(game.Orders);
 });
 
+app.MapGet("/api/games/{gameId:guid}/events", async (
+    Guid gameId, HttpContext context, GameStore gameStore, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var (game, player) = await gameStore.GetAuthorizedAsync(gameId, token, cancellationToken);
+    if (game is null || player is null)
+        return Results.Unauthorized();
+    return Results.Ok(game.Events);
+});
+
 app.MapPost("/api/games/{gameId:guid}/assign", async (
     Guid gameId, AssignCountryRequest request, HttpContext context, GameStore gameStore, GameHub hub,
     CancellationToken cancellationToken) =>

@@ -24,6 +24,7 @@ public sealed class WorldState
     public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
     public List<GameOrder> Orders { get; set; } = [];
+    public List<WorldEvent> Events { get; set; } = [];
     public List<string> Activity { get; set; } = [];
 }
 
@@ -73,6 +74,19 @@ public sealed record GameOrder(
     string? ResultCode,
     string? Result,
     long WorldVersion);
+
+public sealed record WorldEvent(
+    Guid Id,
+    Guid GameId,
+    Guid? OrderId,
+    Guid? ActorPlayerId,
+    Guid? StateId,
+    string Type,
+    string? ResultCode,
+    DateTimeOffset OccurredAtUtc,
+    DateOnly WorldDate,
+    long WorldVersion,
+    string Description);
 
 public sealed record GameOrderPayload(int? TerritoryIndex, int? PlotIndex, string? BuildingId);
 
