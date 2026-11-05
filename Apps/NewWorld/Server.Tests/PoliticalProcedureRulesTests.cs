@@ -6,6 +6,74 @@ namespace NewWorld.Server.Tests;
 public sealed class PoliticalProcedureRulesTests
 {
     [Fact]
+    public void HostCanConfigurePoliticalSystemsBeforeTheWorldStarts()
+    {
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 1,
+            Territories = [new TerritoryState { StateId = Guid.NewGuid(), Index = 0, Name = "State" }]
+        };
+        var stateId = game.Territories[0].StateId;
+        var institutionId = Guid.NewGuid();
+        var system = new StatePoliticalSystem
+        {
+            StateId = stateId,
+            Regime = new PoliticalRegime { Id = Guid.NewGuid(), Name = "Republic" },
+            Constitution = new Constitution
+            {
+                Id = Guid.NewGuid(),
+                EffectiveFrom = new DateOnly(1500, 1, 1),
+                CompetenceRules =
+                [
+                    new ConstitutionalCompetenceRule
+                    {
+                        Id = Guid.NewGuid(),
+                        Competence = PoliticalCompetence.ProposeLaw,
+                        InstitutionId = institutionId,
+                        LegalBasis = "Article 1",
+                        ApprovalRequired = false,
+                        ProposerPermissionSetIds = [GovernmentPermissionRules.MemberPermissionSetId],
+                        VoterPermissionSetIds = [GovernmentPermissionRules.MemberPermissionSetId]
+                    }
+                ]
+            },
+            Institutions =
+            [
+                new PoliticalInstitution
+                {
+                    Id = institutionId,
+                    Name = "Assembly",
+                    Branch = PoliticalBranch.Legislative
+                }
+            ]
+        };
+
+        var error = PoliticalSetupRules.Configure(game, new PoliticalScenarioRequest(1, [system]));
+
+        Assert.Null(error);
+        Assert.Equal(stateId, Assert.Single(game.PoliticalSystems).StateId);
+        Assert.Equal("Republic", game.PoliticalSystems[0].Regime!.Name);
+    }
+
+    [Fact]
+    public void InvalidPoliticalConfigurationIsRejectedBeforeTheWorldStarts()
+    {
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 1,
+            Territories = [new TerritoryState { StateId = Guid.NewGuid(), Index = 0, Name = "State" }]
+        };
+
+        var error = PoliticalSetupRules.Configure(
+            game,
+            new PoliticalScenarioRequest(1, [new StatePoliticalSystem { StateId = Guid.NewGuid() }]));
+
+        Assert.StartsWith("Invalid political configuration:", error);
+    }
+
+    [Fact]
     public void LawProposalRequiresAnExplicitConstitutionalCompetence()
     {
         var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);

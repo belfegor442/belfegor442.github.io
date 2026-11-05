@@ -205,6 +205,30 @@ app.MapPut("/api/games/{gameId:guid}/economy", async (
     return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
 });
 
+app.MapPut("/api/games/{gameId:guid}/politics", async (
+    Guid gameId, PoliticalScenarioRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can configure political systems before the world starts.";
+            return PoliticalSetupRules.Configure(game, request);
+        },
+        cancellationToken,
+        "politics.configured");
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
 app.Map("/ws", (HttpContext context, GameHub hub) => hub.HandleAsync(context, allowedOrigins));
 
 app.Run();
