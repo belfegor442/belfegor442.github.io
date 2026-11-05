@@ -53,22 +53,31 @@ public enum GameOrderType
     Unsupported
 }
 
+public enum GameOrderStatus
+{
+    Rejected,
+    Executed
+}
+
 public sealed record GameOrder(
     Guid GameId,
     Guid Id,
     Guid PlayerId,
     Guid? StateId,
     GameOrderType Type,
+    GameOrderStatus Status,
     GameOrderPayload Payload,
+    long ExpectedWorldVersion,
     DateTimeOffset SubmittedAtUtc,
     DateOnly SubmittedOnWorldDate,
-    bool Accepted,
+    string? ResultCode,
     string? Result,
     long WorldVersion);
 
 public sealed record GameOrderPayload(int? TerritoryIndex, int? PlotIndex, string? BuildingId);
 
-public sealed record GameOrderResult(Guid Id, bool Accepted, string? Error, bool Replayed);
+public sealed record OrderRejection(string Code, string Message);
+public sealed record GameOrderResult(Guid Id, bool Accepted, string? Code, string? Error, bool Replayed);
 
 public sealed class GovernmentMembership
 {
@@ -142,7 +151,7 @@ public sealed record TerritoryView(
     int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
-    string? BuildingId, Guid? OrderId);
+    string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 

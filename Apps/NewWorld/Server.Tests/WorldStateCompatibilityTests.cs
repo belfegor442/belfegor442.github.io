@@ -117,11 +117,13 @@ public sealed class WorldStateCompatibilityTests
         var stateId = Guid.NewGuid();
         var order = new GameOrder(
             gameId, Guid.NewGuid(), playerId, stateId, GameOrderType.ConstructBuilding,
-            new GameOrderPayload(null, 2, "farm"),
-            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), false, "Insufficient treasury.", 4);
+            GameOrderStatus.Rejected, new GameOrderPayload(null, 2, "farm"), 3,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1),
+            "INSUFFICIENT_FUNDS", "Insufficient treasury.", 4);
         var game = new WorldState
         {
             Id = gameId,
+            WorldVersion = 4,
             Players = [new PlayerState { Id = playerId }],
             Territories = [new TerritoryState { StateId = stateId }],
             Orders = [order]
@@ -140,8 +142,8 @@ public sealed class WorldStateCompatibilityTests
         var orderId = Guid.NewGuid();
         var firstOrder = new GameOrder(
             gameId, orderId, playerId, null, GameOrderType.PauseWorld,
-            new GameOrderPayload(null, null, null),
-            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), true, null, 2);
+            GameOrderStatus.Executed, new GameOrderPayload(null, null, null), 1,
+            DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1), null, null, 2);
         var game = new WorldState
         {
             Id = gameId,

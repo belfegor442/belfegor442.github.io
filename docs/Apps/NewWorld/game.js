@@ -69,21 +69,23 @@
 
   function removePendingOrder(orderId) {
     const remaining = getPendingOrders().filter(order => order.orderId !== orderId);
-    if (savePendingOrders(remaining)) sentOrderIds.delete(orderId);
+    if (savePendingOrders(remaining)) {
+      sentOrderIds.delete(orderId);
+      renderMultiplayer();
+    }
   }
 
   function replayPendingOrders(currentSocket) {
-    if (currentSocket !== socket || currentSocket.readyState !== WebSocket.OPEN) return;
-    for (const order of ordersForCurrentSession()) {
-      if (sentOrderIds.has(order.orderId)) continue;
-      try {
-        currentSocket.send(JSON.stringify(order));
-        sentOrderIds.add(order.orderId);
-      } catch (error) {
-        console.error('[new-world] Could not resend pending order:', error);
-        showMessage('An order is queued and will be retried after reconnecting.', true);
-        return;
-      }
+    if (currentSocket !== socket || currentSocket.readyState !== WebSocket.OPEN ||
+        sentOrderIds.size > 0) return;
+    const order = ordersForCurrentSession()[0];
+    if (!order || sentOrderIds.has(order.orderId)) return;
+    try {
+      currentSocket.send(JSON.stringify(order));
+      sentOrderIds.add(order.orderId);
+    } catch (error) {
+      console.error('[new-world] Could not resend pending order:', error);
+      showMessage('An order is queued and will be retried after reconnecting.', true);
     }
   }
 
@@ -667,8 +669,9 @@
         if (message.order.accepted) {
           showMessage(message.order.replayed ? 'Order already applied; world state synchronized.' : 'Order accepted.');
         } else {
-          showMessage(message.order.error || 'The server rejected the order.', true);
+          showMessage(orderErrorMessage(message.order.code), true);
         }
+        if (message.order.replayed) replayPendingOrders(currentSocket);
       } else if (message.type === 'error') {
         showMessage(message.error || 'The server rejected the request.', true);
       }
@@ -692,15 +695,42 @@
       showMessage('Not connected to the game server. Reconnect before acting.', true);
       return;
     }
+    const player = currentPlayer();
+    const selectedMembership = membershipsFor(player).find(membership =>
+      membership.stateIndex === player?.countryIndex) || membershipsFor(player)[0];
     const order = {
       ...action,
       orderId: crypto.randomUUID(),
       gameId: onlineSession.gameId,
-      playerId: onlineSession.playerId
+      playerId: onlineSession.playerId,
+      expectedWorldVersion: onlineGame?.worldVersion,
+      stateId: ['claim', 'build'].includes(action.type) ? selectedMembership?.stateId : null
     };
+    if (!order.expectedWorldVersion || (['claim', 'build'].includes(action.type) && !order.stateId)) {
+      showMessage('The authoritative world version or government membership is unavailable.', true);
+      return;
+    }
     const queued = [...getPendingOrders(), order];
     if (!savePendingOrders(queued)) return;
+    renderMultiplayer();
     replayPendingOrders(socket);
+  }
+
+  function orderErrorMessage(code) {
+    const messages = {
+      WORLD_NOT_STARTED: 'The host must start the world before actions are allowed.',
+      NOT_MEMBER: 'You are not a member of the selected government.',
+      INSUFFICIENT_PERMISSION: 'Your government permissions do not allow this action.',
+      INVALID_PAYLOAD: 'The order contains invalid details.',
+      INSUFFICIENT_FUNDS: 'The government treasury does not have enough funds.',
+      TARGET_UNAVAILABLE: 'The selected target is no longer available.',
+      STALE_WORLD_VERSION: 'The world changed. Review the latest state before trying again.',
+      PAUSE_STATE_CONFLICT: 'The world pause state changed before this vote was processed.',
+      NOT_CONNECTED: 'Reconnect before voting on the world clock.',
+      UNSUPPORTED_ORDER: 'This order type is not supported.',
+      ORDER_ID_REUSED: 'This order ID was already used for a different request.'
+    };
+    return messages[code] || 'The server rejected the order.';
   }
 
   async function assignCountry(playerId, countryIndex) {
@@ -742,6 +772,10 @@
     sessionPanel.hidden = !isOnline();
     if (!onlineSession) return;
 
+    const pendingCount = ordersForCurrentSession().length;
+    $('pending-orders-status').textContent = pendingCount
+      ? pendingCount + ' pending order' + (pendingCount === 1 ? '' : 's') + ' · saved on this device'
+      : 'No pending orders.';
     $('session-summary').textContent = onlineGame
       ? (onlineGame.status || (onlineGame.started ? 'running' : 'lobby')).toUpperCase() +
         ' · ' + formatWorldDate(onlineGame.worldDate) +

@@ -17,11 +17,11 @@ The browser's sample figures are preview-only. There is no single-player simulat
 
 The State treasury and monthly balance are shared by all members. Each member's construction plots remain separate for now, while their building income and upkeep contribute to their selected government's finances.
 
-Every multiplayer action now requires a client-generated order ID. Accepted and rejected results are written to the persistent world history; retrying the same ID for the same player returns its original result without applying it again. The authenticated `GET /api/games/{gameId}/orders` endpoint reads that history. The browser persists unsent orders and retries them after reconnecting.
+Every multiplayer action now requires a client-generated order ID and the observed world version; economic orders also identify their government State. The server derives the actor from the authenticated session, rejects stale versions, and records accepted and rejected results with stable machine-readable codes. Retrying an order ID returns its prior result without repeating effects. The authenticated `GET /api/games/{gameId}/orders` endpoint reads the history. The browser persists orders on the device, displays the pending count, and retries them after reconnecting.
 
 Economic actions check the active membership's permission set; unknown permission-set IDs fail closed. Current memberships receive the existing `government-member` permission set, and configurable roles and permission management are not available yet. Pause voting remains a game-wide vote by connected players.
 
-This is only the Phase A foundation. Constitutional permissions and configurable roles, political institutions, late-join approval, atomic backup recovery, and most economic, social, military, and diplomatic systems are not implemented.
+This is only a partial implementation of the first blocks, not completion of the 25-block game specification. Constitutional permissions and configurable roles, political institutions, late-join approval, atomic backup recovery, and most economic, social, military, and diplomatic systems are not implemented.
 
 Run the deterministic simulation tests from the repository root:
 

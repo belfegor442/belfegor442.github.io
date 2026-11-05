@@ -212,10 +212,11 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
     private async Task HandleMessageAsync(
         Guid gameId, string token, Connection connection, ClientMessage message, CancellationToken cancellationToken)
     {
-        if (message.OrderId is not Guid orderId || orderId == Guid.Empty)
+        if (message.OrderId is not Guid orderId || orderId == Guid.Empty ||
+            message.ExpectedWorldVersion is not long expectedWorldVersion || expectedWorldVersion < 1)
         {
-            await SendAsync(connection, new ServerMessage("error", "A non-empty order ID is required."),
-                cancellationToken);
+            await SendAsync(connection, new ServerMessage(
+                "error", "A non-empty order ID and expected world version are required."), cancellationToken);
             return;
         }
 
@@ -231,22 +232,26 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var payload = new GameOrderPayload(
             message.TerritoryIndex, message.PlotIndex, message.BuildingId);
         var result = await store.ExecuteOrderAsync(
-            gameId, token, orderId, orderType, payload, (game, player) =>
+            gameId, token, orderId, message.StateId, orderType, payload, expectedWorldVersion, (game, player) =>
         {
             if (!game.Started)
-                return "The host must start the world before actions are allowed.";
+                return new OrderRejection("WORLD_NOT_STARTED", "The host must start the world before actions are allowed.");
             if (!game.Memberships.Any(membership =>
                     membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
-                return "This player has not been assigned a state.";
-            var governmentMembership = game.Memberships.FirstOrDefault(membership =>
-                membership.PlayerId == player.Id &&
-                membership.Status == MembershipStatus.Active &&
-                game.Territories.Single(territory => territory.StateId == membership.StateId).Index ==
-                player.LegacyCountryIndex) ??
-                game.Memberships.First(membership =>
-                    membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active);
-            var government = game.Territories.Single(territory =>
-                territory.StateId == governmentMembership.StateId);
+                return new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
+            GovernmentMembership? governmentMembership = null;
+            TerritoryState? government = null;
+            if (orderType is GameOrderType.EstablishAdministration or GameOrderType.ConstructBuilding)
+            {
+                governmentMembership = game.Memberships.FirstOrDefault(membership =>
+                    membership.PlayerId == player.Id &&
+                    membership.Status == MembershipStatus.Active &&
+                    membership.StateId == message.StateId);
+                if (governmentMembership is null)
+                    return new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
+                government = game.Territories.Single(territory =>
+                    territory.StateId == governmentMembership.StateId);
+            }
 
             switch (message.Type)
             {
@@ -254,9 +259,10 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 case "resume":
                     var shouldPause = message.Type == "pause";
                     if (game.Paused == shouldPause)
-                        return shouldPause ? "The world is already paused." : "The world is not paused.";
+                        return new OrderRejection("PAUSE_STATE_CONFLICT",
+                            shouldPause ? "The world is already paused." : "The world is not paused.");
                     if (!connectedPlayers.Contains(player.Id))
-                        return "Only connected players can vote.";
+                        return new OrderRejection("NOT_CONNECTED", "Only connected players can vote.");
 
                     var voteResult = PauseVoteRules.Toggle(game, player.Id, connectedPlayers);
                     switch (voteResult)
@@ -280,16 +286,18 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
                 case "claim":
                     if (!GovernmentPermissionRules.Allows(
-                            governmentMembership.PermissionSetId, GovernmentAction.EstablishAdministration))
-                        return "Your government permissions do not allow establishing an administration.";
+                            governmentMembership!.PermissionSetId, GovernmentAction.EstablishAdministration))
+                        return new OrderRejection(
+                            "INSUFFICIENT_PERMISSION",
+                            "Your government permissions do not allow establishing an administration.");
                     if (message.TerritoryIndex is not int territoryIndex ||
                         territoryIndex < 0 || territoryIndex >= game.Territories.Count)
-                        return "Invalid territory.";
+                        return new OrderRejection("INVALID_PAYLOAD", "Invalid territory.");
                     var territory = game.Territories[territoryIndex];
                     if (territory.OwnerPlayerId is not null)
-                        return "This territory is already administered.";
-                    if (government.Treasury < 450)
-                        return "Insufficient treasury (¤450 required).";
+                        return new OrderRejection("TARGET_UNAVAILABLE", "This territory is already administered.");
+                    if (government!.Treasury < 450)
+                        return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury (¤450 required).");
                     government.Treasury -= 450;
                     territory.OwnerPlayerId = player.Id;
                     territory.Infrastructure++;
@@ -298,23 +306,24 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 
                 case "build":
                     if (!GovernmentPermissionRules.Allows(
-                            governmentMembership.PermissionSetId, GovernmentAction.ConstructBuilding))
-                        return "Your government permissions do not allow construction.";
+                            governmentMembership!.PermissionSetId, GovernmentAction.ConstructBuilding))
+                        return new OrderRejection(
+                            "INSUFFICIENT_PERMISSION", "Your government permissions do not allow construction.");
                     if (message.PlotIndex is not int plot || plot < 0 || plot >= 144)
-                        return "Invalid construction plot.";
+                        return new OrderRejection("INVALID_PAYLOAD", "Invalid construction plot.");
                     if (message.BuildingId is null || !GameCatalog.Buildings.TryGetValue(message.BuildingId, out var building))
-                        return "Unknown building.";
+                        return new OrderRejection("INVALID_PAYLOAD", "Unknown building.");
                     if (player.Buildings.ContainsKey(plot))
-                        return "This plot is already developed.";
-                    if (government.Treasury < building.Cost)
-                        return "Insufficient treasury.";
+                        return new OrderRejection("TARGET_UNAVAILABLE", "This plot is already developed.");
+                    if (government!.Treasury < building.Cost)
+                        return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury.");
                     government.Treasury -= building.Cost;
                     player.Buildings.Add(plot, building);
                     GameStore.AddActivity(game, $"{player.Name} constructed a {building.Name.ToLowerInvariant()}.");
                     return null;
 
                 default:
-                    return "Unsupported action.";
+                    return new OrderRejection("UNSUPPORTED_ORDER", "Unsupported action.");
             }
         }, cancellationToken);
 

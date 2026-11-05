@@ -126,9 +126,11 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             Guid gameId,
             string token,
             Guid orderId,
+            Guid? stateId,
             GameOrderType orderType,
             GameOrderPayload payload,
-            Func<WorldState, PlayerState, string?> mutation,
+            long expectedWorldVersion,
+            Func<WorldState, PlayerState, OrderRejection?> mutation,
             CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -140,47 +142,64 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         if (player is null)
             return (null, null, null, "Invalid player token.");
 
-        var (replay, replayError) = GameOrderRules.FindReplay(game, player.Id, orderId, orderType, payload);
+        var (replay, replayError) = GameOrderRules.FindReplay(
+            game, player.Id, orderId, stateId, orderType, payload, expectedWorldVersion);
         if (replayError is not null)
-            return (game, player, new GameOrderResult(orderId, false, replayError, true), null);
+            return (game, player, CreateRejectedOrderResult(orderId, "ORDER_ID_REUSED", replayError, true), null);
         if (replay is not null)
         {
             await transaction.CommitAsync(cancellationToken);
             return (game, player, replay, null);
         }
 
-        var error = mutation(game, player);
-        if (error is null)
-            game.WorldVersion++;
+        OrderRejection? rejection = null;
+        if (!game.Started)
+            rejection = new OrderRejection(
+                "WORLD_NOT_STARTED", "The host must start the world before actions are allowed.");
+        else if (!game.Memberships.Any(membership =>
+                     membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
+            rejection = new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
+        else if (orderType is GameOrderType.EstablishAdministration or GameOrderType.ConstructBuilding &&
+                 !game.Memberships.Any(membership =>
+                     membership.PlayerId == player.Id &&
+                     membership.StateId == stateId &&
+                     membership.Status == MembershipStatus.Active))
+            rejection = new OrderRejection("NOT_MEMBER", "You are not a member of the selected government.");
+        else
+            rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
 
-        var selectedMembership = game.Memberships.FirstOrDefault(membership =>
-            membership.PlayerId == player.Id &&
-            membership.Status == MembershipStatus.Active &&
-            game.Territories.Single(territory => territory.StateId == membership.StateId).Index ==
-            player.LegacyCountryIndex) ??
-            game.Memberships.FirstOrDefault(membership =>
-                membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active);
+        if (rejection is null)
+            rejection = mutation(game, player);
+        game.WorldVersion++;
+
         var order = new GameOrder(
             game.Id,
             orderId,
             player.Id,
-            selectedMembership?.StateId,
+            stateId,
             orderType,
+            rejection is null ? GameOrderStatus.Executed : GameOrderStatus.Rejected,
             payload,
+            expectedWorldVersion,
             DateTimeOffset.UtcNow,
             game.WorldDate,
-            error is null,
-            error,
+            rejection?.Code,
+            rejection?.Message,
             game.WorldVersion);
         game.Orders.Add(order);
-        AddActivity(game, error is null
+        AddActivity(game, rejection is null
             ? $"{player.Name} submitted {orderType} (order {orderId:N})."
-            : $"{player.Name}'s {orderType} order was rejected: {error}");
+            : $"{player.Name}'s {orderType} order was rejected ({rejection.Code}): {rejection.Message}");
 
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return (game, player, new GameOrderResult(orderId, error is null, error, false), null);
+        return (game, player, new GameOrderResult(
+            orderId, rejection is null, rejection?.Code, rejection?.Message, false), null);
     }
+
+    private static GameOrderResult CreateRejectedOrderResult(
+        Guid orderId, string code, string message, bool replayed = false) =>
+        new(orderId, false, code, message, replayed);
 
     public async Task<(WorldState? Game, string? Error)> MutateSystemAsync(
         Guid gameId, Func<WorldState, string?> mutation, CancellationToken cancellationToken)
