@@ -73,7 +73,8 @@ public sealed record GameOrder(
     DateOnly SubmittedOnWorldDate,
     string? ResultCode,
     string? Result,
-    long WorldVersion);
+    long WorldVersion,
+    string? PermissionSetId = null);
 
 public sealed record WorldEvent(
     Guid Id,

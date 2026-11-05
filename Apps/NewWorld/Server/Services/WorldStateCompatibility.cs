@@ -114,6 +114,7 @@ public static class WorldStateCompatibility
                 order.Payload is null ||
                 !Enum.IsDefined(order.Type) ||
                 !Enum.IsDefined(order.Status) ||
+                order.PermissionSetId is not null && string.IsNullOrWhiteSpace(order.PermissionSetId) ||
                 order.ExpectedWorldVersion < 1 ||
                 !ordersById.TryAdd(order.Id, order) ||
                 (order.Status == GameOrderStatus.Executed &&

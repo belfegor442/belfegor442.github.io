@@ -145,7 +145,29 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         var (replay, replayError) = GameOrderRules.FindReplay(
             game, player.Id, orderId, stateId, orderType, payload, expectedWorldVersion);
         if (replayError is not null)
+        {
+            var auditStateId = stateId is Guid requestedStateId &&
+                               game.Territories.Any(territory => territory.StateId == requestedStateId)
+                ? requestedStateId
+                : (Guid?)null;
+            var occurredAtUtc = DateTimeOffset.UtcNow;
+            game.Events.Add(new WorldEvent(
+                Guid.NewGuid(),
+                game.Id,
+                null,
+                player.Id,
+                auditStateId,
+                "order.rejected",
+                "ORDER_ID_REUSED",
+                occurredAtUtc,
+                game.WorldDate,
+                game.WorldVersion,
+                $"Rejected reused order ID {orderId:N}: {replayError}"));
+            AddActivity(game, $"{player.Name}'s order was rejected (ORDER_ID_REUSED).");
+            await SaveAsync(connection, transaction, game, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return (game, player, CreateRejectedOrderResult(orderId, "ORDER_ID_REUSED", replayError, true), null);
+        }
         if (replay is not null)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -183,7 +205,13 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             game.WorldDate,
             rejection?.Code,
             rejection?.Message,
-            game.WorldVersion);
+            game.WorldVersion,
+            stateId is Guid authorizedStateId
+                ? game.Memberships.FirstOrDefault(membership =>
+                    membership.PlayerId == player.Id &&
+                    membership.StateId == authorizedStateId &&
+                    membership.Status == MembershipStatus.Active)?.PermissionSetId
+                : null);
         game.Orders.Add(order);
         AddActivity(game, rejection is null
             ? $"{player.Name} submitted {orderType} (order {orderId:N})."

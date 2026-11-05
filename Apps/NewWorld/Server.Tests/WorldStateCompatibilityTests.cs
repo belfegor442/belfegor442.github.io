@@ -139,7 +139,7 @@ public sealed class WorldStateCompatibilityTests
             gameId, Guid.NewGuid(), playerId, stateId, GameOrderType.ConstructBuilding,
             GameOrderStatus.Rejected, new GameOrderPayload(null, 2, "farm"), 3,
             DateTimeOffset.UtcNow, new DateOnly(1500, 1, 1),
-            "INSUFFICIENT_FUNDS", "Insufficient treasury.", 4);
+            "INSUFFICIENT_FUNDS", "Insufficient treasury.", 4, "government-member");
         var game = new WorldState
         {
             Id = gameId,
@@ -152,6 +152,7 @@ public sealed class WorldStateCompatibilityTests
         WorldStateCompatibility.Normalize(game);
 
         Assert.Equal(order, Assert.Single(game.Orders));
+        Assert.Equal("government-member", game.Orders[0].PermissionSetId);
     }
 
     [Fact]
