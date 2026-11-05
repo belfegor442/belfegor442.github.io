@@ -44,6 +44,7 @@ public sealed class LobbyRulesTests
                 new PlayerState { Id = Guid.NewGuid(), Name = "Player Two" }
             ]
         };
+        WorldStateCompatibility.Normalize(game);
 
         Assert.Null(GovernmentMembershipRules.Assign(game, game.Players[0].Id, 0));
         Assert.Null(GovernmentMembershipRules.Assign(game, game.Players[1].Id, 0));
@@ -53,6 +54,9 @@ public sealed class LobbyRulesTests
             membership.Status == MembershipStatus.Active));
         Assert.Equal(2400, game.Territories[0].Treasury);
         Assert.All(game.Players, player => Assert.Equal(0, player.Treasury));
+        Assert.All(game.FinancialTransactions, transaction =>
+            Assert.Equal(game.Territories[0].CurrencyId, transaction.CurrencyId));
+        Assert.Equal(2, game.FinancialTransactions.Count);
     }
 
     [Fact]
@@ -70,6 +74,7 @@ public sealed class LobbyRulesTests
                 new TerritoryState { Index = 1, StateId = Guid.NewGuid(), Name = "Gania" }
             ]
         };
+        WorldStateCompatibility.Normalize(game);
 
         Assert.Null(GovernmentMembershipRules.Assign(game, player.Id, 0));
         Assert.Null(GovernmentMembershipRules.Assign(game, player.Id, 1));
@@ -84,6 +89,8 @@ public sealed class LobbyRulesTests
         Assert.Equal(new DateOnly(1500, 1, 1), snapshot.WorldDate);
         Assert.Equal(1200, game.Territories[0].Treasury);
         Assert.Equal(0, game.Territories[1].Treasury);
+        var transaction = Assert.Single(game.FinancialTransactions);
+        Assert.Equal(game.Territories[0].StateId, transaction.StateId);
     }
 
     [Fact]

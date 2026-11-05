@@ -49,6 +49,8 @@ public static class GovernmentMembershipRules
             var territory = game.Territories.Single(item => item.Index == assignedIndex);
             if (!activeMemberships.Any(membership => membership.StateId == territory.StateId))
             {
+                var membershipId = Guid.NewGuid();
+                var balanceBefore = territory.Treasury;
                 var accumulatedRemainder = (long)territory.DailyBalanceRemainder + player.DailyBalanceRemainder;
                 var treasuryIncrease = (long)player.Treasury + accumulatedRemainder / 30;
                 if (territory.Treasury > int.MaxValue - treasuryIncrease)
@@ -61,12 +63,18 @@ public static class GovernmentMembershipRules
                 territory.OwnerPlayerId ??= player.Id;
                 game.Memberships.Add(new GovernmentMembership
                 {
-                    Id = Guid.NewGuid(),
+                    Id = membershipId,
                     GameId = game.Id,
                     PlayerId = player.Id,
                     StateId = territory.StateId,
                     JoinedAtWorldDate = game.WorldDate
                 });
+                if (territory.Treasury != balanceBefore)
+                    GameStore.AddEconomicTransaction(
+                        game, territory, EconomicTransactionType.MembershipTransfer,
+                        balanceBefore, territory.Treasury,
+                        $"Legacy personal treasury transferred to {territory.Name}.",
+                        membershipId: membershipId);
             }
         }
 

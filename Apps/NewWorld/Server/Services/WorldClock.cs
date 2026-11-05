@@ -60,7 +60,18 @@ public sealed class WorldClock(
                         foreach (var government in game.Territories)
                         {
                             var balance = SimulationRules.CalculateGovernmentBalance(game, government);
-                            SimulationRules.AccrueDailyBalance(government, balance.MonthlyBalance);
+                            var balanceBefore = government.Treasury;
+                            var dailyChange =
+                                SimulationRules.AccrueDailyBalance(government, balance.MonthlyBalance);
+                            if (dailyChange != 0)
+                                GameStore.AddEconomicTransaction(
+                                    game,
+                                    government,
+                                    EconomicTransactionType.DailyBalance,
+                                    balanceBefore,
+                                    government.Treasury,
+                                    $"Daily balance change from a monthly balance of {balance.MonthlyBalance}.",
+                                    recordedAtUtc: game.LastTickUtc);
                         }
                         var (productionResults, productionError) =
                             EconomyRules.AdvanceDailyProduction(game);

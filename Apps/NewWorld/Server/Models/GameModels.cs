@@ -28,6 +28,8 @@ public sealed class WorldState
     public List<EconomicGood> Goods { get; set; } = [];
     public List<ProductionRecipe> ProductionRecipes { get; set; } = [];
     public List<EconomicCompany> Companies { get; set; } = [];
+    public List<StateCurrency> Currencies { get; set; } = [];
+    public List<EconomicTransaction> FinancialTransactions { get; set; } = [];
     public List<GameOrder> Orders { get; set; } = [];
     public List<WorldEvent> Events { get; set; } = [];
     public List<string> Activity { get; set; } = [];
@@ -145,6 +147,7 @@ public sealed class PlayerState
 public sealed class TerritoryState
 {
     public Guid StateId { get; set; }
+    public Guid CurrencyId { get; set; }
     public int Index { get; set; }
     public string Name { get; set; } = "";
     public int Treasury { get; set; }
@@ -184,6 +187,8 @@ public sealed record GameSnapshot(
     IReadOnlyList<PoliticalStateView> PoliticalSystems,
     IReadOnlyList<EconomicGood> Goods,
     IReadOnlyList<ProductionRecipe> ProductionRecipes,
+    IReadOnlyList<StateCurrency> Currencies,
+    IReadOnlyList<EconomicTransaction> FinancialTransactions,
     IReadOnlyList<EconomicCompanyView> Companies);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
@@ -193,7 +198,8 @@ public sealed record GovernmentMembershipView(
     Guid Id, Guid PlayerId, Guid StateId, int StateIndex, MembershipStatus Status, string PermissionSetId);
 public sealed record TerritoryView(
     Guid StateId, int Index, string Name, int Treasury, int TerritoryIncome, int CityIncome, int Upkeep,
-    int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
+    int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId,
+    Guid CurrencyId = default);
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
     string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId,

@@ -32,6 +32,8 @@ public static class WorldStateCompatibility
         game.Goods ??= [];
         game.ProductionRecipes ??= [];
         game.Companies ??= [];
+        game.Currencies ??= [];
+        game.FinancialTransactions ??= [];
         game.Orders ??= [];
         game.Events ??= [];
         game.Activity ??= [];
@@ -73,6 +75,45 @@ public static class WorldStateCompatibility
 
         var stateIds = game.Territories.Select(territory => territory.StateId).ToHashSet();
         var playerIds = game.Players.Select(player => player.Id).ToHashSet();
+        foreach (var territory in game.Territories)
+        {
+            var currency = territory.CurrencyId == Guid.Empty
+                ? game.Currencies.FirstOrDefault(item => item.StateId == territory.StateId)
+                : game.Currencies.FirstOrDefault(item => item.Id == territory.CurrencyId);
+            if (currency is null)
+            {
+                currency = new StateCurrency
+                {
+                    Id = territory.CurrencyId != Guid.Empty
+                        ? territory.CurrencyId
+                        : CreateStableId($"{game.Id:N}:currency:{territory.StateId:N}"),
+                    StateId = territory.StateId
+                };
+                game.Currencies.Add(currency);
+            }
+            if (currency.StateId != territory.StateId)
+                throw new InvalidDataException("A State references another State's currency.");
+            territory.CurrencyId = currency.Id;
+        }
+
+        var currencyIds = new HashSet<Guid>();
+        var currencyStateIds = new HashSet<Guid>();
+        foreach (var currency in game.Currencies)
+        {
+            var hasCurrencyMetadata = !string.IsNullOrWhiteSpace(currency.Name) ||
+                                      !string.IsNullOrWhiteSpace(currency.Code) ||
+                                      currency.MinorUnitScale is not null;
+            if (currency.Id == Guid.Empty ||
+                !stateIds.Contains(currency.StateId) ||
+                !currencyIds.Add(currency.Id) ||
+                !currencyStateIds.Add(currency.StateId) ||
+                hasCurrencyMetadata &&
+                (string.IsNullOrWhiteSpace(currency.Name) ||
+                 string.IsNullOrWhiteSpace(currency.Code) ||
+                 currency.MinorUnitScale is not int scale || scale is < 0 or > 18))
+                throw new InvalidDataException("The saved world contains an invalid State currency.");
+        }
+
         var goodIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var good in game.Goods)
         {
@@ -197,14 +238,18 @@ public static class WorldStateCompatibility
             }
 
             if (system.Government is PoliticalGovernment government &&
-                (government.Id == Guid.Empty ||
-                 government.Budget < 0 ||
-                 government.Legitimacy is < 0 or > 100 ||
-                 government.InstitutionalSupport is < 0 or > 100 ||
-                 government.Tensions is < 0 or > 100 ||
-                 government.EconomicCondition is < 0 or > 100 ||
-                 government.ConflictPressure is < 0 or > 100 ||
-                 government.Compliance is < 0 or > 100))
+                government.CurrencyId == Guid.Empty)
+                government.CurrencyId = game.Territories.Single(item => item.StateId == system.StateId).CurrencyId;
+            if (system.Government is PoliticalGovernment checkedGovernment &&
+                (checkedGovernment.Id == Guid.Empty ||
+                 checkedGovernment.CurrencyId != game.Territories.Single(item => item.StateId == system.StateId).CurrencyId ||
+                 checkedGovernment.Budget < 0 ||
+                 checkedGovernment.Legitimacy is < 0 or > 100 ||
+                 checkedGovernment.InstitutionalSupport is < 0 or > 100 ||
+                 checkedGovernment.Tensions is < 0 or > 100 ||
+                 checkedGovernment.EconomicCondition is < 0 or > 100 ||
+                 checkedGovernment.ConflictPressure is < 0 or > 100 ||
+                 checkedGovernment.Compliance is < 0 or > 100))
                 throw new InvalidDataException("The saved world contains an invalid government.");
             if (system.Constitution?.StabilityWeights is StabilityWeights weights &&
                 (weights.Legitimacy < 0 || weights.InstitutionalSupport < 0 ||
@@ -507,11 +552,75 @@ public static class WorldStateCompatibility
             game.EconomyVersion = 1;
         }
 
+        if (game.EconomyVersion < 2)
+        {
+            foreach (var territory in game.Territories.Where(item => item.Treasury > 0))
+            {
+                if (game.FinancialTransactions.Any(transaction =>
+                        transaction.StateId == territory.StateId))
+                    continue;
+                GameStore.AddEconomicTransaction(
+                    game,
+                    territory,
+                    EconomicTransactionType.OpeningBalance,
+                    0,
+                    territory.Treasury,
+                    "Opening balance imported when State currencies were introduced.");
+            }
+            game.EconomyVersion = 2;
+        }
+
         foreach (var territory in game.Territories)
         {
             if (territory.Treasury < 0 || territory.DailyBalanceRemainder is < 0 or >= 30)
                 throw new InvalidDataException("The saved world contains invalid state finances.");
         }
+
+        var transactionIds = new HashSet<Guid>();
+        var lastBalances = new Dictionary<Guid, long>();
+        var statesWithOpeningBalances = new HashSet<Guid>();
+        var territoriesByState = game.Territories.ToDictionary(territory => territory.StateId);
+        foreach (var transaction in game.FinancialTransactions)
+        {
+            if (transaction.Id == Guid.Empty ||
+                !Enum.IsDefined(transaction.Type) ||
+                !transactionIds.Add(transaction.Id) ||
+                !territoriesByState.TryGetValue(transaction.StateId, out var territory) ||
+                transaction.CurrencyId != territory.CurrencyId ||
+                transaction.Amount != transaction.BalanceAfter - transaction.BalanceBefore ||
+                transaction.BalanceBefore is < 0 or > int.MaxValue ||
+                transaction.BalanceAfter is < 0 or > int.MaxValue ||
+                transaction.WorldDate == default ||
+                transaction.WorldDate > game.WorldDate ||
+                transaction.RecordedAtUtc == default ||
+                string.IsNullOrWhiteSpace(transaction.Description) ||
+                transaction.OrderId is Guid transactionOrderId &&
+                !ordersById.ContainsKey(transactionOrderId) ||
+                transaction.MembershipId is Guid transactionMembershipId &&
+                !membershipIds.Contains(transactionMembershipId) ||
+                transaction.Type == EconomicTransactionType.OpeningBalance &&
+                (transaction.BalanceBefore != 0 ||
+                 transaction.OrderId is not null ||
+                 transaction.MembershipId is not null ||
+                 !statesWithOpeningBalances.Add(transaction.StateId)) ||
+                transaction.Type == EconomicTransactionType.MembershipTransfer &&
+                transaction.MembershipId is null ||
+                (transaction.Type is EconomicTransactionType.AdministrationCost or
+                    EconomicTransactionType.ConstructionCost) &&
+                transaction.OrderId is null ||
+                lastBalances.TryGetValue(transaction.StateId, out var previousBalance) &&
+                previousBalance != transaction.BalanceBefore)
+                throw new InvalidDataException("The saved world contains an invalid financial transaction.");
+            lastBalances[transaction.StateId] = transaction.BalanceAfter;
+        }
+
+        if (game.FinancialTransactions
+            .GroupBy(transaction => transaction.StateId)
+            .Any(group => group.Last().BalanceAfter != territoriesByState[group.Key].Treasury))
+            throw new InvalidDataException("A State treasury does not match its financial transaction history.");
+        if (game.Territories.Any(territory =>
+                territory.Treasury > 0 && !lastBalances.ContainsKey(territory.StateId)))
+            throw new InvalidDataException("A State treasury is missing its opening financial transaction.");
     }
 
     public static Guid CreateStableId(string value)

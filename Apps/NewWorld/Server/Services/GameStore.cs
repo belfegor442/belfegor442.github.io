@@ -41,7 +41,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         {
             Id = id,
             WorldDate = new DateOnly(1500, 1, 1),
-            EconomyVersion = 1,
+            EconomyVersion = 2,
             HostPlayerId = playerId,
             LastTickUtc = DateTimeOffset.UtcNow,
             Players = [new PlayerState { Id = playerId, Name = playerName, IsHost = true, TokenHash = Hash(playerToken) }],
@@ -56,6 +56,12 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             }).ToList(),
             Activity = [$"{playerName} created a private world."]
         };
+        game.Currencies = game.Territories.Select(territory =>
+        {
+            var currency = new StateCurrency { Id = Guid.NewGuid(), StateId = territory.StateId };
+            territory.CurrencyId = currency.Id;
+            return currency;
+        }).ToList();
         game.PoliticalSystems = game.Territories.Select(territory =>
             new StatePoliticalSystem { StateId = territory.StateId }).ToList();
         AddWorldEvent(
@@ -324,6 +330,41 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         game.Activity.Insert(0, activity);
         if (game.Activity.Count > 20)
             game.Activity.RemoveAt(game.Activity.Count - 1);
+    }
+
+    public static void AddEconomicTransaction(
+        WorldState game,
+        TerritoryState state,
+        EconomicTransactionType type,
+        long balanceBefore,
+        long balanceAfter,
+        string description,
+        Guid? orderId = null,
+        Guid? membershipId = null,
+        DateTimeOffset? recordedAtUtc = null)
+    {
+        if (state.StateId == Guid.Empty ||
+            state.CurrencyId == Guid.Empty ||
+            balanceBefore is < 0 or > int.MaxValue ||
+            balanceAfter is < 0 or > int.MaxValue ||
+            balanceAfter != state.Treasury ||
+            !Enum.IsDefined(type) ||
+            string.IsNullOrWhiteSpace(description))
+            throw new InvalidDataException("A State treasury transaction is invalid.");
+
+        game.FinancialTransactions.Add(new EconomicTransaction(
+            Guid.NewGuid(),
+            state.StateId,
+            state.CurrencyId,
+            type,
+            balanceAfter - balanceBefore,
+            balanceBefore,
+            balanceAfter,
+            game.WorldDate,
+            recordedAtUtc ?? DateTimeOffset.UtcNow,
+            orderId,
+            membershipId,
+            description));
     }
 
     public static WorldEvent AddWorldEvent(

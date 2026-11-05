@@ -44,14 +44,55 @@ public sealed class WorldStateCompatibilityTests
         Assert.Equal(1600, game.Territories[0].Treasury);
         Assert.Equal(17, game.Territories[0].DailyBalanceRemainder);
         Assert.Equal(0, game.Players[0].Treasury);
+        var currency = Assert.Single(game.Currencies);
+        Assert.Equal(game.Territories[0].StateId, currency.StateId);
+        Assert.Equal(currency.Id, game.Territories[0].CurrencyId);
+        var openingBalance = Assert.Single(game.FinancialTransactions);
+        Assert.Equal(EconomicTransactionType.OpeningBalance, openingBalance.Type);
+        Assert.Equal(1600, openingBalance.BalanceAfter);
 
         var stableStateId = game.Territories[0].StateId;
         var stableMembershipId = membership.Id;
+        var stableCurrencyId = currency.Id;
+        var stableTransactionId = openingBalance.Id;
         WorldStateCompatibility.Normalize(game);
 
         Assert.Equal(stableStateId, game.Territories[0].StateId);
         Assert.Equal(stableMembershipId, Assert.Single(game.Memberships).Id);
+        Assert.Equal(stableCurrencyId, Assert.Single(game.Currencies).Id);
+        Assert.Equal(stableTransactionId, Assert.Single(game.FinancialTransactions).Id);
         Assert.Equal(1600, game.Territories[0].Treasury);
+    }
+
+    [Fact]
+    public void NormalizeRejectsStateTreasuryWithoutFinancialHistory()
+    {
+        var stateId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            WorldDate = new DateOnly(1500, 1, 1),
+            EconomyVersion = 2,
+            Territories =
+            [
+                new TerritoryState
+                {
+                    StateId = stateId,
+                    CurrencyId = currencyId,
+                    Treasury = 100
+                }
+            ],
+            Currencies =
+            [
+                new StateCurrency
+                {
+                    Id = currencyId,
+                    StateId = stateId
+                }
+            ]
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
     }
 
     [Fact]

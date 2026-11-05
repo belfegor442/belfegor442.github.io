@@ -204,7 +204,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 return new TerritoryView(
                     territory.StateId, territory.Index, territory.Name, territory.Treasury, territoryIncome,
                     cityIncome, upkeep, monthlyBalance, territory.Population, territory.Prosperity,
-                    territory.Infrastructure, territory.OwnerPlayerId);
+                    territory.Infrastructure, territory.OwnerPlayerId, territory.CurrencyId);
             }).ToList(),
             game.Activity,
             game.Name,
@@ -238,6 +238,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             }).ToList(),
             game.Goods,
             game.ProductionRecipes,
+            game.Currencies,
+            game.FinancialTransactions.TakeLast(100).ToList(),
             game.Companies.Select(company => new EconomicCompanyView(
                 company.Id,
                 company.StateId,
@@ -342,7 +344,12 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                         return new OrderRejection("TARGET_UNAVAILABLE", "This territory is already administered.");
                     if (government!.Treasury < 450)
                         return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury (¤450 required).");
+                    var claimBalanceBefore = government.Treasury;
                     government.Treasury -= 450;
+                    GameStore.AddEconomicTransaction(
+                        game, government, EconomicTransactionType.AdministrationCost,
+                        claimBalanceBefore, government.Treasury,
+                        $"Administration established in {territory.Name}.", orderId);
                     territory.OwnerPlayerId = player.Id;
                     territory.Infrastructure++;
                     GameStore.AddActivity(game, $"{player.Name} established an administration in {territory.Name}.");
@@ -361,7 +368,12 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                         return new OrderRejection("TARGET_UNAVAILABLE", "This plot is already developed.");
                     if (government!.Treasury < building.Cost)
                         return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury.");
+                    var constructionBalanceBefore = government.Treasury;
                     government.Treasury -= building.Cost;
+                    GameStore.AddEconomicTransaction(
+                        game, government, EconomicTransactionType.ConstructionCost,
+                        constructionBalanceBefore, government.Treasury,
+                        $"Constructed {building.Name}.", orderId);
                     player.Buildings.Add(plot, building);
                     GameStore.AddActivity(game, $"{player.Name} constructed a {building.Name.ToLowerInvariant()}.");
                     return null;

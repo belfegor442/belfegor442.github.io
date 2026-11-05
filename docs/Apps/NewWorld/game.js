@@ -189,6 +189,7 @@
     $('ledger-balance').textContent = onlineGame
       ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
       : '—';
+    renderFinancialLedger();
     $('activity').innerHTML = state.activity.slice(0, 8)
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
     $('world-mode').textContent = isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
@@ -237,6 +238,38 @@
         company.name + ' · ' + company.sector,
         'Inventory: ' + (inventory.join(', ') || 'empty') +
         ' · Production: ' + (facilities.join(', ') || 'no active facilities'));
+    }
+  }
+
+  function renderFinancialLedger() {
+    const list = $('transaction-list');
+    list.replaceChildren();
+    if (!onlineGame) {
+      $('state-currency').textContent = 'Connect to a multiplayer world to load currency and transaction data.';
+      return;
+    }
+
+    const territory = onlineGame.territories.find(item => item.index === state.selected);
+    const currency = onlineGame.currencies?.find(item => item.stateId === territory?.stateId);
+    $('state-currency').textContent = currency?.name && currency?.code
+      ? currency.name + ' (' + currency.code + ') · ' + currency.minorUnitScale + ' decimal place(s)'
+      : 'State currency identity is recorded; its official name, code, and precision remain undefined.';
+    const transactions = (onlineGame.financialTransactions || [])
+      .filter(item => item.stateId === territory?.stateId)
+      .slice()
+      .reverse();
+    if (!transactions.length) {
+      addPoliticalRow(list, 'No transactions recorded', 'The State has no financial activity in the available history.');
+      return;
+    }
+    for (const transaction of transactions) {
+      const sign = transaction.amount > 0 ? '+' : transaction.amount < 0 ? '−' : '';
+      addPoliticalRow(
+        list,
+        String(transaction.type).replaceAll(/([A-Z])/g, ' $1').toUpperCase() +
+          ' · ' + formatWorldDate(transaction.worldDate),
+        transaction.description + ' · ' + sign + money(Math.abs(transaction.amount)) +
+          ' · balance ' + money(transaction.balanceAfter));
     }
   }
 

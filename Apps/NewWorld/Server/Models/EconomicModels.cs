@@ -9,6 +9,38 @@ public enum EconomicGoodCategory
     Service
 }
 
+public enum EconomicTransactionType
+{
+    OpeningBalance,
+    MembershipTransfer,
+    AdministrationCost,
+    ConstructionCost,
+    DailyBalance
+}
+
+public sealed class StateCurrency
+{
+    public Guid Id { get; set; }
+    public Guid StateId { get; set; }
+    public string? Name { get; set; }
+    public string? Code { get; set; }
+    public int? MinorUnitScale { get; set; }
+}
+
+public sealed record EconomicTransaction(
+    Guid Id,
+    Guid StateId,
+    Guid CurrencyId,
+    EconomicTransactionType Type,
+    long Amount,
+    long BalanceBefore,
+    long BalanceAfter,
+    DateOnly WorldDate,
+    DateTimeOffset RecordedAtUtc,
+    Guid? OrderId,
+    Guid? MembershipId,
+    string Description);
+
 public sealed class EconomicGood
 {
     public string Id { get; set; } = "";

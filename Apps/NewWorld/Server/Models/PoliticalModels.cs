@@ -100,6 +100,7 @@ public sealed class PoliticalGovernment
 {
     public Guid Id { get; set; }
     public string Program { get; set; } = "";
+    public Guid CurrencyId { get; set; }
     public int Budget { get; set; }
     public int Legitimacy { get; set; }
     public int InstitutionalSupport { get; set; }
