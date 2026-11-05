@@ -4,6 +4,21 @@ namespace NewWorld.Server.Services;
 
 public static class GameOrderRules
 {
+    public static GameOrderType ParseType(string messageType) => messageType switch
+    {
+        "claim" => GameOrderType.EstablishAdministration,
+        "build" => GameOrderType.ConstructBuilding,
+        "approveBudget" => GameOrderType.ApproveBudget,
+        "proposeLaw" => GameOrderType.ProposeLaw,
+        "appointOffice" => GameOrderType.AppointOffice,
+        "negotiateTreaty" => GameOrderType.NegotiateTreaty,
+        "mobilizeUnit" => GameOrderType.MobilizeUnit,
+        "startProject" => GameOrderType.StartProject,
+        "pause" => GameOrderType.PauseWorld,
+        "resume" => GameOrderType.ResumeWorld,
+        _ => GameOrderType.Unsupported
+    };
+
     public static (WorldState Game, PlayerState Player, OrderRejection? Rejection) ApplyMutationAtomically(
         WorldState game,
         Guid playerId,

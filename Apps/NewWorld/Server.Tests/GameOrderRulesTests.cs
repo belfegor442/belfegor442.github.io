@@ -5,6 +5,23 @@ namespace NewWorld.Server.Tests;
 
 public sealed class GameOrderRulesTests
 {
+    [Theory]
+    [InlineData("claim", GameOrderType.EstablishAdministration)]
+    [InlineData("build", GameOrderType.ConstructBuilding)]
+    [InlineData("approveBudget", GameOrderType.ApproveBudget)]
+    [InlineData("proposeLaw", GameOrderType.ProposeLaw)]
+    [InlineData("appointOffice", GameOrderType.AppointOffice)]
+    [InlineData("negotiateTreaty", GameOrderType.NegotiateTreaty)]
+    [InlineData("mobilizeUnit", GameOrderType.MobilizeUnit)]
+    [InlineData("startProject", GameOrderType.StartProject)]
+    [InlineData("pause", GameOrderType.PauseWorld)]
+    [InlineData("resume", GameOrderType.ResumeWorld)]
+    [InlineData("unknown", GameOrderType.Unsupported)]
+    public void ClientIntentsMapToExplicitOrderTypes(string messageType, GameOrderType expectedType)
+    {
+        Assert.Equal(expectedType, GameOrderRules.ParseType(messageType));
+    }
+
     [Fact]
     public void RejectedMutationCannotPartiallyChangeThePersistedWorld()
     {

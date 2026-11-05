@@ -21,6 +21,8 @@ Every multiplayer action now requires a client-generated order ID, the observed 
 
 Economic actions check the active membership's permission set; unknown permission-set IDs fail closed. Current memberships receive the existing `government-member` permission set, and configurable roles and permission management are not available yet. Pause voting remains a game-wide vote by connected players.
 
+The order protocol has stable typed intents for budgets, laws, appointments, treaties, mobilization, and projects. Only administration, construction, and pause/resume currently have execution workflows; other known intents are audited and explicitly rejected as unsupported until their corresponding systems exist.
+
 This is only a partial implementation of the first blocks, not completion of the 25-block game specification. Constitutional permissions and configurable roles, political institutions, late-join approval, atomic backup recovery, and most economic, social, military, and diplomatic systems are not implemented.
 
 Run the deterministic simulation tests from the repository root:

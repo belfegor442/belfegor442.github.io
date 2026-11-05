@@ -221,14 +221,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         }
 
         var connectedPlayers = ConnectedPlayers(gameId);
-        var orderType = message.Type switch
-        {
-            "claim" => GameOrderType.EstablishAdministration,
-            "build" => GameOrderType.ConstructBuilding,
-            "pause" => GameOrderType.PauseWorld,
-            "resume" => GameOrderType.ResumeWorld,
-            _ => GameOrderType.Unsupported
-        };
+        var orderType = GameOrderRules.ParseType(message.Type);
         var payload = new GameOrderPayload(
             message.TerritoryIndex, message.PlotIndex, message.BuildingId);
         var result = await store.ExecuteOrderAsync(

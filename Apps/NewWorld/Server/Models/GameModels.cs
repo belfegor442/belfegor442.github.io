@@ -49,6 +49,12 @@ public enum GameOrderType
 {
     EstablishAdministration,
     ConstructBuilding,
+    ApproveBudget,
+    ProposeLaw,
+    AppointOffice,
+    NegotiateTreaty,
+    MobilizeUnit,
+    StartProject,
     PauseWorld,
     ResumeWorld,
     Unsupported
