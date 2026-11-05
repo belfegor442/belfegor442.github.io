@@ -222,6 +222,52 @@ public sealed class GameOrderRulesTests
     }
 
     [Fact]
+    public void HostWithoutGovernmentPermissionCannotUseHostingPrivilegesToMutateAState()
+    {
+        var host = new PlayerState { Id = Guid.NewGuid(), IsHost = true };
+        var state = new TerritoryState { StateId = Guid.NewGuid(), Treasury = 900 };
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            Started = true,
+            Status = GameStatus.Running,
+            HostPlayerId = host.Id,
+            WorldDate = new DateOnly(1500, 1, 1),
+            Players = [host],
+            Territories = [state],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = host.Id,
+                    StateId = state.StateId,
+                    PermissionSetId = "government-observer"
+                }
+            ]
+        };
+        Assert.Null(GameOrderRules.CheckMembership(game, host.Id, state.StateId));
+
+        var applied = GameOrderRules.ApplyMutationAtomically(game, host.Id, (candidate, player) =>
+        {
+            var membership = candidate.Memberships.Single();
+            if (!GovernmentPermissionRules.Allows(
+                    membership.PermissionSetId, GovernmentAction.ConstructBuilding))
+                return new OrderRejection("INSUFFICIENT_PERMISSION", "Construction is not permitted.");
+            candidate.Territories[0].Treasury -= 450;
+            return null;
+        });
+        var orderResult = GameOrderRules.RecordOutcome(
+            game, host, Guid.NewGuid(), state.StateId, GameOrderType.ConstructBuilding,
+            new GameOrderPayload(null, 0, "farm"), 1, null,
+            applied.Rejection, DateTimeOffset.UtcNow);
+
+        Assert.False(orderResult.Accepted);
+        Assert.Equal(900, game.Territories[0].Treasury);
+        Assert.Equal(1, game.WorldVersion);
+        Assert.Equal("government-observer", Assert.Single(game.Orders).PermissionSetId);
+    }
+
+    [Fact]
     public void StaleWorldVersionsAreRejectedWithStableCode()
     {
         Assert.Null(GameOrderRules.CheckWorldVersion(4, 4));
