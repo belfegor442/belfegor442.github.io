@@ -1162,6 +1162,7 @@
       ? activeMemberships.find(membership => membership.stateId === action.stateId)
       : activeMemberships.find(membership => membership.stateIndex === player?.countryIndex) ||
         activeMemberships[0];
+    const isGameWideVote = action.type === 'pause' || action.type === 'resume';
     const order = {
       ...action,
       orderId: crypto.randomUUID(),
@@ -1170,7 +1171,7 @@
       expectedWorldVersion: onlineGame?.worldVersion,
       stateId: selectedMembership?.stateId ?? action.stateId ?? null
     };
-    if (!order.expectedWorldVersion || !order.stateId) {
+    if (!order.expectedWorldVersion || (!isGameWideVote && !order.stateId)) {
       showMessage('The authoritative world version or government membership is unavailable.', true);
       return;
     }

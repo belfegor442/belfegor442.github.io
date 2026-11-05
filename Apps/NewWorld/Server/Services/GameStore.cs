@@ -193,7 +193,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
 
         OrderRejection? rejection = GameOrderRules.CheckWorldAvailability(game, orderType);
         if (rejection is null)
-            rejection = GameOrderRules.CheckMembership(game, player.Id, stateId);
+            rejection = GameOrderRules.CheckMembership(game, player.Id, stateId, orderType);
         if (rejection is null)
             rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
         if (rejection is null)

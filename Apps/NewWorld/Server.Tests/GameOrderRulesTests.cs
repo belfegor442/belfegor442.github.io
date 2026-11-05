@@ -175,6 +175,30 @@ public sealed class GameOrderRulesTests
     }
 
     [Fact]
+    public void GameWidePauseVotesDoNotRequireASelectedState()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var stateId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Players = [player],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = player.Id,
+                    StateId = stateId,
+                    Status = MembershipStatus.Active
+                }
+            ]
+        };
+
+        Assert.Null(GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.PauseWorld));
+        Assert.Null(GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.ResumeWorld));
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.ConstructBuilding)?.Code);
+    }
+
+    [Fact]
     public void MembershipAuthorizationUsesPlayerAndSelectedStateWithoutHostPrivilege()
     {
         var hostId = Guid.NewGuid();

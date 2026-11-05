@@ -117,11 +117,15 @@ public static class GameOrderRules
     }
 
     public static OrderRejection? CheckMembership(
-        WorldState game, Guid playerId, Guid? stateId)
+        WorldState game, Guid playerId, Guid? stateId, GameOrderType? orderType = null)
     {
-        if (!game.Memberships.Any(membership =>
-                membership.PlayerId == playerId && membership.Status == MembershipStatus.Active))
+        var activeMembership = game.Memberships.FirstOrDefault(membership =>
+            membership.PlayerId == playerId && membership.Status == MembershipStatus.Active);
+        if (activeMembership is null)
             return new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
+
+        if (orderType is GameOrderType.PauseWorld or GameOrderType.ResumeWorld)
+            return null;
 
         if (stateId is not Guid selectedStateId ||
             !game.Memberships.Any(membership =>
