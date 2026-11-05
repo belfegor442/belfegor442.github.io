@@ -199,6 +199,14 @@ public static class WorldStateCompatibility
                     string.IsNullOrWhiteSpace(decision.Text) ||
                     string.IsNullOrWhiteSpace(decision.LegalBasis) ||
                     decision.ConstitutionVersion < 1 ||
+                    decision.Competence == PoliticalCompetence.ProposeLaw &&
+                    (decision.OfficeId is not null || decision.AppointeePlayerId is not null) ||
+                    decision.Competence == PoliticalCompetence.AppointOffice &&
+                    (decision.OfficeId is not Guid officeId ||
+                     !officeIds.Contains(officeId) ||
+                     decision.AppointeePlayerId is not Guid appointeeId ||
+                     !playerIds.Contains(appointeeId)) ||
+                    decision.Competence is not (PoliticalCompetence.ProposeLaw or PoliticalCompetence.AppointOffice) ||
                     decision.ProposedOnWorldDate == default ||
                     decision.ProposedOnWorldDate > game.WorldDate ||
                     decision.Status == PoliticalDecisionStatus.PendingApproval &&
@@ -248,8 +256,13 @@ public static class WorldStateCompatibility
                     (effectiveFrom < law.ProposedOnWorldDate || effectiveFrom > game.WorldDate))
                     throw new InvalidDataException("The saved world contains an invalid political law.");
             }
-            if (lawIds.Count != decisionIds.Count)
-                throw new InvalidDataException("The saved world contains a decision without a corresponding law.");
+            var lawDecisionIds = system.Decisions
+                .Where(decision => decision.Competence == PoliticalCompetence.ProposeLaw)
+                .Select(decision => decision.Id)
+                .ToHashSet();
+            if (lawIds.Count != lawDecisionIds.Count ||
+                lawIds.Any(lawId => !lawDecisionIds.Contains(lawId)))
+                throw new InvalidDataException("The saved world contains a legislative decision without a corresponding law.");
         }
 
         var membershipIds = new HashSet<Guid>();

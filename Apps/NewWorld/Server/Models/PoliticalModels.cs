@@ -163,6 +163,8 @@ public sealed class PoliticalDecision
     public string Title { get; set; } = "";
     public string Text { get; set; } = "";
     public string LegalBasis { get; set; } = "";
+    public Guid? OfficeId { get; set; }
+    public Guid? AppointeePlayerId { get; set; }
     public PoliticalDecisionStatus Status { get; set; }
     public DateOnly ProposedOnWorldDate { get; set; }
     public DateOnly? ResolvedOnWorldDate { get; set; }
@@ -177,6 +179,7 @@ public sealed record PoliticalVote(
 
 public sealed record PoliticalDecisionRequest(string Title, string Text, Guid? DecisionId);
 public sealed record PoliticalVoteRequest(Guid DecisionId, PoliticalVoteChoice Choice);
+public sealed record PoliticalAppointmentRequest(Guid OfficeId, Guid AppointeePlayerId);
 
 public sealed record PoliticalStateView(
     Guid StateId,

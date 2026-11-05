@@ -261,6 +261,18 @@
       addPoliticalRow(summary, 'GOVERNMENT', 'No government composition is defined.');
     }
 
+    const player = currentPlayer();
+    const membership = membershipsFor(player).find(item => item.stateId === system.stateId);
+    const lawRule = constitution?.competenceRules
+      ?.find(rule => rule.competence === 'proposeLaw');
+    const appointmentRule = constitution?.competenceRules
+      ?.find(rule => rule.competence === 'appointOffice');
+    const canAppointOffice = onlineGame.status === 'running' &&
+      membership &&
+      appointmentRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
+    const eligibleAppointees = onlineGame.players.filter(candidate =>
+      membershipsFor(candidate).some(item => item.stateId === system.stateId));
+
     if (system.institutions.length) {
       for (const institution of system.institutions) {
         const officeDetails = (system.offices || [])
@@ -269,10 +281,45 @@
             const holder = onlineGame.players.find(player => player.id === office.holderPlayerId);
             return office.name + ': ' + (holder?.name || 'vacant');
           }).join(' · ');
-        addPoliticalRow(
+        const row = addPoliticalRow(
           institutions,
           institution.name + ' · ' + String(institution.branch).toUpperCase(),
           officeDetails || 'No offices are configured.');
+        if (canAppointOffice && institution.id === appointmentRule.institutionId) {
+          for (const office of (system.offices || []).filter(item =>
+            item.institutionId === institution.id)) {
+            const select = document.createElement('select');
+            select.className = 'text-field appointment-select';
+            select.setAttribute('aria-label', 'Appointee for ' + office.name);
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select appointee for ' + office.name;
+            select.appendChild(placeholder);
+            for (const candidate of eligibleAppointees) {
+              const option = document.createElement('option');
+              option.value = candidate.id;
+              option.textContent = candidate.name;
+              select.appendChild(option);
+            }
+            const appointButton = document.createElement('button');
+            appointButton.type = 'button';
+            appointButton.textContent = 'APPOINT';
+            appointButton.disabled = eligibleAppointees.length === 0;
+            select.addEventListener('change', () => {
+              appointButton.disabled = !select.value;
+            });
+            appointButton.addEventListener('click', () => {
+              if (!select.value) return;
+              sendAction({
+                type: 'appointOffice',
+                stateId: system.stateId,
+                officeId: office.id,
+                appointeePlayerId: select.value
+              });
+            });
+            row.append(select, appointButton);
+          }
+        }
       }
     } else {
       addPoliticalRow(institutions, 'No institutions defined', 'Institutional design remains pending.');
@@ -300,21 +347,20 @@
       addPoliticalRow(laws, 'No legislation recorded', 'Only proposals completing the configured constitutional procedure enter into force.');
     }
 
-    const player = currentPlayer();
-    const membership = membershipsFor(player).find(item => item.stateId === system.stateId);
-    const lawRule = constitution?.competenceRules
-      ?.find(rule => rule.competence === 'proposeLaw');
+
     if (system.decisions.length) {
       for (const decision of [...system.decisions].reverse()) {
+        const decisionRule = constitution?.competenceRules
+          ?.find(rule => rule.competence === decision.competence);
         const row = addPoliticalRow(
           decisions,
           decision.title + ' · ' + String(decision.status).replaceAll(/([A-Z])/g, ' $1').toUpperCase(),
           decision.text + ' · ' + decision.votes.length + ' vote(s) · ' + decision.legalBasis);
         const canVote = onlineGame.status === 'running' &&
-          lawRule?.approvalRequired &&
+          decisionRule?.approvalRequired &&
           decision.status === 'pendingApproval' &&
           membership &&
-          lawRule?.voterPermissionSetIds?.includes(membership.permissionSetId) &&
+          decisionRule?.voterPermissionSetIds?.includes(membership.permissionSetId) &&
           !decision.votes.some(vote => vote.playerId === onlineSession.playerId);
         if (canVote) {
           for (const [choice, label] of [['approve', 'APPROVE'], ['reject', 'REJECT']]) {
@@ -882,6 +928,7 @@
       WORLD_NOT_RUNNING: 'This action is unavailable while the world is paused or closed.',
       NOT_MEMBER: 'You are not a member of the selected government.',
       INSUFFICIENT_PERMISSION: 'Your government permissions do not allow this action.',
+      NO_ELIGIBLE_VOTERS: 'No active member can vote under this constitutional procedure.',
       INVALID_PAYLOAD: 'The order contains invalid details.',
       INSUFFICIENT_FUNDS: 'The government treasury does not have enough funds.',
       TARGET_UNAVAILABLE: 'The selected target is no longer available.',
@@ -900,6 +947,11 @@
       DECISION_ID_CONFLICT: 'This decision identifier is already in use.',
       CONSTITUTION_CHANGED: 'The State constitution changed; review the decision before continuing.',
       ALREADY_VOTED: 'You have already voted on this decision.',
+      OFFICE_NOT_FOUND: 'That office is no longer available.',
+      INSTITUTION_MISMATCH: 'This constitutional authority cannot appoint to that institution.',
+      APPOINTEE_NOT_MEMBER: 'The selected appointee must be an active member of this State government.',
+      APPOINTEE_ALREADY_HOLDS_OFFICE: 'That player already holds the selected office.',
+      OFFICE_APPOINTMENT_PENDING: 'An appointment decision is already pending for that office.',
       ORDER_ID_REUSED: 'This order ID was already used for a different request.'
     };
     return messages[code] || 'The server rejected the order.';

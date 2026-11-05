@@ -32,6 +32,9 @@ public static class PoliticalProcedureRules
             !rule!.ProposerPermissionSetIds.Contains(membership.PermissionSetId))
             return new OrderRejection(
                 "INSUFFICIENT_PERMISSION", "Your government permissions do not allow proposing laws.");
+        if (rule.ApprovalRequired && !HasEligibleVoters(game, selectedStateId, rule))
+            return new OrderRejection(
+                "NO_ELIGIBLE_VOTERS", "This procedure has no active members eligible to vote.");
         if (system!.Decisions.Any(decision => decision.Id == orderId) ||
             system.Laws.Any(law => law.Id == orderId))
             return new OrderRejection("DECISION_ID_CONFLICT", "This decision ID is already in use.");
@@ -75,6 +78,93 @@ public static class PoliticalProcedureRules
         return null;
     }
 
+    public static OrderRejection? AppointOffice(
+        WorldState game,
+        PlayerState actor,
+        Guid orderId,
+        Guid? stateId,
+        Guid? officeId,
+        Guid? appointeePlayerId)
+    {
+        if (stateId is not Guid selectedStateId ||
+            officeId is not Guid selectedOfficeId ||
+            appointeePlayerId is not Guid selectedAppointeeId ||
+            selectedStateId == Guid.Empty ||
+            selectedOfficeId == Guid.Empty ||
+            selectedAppointeeId == Guid.Empty)
+            return new OrderRejection("INVALID_PAYLOAD", "A State, office, and appointee are required.");
+
+        var (system, rule, error) =
+            FindRule(game, selectedStateId, PoliticalCompetence.AppointOffice);
+        if (error is not null)
+            return error;
+
+        var proposerMembership = game.Memberships.FirstOrDefault(item =>
+            item.PlayerId == actor.Id &&
+            item.StateId == selectedStateId &&
+            item.Status == MembershipStatus.Active);
+        if (proposerMembership is null ||
+            !rule!.ProposerPermissionSetIds.Contains(proposerMembership.PermissionSetId))
+            return new OrderRejection(
+                "INSUFFICIENT_PERMISSION", "Your government permissions do not allow appointing office holders.");
+        if (rule.ApprovalRequired && !HasEligibleVoters(game, selectedStateId, rule))
+            return new OrderRejection(
+                "NO_ELIGIBLE_VOTERS", "This procedure has no active members eligible to vote.");
+
+        var office = system!.Offices.SingleOrDefault(item => item.Id == selectedOfficeId);
+        if (office is null)
+            return new OrderRejection("OFFICE_NOT_FOUND", "The selected office does not exist in this State.");
+        if (office.InstitutionId != rule.InstitutionId)
+            return new OrderRejection(
+                "INSTITUTION_MISMATCH", "This constitutional competence does not control the selected institution.");
+        if (!game.Players.Any(player => player.Id == selectedAppointeeId) ||
+            !game.Memberships.Any(item =>
+                item.PlayerId == selectedAppointeeId &&
+                item.StateId == selectedStateId &&
+                item.Status == MembershipStatus.Active))
+            return new OrderRejection(
+                "APPOINTEE_NOT_MEMBER", "The appointee must be an active member of this State government.");
+        if (office.HolderPlayerId == selectedAppointeeId)
+            return new OrderRejection("APPOINTEE_ALREADY_HOLDS_OFFICE", "This player already holds the selected office.");
+        if (system.Decisions.Any(decision => decision.Id == orderId) ||
+            system.Laws.Any(law => law.Id == orderId))
+            return new OrderRejection("DECISION_ID_CONFLICT", "This decision ID is already in use.");
+        if (system.Decisions.Any(decision =>
+                decision.Competence == PoliticalCompetence.AppointOffice &&
+                decision.OfficeId == selectedOfficeId &&
+                decision.Status == PoliticalDecisionStatus.PendingApproval))
+            return new OrderRejection(
+                "OFFICE_APPOINTMENT_PENDING", "An appointment decision is already pending for this office.");
+
+        var appointeeName = game.Players.Single(player => player.Id == selectedAppointeeId).Name;
+        var decision = new PoliticalDecision
+        {
+            Id = orderId,
+            StateId = selectedStateId,
+            Competence = PoliticalCompetence.AppointOffice,
+            ProposerPlayerId = actor.Id,
+            InstitutionId = rule.InstitutionId,
+            ConstitutionVersion = system.Constitution!.Version,
+            Title = $"Appoint {appointeeName} as {office.Name}",
+            Text = $"Appoint {appointeeName} to the office of {office.Name}.",
+            LegalBasis = rule.LegalBasis,
+            OfficeId = office.Id,
+            AppointeePlayerId = selectedAppointeeId,
+            Status = rule.ApprovalRequired
+                ? PoliticalDecisionStatus.PendingApproval
+                : PoliticalDecisionStatus.Approved,
+            ProposedOnWorldDate = game.WorldDate,
+            ResolvedOnWorldDate = rule.ApprovalRequired ? null : game.WorldDate
+        };
+        system.Decisions.Add(decision);
+        if (!rule.ApprovalRequired)
+            ApplyAppointment(game, system, decision);
+
+        var outcome = rule.ApprovalRequired ? "proposed an appointment to" : "appointed";
+        GameStore.AddActivity(game, $"{actor.Name} {outcome} {office.Name}.");
+        return null;
+    }
+
     public static OrderRejection? VoteOnDecision(
         WorldState game,
         PlayerState actor,
@@ -88,30 +178,42 @@ public static class PoliticalProcedureRules
             !Enum.IsDefined(voteChoice))
             return new OrderRejection("INVALID_PAYLOAD", "A State, decision, and valid vote are required.");
 
-        var (system, rule, error) = FindRule(game, selectedStateId, PoliticalCompetence.ProposeLaw);
-        if (error is not null)
-            return error;
-        if (!rule!.ApprovalRequired)
-            return new OrderRejection(
-                "APPROVAL_NOT_REQUIRED", "This constitutional procedure does not require a vote.");
-
-        var decision = system!.Decisions.SingleOrDefault(item =>
+        var system = game.PoliticalSystems.SingleOrDefault(item => item.StateId == selectedStateId);
+        var decision = system?.Decisions.SingleOrDefault(item =>
             item.Id == selectedDecisionId && item.StateId == selectedStateId);
         if (decision is null)
             return new OrderRejection("DECISION_NOT_FOUND", "The political decision does not exist in this State.");
         if (decision.Status != PoliticalDecisionStatus.PendingApproval)
             return new OrderRejection("DECISION_CLOSED", "This political decision is no longer open for votes.");
-        if (decision.Competence != rule!.Competence ||
-            decision.InstitutionId != rule.InstitutionId ||
+
+        var (configuredSystem, rule, error) =
+            FindRule(game, selectedStateId, decision.Competence);
+        if (error is not null)
+            return error;
+        system = configuredSystem!;
+        var votingRule = rule!;
+        if (decision.Competence != votingRule.Competence ||
+            decision.InstitutionId != votingRule.InstitutionId ||
             decision.ConstitutionVersion != system.Constitution!.Version)
             return new OrderRejection(
                 "CONSTITUTION_CHANGED", "The decision no longer matches the State's current constitution.");
+        if (!votingRule.ApprovalRequired)
+            return new OrderRejection(
+                "APPROVAL_NOT_REQUIRED", "This constitutional procedure does not require a vote.");
+        if (decision.Competence == PoliticalCompetence.AppointOffice &&
+            (decision.AppointeePlayerId is not Guid appointeeId ||
+             !game.Memberships.Any(item =>
+                 item.PlayerId == appointeeId &&
+                 item.StateId == selectedStateId &&
+                 item.Status == MembershipStatus.Active)))
+            return new OrderRejection(
+                "APPOINTEE_NOT_MEMBER", "The proposed appointee is no longer an active member of this State government.");
 
         var membership = game.Memberships.FirstOrDefault(item =>
             item.PlayerId == actor.Id &&
             item.StateId == selectedStateId &&
             item.Status == MembershipStatus.Active);
-        if (membership is null || !rule.VoterPermissionSetIds.Contains(membership.PermissionSetId))
+        if (membership is null || !votingRule.VoterPermissionSetIds.Contains(membership.PermissionSetId))
             return new OrderRejection(
                 "INSUFFICIENT_PERMISSION", "Your government permissions do not allow voting on this decision.");
         if (decision.Votes.Any(vote => vote.PlayerId == actor.Id))
@@ -122,18 +224,18 @@ public static class PoliticalProcedureRules
         var eligibleVoters = game.Memberships
             .Where(item => item.StateId == selectedStateId &&
                            item.Status == MembershipStatus.Active &&
-                           rule.VoterPermissionSetIds.Contains(item.PermissionSetId))
+                           votingRule.VoterPermissionSetIds.Contains(item.PermissionSetId))
             .Select(item => item.PlayerId)
             .ToHashSet();
         var approvalVotes = decision.Votes.Count(vote => vote.Choice == PoliticalVoteChoice.Approve);
-        var thresholdBase = rule.ApprovalThresholdBasis switch
+        var thresholdBase = votingRule.ApprovalThresholdBasis switch
         {
             ApprovalThresholdBasis.VotesCast => decision.Votes.Count,
             ApprovalThresholdBasis.EligibleVoters => eligibleVoters.Count,
             _ => throw new InvalidDataException("A constitutional approval threshold basis is not configured.")
         };
-        var requiredApprovalVotes = (thresholdBase * rule.ApprovalThresholdPercent + 99) / 100;
-        if (decision.Votes.Count >= rule.MinimumVotes && approvalVotes >= requiredApprovalVotes)
+        var requiredApprovalVotes = (thresholdBase * votingRule.ApprovalThresholdPercent + 99) / 100;
+        if (decision.Votes.Count >= votingRule.MinimumVotes && approvalVotes >= requiredApprovalVotes)
         {
             decision.Status = PoliticalDecisionStatus.Approved;
             decision.ResolvedOnWorldDate = game.WorldDate;
@@ -145,22 +247,63 @@ public static class PoliticalProcedureRules
             decision.ResolvedOnWorldDate = game.WorldDate;
         }
 
-        if (decision.Status is PoliticalDecisionStatus.Approved or PoliticalDecisionStatus.Rejected)
+        if (decision.Status == PoliticalDecisionStatus.Approved)
+        {
+            if (decision.Competence == PoliticalCompetence.ProposeLaw)
+            {
+                var law = system.Laws.SingleOrDefault(item => item.DecisionId == decision.Id)
+                    ?? throw new InvalidDataException("A legislative decision has no corresponding law record.");
+                law.Status = PoliticalLawStatus.InForce;
+                law.EffectiveFrom = game.WorldDate;
+            }
+            else if (decision.Competence == PoliticalCompetence.AppointOffice)
+            {
+                ApplyAppointment(game, system, decision);
+            }
+            else
+            {
+                throw new InvalidDataException("An approved political decision has an unsupported competence.");
+            }
+        }
+        else if (decision.Status == PoliticalDecisionStatus.Rejected &&
+                 decision.Competence == PoliticalCompetence.ProposeLaw)
         {
             var law = system.Laws.SingleOrDefault(item => item.DecisionId == decision.Id)
                 ?? throw new InvalidDataException("A legislative decision has no corresponding law record.");
-            law.Status = decision.Status == PoliticalDecisionStatus.Approved
-                ? PoliticalLawStatus.InForce
-                : PoliticalLawStatus.Rejected;
-            law.EffectiveFrom = law.Status == PoliticalLawStatus.InForce
-                ? game.WorldDate
-                : null;
+            law.Status = PoliticalLawStatus.Rejected;
+            law.EffectiveFrom = null;
         }
 
         var choiceText = voteChoice == PoliticalVoteChoice.Approve ? "approved" : "rejected";
         GameStore.AddActivity(game, $"{actor.Name} voted to {choiceText} \"{decision.Title}\".");
         return null;
     }
+
+    private static void ApplyAppointment(
+        WorldState game,
+        StatePoliticalSystem system,
+        PoliticalDecision decision)
+    {
+        if (decision.OfficeId is not Guid officeId ||
+            decision.AppointeePlayerId is not Guid appointeePlayerId ||
+            !game.Memberships.Any(item =>
+                item.PlayerId == appointeePlayerId &&
+                item.StateId == system.StateId &&
+                item.Status == MembershipStatus.Active))
+            throw new InvalidDataException("The approved office appointment has an invalid appointee.");
+
+        var office = system.Offices.SingleOrDefault(item => item.Id == officeId)
+            ?? throw new InvalidDataException("The approved office appointment references a missing office.");
+        office.HolderPlayerId = appointeePlayerId;
+        office.TermStartsOn = game.WorldDate;
+    }
+
+    private static bool HasEligibleVoters(
+        WorldState game, Guid stateId, ConstitutionalCompetenceRule rule) =>
+        game.Memberships.Any(item =>
+            item.StateId == stateId &&
+            item.Status == MembershipStatus.Active &&
+            rule.VoterPermissionSetIds.Contains(item.PermissionSetId));
 
     public static int? CalculateStability(StatePoliticalSystem system)
     {

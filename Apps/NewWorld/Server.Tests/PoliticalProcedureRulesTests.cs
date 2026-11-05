@@ -44,7 +44,7 @@ public sealed class PoliticalProcedureRulesTests
     [Fact]
     public void ConstitutionCanEnactALawWithoutApprovalWhenThatProcedureIsExplicit()
     {
-        var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 0, minimumVotes: 0);
+        var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
         var rule = game.PoliticalSystems.Single().Constitution!.CompetenceRules.Single();
         rule.ApprovalRequired = false;
         rule.VoterPermissionSetIds.Clear();
@@ -204,6 +204,67 @@ public sealed class PoliticalProcedureRulesTests
             game.PoliticalSystems.Single().Decisions.Single().Status);
     }
 
+    [Fact]
+    public void OfficeCanBeAppointedDirectlyWhenConstitutionDoesNotRequireApproval()
+    {
+        var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        var office = AddAppointmentRule(game, approvalRequired: false);
+
+        var error = PoliticalProcedureRules.AppointOffice(
+            game, player, Guid.NewGuid(), stateId, office.Id, player.Id);
+
+        Assert.Null(error);
+        Assert.Equal(player.Id, office.HolderPlayerId);
+        Assert.Equal(game.WorldDate, office.TermStartsOn);
+        var decision = Assert.Single(game.PoliticalSystems.Single().Decisions);
+        Assert.Equal(PoliticalCompetence.AppointOffice, decision.Competence);
+        Assert.Equal(PoliticalDecisionStatus.Approved, decision.Status);
+        Assert.Single(WorldStateCompatibility.Clone(game).PoliticalSystems.Single().Offices);
+    }
+
+    [Fact]
+    public void OfficeAppointmentWaitsForConfiguredApprovalAndVote()
+    {
+        var (game, proposer, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        var appointee = AddEligibleVoters(game, stateId, 1).Single();
+        var office = AddAppointmentRule(game, approvalRequired: true, minimumVotes: 2);
+        var decisionId = Guid.NewGuid();
+
+        Assert.Null(PoliticalProcedureRules.AppointOffice(
+            game, proposer, decisionId, stateId, office.Id, appointee.Id));
+        Assert.Null(office.HolderPlayerId);
+        Assert.Null(PoliticalProcedureRules.VoteOnDecision(
+            game, proposer, stateId, decisionId, PoliticalVoteChoice.Approve));
+        Assert.Null(office.HolderPlayerId);
+        Assert.Null(PoliticalProcedureRules.VoteOnDecision(
+            game, appointee, stateId, decisionId, PoliticalVoteChoice.Approve));
+
+        Assert.Equal(PoliticalDecisionStatus.Approved,
+            game.PoliticalSystems.Single().Decisions.Single().Status);
+        Assert.Equal(appointee.Id, office.HolderPlayerId);
+    }
+
+    [Fact]
+    public void OfficeAppointmentRequiresConstitutionalPermissionAndActiveMembership()
+    {
+        var (game, proposer, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        var office = AddAppointmentRule(game, approvalRequired: false);
+        game.Memberships.Single().PermissionSetId = "observer";
+
+        var unauthorized = PoliticalProcedureRules.AppointOffice(
+            game, proposer, Guid.NewGuid(), stateId, office.Id, proposer.Id);
+
+        Assert.Equal("INSUFFICIENT_PERMISSION", unauthorized?.Code);
+        Assert.Empty(game.PoliticalSystems.Single().Decisions);
+        game.Memberships.Single().PermissionSetId = "legislative-member";
+        var inactivePlayer = AddEligibleVoters(game, stateId, 1).Single();
+        game.Memberships.Single(item => item.PlayerId == inactivePlayer.Id).Status =
+            MembershipStatus.Suspended;
+        var inactiveAppointee = PoliticalProcedureRules.AppointOffice(
+            game, proposer, Guid.NewGuid(), stateId, office.Id, inactivePlayer.Id);
+        Assert.Equal("APPOINTEE_NOT_MEMBER", inactiveAppointee?.Code);
+    }
+
     private static (WorldState Game, PlayerState Player, Guid StateId) CreatePoliticalWorld(
         int approvalThreshold,
         int minimumVotes)
@@ -288,5 +349,38 @@ public sealed class PoliticalProcedureRulesTests
             });
         }
         return players;
+    }
+
+    private static PoliticalOffice AddAppointmentRule(
+        WorldState game,
+        bool approvalRequired,
+        int minimumVotes = 0)
+    {
+        var system = game.PoliticalSystems.Single();
+        var institution = system.Institutions.Single();
+        var office = new PoliticalOffice
+        {
+            Id = Guid.NewGuid(),
+            Name = "Minister",
+            InstitutionId = institution.Id
+        };
+        system.Offices.Add(office);
+        institution.OfficeIds.Add(office.Id);
+        system.Constitution!.CompetenceRules.Add(new ConstitutionalCompetenceRule
+        {
+            Id = Guid.NewGuid(),
+            Competence = PoliticalCompetence.AppointOffice,
+            InstitutionId = institution.Id,
+            LegalBasis = "Article 5: appointment procedure",
+            ApprovalRequired = approvalRequired,
+            MinimumVotes = minimumVotes,
+            ApprovalThresholdPercent = approvalRequired ? 50 : 0,
+            ApprovalThresholdBasis = approvalRequired
+                ? ApprovalThresholdBasis.VotesCast
+                : ApprovalThresholdBasis.Unspecified,
+            ProposerPermissionSetIds = ["legislative-member"],
+            VoterPermissionSetIds = approvalRequired ? ["legislative-member"] : []
+        });
+        return office;
     }
 }
