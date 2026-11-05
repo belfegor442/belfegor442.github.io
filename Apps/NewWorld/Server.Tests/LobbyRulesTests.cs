@@ -51,6 +51,8 @@ public sealed class LobbyRulesTests
         Assert.Equal(2, game.Memberships.Count(membership =>
             membership.StateId == game.Territories[0].StateId &&
             membership.Status == MembershipStatus.Active));
+        Assert.Equal(2400, game.Territories[0].Treasury);
+        Assert.All(game.Players, player => Assert.Equal(0, player.Treasury));
     }
 
     [Fact]
@@ -78,5 +80,7 @@ public sealed class LobbyRulesTests
         var snapshot = GameHub.BuildSnapshot(game, new HashSet<Guid> { player.Id });
         Assert.Equal(2, Assert.Single(snapshot.Players).Memberships.Count);
         Assert.Equal(new DateOnly(1500, 1, 1), snapshot.WorldDate);
+        Assert.Equal(1200, game.Territories[0].Treasury);
+        Assert.Equal(0, game.Territories[1].Treasury);
     }
 }

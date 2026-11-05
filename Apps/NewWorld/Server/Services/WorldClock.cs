@@ -57,9 +57,11 @@ public sealed class WorldClock(
                         game.Day++;
                         game.WorldDate = game.WorldDate.AddDays(1);
                         game.LastTickUtc = game.LastTickUtc.Add(DayLength);
-                        foreach (var player in game.Players)
-                            SimulationRules.AccrueDailyBalance(
-                                player, SimulationRules.CalculateMonthlyBalance(game, player));
+                        foreach (var government in game.Territories)
+                        {
+                            var balance = SimulationRules.CalculateGovernmentBalance(game, government);
+                            SimulationRules.AccrueDailyBalance(government, balance.MonthlyBalance);
+                        }
                         if (game.WorldDate.Month == 1 && game.WorldDate.Day == 1)
                         {
                             foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))

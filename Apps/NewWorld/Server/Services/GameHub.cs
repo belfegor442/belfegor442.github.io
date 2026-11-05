@@ -168,12 +168,15 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 membership.StateIndex == player.LegacyCountryIndex)?.StateIndex ??
                 playerMemberships?.FirstOrDefault()?.StateIndex ??
                 player.LegacyCountryIndex;
+            var governmentTreasury = countryIndex is int index
+                ? game.Territories.SingleOrDefault(territory => territory.Index == index)?.Treasury
+                : null;
             return new PlayerView(
                 player.Id,
                 player.Name,
                 player.IsHost,
                 countryIndex,
-                player.Treasury,
+                governmentTreasury ?? player.Treasury,
                 player.Buildings,
                 connectedPlayers.Contains(player.Id),
                 playerMemberships ?? []);
@@ -187,9 +190,15 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             game.Paused,
             game.PauseVotes.Where(connectedPlayers.Contains).ToList(),
             players,
-            game.Territories.Select(territory => new TerritoryView(
-                territory.StateId, territory.Index, territory.Name, territory.Population, territory.Prosperity,
-                territory.Infrastructure, territory.OwnerPlayerId)).ToList(),
+            game.Territories.Select(territory =>
+            {
+                var (territoryIncome, cityIncome, upkeep, monthlyBalance) =
+                    SimulationRules.CalculateGovernmentBalance(game, territory);
+                return new TerritoryView(
+                    territory.StateId, territory.Index, territory.Name, territory.Treasury, territoryIncome,
+                    cityIncome, upkeep, monthlyBalance, territory.Population, territory.Prosperity,
+                    territory.Infrastructure, territory.OwnerPlayerId);
+            }).ToList(),
             game.Activity,
             game.Name,
             game.Status,
@@ -211,6 +220,15 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             if (!game.Memberships.Any(membership =>
                     membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
                 return "This player has not been assigned a state.";
+            var governmentMembership = game.Memberships.FirstOrDefault(membership =>
+                membership.PlayerId == player.Id &&
+                membership.Status == MembershipStatus.Active &&
+                game.Territories.Single(territory => territory.StateId == membership.StateId).Index ==
+                player.LegacyCountryIndex) ??
+                game.Memberships.First(membership =>
+                    membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active);
+            var government = game.Territories.Single(territory =>
+                territory.StateId == governmentMembership.StateId);
 
             switch (message.Type)
             {
@@ -249,9 +267,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     var territory = game.Territories[territoryIndex];
                     if (territory.OwnerPlayerId is not null)
                         return "This territory is already administered.";
-                    if (player.Treasury < 450)
+                    if (government.Treasury < 450)
                         return "Insufficient treasury (¤450 required).";
-                    player.Treasury -= 450;
+                    government.Treasury -= 450;
                     territory.OwnerPlayerId = player.Id;
                     territory.Infrastructure++;
                     GameStore.AddActivity(game, $"{player.Name} established an administration in {territory.Name}.");
@@ -264,9 +282,9 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                         return "Unknown building.";
                     if (player.Buildings.ContainsKey(plot))
                         return "This plot is already developed.";
-                    if (player.Treasury < building.Cost)
+                    if (government.Treasury < building.Cost)
                         return "Insufficient treasury.";
-                    player.Treasury -= building.Cost;
+                    government.Treasury -= building.Cost;
                     player.Buildings.Add(plot, building);
                     GameStore.AddActivity(game, $"{player.Name} constructed a {building.Name.ToLowerInvariant()}.");
                     return null;

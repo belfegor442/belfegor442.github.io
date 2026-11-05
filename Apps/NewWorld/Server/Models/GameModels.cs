@@ -13,6 +13,7 @@ public sealed class WorldState
     public int Day { get; set; } = 1;
     public DateOnly WorldDate { get; set; }
     public long WorldVersion { get; set; } = 1;
+    public int EconomyVersion { get; set; }
     public string ScenarioId { get; set; } = "beleland";
     public string ScenarioVersion { get; set; } = "1.0";
     public int MaxHumanPlayers { get; set; } = GameCatalog.MaxHumanPlayers;
@@ -71,6 +72,8 @@ public sealed class TerritoryState
     public Guid StateId { get; set; }
     public int Index { get; set; }
     public string Name { get; set; } = "";
+    public int Treasury { get; set; }
+    public int DailyBalanceRemainder { get; set; }
     public int Population { get; set; }
     public int Prosperity { get; set; }
     public int Infrastructure { get; set; }
@@ -108,7 +111,8 @@ public sealed record PlayerView(
 public sealed record GovernmentMembershipView(
     Guid Id, Guid PlayerId, Guid StateId, int StateIndex, MembershipStatus Status, string PermissionSetId);
 public sealed record TerritoryView(
-    Guid StateId, int Index, string Name, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
+    Guid StateId, int Index, string Name, int Treasury, int TerritoryIncome, int CityIncome, int Upkeep,
+    int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
 public sealed record ClientMessage(string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex, string? BuildingId);
 public sealed record ServerMessage(string Type, string? Error = null, GameSnapshot? Game = null);
 

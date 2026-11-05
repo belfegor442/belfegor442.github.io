@@ -17,7 +17,13 @@ public sealed class WorldStateCompatibilityTests
               "started": true,
               "day": 366,
               "players": [
-                { "id": "{{playerId}}", "name": "Player One", "countryIndex": 0 }
+                {
+                  "id": "{{playerId}}",
+                  "name": "Player One",
+                  "countryIndex": 0,
+                  "treasury": 1600,
+                  "dailyBalanceRemainder": 17
+                }
               ],
               "territories": [
                 { "index": 0, "name": "Coimbrila" }
@@ -35,6 +41,9 @@ public sealed class WorldStateCompatibilityTests
         Assert.Equal(playerId, membership.PlayerId);
         Assert.Equal(game.Territories[0].StateId, membership.StateId);
         Assert.NotEqual(Guid.Empty, membership.Id);
+        Assert.Equal(1600, game.Territories[0].Treasury);
+        Assert.Equal(17, game.Territories[0].DailyBalanceRemainder);
+        Assert.Equal(0, game.Players[0].Treasury);
 
         var stableStateId = game.Territories[0].StateId;
         var stableMembershipId = membership.Id;
@@ -42,6 +51,7 @@ public sealed class WorldStateCompatibilityTests
 
         Assert.Equal(stableStateId, game.Territories[0].StateId);
         Assert.Equal(stableMembershipId, Assert.Single(game.Memberships).Id);
+        Assert.Equal(1600, game.Territories[0].Treasury);
     }
 
     [Fact]

@@ -6,36 +6,46 @@ public static class SimulationRules
 {
     private const int DaysPerFinancialPeriod = 30;
 
-    public static int CalculateMonthlyBalance(WorldState game, PlayerState player)
+    public static (int TerritoryIncome, int CityIncome, int Upkeep, int MonthlyBalance)
+        CalculateGovernmentBalance(WorldState game, TerritoryState government)
     {
+        var members = game.Memberships
+            .Where(membership => membership.StateId == government.StateId &&
+                membership.Status == MembershipStatus.Active)
+            .Select(membership => game.Players.Single(player => player.Id == membership.PlayerId))
+            .ToList();
+        var cityOwners = members.Where(player => player.LegacyCountryIndex == government.Index).ToList();
+        var cityOwnerIds = cityOwners.Select(player => player.Id).ToHashSet();
         var territoryIncome = game.Territories
-            .Where(territory => territory.OwnerPlayerId == player.Id)
+            .Where(territory => territory.OwnerPlayerId is Guid ownerId && cityOwnerIds.Contains(ownerId))
             .Sum(territory => (int)Math.Round(territory.Population / 1500d * (territory.Prosperity / 100d)));
-        var cityIncome = 85 + player.Buildings.Values.Sum(building => building.Income);
-        return territoryIncome + cityIncome - player.Buildings.Count * 2;
+        var cityIncome = cityOwners.Count * 85 + cityOwners.Sum(player =>
+            player.Buildings.Values.Sum(building => building.Income));
+        var upkeep = cityOwners.Sum(player => player.Buildings.Count * 2);
+        return (territoryIncome, cityIncome, upkeep, territoryIncome + cityIncome - upkeep);
     }
 
-    public static int AccrueDailyBalance(PlayerState player, int monthlyBalance)
+    public static int AccrueDailyBalance(TerritoryState government, int monthlyBalance)
     {
-        var accumulated = (long)player.DailyBalanceRemainder + monthlyBalance;
+        var accumulated = (long)government.DailyBalanceRemainder + monthlyBalance;
         var dailyChange = (int)(accumulated / DaysPerFinancialPeriod);
-        player.DailyBalanceRemainder = (int)(accumulated % DaysPerFinancialPeriod);
+        government.DailyBalanceRemainder = (int)(accumulated % DaysPerFinancialPeriod);
 
-        var treasury = (long)player.Treasury + dailyChange;
+        var treasury = (long)government.Treasury + dailyChange;
         if (treasury < 0)
         {
-            dailyChange = -player.Treasury;
+            dailyChange = -government.Treasury;
             treasury = 0;
-            player.DailyBalanceRemainder = 0;
+            government.DailyBalanceRemainder = 0;
         }
         else if (treasury > int.MaxValue)
         {
-            dailyChange = int.MaxValue - player.Treasury;
+            dailyChange = int.MaxValue - government.Treasury;
             treasury = int.MaxValue;
-            player.DailyBalanceRemainder = 0;
+            government.DailyBalanceRemainder = 0;
         }
 
-        player.Treasury = (int)treasury;
+        government.Treasury = (int)treasury;
         return dailyChange;
     }
 }

@@ -41,6 +41,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         {
             Id = id,
             WorldDate = new DateOnly(1500, 1, 1),
+            EconomyVersion = 1,
             HostPlayerId = playerId,
             LastTickUtc = DateTimeOffset.UtcNow,
             Players = [new PlayerState { Id = playerId, Name = playerName, IsHost = true, TokenHash = Hash(playerToken) }],

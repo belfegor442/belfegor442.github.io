@@ -12,6 +12,7 @@
     year: 1,
     month: 0,
     treasury: 1200,
+    governmentFinance: null,
     selected: 0,
     owned: [],
     states: names.map((name, i) => ({
@@ -80,10 +81,12 @@
   }
 
   function cityIncome() {
+    if (onlineGame) return state.governmentFinance?.cityIncome || 0;
     return Object.values(state.buildings).reduce((sum, building) => sum + building.income, 85);
   }
 
   function ownedIncome() {
+    if (onlineGame) return state.governmentFinance?.territoryIncome || 0;
     return state.owned.reduce((sum, index) => {
       const territory = state.states[index];
       return sum + Math.round(territory.pop / 1500 * (territory.prosperity / 100));
@@ -91,6 +94,7 @@
   }
 
   function balance() {
+    if (onlineGame) return state.governmentFinance?.monthlyBalance || 0;
     return cityIncome() + ownedIncome() - Object.keys(state.buildings).length * 2;
   }
 
@@ -136,7 +140,7 @@
     $('ledger-treasury').textContent = onlineGame ? money(state.treasury) : '—';
     $('ledger-territory').textContent = onlineGame ? money(ownedIncome()) : '—';
     $('ledger-city').textContent = onlineGame ? money(cityIncome()) : '—';
-    $('ledger-cost').textContent = onlineGame ? '−' + money(Object.keys(state.buildings).length * 2) : '—';
+    $('ledger-cost').textContent = onlineGame ? '−' + money(state.governmentFinance?.upkeep || 0) : '—';
     $('ledger-balance').textContent = onlineGame
       ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
       : '—';
@@ -556,10 +560,13 @@
       showMessage('Your player record is not in this world. Rejoin using a valid invitation.', true);
       return;
     }
+    const governmentIndex = player.countryIndex ?? membershipsFor(player)[0]?.stateIndex;
+    const governmentFinance = game.territories.find(territory => territory.index === governmentIndex) || null;
     state = {
       ...state,
-      treasury: player.treasury,
-      selected: membershipsFor(player)[0]?.stateIndex ?? player.countryIndex ?? state.selected,
+      treasury: governmentFinance?.treasury ?? player.treasury,
+      governmentFinance,
+      selected: governmentIndex ?? player.countryIndex ?? state.selected,
       owned: game.territories.filter(territory => territory.ownerPlayerId === player.id)
         .map(territory => territory.index),
       states: game.territories.map(territory => ({

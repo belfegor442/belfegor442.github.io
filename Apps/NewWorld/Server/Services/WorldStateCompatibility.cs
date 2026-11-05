@@ -77,6 +77,43 @@ public static class WorldStateCompatibility
                 !activePlayerStates.Add((membership.PlayerId, membership.StateId)))
                 throw new InvalidDataException("The saved world contains an invalid government membership.");
         }
+
+        if (game.Players.Any(player =>
+                player.Treasury < 0 || player.DailyBalanceRemainder is < 0 or >= 30))
+            throw new InvalidDataException("The saved world contains invalid legacy player finances.");
+
+        if (game.EconomyVersion < 1)
+        {
+            foreach (var player in game.Players)
+            {
+                var activeMemberships = game.Memberships.Where(membership =>
+                    membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active).ToList();
+                if (activeMemberships.Count == 0)
+                    continue;
+
+                var membership = activeMemberships.FirstOrDefault(item =>
+                    game.Territories.Single(territory => territory.StateId == item.StateId).Index ==
+                    player.LegacyCountryIndex) ?? activeMemberships[0];
+                var government = game.Territories.Single(territory => territory.StateId == membership.StateId);
+                var accumulatedRemainder =
+                    (long)government.DailyBalanceRemainder + player.DailyBalanceRemainder;
+                var treasuryIncrease = (long)player.Treasury + accumulatedRemainder / 30;
+                if (government.Treasury > int.MaxValue - treasuryIncrease)
+                    throw new InvalidDataException("The saved world exceeds the supported state treasury limit.");
+
+                government.Treasury += (int)treasuryIncrease;
+                government.DailyBalanceRemainder = (int)(accumulatedRemainder % 30);
+                player.Treasury = 0;
+                player.DailyBalanceRemainder = 0;
+            }
+            game.EconomyVersion = 1;
+        }
+
+        foreach (var territory in game.Territories)
+        {
+            if (territory.Treasury < 0 || territory.DailyBalanceRemainder is < 0 or >= 30)
+                throw new InvalidDataException("The saved world contains invalid state finances.");
+        }
     }
 
     public static Guid CreateStableId(string value)

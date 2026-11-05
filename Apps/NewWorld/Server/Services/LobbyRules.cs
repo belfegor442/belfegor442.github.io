@@ -49,6 +49,15 @@ public static class GovernmentMembershipRules
             var territory = game.Territories.Single(item => item.Index == assignedIndex);
             if (!activeMemberships.Any(membership => membership.StateId == territory.StateId))
             {
+                var accumulatedRemainder = (long)territory.DailyBalanceRemainder + player.DailyBalanceRemainder;
+                var treasuryIncrease = (long)player.Treasury + accumulatedRemainder / 30;
+                if (territory.Treasury > int.MaxValue - treasuryIncrease)
+                    return "The state treasury has reached its limit.";
+
+                territory.Treasury += (int)treasuryIncrease;
+                territory.DailyBalanceRemainder = (int)(accumulatedRemainder % 30);
+                player.Treasury = 0;
+                player.DailyBalanceRemainder = 0;
                 territory.OwnerPlayerId ??= player.Id;
                 game.Memberships.Add(new GovernmentMembership
                 {
