@@ -166,8 +166,16 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
 
         if (rejection is null)
-            rejection = mutation(game, player);
-        game.WorldVersion++;
+        {
+            var result = GameOrderRules.ApplyMutationAtomically(game, player.Id, mutation);
+            rejection = result.Rejection;
+            if (rejection is null)
+            {
+                game = result.Game;
+                player = result.Player;
+                game.WorldVersion++;
+            }
+        }
 
         var order = new GameOrder(
             game.Id,

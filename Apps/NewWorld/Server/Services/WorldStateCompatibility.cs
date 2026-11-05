@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using NewWorld.Server.Models;
 
 namespace NewWorld.Server.Services;
@@ -7,6 +9,19 @@ namespace NewWorld.Server.Services;
 public static class WorldStateCompatibility
 {
     private static readonly DateOnly ScenarioStartDate = new(1500, 1, 1);
+    private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
+
+    public static WorldState Clone(WorldState game)
+    {
+        var clone = JsonSerializer.Deserialize<WorldState>(
+            JsonSerializer.Serialize(game, CloneOptions), CloneOptions)
+            ?? throw new InvalidDataException("The saved world could not be cloned.");
+        Normalize(clone);
+        return clone;
+    }
 
     public static void Normalize(WorldState game)
     {

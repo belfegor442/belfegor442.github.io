@@ -4,6 +4,20 @@ namespace NewWorld.Server.Services;
 
 public static class GameOrderRules
 {
+    public static (WorldState Game, PlayerState Player, OrderRejection? Rejection) ApplyMutationAtomically(
+        WorldState game,
+        Guid playerId,
+        Func<WorldState, PlayerState, OrderRejection?> mutation)
+    {
+        var candidate = WorldStateCompatibility.Clone(game);
+        var candidatePlayer = candidate.Players.SingleOrDefault(player => player.Id == playerId)
+            ?? throw new InvalidDataException("The order actor is missing from the cloned world.");
+        var rejection = mutation(candidate, candidatePlayer);
+        return rejection is null
+            ? (candidate, candidatePlayer, null)
+            : (game, game.Players.Single(player => player.Id == playerId), rejection);
+    }
+
     public static OrderRejection? CheckWorldAvailability(WorldState game, GameOrderType orderType)
     {
         if (!game.Started)

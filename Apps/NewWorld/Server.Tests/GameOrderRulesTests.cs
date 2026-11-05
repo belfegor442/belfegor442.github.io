@@ -5,6 +5,55 @@ namespace NewWorld.Server.Tests;
 
 public sealed class GameOrderRulesTests
 {
+    [Fact]
+    public void RejectedMutationCannotPartiallyChangeThePersistedWorld()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var state = new TerritoryState { StateId = Guid.NewGuid(), Treasury = 900 };
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            Players = [player],
+            Territories = [state]
+        };
+
+        var result = GameOrderRules.ApplyMutationAtomically(game, player.Id, (candidate, _) =>
+        {
+            candidate.Territories[0].Treasury -= 450;
+            candidate.Activity.Add("partially applied");
+            return new OrderRejection("CONFLICT", "The order cannot be applied.");
+        });
+
+        Assert.Same(game, result.Game);
+        Assert.Equal(900, game.Territories[0].Treasury);
+        Assert.Empty(game.Activity);
+        Assert.Equal("CONFLICT", result.Rejection?.Code);
+    }
+
+    [Fact]
+    public void AcceptedMutationReturnsAnIsolatedWorldCopy()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var state = new TerritoryState { StateId = Guid.NewGuid(), Treasury = 900 };
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            Players = [player],
+            Territories = [state]
+        };
+
+        var result = GameOrderRules.ApplyMutationAtomically(game, player.Id, (candidate, _) =>
+        {
+            candidate.Territories[0].Treasury -= 450;
+            return null;
+        });
+
+        Assert.Null(result.Rejection);
+        Assert.NotSame(game, result.Game);
+        Assert.Equal(900, game.Territories[0].Treasury);
+        Assert.Equal(450, result.Game.Territories[0].Treasury);
+    }
+
     [Theory]
     [InlineData(GameOrderType.ConstructBuilding, GameStatus.Paused, "WORLD_NOT_RUNNING")]
     [InlineData(GameOrderType.ConstructBuilding, GameStatus.Closed, "WORLD_NOT_RUNNING")]
