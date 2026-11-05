@@ -912,6 +912,12 @@ public static class WorldStateCompatibility
                 settlement.WorldDate > game.WorldDate ||
                 settlement.Demand < 0 ||
                 settlement.PopulationDemand < 0 ||
+                settlement.PopulationDemand > settlement.Demand ||
+                settlement.PopulationQuantitySold < 0 ||
+                settlement.PopulationQuantitySold > settlement.PopulationDemand ||
+                settlement.PopulationUnmetDemand < 0 ||
+                settlement.PopulationUnmetDemand !=
+                settlement.PopulationDemand - settlement.PopulationQuantitySold ||
                 settlement.DomesticSupply < 0 ||
                 settlement.ImportedSupply < 0 ||
                 settlement.QuantitySold < 0 ||

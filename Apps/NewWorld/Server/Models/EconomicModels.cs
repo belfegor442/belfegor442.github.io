@@ -136,7 +136,9 @@ public sealed record MarketSettlement(
     long PriceAfter,
     long ConsumerBudget,
     long ConsumerSpending,
-    long PopulationDemand = 0);
+    long PopulationDemand = 0,
+    long PopulationQuantitySold = 0,
+    long PopulationUnmetDemand = 0);
 
 public sealed record EconomyScenarioRequest(
     long ExpectedWorldVersion,

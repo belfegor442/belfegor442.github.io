@@ -278,6 +278,8 @@
           ' · Price bounds: ' + money(market.minimumPrice) + '–' + money(market.maximumPrice) +
           (latest
             ? ' · Population demand: ' + latest.populationDemand + ' ' + unit +
+              ' · population need met: ' + latest.populationQuantitySold +
+              ', unmet: ' + latest.populationUnmetDemand +
               ' · Last clearing ' + formatWorldDate(latest.worldDate) + ': ' +
               latest.quantitySold + ' sold, ' + latest.unmetDemand + ' unmet; ' +
               latest.domesticSupply + ' domestic / ' + latest.importedSupply + ' imported'

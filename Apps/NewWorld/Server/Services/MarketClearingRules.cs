@@ -106,6 +106,8 @@ public static class MarketClearingRules
                 BigInteger.Min(totalSupply, affordableDemand));
             var allocations = Allocate(offers, quantitySold);
             var spending = checked(quantitySold * priceAfter);
+            var populationQuantitySold = (long)CalculateProportionalShare(
+                quantitySold, groupDemand, demand);
             foreach (var (offer, quantity) in allocations)
             {
                 if (quantity == 0)
@@ -157,7 +159,9 @@ public static class MarketClearingRules
                 priceAfter,
                 market.DailyConsumerBudget,
                 spending,
-                (long)groupDemand);
+                (long)groupDemand,
+                populationQuantitySold,
+                (long)groupDemand - populationQuantitySold);
             settlements.Add(settlement);
         }
 
@@ -386,6 +390,19 @@ public static class MarketClearingRules
             change = difference > 0 ? BigInteger.One : BigInteger.MinusOne;
         var next = currentPrice + change;
         return (long)BigInteger.Clamp(next, market.MinimumPrice, market.MaximumPrice);
+    }
+
+    private static BigInteger CalculateProportionalShare(
+        long quantitySold, BigInteger populationDemand, long totalDemand)
+    {
+        if (quantitySold == 0 || populationDemand == 0 || totalDemand == 0)
+            return BigInteger.Zero;
+
+        var numerator = (BigInteger)quantitySold * populationDemand;
+        var share = BigInteger.DivRem(numerator, totalDemand, out var remainder);
+        if (remainder * 2 >= totalDemand)
+            share++;
+        return BigInteger.Min(share, populationDemand);
     }
 
     private static long CappedSum(IEnumerable<long> values)

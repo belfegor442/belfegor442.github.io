@@ -445,6 +445,8 @@ public sealed class MarketClearingRulesTests
 
         Assert.Null(firstDay.Error);
         Assert.Equal(1, firstSettlement.PopulationDemand);
+        Assert.Equal(1, firstSettlement.PopulationQuantitySold);
+        Assert.Equal(0, firstSettlement.PopulationUnmetDemand);
         Assert.Equal(2, firstSettlement.Demand);
         Assert.Equal(2, firstSettlement.QuantitySold);
         Assert.Equal(500, game.PopulationGroups[0].DailyDemandRemainders["flour"]);
@@ -455,6 +457,8 @@ public sealed class MarketClearingRulesTests
 
         Assert.Null(secondDay.Error);
         Assert.Equal(2, secondSettlement.PopulationDemand);
+        Assert.Equal(2, secondSettlement.PopulationQuantitySold);
+        Assert.Equal(0, secondSettlement.PopulationUnmetDemand);
         Assert.Equal(3, secondSettlement.Demand);
         Assert.Equal(3, secondSettlement.QuantitySold);
         Assert.Equal(0, game.PopulationGroups[0].DailyDemandRemainders["flour"]);
@@ -462,6 +466,40 @@ public sealed class MarketClearingRulesTests
         var snapshot = GameHub.BuildSnapshot(game, new HashSet<Guid>());
         Assert.Equal(500, Assert.Single(snapshot.PopulationGroups).Population);
         Assert.Equal(2, snapshot.MarketHistory.Count);
+    }
+
+    [Fact]
+    public void PopulationSettlementRecordsUnmetNeedWhenSupplyIsInsufficient()
+    {
+        var (game, company, market) = CreateMarketWorld();
+        company.Inventory["flour"] = 1;
+        market.DailyConsumerBudget = 100;
+        game.PopulationGroups.Add(new PopulationGroup
+        {
+            Id = Guid.NewGuid(),
+            StateId = market.StateId,
+            Name = "Households",
+            Population = 1000,
+            Needs =
+            [
+                new PopulationNeed
+                {
+                    GoodId = "flour",
+                    DailyQuantityPerThousandPeople = 3
+                }
+            ]
+        });
+        WorldStateCompatibility.Normalize(game);
+
+        var result = MarketClearingRules.ClearDailyMarkets(game);
+        var settlement = Assert.Single(result.Settlements);
+
+        Assert.Null(result.Error);
+        Assert.Equal(3, settlement.PopulationDemand);
+        Assert.Equal(1, settlement.PopulationQuantitySold);
+        Assert.Equal(2, settlement.PopulationUnmetDemand);
+        Assert.Equal(2, settlement.UnmetDemand);
+        WorldStateCompatibility.Normalize(game);
     }
 
     [Fact]
