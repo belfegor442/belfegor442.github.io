@@ -18,6 +18,69 @@ public static class GameOrderRules
             : (game, game.Players.Single(player => player.Id == playerId), rejection);
     }
 
+    public static GameOrderResult RecordOutcome(
+        WorldState game,
+        PlayerState player,
+        Guid orderId,
+        Guid? stateId,
+        GameOrderType orderType,
+        GameOrderPayload payload,
+        long expectedWorldVersion,
+        DateOnly? targetWorldDate,
+        OrderRejection? rejection,
+        DateTimeOffset submittedAtUtc)
+    {
+        if (rejection is null)
+            game.WorldVersion++;
+
+        var permissionSetId = stateId is Guid selectedStateId
+            ? game.Memberships.FirstOrDefault(membership =>
+                membership.PlayerId == player.Id &&
+                membership.StateId == selectedStateId &&
+                membership.Status == MembershipStatus.Active)?.PermissionSetId
+            : null;
+        var order = new GameOrder(
+            game.Id,
+            orderId,
+            player.Id,
+            stateId,
+            orderType,
+            rejection is null ? GameOrderStatus.Executed : GameOrderStatus.Rejected,
+            payload,
+            expectedWorldVersion,
+            submittedAtUtc,
+            game.WorldDate,
+            rejection?.Code,
+            rejection?.Message,
+            game.WorldVersion,
+            permissionSetId,
+            targetWorldDate ?? game.WorldDate);
+        game.Orders.Add(order);
+        GameStore.AddActivity(game, rejection is null
+            ? $"{player.Name} submitted {orderType} (order {orderId:N})."
+            : $"{player.Name}'s {orderType} order was rejected ({rejection.Code}): {rejection.Message}");
+
+        var eventStateId = stateId is Guid requestedStateId &&
+                           game.Territories.Any(territory => territory.StateId == requestedStateId)
+            ? requestedStateId
+            : (Guid?)null;
+        game.Events.Add(new WorldEvent(
+            Guid.NewGuid(),
+            game.Id,
+            orderId,
+            player.Id,
+            eventStateId,
+            rejection is null ? "order.executed" : "order.rejected",
+            rejection?.Code,
+            submittedAtUtc,
+            game.WorldDate,
+            game.WorldVersion,
+            rejection is null ? $"Executed {orderType}." : rejection.Message));
+
+        return new GameOrderResult(
+            orderId, rejection is null, rejection?.Code, rejection?.Message, false);
+    }
+
     public static OrderRejection? CheckWorldAvailability(WorldState game, GameOrderType orderType)
     {
         if (!game.Started)
@@ -60,9 +123,19 @@ public static class GameOrderRules
             : new OrderRejection(
                 "STALE_WORLD_VERSION", "The world changed. Review the latest state and retry.");
 
+    public static OrderRejection? CheckTargetWorldDate(DateOnly? targetDate, DateOnly currentDate)
+    {
+        if (targetDate is not DateOnly requestedDate || requestedDate == currentDate)
+            return null;
+        if (requestedDate < currentDate)
+            return new OrderRejection("TARGET_DATE_IN_PAST", "The target world date has already passed.");
+        return new OrderRejection(
+            "SCHEDULED_ORDERS_UNSUPPORTED", "Orders cannot be scheduled for a future world date yet.");
+    }
+
     public static (GameOrderResult? Replay, string? Error) FindReplay(
         WorldState game, Guid playerId, Guid orderId, Guid? stateId,
-        GameOrderType type, GameOrderPayload payload, long expectedWorldVersion)
+        GameOrderType type, GameOrderPayload payload, long expectedWorldVersion, DateOnly? targetWorldDate = null)
     {
         var previousOrder = game.Orders.FirstOrDefault(order => order.Id == orderId);
         if (previousOrder is null)
@@ -71,7 +144,9 @@ public static class GameOrderRules
             previousOrder.Type != type ||
             previousOrder.StateId != stateId ||
             previousOrder.Payload != payload ||
-            previousOrder.ExpectedWorldVersion != expectedWorldVersion)
+            previousOrder.ExpectedWorldVersion != expectedWorldVersion ||
+            (previousOrder.TargetWorldDate ?? previousOrder.SubmittedOnWorldDate) !=
+            (targetWorldDate ?? previousOrder.SubmittedOnWorldDate))
             return (null, "This order ID was already used for a different request.");
         return (new GameOrderResult(
             previousOrder.Id, previousOrder.Status == GameOrderStatus.Executed,

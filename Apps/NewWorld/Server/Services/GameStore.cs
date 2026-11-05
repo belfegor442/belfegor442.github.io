@@ -129,6 +129,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             Guid? stateId,
             GameOrderType orderType,
             GameOrderPayload payload,
+            DateOnly? targetWorldDate,
             long expectedWorldVersion,
             Func<WorldState, PlayerState, OrderRejection?> mutation,
             CancellationToken cancellationToken)
@@ -143,7 +144,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             return (null, null, null, "Invalid player token.");
 
         var (replay, replayError) = GameOrderRules.FindReplay(
-            game, player.Id, orderId, stateId, orderType, payload, expectedWorldVersion);
+            game, player.Id, orderId, stateId, orderType, payload, expectedWorldVersion, targetWorldDate);
         if (replayError is not null)
         {
             var auditStateId = stateId is Guid requestedStateId &&
@@ -179,6 +180,8 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             rejection = GameOrderRules.CheckMembership(game, player.Id, stateId);
         if (rejection is null)
             rejection = GameOrderRules.CheckWorldVersion(expectedWorldVersion, game.WorldVersion);
+        if (rejection is null)
+            rejection = GameOrderRules.CheckTargetWorldDate(targetWorldDate, game.WorldDate);
 
         if (rejection is null)
         {
@@ -188,54 +191,16 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             {
                 game = result.Game;
                 player = result.Player;
-                game.WorldVersion++;
             }
         }
 
-        var order = new GameOrder(
-            game.Id,
-            orderId,
-            player.Id,
-            stateId,
-            orderType,
-            rejection is null ? GameOrderStatus.Executed : GameOrderStatus.Rejected,
-            payload,
-            expectedWorldVersion,
-            DateTimeOffset.UtcNow,
-            game.WorldDate,
-            rejection?.Code,
-            rejection?.Message,
-            game.WorldVersion,
-            stateId is Guid authorizedStateId
-                ? game.Memberships.FirstOrDefault(membership =>
-                    membership.PlayerId == player.Id &&
-                    membership.StateId == authorizedStateId &&
-                    membership.Status == MembershipStatus.Active)?.PermissionSetId
-                : null);
-        game.Orders.Add(order);
-        AddActivity(game, rejection is null
-            ? $"{player.Name} submitted {orderType} (order {orderId:N})."
-            : $"{player.Name}'s {orderType} order was rejected ({rejection.Code}): {rejection.Message}");
-        game.Events.Add(new WorldEvent(
-            Guid.NewGuid(),
-            game.Id,
-            orderId,
-            player.Id,
-            stateId is Guid eventStateId &&
-            game.Territories.Any(territory => territory.StateId == eventStateId)
-                ? eventStateId
-                : null,
-            rejection is null ? "order.executed" : "order.rejected",
-            rejection?.Code,
-            order.SubmittedAtUtc,
-            game.WorldDate,
-            game.WorldVersion,
-            rejection is null ? $"Executed {orderType}." : rejection.Message));
+        var orderResult = GameOrderRules.RecordOutcome(
+            game, player, orderId, stateId, orderType, payload,
+            expectedWorldVersion, targetWorldDate, rejection, DateTimeOffset.UtcNow);
 
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return (game, player, new GameOrderResult(
-            orderId, rejection is null, rejection?.Code, rejection?.Message, false), null);
+        return (game, player, orderResult, null);
     }
 
     private static GameOrderResult CreateRejectedOrderResult(

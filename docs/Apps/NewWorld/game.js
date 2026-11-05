@@ -725,6 +725,8 @@
       INVALID_PAYLOAD: 'The order contains invalid details.',
       INSUFFICIENT_FUNDS: 'The government treasury does not have enough funds.',
       TARGET_UNAVAILABLE: 'The selected target is no longer available.',
+      TARGET_DATE_IN_PAST: 'The requested world date has already passed.',
+      SCHEDULED_ORDERS_UNSUPPORTED: 'Future-dated orders are not available yet.',
       STALE_WORLD_VERSION: 'The world changed. Review the latest state before trying again.',
       PAUSE_STATE_CONFLICT: 'The world pause state changed before this vote was processed.',
       NOT_CONNECTED: 'Reconnect before voting on the world clock.',

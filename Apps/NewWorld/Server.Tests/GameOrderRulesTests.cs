@@ -54,6 +54,81 @@ public sealed class GameOrderRulesTests
         Assert.Equal(450, result.Game.Territories[0].Treasury);
     }
 
+    [Fact]
+    public void RejectedOrderIsAuditedWithoutAdvancingTheWorldVersion()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var state = new TerritoryState { StateId = Guid.NewGuid(), Treasury = 900 };
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 4,
+            WorldDate = new DateOnly(1500, 1, 1),
+            Players = [player],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = player.Id,
+                    StateId = state.StateId,
+                    PermissionSetId = GovernmentPermissionRules.MemberPermissionSetId
+                }
+            ],
+            Territories = [state]
+        };
+        var orderId = Guid.NewGuid();
+
+        var result = GameOrderRules.RecordOutcome(
+            game, player, orderId, state.StateId, GameOrderType.ConstructBuilding,
+            new GameOrderPayload(null, 1, "farm"), 4, null,
+            new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury."),
+            DateTimeOffset.UtcNow);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(4, game.WorldVersion);
+        Assert.Equal(900, game.Territories[0].Treasury);
+        Assert.Equal(4, Assert.Single(game.Orders).WorldVersion);
+        var worldEvent = Assert.Single(game.Events);
+        Assert.Equal(orderId, worldEvent.OrderId);
+        Assert.Equal("INSUFFICIENT_FUNDS", worldEvent.ResultCode);
+        Assert.Equal(4, worldEvent.WorldVersion);
+    }
+
+    [Fact]
+    public void AcceptedOrderAuditsTheResultAtTheNewWorldVersion()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var state = new TerritoryState { StateId = Guid.NewGuid(), Treasury = 900 };
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 4,
+            WorldDate = new DateOnly(1500, 1, 1),
+            Players = [player],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = player.Id,
+                    StateId = state.StateId,
+                    PermissionSetId = GovernmentPermissionRules.MemberPermissionSetId
+                }
+            ],
+            Territories = [state]
+        };
+
+        var result = GameOrderRules.RecordOutcome(
+            game, player, Guid.NewGuid(), state.StateId, GameOrderType.ConstructBuilding,
+            new GameOrderPayload(null, 1, "farm"), 4, null, null, DateTimeOffset.UtcNow);
+
+        Assert.True(result.Accepted);
+        Assert.Equal(5, game.WorldVersion);
+        var order = Assert.Single(game.Orders);
+        Assert.Equal(5, order.WorldVersion);
+        Assert.Equal(GovernmentPermissionRules.MemberPermissionSetId, order.PermissionSetId);
+        Assert.Equal(5, Assert.Single(game.Events).WorldVersion);
+    }
+
     [Theory]
     [InlineData(GameOrderType.ConstructBuilding, GameStatus.Paused, "WORLD_NOT_RUNNING")]
     [InlineData(GameOrderType.ConstructBuilding, GameStatus.Closed, "WORLD_NOT_RUNNING")]
@@ -137,6 +212,19 @@ public sealed class GameOrderRulesTests
     }
 
     [Fact]
+    public void OrdersCanTargetTheCurrentDateButCannotBeBackdatedOrScheduled()
+    {
+        var currentDate = new DateOnly(1500, 1, 1);
+
+        Assert.Null(GameOrderRules.CheckTargetWorldDate(null, currentDate));
+        Assert.Null(GameOrderRules.CheckTargetWorldDate(currentDate, currentDate));
+        Assert.Equal("TARGET_DATE_IN_PAST",
+            GameOrderRules.CheckTargetWorldDate(currentDate.AddDays(-1), currentDate)?.Code);
+        Assert.Equal("SCHEDULED_ORDERS_UNSUPPORTED",
+            GameOrderRules.CheckTargetWorldDate(currentDate.AddDays(1), currentDate)?.Code);
+    }
+
+    [Fact]
     public void RetryReturnsOriginalResultWithoutChangingTheOrder()
     {
         var playerId = Guid.NewGuid();
@@ -206,5 +294,30 @@ public sealed class GameOrderRulesTests
         Assert.Equal("This order ID was already used for a different request.",
             GameOrderRules.FindReplay(game, playerId, orderId, null, GameOrderType.EstablishAdministration,
                 new GameOrderPayload(2, null, null), 2).Error);
+    }
+
+    [Fact]
+    public void ReusingAnOrderIdWithDifferentTargetDateIsRejected()
+    {
+        var playerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var submittedDate = new DateOnly(1500, 1, 1);
+        var game = new WorldState
+        {
+            Orders =
+            [
+                new GameOrder(Guid.NewGuid(), orderId, playerId, null,
+                    GameOrderType.PauseWorld, GameOrderStatus.Rejected,
+                    new GameOrderPayload(null, null, null), 1,
+                    DateTimeOffset.UtcNow, submittedDate, "NOT_MEMBER", "No membership.", 1,
+                    TargetWorldDate: submittedDate)
+            ]
+        };
+
+        var (_, error) = GameOrderRules.FindReplay(
+            game, playerId, orderId, null, GameOrderType.PauseWorld,
+            new GameOrderPayload(null, null, null), 1, submittedDate.AddDays(1));
+
+        Assert.Equal("This order ID was already used for a different request.", error);
     }
 }

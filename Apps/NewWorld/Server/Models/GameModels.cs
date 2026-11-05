@@ -74,7 +74,8 @@ public sealed record GameOrder(
     string? ResultCode,
     string? Result,
     long WorldVersion,
-    string? PermissionSetId = null);
+    string? PermissionSetId = null,
+    DateOnly? TargetWorldDate = null);
 
 public sealed record WorldEvent(
     Guid Id,
@@ -166,7 +167,8 @@ public sealed record TerritoryView(
     int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
-    string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId);
+    string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId,
+    DateOnly? TargetWorldDate = null);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 

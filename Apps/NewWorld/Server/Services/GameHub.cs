@@ -232,7 +232,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var payload = new GameOrderPayload(
             message.TerritoryIndex, message.PlotIndex, message.BuildingId);
         var result = await store.ExecuteOrderAsync(
-            gameId, token, orderId, message.StateId, orderType, payload, expectedWorldVersion, (game, player) =>
+            gameId, token, orderId, message.StateId, orderType, payload,
+            message.TargetWorldDate, expectedWorldVersion, (game, player) =>
         {
             if (!game.Started)
                 return new OrderRejection("WORLD_NOT_STARTED", "The host must start the world before actions are allowed.");

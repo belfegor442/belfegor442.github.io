@@ -121,6 +121,8 @@ public static class WorldStateCompatibility
                     order.StateId is Guid executedStateId && !stateIds.Contains(executedStateId)) ||
                 (order.Status == GameOrderStatus.Executed &&
                     (order.ResultCode is not null || order.Result is not null)) ||
+                (order.Status == GameOrderStatus.Executed &&
+                    order.TargetWorldDate is DateOnly targetDate && targetDate != order.SubmittedOnWorldDate) ||
                 (order.Status == GameOrderStatus.Rejected &&
                     (string.IsNullOrWhiteSpace(order.ResultCode) || string.IsNullOrWhiteSpace(order.Result))) ||
                 order.WorldVersion < 1 ||
