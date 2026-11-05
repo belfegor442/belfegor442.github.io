@@ -31,6 +31,18 @@ public static class EconomyRules
                 var batches = facility.BatchesPerCycle;
                 foreach (var input in recipe.Inputs)
                     batches = (int)Math.Min(batches, projectedInventory[input.Key] / input.Value);
+                foreach (var output in recipe.Outputs)
+                {
+                    var good = game.Goods.Single(item => item.Id == output.Key);
+                    if (good.StorageCapacity is not long capacity)
+                        continue;
+
+                    var netOutputPerBatch = output.Value - recipe.Inputs.GetValueOrDefault(output.Key);
+                    if (netOutputPerBatch <= 0)
+                        continue;
+                    var availableCapacity = capacity - projectedInventory.GetValueOrDefault(output.Key);
+                    batches = (int)Math.Min(batches, Math.Max(0, availableCapacity) / netOutputPerBatch);
+                }
                 if (batches == 0)
                 {
                     progressChanges.Add(facility.Id, recipe.DaysPerBatch - 1);

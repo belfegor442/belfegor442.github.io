@@ -48,6 +48,50 @@ public sealed class EconomyRulesTests
     }
 
     [Fact]
+    public void ProductionRespectsConfiguredStorageCapacityWithoutConsumingInputs()
+    {
+        var (game, company, facility) = CreateProductionWorld(
+            daysPerBatch: 1,
+            batchesPerCycle: 5,
+            inputStock: 9);
+        game.Goods.Single(good => good.Id == "flour").StorageCapacity = 3;
+
+        var firstDay = EconomyRules.AdvanceDailyProduction(game);
+
+        Assert.Null(firstDay.Error);
+        Assert.Equal(1, Assert.Single(firstDay.Results).Batches);
+        Assert.Equal(6L, company.Inventory["grain"]);
+        Assert.Equal(2L, company.Inventory["flour"]);
+
+        var blockedDay = EconomyRules.AdvanceDailyProduction(game);
+
+        Assert.Null(blockedDay.Error);
+        Assert.Empty(blockedDay.Results);
+        Assert.Equal(6L, company.Inventory["grain"]);
+        Assert.Equal(2L, company.Inventory["flour"]);
+        Assert.Equal(0, facility.ProgressDays);
+    }
+
+    [Fact]
+    public void NormalizeRejectsGoodsWithInvalidOrExceededStorageCapacity()
+    {
+        var (game, company, _) = CreateProductionWorld(
+            daysPerBatch: 1,
+            batchesPerCycle: 1,
+            inputStock: 3);
+        game.Goods.Single(good => good.Id == "grain").StorageCapacity = 0;
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+
+        game.Goods.Single(good => good.Id == "grain").StorageCapacity = 2;
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+
+        game.Goods.Single(good => good.Id == "grain").StorageCapacity = 3;
+        WorldStateCompatibility.Normalize(game);
+        Assert.Equal(3L, company.Inventory["grain"]);
+    }
+
+    [Fact]
     public void FacilityDoesNotAdvanceWhenRequiredInputsAreUnavailable()
     {
         var (game, company, facility) = CreateProductionWorld(

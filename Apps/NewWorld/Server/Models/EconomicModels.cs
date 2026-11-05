@@ -47,6 +47,7 @@ public sealed class EconomicGood
     public string Name { get; set; } = "";
     public string Unit { get; set; } = "";
     public EconomicGoodCategory Category { get; set; }
+    public long? StorageCapacity { get; set; }
 }
 
 public sealed class ProductionRecipe

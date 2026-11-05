@@ -229,7 +229,10 @@
     for (const company of companies) {
       const inventory = Object.entries(company.inventory || {}).map(([goodId, quantity]) => {
         const good = onlineGame.goods?.find(item => item.id === goodId);
-        return quantity + ' ' + (good?.unit || goodId) + ' ' + (good?.name || '');
+        const capacity = good?.storageCapacity
+          ? ' / ' + good.storageCapacity + ' ' + good.unit + ' capacity'
+          : '';
+        return quantity + capacity + ' ' + (good?.unit || goodId) + ' ' + (good?.name || '');
       });
       const facilities = (company.facilities || []).map(facility =>
         facility.recipeName + ' · ' + facility.progressDays + '/' + facility.daysPerBatch + ' day(s)');

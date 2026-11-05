@@ -121,6 +121,7 @@ public static class WorldStateCompatibility
                 string.IsNullOrWhiteSpace(good.Name) ||
                 string.IsNullOrWhiteSpace(good.Unit) ||
                 !Enum.IsDefined(good.Category) ||
+                good.StorageCapacity is <= 0 ||
                 !goodIds.Add(good.Id))
                 throw new InvalidDataException("The saved world contains an invalid economic good.");
         }
@@ -153,7 +154,11 @@ public static class WorldStateCompatibility
                 string.IsNullOrWhiteSpace(company.Name) ||
                 string.IsNullOrWhiteSpace(company.Sector) ||
                 !companyIds.Add(company.Id) ||
-                company.Inventory.Any(stock => !goodIds.Contains(stock.Key) || stock.Value < 0))
+                company.Inventory.Any(stock =>
+                    !goodIds.Contains(stock.Key) ||
+                    stock.Value < 0 ||
+                    game.Goods.Single(item => item.Id == stock.Key).StorageCapacity is long capacity &&
+                    stock.Value > capacity))
                 throw new InvalidDataException("The saved world contains an invalid economic company.");
 
             foreach (var facility in company.Facilities)
