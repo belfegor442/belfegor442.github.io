@@ -235,7 +235,26 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     system.Laws,
                     system.Decisions,
                     PoliticalProcedureRules.CalculateStability(system));
-            }).ToList());
+            }).ToList(),
+            game.Goods,
+            game.ProductionRecipes,
+            game.Companies.Select(company => new EconomicCompanyView(
+                company.Id,
+                company.StateId,
+                company.Name,
+                company.Sector,
+                company.Inventory,
+                company.Facilities.Select(facility =>
+                {
+                    var recipe = game.ProductionRecipes.Single(item => item.Id == facility.RecipeId);
+                    return new ProductionFacilityView(
+                        facility.Id,
+                        facility.RecipeId,
+                        recipe.Name,
+                        facility.BatchesPerCycle,
+                        facility.ProgressDays,
+                        recipe.DaysPerBatch);
+                }).ToList())).ToList());
     }
 
     private async Task HandleMessageAsync(

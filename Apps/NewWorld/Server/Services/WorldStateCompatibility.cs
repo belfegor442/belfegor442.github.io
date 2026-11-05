@@ -29,6 +29,9 @@ public static class WorldStateCompatibility
         game.Memberships ??= [];
         game.Territories ??= [];
         game.PoliticalSystems ??= [];
+        game.Goods ??= [];
+        game.ProductionRecipes ??= [];
+        game.Companies ??= [];
         game.Orders ??= [];
         game.Events ??= [];
         game.Activity ??= [];
@@ -70,6 +73,62 @@ public static class WorldStateCompatibility
 
         var stateIds = game.Territories.Select(territory => territory.StateId).ToHashSet();
         var playerIds = game.Players.Select(player => player.Id).ToHashSet();
+        var goodIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var good in game.Goods)
+        {
+            if (string.IsNullOrWhiteSpace(good.Id) ||
+                string.IsNullOrWhiteSpace(good.Name) ||
+                string.IsNullOrWhiteSpace(good.Unit) ||
+                !Enum.IsDefined(good.Category) ||
+                !goodIds.Add(good.Id))
+                throw new InvalidDataException("The saved world contains an invalid economic good.");
+        }
+
+        var recipeIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var recipe in game.ProductionRecipes)
+        {
+            recipe.Inputs ??= new Dictionary<string, long>(StringComparer.Ordinal);
+            recipe.Outputs ??= new Dictionary<string, long>(StringComparer.Ordinal);
+            if (string.IsNullOrWhiteSpace(recipe.Id) ||
+                string.IsNullOrWhiteSpace(recipe.Name) ||
+                recipe.DaysPerBatch < 1 ||
+                recipe.Outputs.Count == 0 ||
+                !recipeIds.Add(recipe.Id) ||
+                recipe.Inputs.Any(input =>
+                    !goodIds.Contains(input.Key) || input.Value <= 0) ||
+                recipe.Outputs.Any(output =>
+                    !goodIds.Contains(output.Key) || output.Value <= 0))
+                throw new InvalidDataException("The saved world contains an invalid production recipe.");
+        }
+
+        var companyIds = new HashSet<Guid>();
+        var facilityIds = new HashSet<Guid>();
+        foreach (var company in game.Companies)
+        {
+            company.Inventory ??= new Dictionary<string, long>(StringComparer.Ordinal);
+            company.Facilities ??= [];
+            if (company.Id == Guid.Empty ||
+                !stateIds.Contains(company.StateId) ||
+                string.IsNullOrWhiteSpace(company.Name) ||
+                string.IsNullOrWhiteSpace(company.Sector) ||
+                !companyIds.Add(company.Id) ||
+                company.Inventory.Any(stock => !goodIds.Contains(stock.Key) || stock.Value < 0))
+                throw new InvalidDataException("The saved world contains an invalid economic company.");
+
+            foreach (var facility in company.Facilities)
+            {
+                var recipe = game.ProductionRecipes.SingleOrDefault(item =>
+                    item.Id == facility.RecipeId);
+                if (facility.Id == Guid.Empty ||
+                    !facilityIds.Add(facility.Id) ||
+                    recipe is null ||
+                    facility.BatchesPerCycle < 1 ||
+                    facility.ProgressDays < 0 ||
+                    facility.ProgressDays >= recipe.DaysPerBatch)
+                    throw new InvalidDataException("The saved world contains an invalid production facility.");
+            }
+        }
+
         foreach (var territory in game.Territories)
         {
             if (game.PoliticalSystems.All(system => system.StateId != territory.StateId))

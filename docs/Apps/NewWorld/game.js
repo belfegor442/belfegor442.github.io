@@ -205,8 +205,39 @@
     renderCity();
     renderOptions();
     renderMultiplayer();
+    renderEconomy();
     renderGovernment();
     if (state.selected !== null) selectState(state.selected, false);
+  }
+
+  function renderEconomy() {
+    const list = $('company-list');
+    list.replaceChildren();
+    if (!onlineGame) {
+      addPoliticalRow(list, 'No production data', 'Connect to a multiplayer world to load server-authoritative inventories.');
+      return;
+    }
+
+    const territory = onlineGame.territories.find(item => item.index === state.selected);
+    const companies = onlineGame.companies?.filter(company => company.stateId === territory?.stateId) || [];
+    if (!companies.length) {
+      addPoliticalRow(list, 'No companies configured', 'This State has no configured production facilities.');
+      return;
+    }
+
+    for (const company of companies) {
+      const inventory = Object.entries(company.inventory || {}).map(([goodId, quantity]) => {
+        const good = onlineGame.goods?.find(item => item.id === goodId);
+        return quantity + ' ' + (good?.unit || goodId) + ' ' + (good?.name || '');
+      });
+      const facilities = (company.facilities || []).map(facility =>
+        facility.recipeName + ' · ' + facility.progressDays + '/' + facility.daysPerBatch + ' day(s)');
+      addPoliticalRow(
+        list,
+        company.name + ' · ' + company.sector,
+        'Inventory: ' + (inventory.join(', ') || 'empty') +
+        ' · Production: ' + (facilities.join(', ') || 'no active facilities'));
+    }
   }
 
   function addPoliticalRow(container, title, detail) {

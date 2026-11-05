@@ -25,6 +25,9 @@ public sealed class WorldState
     public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
     public List<StatePoliticalSystem> PoliticalSystems { get; set; } = [];
+    public List<EconomicGood> Goods { get; set; } = [];
+    public List<ProductionRecipe> ProductionRecipes { get; set; } = [];
+    public List<EconomicCompany> Companies { get; set; } = [];
     public List<GameOrder> Orders { get; set; } = [];
     public List<WorldEvent> Events { get; set; } = [];
     public List<string> Activity { get; set; } = [];
@@ -178,7 +181,10 @@ public sealed record GameSnapshot(
     IReadOnlyList<GovernmentMembershipView> Memberships,
     long EventSequence,
     IReadOnlyList<WorldEvent> Events,
-    IReadOnlyList<PoliticalStateView> PoliticalSystems);
+    IReadOnlyList<PoliticalStateView> PoliticalSystems,
+    IReadOnlyList<EconomicGood> Goods,
+    IReadOnlyList<ProductionRecipe> ProductionRecipes,
+    IReadOnlyList<EconomicCompanyView> Companies);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
     IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected,

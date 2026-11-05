@@ -62,6 +62,25 @@ public sealed class WorldClock(
                             var balance = SimulationRules.CalculateGovernmentBalance(game, government);
                             SimulationRules.AccrueDailyBalance(government, balance.MonthlyBalance);
                         }
+                        var (productionResults, productionError) =
+                            EconomyRules.AdvanceDailyProduction(game);
+                        if (productionError is not null)
+                            return productionError;
+                        foreach (var result in productionResults)
+                        {
+                            var company = game.Companies.Single(item => item.Id == result.CompanyId);
+                            var outputs = result.OutputsProduced.Select(output =>
+                            {
+                                var good = game.Goods.Single(item => item.Id == output.Key);
+                                return $"{output.Value} {good.Unit} {good.Name}";
+                            });
+                            var productionDescription =
+                                $"{company.Name} completed {result.Batches} batch(es): {string.Join(", ", outputs)}.";
+                            GameStore.AddActivity(game, productionDescription);
+                            GameStore.AddWorldEvent(
+                                game, "economy.production_completed", null, company.StateId, null,
+                                productionDescription, worldVersion: game.WorldVersion + 1);
+                        }
                         if (game.WorldDate.Month == 1 && game.WorldDate.Day == 1)
                         {
                             foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))
