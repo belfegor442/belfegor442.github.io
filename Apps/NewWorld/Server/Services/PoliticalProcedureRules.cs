@@ -165,6 +165,69 @@ public static class PoliticalProcedureRules
         return null;
     }
 
+    public static OrderRejection? ApproveBudget(
+        WorldState game,
+        PlayerState actor,
+        Guid orderId,
+        Guid? stateId,
+        int? proposedBudget)
+    {
+        if (stateId is not Guid selectedStateId ||
+            selectedStateId == Guid.Empty ||
+            proposedBudget is not int budget ||
+            budget < 0)
+            return new OrderRejection("INVALID_PAYLOAD", "A State and a non-negative budget amount are required.");
+
+        var (system, rule, error) =
+            FindRule(game, selectedStateId, PoliticalCompetence.ApproveBudget);
+        if (error is not null)
+            return error;
+        if (system!.Government is null)
+            return new OrderRejection(
+                "GOVERNMENT_NOT_CONFIGURED", "This State has no configured government budget.");
+
+        var membership = game.Memberships.FirstOrDefault(item =>
+            item.PlayerId == actor.Id &&
+            item.StateId == selectedStateId &&
+            item.Status == MembershipStatus.Active);
+        if (membership is null ||
+            !rule!.ProposerPermissionSetIds.Contains(membership.PermissionSetId))
+            return new OrderRejection(
+                "INSUFFICIENT_PERMISSION", "Your government permissions do not allow approving a budget.");
+        if (rule.ApprovalRequired && !HasEligibleVoters(game, selectedStateId, rule))
+            return new OrderRejection(
+                "NO_ELIGIBLE_VOTERS", "This procedure has no active members eligible to vote.");
+        if (system.Decisions.Any(decision => decision.Id == orderId) ||
+            system.Laws.Any(law => law.Id == orderId))
+            return new OrderRejection("DECISION_ID_CONFLICT", "This decision ID is already in use.");
+
+        var decision = new PoliticalDecision
+        {
+            Id = orderId,
+            StateId = selectedStateId,
+            Competence = PoliticalCompetence.ApproveBudget,
+            ProposerPlayerId = actor.Id,
+            InstitutionId = rule.InstitutionId,
+            ConstitutionVersion = system.Constitution!.Version,
+            Title = "Approve government budget",
+            Text = $"Set the government budget plan to {budget}.",
+            LegalBasis = rule.LegalBasis,
+            ProposedBudget = budget,
+            Status = rule.ApprovalRequired
+                ? PoliticalDecisionStatus.PendingApproval
+                : PoliticalDecisionStatus.Approved,
+            ProposedOnWorldDate = game.WorldDate,
+            ResolvedOnWorldDate = rule.ApprovalRequired ? null : game.WorldDate
+        };
+        system.Decisions.Add(decision);
+        if (!rule.ApprovalRequired)
+            system.Government.Budget = budget;
+
+        var outcome = rule.ApprovalRequired ? "proposed" : "approved";
+        GameStore.AddActivity(game, $"{actor.Name} {outcome} a government budget of {budget}.");
+        return null;
+    }
+
     public static OrderRejection? VoteOnDecision(
         WorldState game,
         PlayerState actor,
@@ -208,6 +271,9 @@ public static class PoliticalProcedureRules
                  item.Status == MembershipStatus.Active)))
             return new OrderRejection(
                 "APPOINTEE_NOT_MEMBER", "The proposed appointee is no longer an active member of this State government.");
+        if (decision.Competence == PoliticalCompetence.ApproveBudget && system.Government is null)
+            return new OrderRejection(
+                "GOVERNMENT_NOT_CONFIGURED", "This State has no configured government budget.");
 
         var membership = game.Memberships.FirstOrDefault(item =>
             item.PlayerId == actor.Id &&
@@ -259,6 +325,12 @@ public static class PoliticalProcedureRules
             else if (decision.Competence == PoliticalCompetence.AppointOffice)
             {
                 ApplyAppointment(game, system, decision);
+            }
+            else if (decision.Competence == PoliticalCompetence.ApproveBudget)
+            {
+                if (system.Government is null || decision.ProposedBudget is not int approvedBudget)
+                    throw new InvalidDataException("An approved budget decision has no configured government or amount.");
+                system.Government.Budget = approvedBudget;
             }
             else
             {

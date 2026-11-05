@@ -237,7 +237,9 @@
       $('government-status').textContent =
         'Connect to a multiplayer world to load authoritative constitutional data.';
       $('propose-law').disabled = true;
+      $('approve-budget').disabled = true;
       $('law-restriction').textContent = 'Law-making requires an explicitly configured Constitution and permitted government membership.';
+      $('budget-restriction').textContent = 'Budget changes require an explicitly configured constitutional competence.';
       addPoliticalRow(summary, 'No political data', 'No authoritative State political system is available.');
       return;
     }
@@ -265,6 +267,22 @@
     const membership = membershipsFor(player).find(item => item.stateId === system.stateId);
     const lawRule = constitution?.competenceRules
       ?.find(rule => rule.competence === 'proposeLaw');
+    const budgetRule = constitution?.competenceRules
+      ?.find(rule => rule.competence === 'approveBudget');
+    const canApproveBudget = onlineGame.status === 'running' &&
+      system.government &&
+      membership &&
+      budgetRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
+    const budgetInput = $('budget-amount');
+    if (system.government && document.activeElement !== budgetInput && !budgetInput.value)
+      budgetInput.value = String(system.government.budget);
+    $('approve-budget').disabled = !canApproveBudget;
+    $('budget-restriction').textContent = canApproveBudget
+      ? 'Authority: ' + budgetRule.legalBasis + (budgetRule.approvalRequired
+        ? '. The configured institution must approve this budget plan.'
+        : '. This configured procedure applies the budget plan directly.')
+      : 'Budget changes are unavailable: the government, constitutional competence, or permission is not configured.';
+
     const appointmentRule = constitution?.competenceRules
       ?.find(rule => rule.competence === 'appointOffice');
     const canAppointOffice = onlineGame.status === 'running' &&
@@ -928,6 +946,7 @@
       WORLD_NOT_RUNNING: 'This action is unavailable while the world is paused or closed.',
       NOT_MEMBER: 'You are not a member of the selected government.',
       INSUFFICIENT_PERMISSION: 'Your government permissions do not allow this action.',
+      GOVERNMENT_NOT_CONFIGURED: 'This State has no configured government budget.',
       NO_ELIGIBLE_VOTERS: 'No active member can vote under this constitutional procedure.',
       INVALID_PAYLOAD: 'The order contains invalid details.',
       INSUFFICIENT_FUNDS: 'The government treasury does not have enough funds.',
@@ -1125,6 +1144,21 @@
   $('pause-vote').addEventListener('click', () => {
     if (!onlineGame?.started) return;
     sendAction({type: onlineGame.paused ? 'resume' : 'pause'});
+  });
+  $('approve-budget').addEventListener('click', () => {
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    const input = $('budget-amount');
+    const amount = Number(input.value);
+    if (!territory || $('approve-budget').disabled) return;
+    if (!input.value || !input.checkValidity() || !Number.isSafeInteger(amount)) {
+      showMessage('Enter a non-negative whole-number budget amount.', true);
+      return;
+    }
+    sendAction({
+      type: 'approveBudget',
+      stateId: territory.stateId,
+      proposedBudget: amount
+    });
   });
   $('propose-law').addEventListener('click', () => {
     const territory = onlineGame?.territories.find(item => item.index === state.selected);

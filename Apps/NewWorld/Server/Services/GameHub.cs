@@ -254,7 +254,7 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var payload = new GameOrderPayload(
             message.TerritoryIndex, message.PlotIndex, message.BuildingId,
             message.DecisionId, message.DecisionTitle, message.DecisionText, message.VoteChoice,
-            message.OfficeId, message.AppointeePlayerId);
+            message.OfficeId, message.AppointeePlayerId, message.ProposedBudget);
         var result = await store.ExecuteOrderAsync(
             gameId, token, orderId, message.StateId, orderType, payload,
             message.TargetWorldDate, expectedWorldVersion, (game, player) =>
@@ -356,6 +356,10 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                     return PoliticalProcedureRules.AppointOffice(
                         game, player, orderId, message.StateId,
                         message.OfficeId, message.AppointeePlayerId);
+
+                case "approveBudget":
+                    return PoliticalProcedureRules.ApproveBudget(
+                        game, player, orderId, message.StateId, message.ProposedBudget);
 
                 case "voteDecision":
                     return PoliticalProcedureRules.VoteOnDecision(

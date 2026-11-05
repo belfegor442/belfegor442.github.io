@@ -109,7 +109,8 @@ public sealed record GameOrderPayload(
     string? DecisionText = null,
     PoliticalVoteChoice? VoteChoice = null,
     Guid? OfficeId = null,
-    Guid? AppointeePlayerId = null);
+    Guid? AppointeePlayerId = null,
+    int? ProposedBudget = null);
 
 public sealed record OrderRejection(string Code, string Message);
 public sealed record GameOrderResult(Guid Id, bool Accepted, string? Code, string? Error, bool Replayed);
@@ -193,7 +194,8 @@ public sealed record ClientMessage(
     DateOnly? TargetWorldDate = null, long? LastEventSequence = null,
     Guid? DecisionId = null, string? DecisionTitle = null, string? DecisionText = null,
     PoliticalVoteChoice? VoteChoice = null,
-    Guid? OfficeId = null, Guid? AppointeePlayerId = null);
+    Guid? OfficeId = null, Guid? AppointeePlayerId = null,
+    int? ProposedBudget = null);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
 

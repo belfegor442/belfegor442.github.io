@@ -265,6 +265,78 @@ public sealed class PoliticalProcedureRulesTests
         Assert.Equal("APPOINTEE_NOT_MEMBER", inactiveAppointee?.Code);
     }
 
+    [Fact]
+    public void BudgetIsAppliedOnlyWhenTheConfiguredApprovalProcedureCompletes()
+    {
+        var (game, proposer, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        var voter = AddEligibleVoters(game, stateId, 1).Single();
+        game.PoliticalSystems.Single().Government = new PoliticalGovernment
+        {
+            Id = Guid.NewGuid(),
+            Budget = 300
+        };
+        AddBudgetRule(game, approvalRequired: true, minimumVotes: 2);
+        var decisionId = Guid.NewGuid();
+
+        Assert.Null(PoliticalProcedureRules.ApproveBudget(
+            game, proposer, decisionId, stateId, 700));
+        Assert.Equal(300, game.PoliticalSystems.Single().Government!.Budget);
+        Assert.Null(PoliticalProcedureRules.VoteOnDecision(
+            game, proposer, stateId, decisionId, PoliticalVoteChoice.Approve));
+        Assert.Equal(300, game.PoliticalSystems.Single().Government!.Budget);
+        Assert.Null(PoliticalProcedureRules.VoteOnDecision(
+            game, voter, stateId, decisionId, PoliticalVoteChoice.Approve));
+
+        Assert.Equal(700, game.PoliticalSystems.Single().Government!.Budget);
+        Assert.Equal(PoliticalDecisionStatus.Approved,
+            game.PoliticalSystems.Single().Decisions.Single().Status);
+        Assert.Equal(700,
+            WorldStateCompatibility.Clone(game).PoliticalSystems.Single().Government!.Budget);
+    }
+
+    [Fact]
+    public void BudgetAppliesDirectlyWhenTheConstitutionDoesNotRequireApproval()
+    {
+        var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        game.PoliticalSystems.Single().Government = new PoliticalGovernment
+        {
+            Id = Guid.NewGuid(),
+            Budget = 300
+        };
+        AddBudgetRule(game, approvalRequired: false);
+
+        Assert.Null(PoliticalProcedureRules.ApproveBudget(
+            game, player, Guid.NewGuid(), stateId, 700));
+
+        Assert.Equal(700, game.PoliticalSystems.Single().Government!.Budget);
+        Assert.Equal(PoliticalDecisionStatus.Approved,
+            game.PoliticalSystems.Single().Decisions.Single().Status);
+        Assert.Equal(game.WorldDate,
+            WorldStateCompatibility.Clone(game).PoliticalSystems.Single().Decisions.Single().ResolvedOnWorldDate);
+    }
+
+    [Fact]
+    public void BudgetRequiresPermissionAndRejectsNegativeAmounts()
+    {
+        var (game, player, stateId) = CreatePoliticalWorld(approvalThreshold: 50, minimumVotes: 1);
+        game.PoliticalSystems.Single().Government = new PoliticalGovernment
+        {
+            Id = Guid.NewGuid(),
+            Budget = 300
+        };
+        AddBudgetRule(game, approvalRequired: false);
+        game.Memberships.Single().PermissionSetId = "observer";
+
+        var unauthorized = PoliticalProcedureRules.ApproveBudget(
+            game, player, Guid.NewGuid(), stateId, 700);
+        Assert.Equal("INSUFFICIENT_PERMISSION", unauthorized?.Code);
+        game.Memberships.Single().PermissionSetId = "legislative-member";
+        var invalidAmount = PoliticalProcedureRules.ApproveBudget(
+            game, player, Guid.NewGuid(), stateId, -1);
+        Assert.Equal("INVALID_PAYLOAD", invalidAmount?.Code);
+        Assert.Equal(300, game.PoliticalSystems.Single().Government!.Budget);
+    }
+
     private static (WorldState Game, PlayerState Player, Guid StateId) CreatePoliticalWorld(
         int approvalThreshold,
         int minimumVotes)
@@ -382,5 +454,29 @@ public sealed class PoliticalProcedureRulesTests
             VoterPermissionSetIds = approvalRequired ? ["legislative-member"] : []
         });
         return office;
+    }
+
+    private static void AddBudgetRule(
+        WorldState game,
+        bool approvalRequired,
+        int minimumVotes = 0)
+    {
+        var system = game.PoliticalSystems.Single();
+        var institution = system.Institutions.Single();
+        system.Constitution!.CompetenceRules.Add(new ConstitutionalCompetenceRule
+        {
+            Id = Guid.NewGuid(),
+            Competence = PoliticalCompetence.ApproveBudget,
+            InstitutionId = institution.Id,
+            LegalBasis = "Article 6: budget procedure",
+            ApprovalRequired = approvalRequired,
+            MinimumVotes = minimumVotes,
+            ApprovalThresholdPercent = approvalRequired ? 50 : 0,
+            ApprovalThresholdBasis = approvalRequired
+                ? ApprovalThresholdBasis.VotesCast
+                : ApprovalThresholdBasis.Unspecified,
+            ProposerPermissionSetIds = ["legislative-member"],
+            VoterPermissionSetIds = approvalRequired ? ["legislative-member"] : []
+        });
     }
 }

@@ -165,6 +165,7 @@ public sealed class PoliticalDecision
     public string LegalBasis { get; set; } = "";
     public Guid? OfficeId { get; set; }
     public Guid? AppointeePlayerId { get; set; }
+    public int? ProposedBudget { get; set; }
     public PoliticalDecisionStatus Status { get; set; }
     public DateOnly ProposedOnWorldDate { get; set; }
     public DateOnly? ResolvedOnWorldDate { get; set; }

@@ -200,13 +200,23 @@ public static class WorldStateCompatibility
                     string.IsNullOrWhiteSpace(decision.LegalBasis) ||
                     decision.ConstitutionVersion < 1 ||
                     decision.Competence == PoliticalCompetence.ProposeLaw &&
-                    (decision.OfficeId is not null || decision.AppointeePlayerId is not null) ||
+                    (decision.OfficeId is not null ||
+                     decision.AppointeePlayerId is not null ||
+                     decision.ProposedBudget is not null) ||
                     decision.Competence == PoliticalCompetence.AppointOffice &&
                     (decision.OfficeId is not Guid officeId ||
                      !officeIds.Contains(officeId) ||
                      decision.AppointeePlayerId is not Guid appointeeId ||
-                     !playerIds.Contains(appointeeId)) ||
-                    decision.Competence is not (PoliticalCompetence.ProposeLaw or PoliticalCompetence.AppointOffice) ||
+                     !playerIds.Contains(appointeeId) ||
+                     decision.ProposedBudget is not null) ||
+                    decision.Competence == PoliticalCompetence.ApproveBudget &&
+                    (system.Government is null ||
+                     decision.ProposedBudget is not int proposedBudget ||
+                     proposedBudget < 0 ||
+                     decision.OfficeId is not null ||
+                     decision.AppointeePlayerId is not null) ||
+                    decision.Competence is not (PoliticalCompetence.ProposeLaw or
+                        PoliticalCompetence.AppointOffice or PoliticalCompetence.ApproveBudget) ||
                     decision.ProposedOnWorldDate == default ||
                     decision.ProposedOnWorldDate > game.WorldDate ||
                     decision.Status == PoliticalDecisionStatus.PendingApproval &&
