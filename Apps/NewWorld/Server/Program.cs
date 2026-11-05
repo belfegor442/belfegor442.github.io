@@ -1,9 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using NewWorld.Server.Models;
 using NewWorld.Server.Services;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 var allowedOrigins = (Environment.GetEnvironmentVariable("NEW_WORLD_ALLOWED_ORIGINS") ??
         "http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io")
     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -12,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("NewWorld")
     ?? throw new InvalidOperationException("Set ConnectionStrings__NewWorld before starting the server.");
 
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<GameStore>();
 builder.Services.AddSingleton<GameHub>();
 builder.Services.AddHostedService<WorldClock>();
@@ -104,20 +109,10 @@ app.MapPost("/api/games/{gameId:guid}/assign", async (
             return "Only the host can assign states.";
         if (game.Started)
             return "State assignments are locked after the world starts.";
-        var target = game.Players.SingleOrDefault(player => player.Id == request.PlayerId);
-        if (target is null)
-            return "Player not found.";
-        if (request.CountryIndex is int index)
-        {
-            var territory = game.Territories[index];
-            if (territory.OwnerPlayerId is not null && territory.OwnerPlayerId != target.Id)
-                return "That state is already assigned.";
-        }
-        foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId == target.Id))
-            territory.OwnerPlayerId = null;
-        target.CountryIndex = request.CountryIndex;
-        if (request.CountryIndex is int assignedIndex)
-            game.Territories[assignedIndex].OwnerPlayerId = target.Id;
+        var assignmentError = GovernmentMembershipRules.Assign(game, request.PlayerId, request.CountryIndex);
+        if (assignmentError is not null)
+            return assignmentError;
+        var target = game.Players.Single(player => player.Id == request.PlayerId);
         GameStore.AddActivity(game, request.CountryIndex is int
             ? $"{actor.Name} assigned {game.Territories[request.CountryIndex.Value].Name} to {target.Name}."
             : $"{actor.Name} unassigned {target.Name}.");
@@ -142,9 +137,11 @@ app.MapPost("/api/games/{gameId:guid}/start", async (
             return "Only the host can start the world.";
         if (game.Started)
             return "The world has already started.";
-        if (game.Players.Any(item => item.CountryIndex is null))
+        if (game.Players.Any(item => !game.Memberships.Any(membership =>
+                membership.PlayerId == item.Id && membership.Status == MembershipStatus.Active)))
             return "Assign a state to every player before starting.";
         game.Started = true;
+        game.Status = GameStatus.Running;
         game.LastTickUtc = DateTimeOffset.UtcNow;
         GameStore.AddActivity(game, "The world began.");
         return null;

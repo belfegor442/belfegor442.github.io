@@ -1,13 +1,17 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NewWorld.Server.Models;
 
 namespace NewWorld.Server.Services;
 
 public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
     private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, Connection>> _games = new();
 
     public IReadOnlySet<Guid> ConnectedPlayers(Guid gameId) =>
@@ -100,22 +104,32 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 if (connections.IsEmpty)
                 {
                     _games.TryRemove(gameId, out _);
-                    await ResetClockAsync(gameId, CancellationToken.None);
+                    await ResetClockAsync(gameId, CancellationToken.None, pauseIfEmpty: true);
                 }
                 await BroadcastAsync(gameId, CancellationToken.None);
             }
         }
     }
 
-    private async Task ResetClockAsync(Guid gameId, CancellationToken cancellationToken)
+    private async Task ResetClockAsync(
+        Guid gameId, CancellationToken cancellationToken, bool pauseIfEmpty = false)
     {
         var result = await store.MutateSystemAsync(gameId, game =>
         {
-            if (game.Started)
-                game.LastTickUtc = DateTimeOffset.UtcNow;
+            if (pauseIfEmpty)
+            {
+                return PauseVoteRules.PauseForNoConnectedPlayers(game, DateTimeOffset.UtcNow)
+                    ? null
+                    : "No pause state change is required.";
+            }
+
+            if (!game.Started)
+                return "The world clock has not started.";
+            game.LastTickUtc = DateTimeOffset.UtcNow;
             return null;
         }, cancellationToken);
-        if (result.Error is not null)
+        if (result.Error is not null && result.Error != "The world clock has not started." &&
+            result.Error != "No pause state change is required.")
             logger.LogWarning("Could not reset the world clock for {GameId}: {Reason}", gameId, result.Error);
     }
 
@@ -131,21 +145,60 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             SendAsync(connection, new ServerMessage("snapshot", Game: snapshot), cancellationToken)));
     }
 
-    public static GameSnapshot BuildSnapshot(WorldState game, IReadOnlySet<Guid> connectedPlayers) =>
-        new(
+    public static GameSnapshot BuildSnapshot(WorldState game, IReadOnlySet<Guid> connectedPlayers)
+    {
+        var stateIndices = game.Territories.ToDictionary(territory => territory.StateId, territory => territory.Index);
+        var memberships = game.Memberships
+            .Where(membership => membership.Status == MembershipStatus.Active)
+            .Select(membership => new GovernmentMembershipView(
+                membership.Id,
+                membership.PlayerId,
+                membership.StateId,
+                stateIndices[membership.StateId],
+                membership.Status,
+                membership.PermissionSetId))
+            .ToList();
+        var membershipsByPlayer = memberships
+            .GroupBy(membership => membership.PlayerId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<GovernmentMembershipView>)group.ToList());
+        var players = game.Players.Select(player =>
+        {
+            membershipsByPlayer.TryGetValue(player.Id, out var playerMemberships);
+            var countryIndex = playerMemberships?.FirstOrDefault(membership =>
+                membership.StateIndex == player.LegacyCountryIndex)?.StateIndex ??
+                playerMemberships?.FirstOrDefault()?.StateIndex ??
+                player.LegacyCountryIndex;
+            return new PlayerView(
+                player.Id,
+                player.Name,
+                player.IsHost,
+                countryIndex,
+                player.Treasury,
+                player.Buildings,
+                connectedPlayers.Contains(player.Id),
+                playerMemberships ?? []);
+        }).ToList();
+
+        return new GameSnapshot(
             game.Id,
             game.Started,
             game.Day,
             game.HostPlayerId,
             game.Paused,
             game.PauseVotes.Where(connectedPlayers.Contains).ToList(),
-            game.Players.Select(player => new PlayerView(
-                player.Id, player.Name, player.IsHost, player.CountryIndex, player.Treasury,
-                player.Buildings, connectedPlayers.Contains(player.Id))).ToList(),
+            players,
             game.Territories.Select(territory => new TerritoryView(
-                territory.Index, territory.Name, territory.Population, territory.Prosperity,
+                territory.StateId, territory.Index, territory.Name, territory.Population, territory.Prosperity,
                 territory.Infrastructure, territory.OwnerPlayerId)).ToList(),
-            game.Activity);
+            game.Activity,
+            game.Name,
+            game.Status,
+            game.WorldDate,
+            game.WorldVersion,
+            game.ScenarioId,
+            game.ScenarioVersion,
+            memberships);
+    }
 
     private async Task HandleMessageAsync(
         Guid gameId, string token, Connection connection, ClientMessage message, CancellationToken cancellationToken)
@@ -155,7 +208,8 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         {
             if (!game.Started)
                 return "The host must start the world before actions are allowed.";
-            if (player.CountryIndex is null)
+            if (!game.Memberships.Any(membership =>
+                    membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active))
                 return "This player has not been assigned a state.";
 
             switch (message.Type)

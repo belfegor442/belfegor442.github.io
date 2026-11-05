@@ -12,6 +12,28 @@ public enum PauseVoteResult
 
 public static class PauseVoteRules
 {
+    public static bool PauseForNoConnectedPlayers(WorldState game, DateTimeOffset now)
+    {
+        var votesChanged = game.PauseVotes.Count > 0;
+        if (votesChanged)
+            game.PauseVotes.Clear();
+
+        if (!game.Started)
+            return votesChanged;
+
+        var shouldPause = !game.Paused;
+        if (!shouldPause && !votesChanged)
+            return false;
+
+        game.Paused = true;
+        game.Status = GameStatus.Paused;
+        game.LastTickUtc = now;
+        GameStore.AddActivity(game, shouldPause
+            ? "The world paused because no players are connected."
+            : "Pending pause votes were cleared because no players are connected.");
+        return true;
+    }
+
     public static PauseVoteResult Toggle(WorldState game, Guid playerId, IReadOnlySet<Guid> connectedPlayers)
     {
         if (!game.PauseVotes.Add(playerId))
@@ -24,6 +46,7 @@ public static class PauseVoteRules
             return PauseVoteResult.Added;
 
         game.Paused = !game.Paused;
+        game.Status = game.Paused ? GameStatus.Paused : GameStatus.Running;
         game.PauseVotes.Clear();
         if (!game.Paused)
             game.LastTickUtc = DateTimeOffset.UtcNow;

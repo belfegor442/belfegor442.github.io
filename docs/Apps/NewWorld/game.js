@@ -13,16 +13,16 @@
     month: 0,
     treasury: 1200,
     selected: 0,
-    owned: [0],
+    owned: [],
     states: names.map((name, i) => ({
       name,
       pop: Math.round(26000 + ((i * 7919 + 1337) % 56000)),
       prosperity: 42 + (i * 13 % 48),
       infra: 1 + (i % 4),
-      owner: i === 0 ? 'Your administration' : 'Independent'
+      owner: 'Unassigned'
     })),
     buildings: {},
-    activity: ['World initialized. Your administration controls the capital district.']
+    activity: ['Preview only. Connect to a multiplayer server to load the authoritative world.']
   };
   const buildingTypes = [
     {id:'farm',name:'FARM',cost:120,income:18,icon:'♧',desc:'Food production and rural employment.'},
@@ -30,7 +30,6 @@
     {id:'workshop',name:'WORKSHOP',cost:360,income:52,icon:'⚒',desc:'Small-scale manufacturing.'},
     {id:'housing',name:'HOUSING',cost:180,income:8,icon:'▦',desc:'Raises the settlement population.'}
   ];
-  const SAVE_KEY = 'new-world-save-v1';
   const SESSION_KEY = 'new-world-session-v1';
   const API_KEY = 'new-world-api-v1';
   const NAME_KEY = 'new-world-player-name-v1';
@@ -45,19 +44,7 @@
     }
   }
 
-  function load() {
-    const saved = readJson(SAVE_KEY);
-    if (!saved) return structuredClone(initial);
-    if (saved.states?.length === 16 && Array.isArray(saved.owned) && saved.buildings &&
-        typeof saved.buildings === 'object') {
-      return {...structuredClone(initial), ...saved};
-    }
-    console.error('[new-world] The local save has an invalid shape.');
-    toast('SAVE COULD NOT BE LOADED — NEW WORLD STARTED');
-    return structuredClone(initial);
-  }
-
-  let state = load();
+  let state = structuredClone(initial);
   const savedSession = readJson(SESSION_KEY);
   let onlineSession = savedSession?.gameId && savedSession?.playerId && savedSession?.playerToken
     ? savedSession
@@ -115,28 +102,51 @@
     return onlineGame?.players.find(player => player.id === onlineSession?.playerId) || null;
   }
 
+  function membershipsFor(player) {
+    return player?.memberships?.filter(membership => membership.status === 'active') || [];
+  }
+
+  function governmentMembersFor(territory) {
+    if (!onlineGame || !territory) return [];
+    return onlineGame.players.filter(player =>
+      membershipsFor(player).some(membership => membership.stateId === territory.stateId));
+  }
+
+  function formatWorldDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (!match) return 'DATE UNAVAILABLE';
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return Number(match[3]) + ' ' + months[Number(match[2]) - 1] + ' ' + match[1];
+  }
+
   function isOnline() {
     return onlineSession !== null;
   }
 
   function update() {
-    $('treasury').textContent = money(state.treasury);
-    $('population').textContent = totalPopulation().toLocaleString('en-US');
-    $('balance').textContent = (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()));
+    $('treasury').textContent = onlineGame ? money(state.treasury) : '—';
+    $('population').textContent = onlineGame ? totalPopulation().toLocaleString('en-US') : '—';
+    $('balance').textContent = onlineGame
+      ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
+      : '—';
     $('date-label').textContent = isOnline()
-      ? 'YEAR ' + String(state.year).padStart(2, '0') + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
-      : 'YEAR ' + String(state.year).padStart(2, '0') + ' / ' + ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER'][state.month];
-    $('city-income').textContent = money(cityIncome());
-    $('ledger-treasury').textContent = money(state.treasury);
-    $('ledger-territory').textContent = money(ownedIncome());
-    $('ledger-city').textContent = money(cityIncome());
-    $('ledger-cost').textContent = '−' + money(Object.keys(state.buildings).length * 2);
-    $('ledger-balance').textContent = (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()));
+      ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
+      : 'MULTIPLAYER REQUIRED';
+    $('city-income').textContent = onlineGame ? money(cityIncome()) : '—';
+    $('ledger-treasury').textContent = onlineGame ? money(state.treasury) : '—';
+    $('ledger-territory').textContent = onlineGame ? money(ownedIncome()) : '—';
+    $('ledger-city').textContent = onlineGame ? money(cityIncome()) : '—';
+    $('ledger-cost').textContent = onlineGame ? '−' + money(Object.keys(state.buildings).length * 2) : '—';
+    $('ledger-balance').textContent = onlineGame
+      ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
+      : '—';
     $('activity').innerHTML = state.activity.slice(0, 8)
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
-    $('world-mode').textContent = isOnline() ? 'PRIVATE MULTIPLAYER' : 'LOCAL PROTOTYPE 0.1.0';
-    $('save-btn').hidden = isOnline();
-    $('next-month').hidden = isOnline();
+    $('world-mode').textContent = isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
+    $('legend-owned').textContent = onlineGame ? 'YOUR GOVERNMENT' : 'GOVERNMENT MEMBERSHIP';
+    $('legend-other').textContent = onlineGame ? 'OTHER STATES' : 'WORLD DATA UNAVAILABLE';
+    $('save-btn').hidden = true;
+    $('next-month').hidden = true;
     $('world-time').hidden = !isOnline();
     $('world-time').textContent = isOnline()
       ? onlineGame?.started
@@ -155,44 +165,67 @@
     })[character]);
   }
 
-  function log(message) {
-    state.activity.unshift(message);
-    state.activity = state.activity.slice(0, 20);
-  }
-
   function selectState(index, notify = true) {
     if (index < 0 || index >= 16) return;
     state.selected = index;
     const territory = state.states[index];
-    const owner = onlineGame?.players.find(player => player.id === onlineGame.territories[index].ownerPlayerId);
+    const territoryView = onlineGame?.territories[index];
+    const owner = onlineGame?.players.find(player => player.id === territoryView?.ownerPlayerId);
+    const governmentMembers = governmentMembersFor(territoryView);
     const mine = state.owned.includes(index);
+    const isGovernmentMember = membershipsFor(currentPlayer())
+      .some(membership => membership.stateId === territoryView?.stateId);
     $('state-name').textContent = territory.name;
-    $('state-description').textContent = mine
-      ? 'This territory is administered by your government. Its population and productivity contribute to your treasury.'
-      : owner
-        ? 'This territory is administered by ' + owner.name + '.'
-        : isOnline()
-          ? onlineGame?.started
-            ? 'An independent territory. You can establish an administration by investing in local governance.'
-            : 'This state is unassigned. The host can allocate it before the world starts.'
-          : 'An independent territory. You can establish an administration by investing in local governance.';
-    $('state-pop').textContent = territory.pop.toLocaleString('en-US');
-    $('state-prosperity').textContent = territory.prosperity + '/100';
-    $('state-revenue').textContent = money(Math.round(territory.pop / 1500 * (territory.prosperity / 100)));
-    $('state-infra').textContent = 'LEVEL ' + territory.infra;
-    $('state-owner').textContent = mine ? 'YOUR ADMINISTRATION' : owner ? owner.name.toUpperCase() : 'INDEPENDENT';
+    if (mine) {
+      $('state-description').textContent = 'This territory is administered by your government.';
+    } else if (isGovernmentMember) {
+      const fellowMembers = governmentMembers
+        .filter(player => player.id !== onlineSession.playerId)
+        .map(player => player.name);
+      $('state-description').textContent = fellowMembers.length
+        ? 'You share this government with ' + fellowMembers.join(', ') + '.'
+        : 'You are currently the only member of this government.';
+    } else if (governmentMembers.length) {
+      $('state-description').textContent = 'Government members: ' +
+        governmentMembers.map(player => player.name).join(', ') + '.';
+    } else if (owner) {
+      $('state-description').textContent = 'This territory is administered by ' + owner.name + '.';
+    } else if (isOnline()) {
+      $('state-description').textContent = onlineGame?.started
+        ? 'An independent territory. You can establish an administration by investing in local governance.'
+        : 'This state has no government membership yet.';
+    } else {
+      $('state-description').textContent = 'Connect to a multiplayer server to inspect the authoritative world.';
+    }
+    $('state-pop').textContent = onlineGame ? territory.pop.toLocaleString('en-US') : '—';
+    $('state-prosperity').textContent = onlineGame ? territory.prosperity + '/100' : '—';
+    $('state-revenue').textContent = onlineGame
+      ? money(Math.round(territory.pop / 1500 * (territory.prosperity / 100)))
+      : '—';
+    $('state-infra').textContent = onlineGame ? 'LEVEL ' + territory.infra : '—';
+    $('state-owner').textContent = mine
+      ? 'YOUR ADMINISTRATION'
+      : governmentMembers.length
+        ? governmentMembers.map(player => player.name.toUpperCase()).join(' · ')
+        : owner ? owner.name.toUpperCase() : onlineGame ? 'INDEPENDENT' : 'NOT CONNECTED';
 
     const claimButton = $('claim-btn');
-    if (mine) {
+    if (mine || isGovernmentMember) {
       claimButton.disabled = true;
-      claimButton.innerHTML = 'ALREADY ADMINISTERED <span>✓</span>';
+      claimButton.innerHTML = isGovernmentMember ? 'YOUR GOVERNMENT <span>✓</span>' : 'ALREADY ADMINISTERED <span>✓</span>';
+    } else if (!isOnline()) {
+      claimButton.disabled = true;
+      claimButton.textContent = 'MULTIPLAYER SERVER REQUIRED';
     } else if (owner) {
       claimButton.disabled = true;
       claimButton.textContent = 'ADMINISTERED BY ' + owner.name.toUpperCase();
+    } else if (governmentMembers.length) {
+      claimButton.disabled = true;
+      claimButton.textContent = 'GOVERNMENT ALREADY ESTABLISHED';
     } else if (isOnline() && !onlineGame?.started) {
       claimButton.disabled = true;
       claimButton.textContent = 'WORLD NOT STARTED';
-    } else if (isOnline() && currentPlayer()?.countryIndex == null) {
+    } else if (isOnline() && membershipsFor(currentPlayer()).length === 0) {
       claimButton.disabled = true;
       claimButton.textContent = 'STATE ASSIGNMENT REQUIRED';
     } else if (state.treasury < 450) {
@@ -214,11 +247,17 @@
       for (let index = 0; index < 16; index++) {
         const path = document.getElementById('state' + (index + 1));
         if (!path) continue;
-        const owner = onlineGame?.players.find(player => player.id === onlineGame.territories[index].ownerPlayerId);
+        const territory = onlineGame?.territories[index];
+        const owner = onlineGame?.players.find(player => player.id === territory?.ownerPlayerId);
+        const governmentMembers = governmentMembersFor(territory);
+        const isGovernmentMember = membershipsFor(currentPlayer())
+          .some(membership => membership.stateId === territory?.stateId);
         path.style.cursor = 'pointer';
         path.style.pointerEvents = 'all';
-        path.style.fill = state.owned.includes(index) ? '#8d9f72' : owner ? '#b88470' : '';
-        path.style.stroke = owner ? '#d8e6ae' : '#59645c';
+        path.style.fill = state.owned.includes(index) || isGovernmentMember
+          ? '#8d9f72'
+          : governmentMembers.length || owner ? '#b88470' : '';
+        path.style.stroke = governmentMembers.length || owner ? '#d8e6ae' : '#59645c';
         path.style.strokeWidth = index === selectedIndex ? '3' : '1.1';
         path.style.filter = index === selectedIndex ? 'brightness(1.18)' : 'none';
       }
@@ -366,8 +405,8 @@
   function renderOptions() {
     const building = state.buildings[selectedPlot];
     const player = currentPlayer();
-    const canBuild = !isOnline() ||
-      (onlineGame?.started && player?.countryIndex != null && socket?.readyState === WebSocket.OPEN);
+    const canBuild = onlineGame?.started && membershipsFor(player).length > 0 &&
+      socket?.readyState === WebSocket.OPEN;
     $('building-options').innerHTML = building
       ? '<p class="muted">This plot is developed. Buildings cannot currently be demolished.</p>'
       : buildingTypes.map(item =>
@@ -381,17 +420,7 @@
   function build(id) {
     const building = buildingTypes.find(item => item.id === id);
     if (!building || selectedPlot === null || state.buildings[selectedPlot] || state.treasury < building.cost) return;
-    if (isOnline()) {
-      sendAction({type: 'build', plotIndex: selectedPlot, buildingId: id});
-      return;
-    }
-    state.treasury -= building.cost;
-    state.buildings[selectedPlot] = {...building};
-    log(building.name + ' constructed in the capital district.');
-    toast(building.name + ' CONSTRUCTED');
-    update();
-    $('plot-title').textContent = building.name;
-    $('plot-description').textContent = building.desc;
+    sendAction({type: 'build', plotIndex: selectedPlot, buildingId: id});
   }
 
   function getApiBase() {
@@ -529,10 +558,8 @@
     }
     state = {
       ...state,
-      year: Math.floor((game.day - 1) / 365) + 1,
-      month: Math.floor(((game.day - 1) % 365) / 91.25),
       treasury: player.treasury,
-      selected: player.countryIndex ?? state.selected,
+      selected: membershipsFor(player)[0]?.stateIndex ?? player.countryIndex ?? state.selected,
       owned: game.territories.filter(territory => territory.ownerPlayerId === player.id)
         .map(territory => territory.index),
       states: game.territories.map(territory => ({
@@ -540,7 +567,8 @@
         pop: territory.population,
         prosperity: territory.prosperity,
         infra: territory.infrastructure,
-        owner: game.players.find(owner => owner.id === territory.ownerPlayerId)?.name || 'Independent'
+        owner: governmentMembersFor(territory).map(member => member.name).join(', ') ||
+          game.players.find(owner => owner.id === territory.ownerPlayerId)?.name || 'Independent'
       })),
       buildings: {...player.buildings},
       activity: [...game.activity]
@@ -648,8 +676,10 @@
     if (!onlineSession) return;
 
     $('session-summary').textContent = onlineGame
-      ? (onlineGame.started ? 'IN PROGRESS' : 'LOBBY') + ' · WORLD ' + onlineGame.id.slice(0, 8).toUpperCase() +
-        ' · DAY ' + onlineGame.day
+      ? (onlineGame.status || (onlineGame.started ? 'running' : 'lobby')).toUpperCase() +
+        ' · ' + formatWorldDate(onlineGame.worldDate) +
+        ' · WORLD ' + onlineGame.id.slice(0, 8).toUpperCase() + ' · DAY ' + onlineGame.day +
+        ' · VERSION ' + onlineGame.worldVersion
       : 'Reconnecting to world ' + onlineSession.gameId.slice(0, 8).toUpperCase() + '…';
     const canShareInvite = Boolean(onlineSession.inviteCode && onlineGame && !onlineGame.started);
     $('invite-panel').hidden = !canShareInvite;
@@ -666,10 +696,12 @@
         summary.className = 'player-summary';
         const playerLabel = document.createElement('span');
         playerLabel.textContent = player.name + (player.isHost ? ' · HOST' : '');
-        const country = onlineGame.territories[player.countryIndex];
+        const memberStates = membershipsFor(player).map(membership =>
+          onlineGame.territories.find(territory => territory.stateId === membership.stateId)?.name
+        ).filter(Boolean);
         const stateLabel = document.createElement('span');
         stateLabel.textContent = (player.connected ? '● ONLINE · ' : '○ OFFLINE · ') +
-          (country?.name || 'STATE UNASSIGNED');
+          (memberStates.join(', ') || 'STATE UNASSIGNED');
         summary.append(playerLabel, stateLabel);
         row.appendChild(summary);
 
@@ -683,7 +715,6 @@
           unassigned.textContent = 'Unassigned';
           select.appendChild(unassigned);
           for (const territory of onlineGame.territories) {
-            if (territory.ownerPlayerId && territory.ownerPlayerId !== player.id) continue;
             const option = document.createElement('option');
             option.value = String(territory.index);
             option.textContent = territory.name;
@@ -703,7 +734,7 @@
 
       const startButton = $('start-world');
       startButton.hidden = !isHost || onlineGame.started;
-      startButton.disabled = onlineGame.players.some(player => player.countryIndex === null);
+      startButton.disabled = onlineGame.players.some(player => membershipsFor(player).length === 0);
 
       const pauseControls = $('pause-controls');
       pauseControls.hidden = !onlineGame.started;
@@ -756,41 +787,15 @@
   $('claim-btn').addEventListener('click', () => {
     const index = state.selected;
     if (state.owned.includes(index) || state.treasury < 450) return;
-    if (isOnline()) {
-      sendAction({type: 'claim', territoryIndex: index});
+    if (!isOnline()) {
+      showMessage('Preview data only. Connect to a multiplayer server to play.');
       return;
     }
-    state.treasury -= 450;
-    state.owned.push(index);
-    state.states[index].owner = 'Your administration';
-    state.states[index].infra++;
-    log('Administration established in ' + state.states[index].name + '.');
-    update();
-    toast('TERRITORY ADDED TO YOUR ADMINISTRATION');
+    sendAction({type: 'claim', territoryIndex: index});
   });
   $('pause-vote').addEventListener('click', () => {
     if (!onlineGame?.started) return;
     sendAction({type: onlineGame.paused ? 'resume' : 'pause'});
-  });
-
-  $('next-month').addEventListener('click', () => {
-    if (isOnline()) return;
-    state.treasury += balance();
-    state.month++;
-    if (state.month === 4) {
-      state.month = 0;
-      state.year++;
-      state.states.forEach((territory, index) => {
-        if (state.owned.includes(index)) {
-          territory.pop = Math.round(territory.pop * 1.003);
-          territory.prosperity = Math.min(100, territory.prosperity + (Math.random() < .5 ? 1 : 0));
-        }
-      });
-    }
-    log('Month advanced. Net fiscal balance: ' +
-      (balance() >= 0 ? '+' : '−') + money(Math.abs(balance())) + '.');
-    update();
-    toast('SIMULATION ADVANCED');
   });
 
   document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {
@@ -802,15 +807,6 @@
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
     $(button.dataset.view + '-view').classList.add('active');
   }));
-  $('save-btn').addEventListener('click', () => {
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-      toast('WORLD SAVED LOCALLY');
-    } catch (error) {
-      console.error('[new-world] Could not save the world:', error);
-      toast('SAVE FAILED — CHECK BROWSER STORAGE');
-    }
-  });
   $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.15));
   $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.15));
   $('reset-map').addEventListener('click', () => {
@@ -871,16 +867,7 @@
       showMessage('Automatic copy was blocked. Select and copy the invitation code manually.', true);
     }
   });
-  window.addEventListener('beforeunload', () => {
-    if (isOnline()) return;
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-    } catch (error) {
-      console.error('[new-world] Could not save the world before leaving:', error);
-    }
-  });
-
-  if (!localStorage.getItem(SAVE_KEY)) log('Initial treasury allocated: ¤ 1,200.');
   update();
+  if (!onlineSession) showMessage('Preview data only. Connect to a multiplayer server to play.');
   if (onlineSession?.gameId && onlineSession?.playerToken) restoreSession();
 })();

@@ -6,6 +6,42 @@ namespace NewWorld.Server.Tests;
 public sealed class PauseVoteRulesTests
 {
     [Fact]
+    public void PauseForNoConnectedPlayersPausesWorldAndClearsVotes()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var game = new WorldState
+        {
+            Started = true,
+            Status = GameStatus.Running,
+            Paused = false,
+            LastTickUtc = now.AddMinutes(-1),
+            PauseVotes = [Guid.NewGuid()]
+        };
+
+        Assert.True(PauseVoteRules.PauseForNoConnectedPlayers(game, now));
+        Assert.True(game.Paused);
+        Assert.Equal(GameStatus.Paused, game.Status);
+        Assert.Equal(now, game.LastTickUtc);
+        Assert.Empty(game.PauseVotes);
+    }
+
+    [Fact]
+    public void PauseForNoConnectedPlayersDoesNotChangeAlreadyPausedWorld()
+    {
+        var lastTick = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var game = new WorldState
+        {
+            Started = true,
+            Status = GameStatus.Paused,
+            Paused = true,
+            LastTickUtc = lastTick
+        };
+
+        Assert.False(PauseVoteRules.PauseForNoConnectedPlayers(game, DateTimeOffset.UtcNow));
+        Assert.Equal(lastTick, game.LastTickUtc);
+    }
+
+    [Fact]
     public void ToggleRequiresStrictMajorityOfConnectedPlayers()
     {
         var game = new WorldState();

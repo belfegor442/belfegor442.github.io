@@ -14,12 +14,12 @@
     <a class="brand" href="/">NORTH ASSEMBLY <span>/</span> NEW WORLD</a>
     <div class="world-tag"><span class="live-dot"></span> BELELAND <span class="world-number">WORLD 001</span></div>
     <div class="top-stats">
-      <div><small>SIMULATION DATE</small><strong id="date-label">YEAR 01 / SPRING</strong></div>
+      <div><small>SIMULATION DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
       <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
       <div><small>POPULATION</small><strong id="population">—</strong></div>
       <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
     </div>
-    <button id="save-btn" class="quiet-btn">SAVE</button>
+    <button id="save-btn" class="quiet-btn" hidden>SAVE</button>
   </header>
 
   <main class="game-shell">
@@ -50,8 +50,8 @@
           <div class="map-compass" aria-hidden="true">N<br>▲</div>
         </div>
         <div class="map-foot">
-          <span><i class="legend owned"></i> YOUR ADMINISTRATION</span>
-          <span><i class="legend other"></i> INDEPENDENT STATES</span>
+          <span><i class="legend owned"></i> <span id="legend-owned">GOVERNMENT MEMBERSHIP</span></span>
+          <span><i class="legend other"></i> <span id="legend-other">WORLD DATA UNAVAILABLE</span></span>
           <span>SELECT A STATE TO INSPECT</span>
         </div>
       </section>
@@ -141,9 +141,9 @@
     </div>
 
     <footer class="game-footer">
-      <div class="world-status"><span>NA / INTERACTIVE SYSTEMS</span><span id="world-mode">LOCAL PROTOTYPE 0.1.0</span></div>
+      <div class="world-status"><span>NA / INTERACTIVE SYSTEMS</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
       <span id="world-time" class="world-time" hidden></span>
-      <button id="next-month" class="advance">ADVANCE MONTH <b>→</b></button>
+      <button id="next-month" class="advance" hidden>ADVANCE MONTH <b>→</b></button>
       <a href="/Apps/">APPLICATION DIRECTORY ↗</a>
     </footer>
   </main>

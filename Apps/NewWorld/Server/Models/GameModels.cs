@@ -1,17 +1,56 @@
+using System.Text.Json.Serialization;
+
 namespace NewWorld.Server.Models;
 
 public sealed class WorldState
 {
     public Guid Id { get; set; }
+    public string Name { get; set; } = "New World";
     public Guid HostPlayerId { get; set; }
     public bool Started { get; set; }
     public bool Paused { get; set; }
+    public GameStatus Status { get; set; } = GameStatus.Lobby;
     public int Day { get; set; } = 1;
+    public DateOnly WorldDate { get; set; }
+    public long WorldVersion { get; set; } = 1;
+    public string ScenarioId { get; set; } = "beleland";
+    public string ScenarioVersion { get; set; } = "1.0";
+    public int MaxHumanPlayers { get; set; } = GameCatalog.MaxHumanPlayers;
     public DateTimeOffset LastTickUtc { get; set; }
+    public long ClockAccumulatorTicks { get; set; }
     public HashSet<Guid> PauseVotes { get; set; } = [];
     public List<PlayerState> Players { get; set; } = [];
+    public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
     public List<string> Activity { get; set; } = [];
+}
+
+public enum GameStatus
+{
+    Lobby,
+    Running,
+    Paused,
+    Recovering,
+    Closed
+}
+
+public enum MembershipStatus
+{
+    Invited,
+    Active,
+    Suspended,
+    Left
+}
+
+public sealed class GovernmentMembership
+{
+    public Guid Id { get; set; }
+    public Guid GameId { get; set; }
+    public Guid PlayerId { get; set; }
+    public Guid StateId { get; set; }
+    public MembershipStatus Status { get; set; } = MembershipStatus.Active;
+    public string PermissionSetId { get; set; } = "government-member";
+    public DateOnly JoinedAtWorldDate { get; set; } = new(1500, 1, 1);
 }
 
 public sealed class PlayerState
@@ -20,7 +59,8 @@ public sealed class PlayerState
     public string Name { get; set; } = "";
     public string TokenHash { get; set; } = "";
     public bool IsHost { get; set; }
-    public int? CountryIndex { get; set; }
+    [JsonPropertyName("countryIndex")]
+    public int? LegacyCountryIndex { get; set; }
     public int Treasury { get; set; } = 1200;
     public int DailyBalanceRemainder { get; set; }
     public Dictionary<int, BuildingState> Buildings { get; set; } = [];
@@ -28,6 +68,7 @@ public sealed class PlayerState
 
 public sealed class TerritoryState
 {
+    public Guid StateId { get; set; }
     public int Index { get; set; }
     public string Name { get; set; } = "";
     public int Population { get; set; }
@@ -52,14 +93,29 @@ public sealed record GameSnapshot(
     IReadOnlyList<Guid> PauseVotePlayerIds,
     IReadOnlyList<PlayerView> Players,
     IReadOnlyList<TerritoryView> Territories,
-    IReadOnlyList<string> Activity);
-public sealed record PlayerView(Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury, IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected);
-public sealed record TerritoryView(int Index, string Name, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
+    IReadOnlyList<string> Activity,
+    string Name,
+    GameStatus Status,
+    DateOnly WorldDate,
+    long WorldVersion,
+    string ScenarioId,
+    string ScenarioVersion,
+    IReadOnlyList<GovernmentMembershipView> Memberships);
+public sealed record PlayerView(
+    Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
+    IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected,
+    IReadOnlyList<GovernmentMembershipView> Memberships);
+public sealed record GovernmentMembershipView(
+    Guid Id, Guid PlayerId, Guid StateId, int StateIndex, MembershipStatus Status, string PermissionSetId);
+public sealed record TerritoryView(
+    Guid StateId, int Index, string Name, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId);
 public sealed record ClientMessage(string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex, string? BuildingId);
 public sealed record ServerMessage(string Type, string? Error = null, GameSnapshot? Game = null);
 
 public static class GameCatalog
 {
+    public const int MaxHumanPlayers = 20;
+
     public static readonly string[] TerritoryNames =
     [
         "Kingdom of Coimbrila", "United Provinces of Gania", "Chungia", "Calcilacia",

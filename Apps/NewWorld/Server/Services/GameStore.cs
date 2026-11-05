@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NewWorld.Server.Models;
 using Npgsql;
 using NpgsqlTypes;
@@ -9,7 +10,10 @@ namespace NewWorld.Server.Services;
 
 public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> logger)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -36,11 +40,13 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         var game = new WorldState
         {
             Id = id,
+            WorldDate = new DateOnly(1500, 1, 1),
             HostPlayerId = playerId,
             LastTickUtc = DateTimeOffset.UtcNow,
             Players = [new PlayerState { Id = playerId, Name = playerName, IsHost = true, TokenHash = Hash(playerToken) }],
             Territories = GameCatalog.TerritoryNames.Select((name, index) => new TerritoryState
             {
+                StateId = Guid.NewGuid(),
                 Index = index,
                 Name = name,
                 Population = Math.Clamp(26000 + ((index * 7919 + 1337) % 56000), 1, 2000000),
@@ -70,14 +76,12 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         var game = await FindByInviteCodeAsync(connection, transaction, Hash(inviteCode), true, cancellationToken);
         if (game is null)
             return (null, null, "Invite code is invalid.");
-        if (game.Started)
-            return (null, null, "This world has already started.");
-        if (game.Players.Count >= GameCatalog.TerritoryNames.Length)
-            return (null, null, "This world has reached its player limit.");
-        if (game.Players.Any(player => string.Equals(player.Name, playerName, StringComparison.OrdinalIgnoreCase)))
-            return (null, null, "That player name is already in use.");
+        var joinError = LobbyRules.GetJoinError(game, playerName);
+        if (joinError is not null)
+            return (null, null, joinError);
 
         game.Players.Add(new PlayerState { Id = Guid.NewGuid(), Name = playerName, TokenHash = Hash(playerToken) });
+        game.WorldVersion++;
         AddActivity(game, $"{playerName} joined the world.");
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -110,6 +114,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         if (error is not null)
             return (game, player, error);
 
+        game.WorldVersion++;
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (game, player, null);
@@ -128,6 +133,7 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         if (error is not null)
             return (game, error);
 
+        game.WorldVersion++;
         await SaveAsync(connection, transaction, game, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (game, null);
@@ -191,13 +197,16 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
 
     private static WorldState? DeserializeState(object? value)
     {
-        return value switch
+        var game = value switch
         {
             string json => JsonSerializer.Deserialize<WorldState>(json, JsonOptions),
             JsonDocument document => DeserializeDocument(document),
             JsonElement element => element.Deserialize<WorldState>(JsonOptions),
             _ => null
         };
+        if (game is not null)
+            WorldStateCompatibility.Normalize(game);
+        return game;
     }
 
     private static WorldState? DeserializeDocument(JsonDocument document)
