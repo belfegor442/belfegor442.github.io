@@ -63,16 +63,30 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 authorized.Game.WorldVersion);
             var connections = _games.GetOrAdd(gameId, _ => new ConcurrentDictionary<Guid, Connection>());
             var wasEmpty = connections.IsEmpty;
-            if (!connections.TryAdd(connection.PlayerId, connection))
+            Connection? replacedConnection = null;
+
+            while (true)
             {
-                await SendAsync(socket, new ServerMessage("error", "This player is already connected."), context.RequestAborted);
-                connection = null;
-                return;
+                if (connections.TryAdd(connection.PlayerId, connection))
+                    break;
+
+                if (!connections.TryGetValue(connection.PlayerId, out var existing))
+                    continue;
+
+                if (connections.TryUpdate(connection.PlayerId, connection, existing))
+                {
+                    replacedConnection = existing;
+                    break;
+                }
             }
+
+            // A valid reconnect supersedes the stale socket for the same authenticated player.
+            replacedConnection?.Socket.Abort();
 
             if (wasEmpty)
                 await ResetClockAsync(gameId, context.RequestAborted);
-            await ResetPauseVotesAsync(gameId, context.RequestAborted);
+            if (replacedConnection is null)
+                await ResetPauseVotesAsync(gameId, context.RequestAborted);
             await SendSnapshotAsync(connection, authorized.Game, context.RequestAborted);
             await BroadcastAsync(gameId, context.RequestAborted);
             while (socket.State == WebSocketState.Open && !context.RequestAborted.IsCancellationRequested)
@@ -103,14 +117,18 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         {
             if (connection is not null && _games.TryGetValue(gameId, out var connections))
             {
-                connections.TryRemove(connection.PlayerId, out _);
-                await ResetPauseVotesAsync(gameId, CancellationToken.None);
-                if (connections.IsEmpty)
+                var removed = ((ICollection<KeyValuePair<Guid, Connection>>)connections)
+                    .Remove(new KeyValuePair<Guid, Connection>(connection.PlayerId, connection));
+                if (removed)
                 {
-                    _games.TryRemove(gameId, out _);
-                    await ResetClockAsync(gameId, CancellationToken.None, pauseIfEmpty: true);
+                    await ResetPauseVotesAsync(gameId, CancellationToken.None);
+                    if (connections.IsEmpty)
+                    {
+                        _games.TryRemove(gameId, out _);
+                        await ResetClockAsync(gameId, CancellationToken.None, pauseIfEmpty: true);
+                    }
+                    await BroadcastAsync(gameId, CancellationToken.None);
                 }
-                await BroadcastAsync(gameId, CancellationToken.None);
             }
         }
     }

@@ -9,11 +9,34 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 var allowedOrigins = (Environment.GetEnvironmentVariable("NEW_WORLD_ALLOWED_ORIGINS") ??
-        "http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io")
+        "http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io;https://northassembly.work.gd;https://www.northassembly.work.gd")
     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
     .ToHashSet(StringComparer.OrdinalIgnoreCase);
-var connectionString = builder.Configuration.GetConnectionString("NewWorld")
-    ?? throw new InvalidOperationException("Set ConnectionStrings__NewWorld before starting the server.");
+var connectionString = builder.Configuration.GetConnectionString("NewWorld");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    if (Uri.TryCreate(databaseUrl, UriKind.Absolute, out var databaseUri) &&
+        (databaseUri.Scheme == "postgres" || databaseUri.Scheme == "postgresql"))
+    {
+        var credentials = databaseUri.UserInfo.Split(':', 2);
+        if (credentials.Length == 2)
+        {
+            connectionString = new NpgsqlConnectionStringBuilder
+            {
+                Host = databaseUri.Host,
+                Port = databaseUri.IsDefaultPort ? 5432 : databaseUri.Port,
+                Database = Uri.UnescapeDataString(databaseUri.AbsolutePath.TrimStart('/')),
+                Username = Uri.UnescapeDataString(credentials[0]),
+                Password = Uri.UnescapeDataString(credentials[1]),
+                SslMode = Npgsql.SslMode.Require
+            }.ConnectionString;
+        }
+    }
+}
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException(
+        "Set ConnectionStrings__NewWorld or a valid PostgreSQL DATABASE_URL before starting the server.");
 
 builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
 builder.Services.AddSingleton(TimeProvider.System);

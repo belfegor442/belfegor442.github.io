@@ -228,8 +228,8 @@
           <p class="panel-kicker">PRIVATE WORLD / NETWORK</p>
           <h2>Multiplayer</h2>
           <p class="muted">Create a private world or join one with an invitation. The server validates actions and keeps the shared world.</p>
-          <label class="field-label" for="api-url">SERVER URL</label>
-          <div class="field-row"><input id="api-url" type="url" autocomplete="url" placeholder="https://your-game-server.example"><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
+          <label class="field-label">NETWORK SERVICE</label>
+          <div class="field-row"><span id="server-endpoint" class="microcopy">Loading multiplayer service…</span><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
           <p id="server-status" class="connection-status" role="status">Server not connected.</p>
           <label class="field-label" for="player-name">PLAYER NAME</label>
           <input id="player-name" class="text-field" maxlength="24" autocomplete="nickname" placeholder="2–24 characters">
@@ -273,6 +273,7 @@
     </footer>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
+  <script>window.NEW_WORLD_API = '';</script>
   <script src="./game.js"></script>
 </body>
 </html>
