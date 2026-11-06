@@ -29,6 +29,24 @@ public static class WorldStateCompatibility
         game.Players ??= [];
         game.Memberships ??= [];
         game.Territories ??= [];
+        game.Provinces ??= [];
+        game.Settlements ??= [];
+        game.ProvinceConnections ??= [];
+        game.TerritorialControls ??= [];
+        game.SovereigntyHistory ??= [];
+        game.MilitaryUnitTypes ??= [];
+        game.MilitaryCommanders ??= [];
+        game.MilitaryUnits ??= [];
+        game.MilitaryOrders ??= [];
+        game.MilitaryBattles ??= [];
+        game.MilitaryRoutes ??= [];
+        game.SupplyRoutes ??= [];
+        game.Occupations ??= [];
+        game.Technologies ??= [];
+        game.ResearchInstitutions ??= [];
+        game.ResearchProjects ??= [];
+        game.TechnologyUnlocks ??= [];
+        game.TechnologyAdoptions ??= [];
         game.PoliticalSystems ??= [];
         game.Goods ??= [];
         game.ProductionRecipes ??= [];
@@ -784,6 +802,10 @@ public static class WorldStateCompatibility
         if (game.Territories.Any(territory =>
                 territory.Treasury > 0 && !lastBalances.ContainsKey(territory.StateId)))
             throw new InvalidDataException("A State treasury is missing its opening financial transaction.");
+
+        TerritorySetupRules.Validate(game);
+        TechnologySetupRules.Validate(game);
+        MilitarySetupRules.Validate(game);
     }
 
     private static void ValidateCompanyTransactions(

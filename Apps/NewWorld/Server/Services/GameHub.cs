@@ -151,6 +151,28 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 cancellationToken)));
     }
 
+    public async Task BroadcastRecoveredAsync(Guid gameId, CancellationToken cancellationToken)
+    {
+        if (!_games.TryGetValue(gameId, out var connections) || connections.IsEmpty)
+            return;
+
+        foreach (var connection in connections.Values)
+        {
+            await connection.SendLock.WaitAsync(cancellationToken);
+            try
+            {
+                connection.LastWorldVersion = 0;
+                connection.LastEventSequence = 0;
+            }
+            finally
+            {
+                connection.SendLock.Release();
+            }
+        }
+
+        await BroadcastAsync(gameId, cancellationToken);
+    }
+
     public static GameSnapshot BuildSnapshot(
         WorldState game, IReadOnlySet<Guid> connectedPlayers, long afterEventSequence = 0)
     {
@@ -263,7 +285,25 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                         facility.BatchesPerCycle,
                         facility.ProgressDays,
                         recipe.DaysPerBatch);
-                }).ToList())).ToList());
+                }).ToList())).ToList(),
+            game.Provinces,
+            game.Settlements,
+            game.ProvinceConnections,
+            game.TerritorialControls,
+            game.SovereigntyHistory,
+            game.MilitaryUnitTypes,
+            game.MilitaryCommanders,
+            game.MilitaryUnits,
+            game.MilitaryOrders,
+            game.MilitaryBattles,
+            game.MilitaryRoutes,
+            game.SupplyRoutes,
+            game.Occupations,
+            game.Technologies,
+            game.ResearchInstitutions,
+            game.ResearchProjects,
+            game.TechnologyUnlocks,
+            game.TechnologyAdoptions);
     }
 
     private async Task HandleMessageAsync(
@@ -282,7 +322,11 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
         var payload = new GameOrderPayload(
             message.TerritoryIndex, message.PlotIndex, message.BuildingId,
             message.DecisionId, message.DecisionTitle, message.DecisionText, message.VoteChoice,
-            message.OfficeId, message.AppointeePlayerId, message.ProposedBudget);
+            message.OfficeId, message.AppointeePlayerId, message.ProposedBudget,
+            message.MilitaryUnitId, message.MilitaryOrderType,
+            message.DestinationProvinceId, message.MilitaryRouteId,
+            message.ResearchProjectId, message.TechnologyId,
+            message.ResearchSector, message.ProvinceId);
         var result = await store.ExecuteOrderAsync(
             gameId, token, orderId, message.StateId, orderType, payload,
             message.TargetWorldDate, expectedWorldVersion, (game, player) =>
@@ -402,6 +446,34 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                 case "voteDecision":
                     return PoliticalProcedureRules.VoteOnDecision(
                         game, player, message.StateId, message.DecisionId, message.VoteChoice);
+
+                case "mobilizeUnit":
+                    return MilitaryRules.SubmitOrder(
+                        game,
+                        player,
+                        orderId,
+                        message.StateId,
+                        message.MilitaryOrderType,
+                        message.MilitaryUnitId,
+                        message.DestinationProvinceId,
+                        message.MilitaryRouteId);
+
+                case "startProject":
+                    return ResearchRules.StartProject(
+                        game, player, message.StateId, message.ResearchProjectId);
+
+                case "cancelProject":
+                    return ResearchRules.CancelProject(
+                        game, player, message.StateId, message.ResearchProjectId);
+
+                case "adoptTechnology":
+                    return ResearchRules.AdoptTechnology(
+                        game,
+                        player,
+                        message.StateId,
+                        message.TechnologyId,
+                        message.ResearchSector,
+                        message.ProvinceId);
 
                 default:
                     return new OrderRejection("UNSUPPORTED_ORDER", "Unsupported action.");

@@ -182,6 +182,9 @@ public sealed record PoliticalVote(
 public sealed record PoliticalDecisionRequest(string Title, string Text, Guid? DecisionId);
 public sealed record PoliticalVoteRequest(Guid DecisionId, PoliticalVoteChoice Choice);
 public sealed record PoliticalAppointmentRequest(Guid OfficeId, Guid AppointeePlayerId);
+public sealed record PoliticalScenarioRequest(
+    long ExpectedWorldVersion,
+    IReadOnlyList<StatePoliticalSystem> PoliticalSystems);
 
 public sealed record PoliticalStateView(
     Guid StateId,

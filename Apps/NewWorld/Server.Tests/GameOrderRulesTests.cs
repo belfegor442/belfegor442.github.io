@@ -175,7 +175,7 @@ public sealed class GameOrderRulesTests
     }
 
     [Fact]
-    public void GameWidePauseVotesDoNotRequireASelectedState()
+    public void GlobalPauseAndResumeOrdersDoNotRequireASelectedStateForActiveMembers()
     {
         var player = new PlayerState { Id = Guid.NewGuid() };
         var stateId = Guid.NewGuid();
@@ -195,7 +195,52 @@ public sealed class GameOrderRulesTests
 
         Assert.Null(GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.PauseWorld));
         Assert.Null(GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.ResumeWorld));
+        Assert.Null(GameOrderRules.CheckMembership(game, player.Id, stateId, GameOrderType.PauseWorld));
+    }
+
+    [Fact]
+    public void UsersWithoutAnActiveMembershipCannotVoteGlobalPauseOrResume()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var game = new WorldState
+        {
+            Players = [player],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = player.Id,
+                    StateId = Guid.NewGuid(),
+                    Status = MembershipStatus.Suspended
+                }
+            ]
+        };
+
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.PauseWorld)?.Code);
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.ResumeWorld)?.Code);
+    }
+
+    [Fact]
+    public void StateSpecificOrdersStillRequireTheSelectedGovernment()
+    {
+        var player = new PlayerState { Id = Guid.NewGuid() };
+        var game = new WorldState
+        {
+            Players = [player],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    PlayerId = player.Id,
+                    StateId = Guid.NewGuid(),
+                    Status = MembershipStatus.Active
+                }
+            ]
+        };
+
         Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, player.Id, null, GameOrderType.ConstructBuilding)?.Code);
+        Assert.Equal("NOT_MEMBER", GameOrderRules.CheckMembership(game, player.Id, Guid.NewGuid(), GameOrderType.ConstructBuilding)?.Code);
+        Assert.Null(GameOrderRules.CheckMembership(game, player.Id, game.Memberships[0].StateId, GameOrderType.ConstructBuilding));
     }
 
     [Fact]
@@ -294,6 +339,34 @@ public sealed class GameOrderRulesTests
         Assert.Equal(900, game.Territories[0].Treasury);
         Assert.Equal(1, game.WorldVersion);
         Assert.Equal("government-observer", Assert.Single(game.Orders).PermissionSetId);
+    }
+
+    [Fact]
+    public void GovernmentRolesCanBeAssignedBeforeTheWorldStarts()
+    {
+        var stateId = Guid.NewGuid();
+        var membershipId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            WorldVersion = 1,
+            Territories = [new TerritoryState { StateId = stateId, Index = 0, Name = "North" }],
+            Memberships =
+            [
+                new GovernmentMembership
+                {
+                    Id = membershipId,
+                    GameId = Guid.NewGuid(),
+                    PlayerId = Guid.NewGuid(),
+                    StateId = stateId,
+                    PermissionSetId = GovernmentPermissionRules.MemberPermissionSetId
+                }
+            ]
+        };
+
+        Assert.Null(GovernmentMembershipRules.SetPermissionSet(game, membershipId, GovernmentPermissionRules.CouncilPermissionSetId));
+        Assert.Equal(GovernmentPermissionRules.CouncilPermissionSetId, game.Memberships.Single().PermissionSetId);
+        Assert.Equal("Unknown government permission set.", GovernmentMembershipRules.SetPermissionSet(game, membershipId, "rogue-role"));
     }
 
     [Fact]

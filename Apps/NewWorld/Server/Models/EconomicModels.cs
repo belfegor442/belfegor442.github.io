@@ -15,6 +15,7 @@ public enum EconomicTransactionType
     MembershipTransfer,
     AdministrationCost,
     ConstructionCost,
+    ResearchFunding,
     DailyBalance
 }
 

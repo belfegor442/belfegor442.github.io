@@ -67,7 +67,8 @@ public static class GovernmentMembershipRules
                     GameId = game.Id,
                     PlayerId = player.Id,
                     StateId = territory.StateId,
-                    JoinedAtWorldDate = game.WorldDate
+                    JoinedAtWorldDate = game.WorldDate,
+                    PermissionSetId = GovernmentPermissionRules.MemberPermissionSetId
                 });
                 if (territory.Treasury != balanceBefore)
                     GameStore.AddEconomicTransaction(
@@ -78,6 +79,24 @@ public static class GovernmentMembershipRules
             }
         }
 
+        return null;
+    }
+
+    public static string? SetPermissionSet(
+        WorldState game,
+        Guid membershipId,
+        string permissionSetId)
+    {
+        if (!GovernmentPermissionRules.IsKnown(permissionSetId))
+            return "Unknown government permission set.";
+
+        var membership = game.Memberships.SingleOrDefault(item => item.Id == membershipId);
+        if (membership is null)
+            return "Government membership not found.";
+        if (game.Started)
+            return "Government roles are locked after the world starts.";
+
+        membership.PermissionSetId = permissionSetId;
         return null;
     }
 }

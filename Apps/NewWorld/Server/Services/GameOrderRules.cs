@@ -14,6 +14,8 @@ public static class GameOrderRules
         "negotiateTreaty" => GameOrderType.NegotiateTreaty,
         "mobilizeUnit" => GameOrderType.MobilizeUnit,
         "startProject" => GameOrderType.StartProject,
+        "cancelProject" => GameOrderType.CancelProject,
+        "adoptTechnology" => GameOrderType.AdoptTechnology,
         "voteDecision" => GameOrderType.VotePoliticalDecision,
         "pause" => GameOrderType.PauseWorld,
         "resume" => GameOrderType.ResumeWorld,
@@ -119,9 +121,10 @@ public static class GameOrderRules
     public static OrderRejection? CheckMembership(
         WorldState game, Guid playerId, Guid? stateId, GameOrderType? orderType = null)
     {
-        var activeMembership = game.Memberships.FirstOrDefault(membership =>
-            membership.PlayerId == playerId && membership.Status == MembershipStatus.Active);
-        if (activeMembership is null)
+        var hasActiveMembership = game.Memberships.Any(membership =>
+            membership.PlayerId == playerId &&
+            membership.Status == MembershipStatus.Active);
+        if (!hasActiveMembership)
             return new OrderRejection("NOT_MEMBER", "This player has not been assigned a state.");
 
         if (orderType is GameOrderType.PauseWorld or GameOrderType.ResumeWorld)

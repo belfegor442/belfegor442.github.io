@@ -94,6 +94,7 @@ a { color: inherit; }
   align-items: stretch;
   gap: 5px;
   padding: 8px 5px;
+  overflow-y: auto;
   border-right: 1px solid var(--line);
   background: #20241f;
 }

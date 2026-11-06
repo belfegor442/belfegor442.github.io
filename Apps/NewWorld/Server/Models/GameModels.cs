@@ -16,6 +16,7 @@ public sealed class WorldState
     public int EconomyVersion { get; set; }
     public string ScenarioId { get; set; } = "beleland";
     public string ScenarioVersion { get; set; } = "1.0";
+    public int MapGeometryVersion { get; set; } = 1;
     public int MaxHumanPlayers { get; set; } = GameCatalog.MaxHumanPlayers;
     public DateTimeOffset LastTickUtc { get; set; }
     public long ClockAccumulatorTicks { get; set; }
@@ -24,6 +25,24 @@ public sealed class WorldState
     public List<PlayerState> Players { get; set; } = [];
     public List<GovernmentMembership> Memberships { get; set; } = [];
     public List<TerritoryState> Territories { get; set; } = [];
+    public List<Province> Provinces { get; set; } = [];
+    public List<Settlement> Settlements { get; set; } = [];
+    public List<ProvinceConnection> ProvinceConnections { get; set; } = [];
+    public List<TerritorialControl> TerritorialControls { get; set; } = [];
+    public List<SovereigntyHistory> SovereigntyHistory { get; set; } = [];
+    public List<MilitaryUnitType> MilitaryUnitTypes { get; set; } = [];
+    public List<MilitaryCommander> MilitaryCommanders { get; set; } = [];
+    public List<MilitaryUnit> MilitaryUnits { get; set; } = [];
+    public List<MilitaryOrder> MilitaryOrders { get; set; } = [];
+    public List<MilitaryBattle> MilitaryBattles { get; set; } = [];
+    public List<MilitaryRoute> MilitaryRoutes { get; set; } = [];
+    public List<SupplyRoute> SupplyRoutes { get; set; } = [];
+    public List<Occupation> Occupations { get; set; } = [];
+    public List<Technology> Technologies { get; set; } = [];
+    public List<ResearchInstitution> ResearchInstitutions { get; set; } = [];
+    public List<ResearchProject> ResearchProjects { get; set; } = [];
+    public List<TechnologyUnlock> TechnologyUnlocks { get; set; } = [];
+    public List<TechnologyAdoption> TechnologyAdoptions { get; set; } = [];
     public List<StatePoliticalSystem> PoliticalSystems { get; set; } = [];
     public List<EconomicGood> Goods { get; set; } = [];
     public List<ProductionRecipe> ProductionRecipes { get; set; } = [];
@@ -67,6 +86,8 @@ public enum GameOrderType
     NegotiateTreaty,
     MobilizeUnit,
     StartProject,
+    CancelProject,
+    AdoptTechnology,
     VotePoliticalDecision,
     PauseWorld,
     ResumeWorld,
@@ -120,7 +141,15 @@ public sealed record GameOrderPayload(
     PoliticalVoteChoice? VoteChoice = null,
     Guid? OfficeId = null,
     Guid? AppointeePlayerId = null,
-    int? ProposedBudget = null);
+    int? ProposedBudget = null,
+    Guid? MilitaryUnitId = null,
+    MilitaryOrderType? MilitaryOrderType = null,
+    Guid? DestinationProvinceId = null,
+    Guid? MilitaryRouteId = null,
+    Guid? ResearchProjectId = null,
+    string? TechnologyId = null,
+    string? ResearchSector = null,
+    Guid? ProvinceId = null);
 
 public sealed record OrderRejection(string Code, string Message);
 public sealed record GameOrderResult(Guid Id, bool Accepted, string? Code, string? Error, bool Replayed);
@@ -168,6 +197,7 @@ public sealed record BuildingState(string Id, string Name, int Cost, int Income,
 public sealed record CreateGameRequest(string PlayerName);
 public sealed record JoinGameRequest(string InviteCode, string PlayerName);
 public sealed record AssignCountryRequest(Guid PlayerId, int? CountryIndex);
+public sealed record UpdateGovernmentPermissionRequest(Guid MembershipId, string PermissionSetId);
 public sealed record ApiError(string Error);
 public sealed record SessionResponse(Guid GameId, string InviteCode, Guid PlayerId, string PlayerToken, GameSnapshot Game);
 public sealed record GameSnapshot(
@@ -199,7 +229,25 @@ public sealed record GameSnapshot(
     IReadOnlyList<EconomicTransaction> FinancialTransactions,
     IReadOnlyList<CompanyFinancialTransaction> CompanyFinancialTransactions,
     IReadOnlyList<MarketSettlement> MarketHistory,
-    IReadOnlyList<EconomicCompanyView> Companies);
+    IReadOnlyList<EconomicCompanyView> Companies,
+    IReadOnlyList<Province> Provinces,
+    IReadOnlyList<Settlement> Settlements,
+    IReadOnlyList<ProvinceConnection> ProvinceConnections,
+    IReadOnlyList<TerritorialControl> TerritorialControls,
+    IReadOnlyList<SovereigntyHistory> SovereigntyHistory,
+    IReadOnlyList<MilitaryUnitType> MilitaryUnitTypes,
+    IReadOnlyList<MilitaryCommander> MilitaryCommanders,
+    IReadOnlyList<MilitaryUnit> MilitaryUnits,
+    IReadOnlyList<MilitaryOrder> MilitaryOrders,
+    IReadOnlyList<MilitaryBattle> MilitaryBattles,
+    IReadOnlyList<MilitaryRoute> MilitaryRoutes,
+    IReadOnlyList<SupplyRoute> SupplyRoutes,
+    IReadOnlyList<Occupation> Occupations,
+    IReadOnlyList<Technology> Technologies,
+    IReadOnlyList<ResearchInstitution> ResearchInstitutions,
+    IReadOnlyList<ResearchProject> ResearchProjects,
+    IReadOnlyList<TechnologyUnlock> TechnologyUnlocks,
+    IReadOnlyList<TechnologyAdoption> TechnologyAdoptions);
 public sealed record PlayerView(
     Guid Id, string Name, bool IsHost, int? CountryIndex, int Treasury,
     IReadOnlyDictionary<int, BuildingState> Buildings, bool Connected,
@@ -217,21 +265,46 @@ public sealed record ClientMessage(
     Guid? DecisionId = null, string? DecisionTitle = null, string? DecisionText = null,
     PoliticalVoteChoice? VoteChoice = null,
     Guid? OfficeId = null, Guid? AppointeePlayerId = null,
-    int? ProposedBudget = null);
+    int? ProposedBudget = null,
+    Guid? MilitaryUnitId = null,
+    MilitaryOrderType? MilitaryOrderType = null,
+    Guid? DestinationProvinceId = null,
+    Guid? MilitaryRouteId = null,
+    Guid? ResearchProjectId = null,
+    string? TechnologyId = null,
+    string? ResearchSector = null,
+    Guid? ProvinceId = null);
 public sealed record ServerMessage(
     string Type, string? Error = null, GameSnapshot? Game = null, GameOrderResult? Order = null);
+
+public sealed record InitialTerritoryDefinition(string StableKey, string Name);
 
 public static class GameCatalog
 {
     public const int MaxHumanPlayers = 20;
 
-    public static readonly string[] TerritoryNames =
+    public static readonly InitialTerritoryDefinition[] InitialTerritories =
     [
-        "Kingdom of Coimbrila", "United Provinces of Gania", "Chungia", "Calcilacia",
-        "Pician Empire", "Meityeun Theocracy", "Swabing", "Alba", "Knosian Despotate",
-        "Kalestos", "Gorkirch", "Duchy of Shonewesia", "Shahtehaq", "Kvinian Empire",
-        "Shi", "Kueopia"
+        new("coimbrila", "Kingdom of Coimbrila"),
+        new("gania", "United Provinces of Gania"),
+        new("chungia", "Chungia"),
+        new("calcilacia", "Calcilacia"),
+        new("pician-empire", "Pician Empire"),
+        new("meityeun-theocracy", "Meityeun Theocracy"),
+        new("swabing", "Swabing"),
+        new("alba", "Alba"),
+        new("knosian-despotate", "Knosian Despotate"),
+        new("kalestos", "Kalestos"),
+        new("gorkirch", "Gorkirch"),
+        new("shonewesia", "Duchy of Shonewesia"),
+        new("shahtehaq", "Shahtehaq"),
+        new("kvinian-empire", "Kvinian Empire"),
+        new("shi", "Shi"),
+        new("kueopia", "Kueopia")
     ];
+
+    public static readonly string[] TerritoryNames =
+        InitialTerritories.Select(item => item.Name).ToArray();
 
     public static readonly IReadOnlyDictionary<string, BuildingState> Buildings =
         new Dictionary<string, BuildingState>(StringComparer.Ordinal)

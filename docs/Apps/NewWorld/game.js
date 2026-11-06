@@ -67,6 +67,15 @@
       order.gameId === onlineSession?.gameId && order.playerId === onlineSession?.playerId);
   }
 
+  function discardPendingOrdersForCurrentSession() {
+    const remaining = getPendingOrders().filter(order =>
+      order.gameId !== onlineSession?.gameId || order.playerId !== onlineSession?.playerId);
+    if (!savePendingOrders(remaining)) return false;
+    sentOrderIds.clear();
+    renderMultiplayer();
+    return true;
+  }
+
   function removePendingOrder(orderId) {
     const remaining = getPendingOrders().filter(order => order.orderId !== orderId);
     if (savePendingOrders(remaining)) {
@@ -77,7 +86,7 @@
 
   function replayPendingOrders(currentSocket) {
     if (currentSocket !== socket || currentSocket.readyState !== WebSocket.OPEN ||
-        sentOrderIds.size > 0) return;
+        sentOrderIds.size > 0 || recoveryOrdersNeedCleanup) return;
     const order = ordersForCurrentSession()[0];
     if (!order || sentOrderIds.has(order.orderId)) return;
     try {
@@ -100,11 +109,13 @@
   let reconnectTimer = null;
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
+  let recoveryOrdersNeedCleanup = false;
   let selectedPlot = null;
   let zoom = 1;
   let pan = {x: 0, y: 0};
   let drag = null;
   let hoveredState = null;
+  let selectedProvinceId = null;
 
   function toast(message) {
     const element = $('toast');
@@ -208,6 +219,9 @@
     renderMultiplayer();
     renderEconomy();
     renderGovernment();
+    renderTerritory();
+    renderMilitary();
+    renderTechnology();
     if (state.selected !== null) selectState(state.selected, false);
   }
 
@@ -324,6 +338,456 @@
         (origin?.name || 'Unknown State') + ' → ' + (destination?.name || 'Unknown State') +
           ' · ' + (good?.name || route.goodId),
         (route.enabled ? 'Active' : 'Suspended') + bilateralTerms);
+    }
+  }
+
+  function renderTerritory() {
+    const provinceList = $('province-list');
+    const settlementList = $('settlement-list');
+    const controlList = $('territorial-control-list');
+    for (const list of [provinceList, settlementList, controlList]) list.replaceChildren();
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    $('territory-title').textContent = territory?.name || 'Territorial administration';
+    $('territory-setup-panel').hidden = !canConfigureScenario();
+    if (!onlineGame || !territory) {
+      $('territory-status').textContent = 'Connect to a multiplayer world and select a State to inspect territorial data.';
+      addPoliticalRow(provinceList, 'No province data', 'Province records are loaded from the server scenario.');
+      addPoliticalRow(settlementList, 'No settlement data', 'Settlement records are loaded from the server scenario.');
+      addPoliticalRow(controlList, 'No control history', 'Control and sovereignty records are kept separately.');
+      return;
+    }
+
+    const provinces = (onlineGame.provinces || []).filter(item =>
+      item.sovereignStateId === territory.stateId);
+    const selectedProvince = provinces.find(item => item.id === selectedProvinceId);
+    $('territory-status').textContent = provinces.length
+      ? provinces.length + ' configured province(s) · sovereignty and effective control are distinct.' +
+        (selectedProvince ? ' Selected: ' + selectedProvince.name + '.' : '')
+      : 'Province configuration is pending for this State.';
+    if (!provinces.length) addPoliticalRow(provinceList, 'No provinces configured', 'No province values are inferred from the map.');
+    for (const province of provinces) {
+      const currentControls = (onlineGame.territorialControls || []).filter(item =>
+        item.provinceId === province.id);
+      addPoliticalRow(
+        provinceList,
+        province.name,
+        'SVG mapping: ' + province.svgElementId + ' · population: ' +
+          Number(province.population).toLocaleString('en-US') + ' · terrain: ' +
+          (province.terrainId || 'pending') + ' · control records: ' + currentControls.length);
+    }
+
+    const provinceIds = new Set(provinces.map(item => item.id));
+    const settlements = (onlineGame.settlements || []).filter(item =>
+      provinceIds.has(item.provinceId));
+    if (!settlements.length) addPoliticalRow(settlementList, 'No settlements configured', 'No settlement data is available.');
+    for (const settlement of settlements) {
+      addPoliticalRow(
+        settlementList,
+        settlement.name + ' · ' + settlement.type,
+        Number(settlement.population).toLocaleString('en-US') + ' residents · province ' +
+          (provinces.find(item => item.id === settlement.provinceId)?.name || 'unknown'));
+    }
+
+    const controls = (onlineGame.territorialControls || []).filter(item =>
+      provinceIds.has(item.provinceId));
+    const sovereignty = (onlineGame.sovereigntyHistory || []).filter(item =>
+      provinceIds.has(item.provinceId));
+    if (!controls.length && !sovereignty.length)
+      addPoliticalRow(controlList, 'No control or sovereignty changes', 'No changes are recorded.');
+    for (const item of controls) {
+      const province = provinces.find(candidate => candidate.id === item.provinceId);
+      const stateName = onlineGame.territories.find(candidate => candidate.stateId === item.stateId)?.name;
+      addPoliticalRow(
+        province?.name || 'Province',
+        String(item.type) + ' control · ' + formatWorldDate(item.effectiveFrom),
+        (stateName || 'Unknown State') + ' · ' + item.cause);
+    }
+    for (const item of sovereignty) {
+      const province = provinces.find(candidate => candidate.id === item.provinceId);
+      const previous = onlineGame.territories.find(candidate => candidate.stateId === item.previousStateId)?.name;
+      const next = onlineGame.territories.find(candidate => candidate.stateId === item.newStateId)?.name;
+      addPoliticalRow(
+        province?.name || 'Province',
+        'Sovereignty · ' + formatWorldDate(item.effectiveOn),
+        (previous || 'No previous State') + ' → ' + (next || 'Unknown State') +
+          ' · ' + item.legalMechanism);
+    }
+  }
+
+  function renderMilitary() {
+    const unitsList = $('military-unit-list');
+    const operationsList = $('military-operation-list');
+    const occupationsList = $('occupation-list');
+    for (const list of [unitsList, operationsList, occupationsList]) list.replaceChildren();
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    $('military-title').textContent = territory?.name
+      ? territory.name + ' · Military situation'
+      : 'Military situation';
+    $('military-setup-panel').hidden = !canConfigureScenario();
+    if (!onlineGame || !territory) {
+      $('military-status').textContent = 'Connect to a multiplayer world and select a State to inspect military data.';
+      addPoliticalRow(unitsList, 'No military units', 'No server-authoritative unit data is available.');
+      addPoliticalRow(operationsList, 'No operations or battles', 'Operations are recorded by the server.');
+      addPoliticalRow(occupationsList, 'No occupation data', 'Occupation never changes sovereignty by itself.');
+      return;
+    }
+
+    const units = (onlineGame.militaryUnits || []).filter(item => item.stateId === territory.stateId);
+    $('military-status').textContent = units.length
+      ? units.length + ' configured unit(s) · movement and combat values come from the server.'
+      : 'Military scenario configuration is pending for this State.';
+    if (!units.length) addPoliticalRow(unitsList, 'No units configured', 'Unit composition and combat balance are not inferred.');
+    for (const unit of units) {
+      const type = (onlineGame.militaryUnitTypes || []).find(item => item.id === unit.unitTypeId);
+      const province = (onlineGame.provinces || []).find(item => item.id === unit.provinceId);
+      const commander = (onlineGame.militaryCommanders || []).find(item => item.id === unit.commanderId);
+      const row = addPoliticalRow(
+        unitsList,
+        type?.name || unit.unitTypeId,
+        Number(unit.personnel).toLocaleString('en-US') + ' personnel · ' +
+          String(unit.status) + ' · province ' + (province?.name || 'unknown'),
+        'Training ' + unit.training + ' · morale ' + unit.morale + ' · experience ' +
+          unit.experience + ' · commander ' + (commander?.name || 'unassigned'));
+      const membership = membershipsFor(currentPlayer()).find(item =>
+        item.stateId === territory.stateId);
+      const canCommand = Boolean(membership &&
+        (type?.commandPermissionSetIds || []).includes(membership.permissionSetId));
+      if (canCommand) {
+        for (const route of (onlineGame.militaryRoutes || []).filter(item =>
+          item.enabled && item.originProvinceId === unit.provinceId)) {
+          const button = document.createElement('button');
+          button.className = 'secondary-button';
+          button.type = 'button';
+          button.textContent = 'MOVE TO ' +
+            ((onlineGame.provinces || []).find(item =>
+              item.id === route.destinationProvinceId)?.name || 'DESTINATION');
+          button.addEventListener('click', () => sendAction({
+            type: 'mobilizeUnit',
+            stateId: territory.stateId,
+            militaryOrderType: 'move',
+            militaryUnitId: unit.id,
+            destinationProvinceId: route.destinationProvinceId,
+            militaryRouteId: route.id
+          }));
+          row.appendChild(button);
+        }
+      }
+    }
+
+    const stateProvinceIds = new Set((onlineGame.provinces || [])
+      .filter(item => item.sovereignStateId === territory.stateId)
+      .map(item => item.id));
+    const orders = (onlineGame.militaryOrders || []).filter(item => item.stateId === territory.stateId);
+    const battles = (onlineGame.militaryBattles || []).filter(item =>
+      stateProvinceIds.has(item.provinceId));
+    if (!orders.length && !battles.length)
+      addPoliticalRow(operationsList, 'No military operations', 'No orders or battles have been recorded.');
+    for (const order of orders) {
+      const unit = units.find(item => item.id === order.unitId);
+      addPoliticalRow(
+        String(order.type) + ' · ' + String(order.status),
+        (unit?.unitTypeId || 'Unit') + ' · submitted ' +
+          formatWorldDate(order.submittedOnWorldDate),
+        order.rejectionReason || 'Remaining travel days: ' + order.travelDaysRemaining);
+    }
+    for (const battle of battles) {
+      const casualtyCount = Object.values(battle.casualtiesByUnit || {})
+        .flatMap(item => Object.values(item || {}))
+        .reduce((sum, value) => sum + Number(value || 0), 0);
+      addPoliticalRow(
+        'Battle · ' + formatWorldDate(battle.worldDate),
+        ((onlineGame.provinces || []).find(item => item.id === battle.provinceId)?.name || 'Unknown location') +
+          ' · ' + battle.participantUnitIds.length + ' units · ' +
+          casualtyCount.toLocaleString('en-US') + ' recorded casualties',
+        battle.result || 'Result not recorded');
+    }
+
+    const occupations = (onlineGame.occupations || []).filter(item =>
+      stateProvinceIds.has(item.provinceId) || item.occupyingStateId === territory.stateId);
+    if (!occupations.length)
+      addPoliticalRow(occupationsList, 'No active occupation records', 'Sovereignty remains unchanged unless a valid legal transfer is recorded.');
+    for (const occupation of occupations) {
+      const province = (onlineGame.provinces || []).find(item => item.id === occupation.provinceId);
+      const occupyingState = onlineGame.territories.find(item =>
+        item.stateId === occupation.occupyingStateId)?.name;
+      addPoliticalRow(
+        province?.name || 'Province',
+        'Occupied by ' + (occupyingState || 'Unknown State') +
+          ' · since ' + formatWorldDate(occupation.startedOn),
+        'Force ' + occupation.occupyingForce + ' · resistance ' + occupation.resistance +
+          ' · duration ' + occupation.durationDays + ' / ' +
+          (occupation.requiredControlDays || 'pending') + ' days' +
+          ' · effective control ' +
+          (occupation.controlEffective ? 'established' : 'not established') +
+          ' · sovereignty unchanged');
+    }
+  }
+
+  function renderTechnology() {
+    const technologyList = $('technology-list');
+    const projectList = $('research-project-list');
+    const adoptionList = $('technology-adoption-list');
+    for (const list of [technologyList, projectList, adoptionList]) list.replaceChildren();
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    $('technology-setup-panel').hidden = !canConfigureScenario();
+    if (!onlineGame) {
+      $('technology-status').textContent = 'Connect to a multiplayer world to load technology data.';
+      addPoliticalRow(technologyList, 'No technology catalog', 'Research does not unlock automatically by date.');
+      addPoliticalRow(projectList, 'No research projects', 'Project progress depends on configured rules.');
+      addPoliticalRow(adoptionList, 'No adoption records', 'Discovery and adoption are separate states.');
+      return;
+    }
+
+    const technologies = onlineGame.technologies || [];
+    const stateId = territory?.stateId;
+    const stateUnlocks = (onlineGame.technologyUnlocks || [])
+      .filter(item => item.stateId === stateId)
+      .map(item => item.technologyId);
+    const unlockedIds = new Set(stateUnlocks);
+    const adoptedIds = new Set((onlineGame.technologyAdoptions || [])
+      .filter(item => item.stateId === stateId)
+      .map(item => item.technologyId));
+    const stateProjects = (onlineGame.researchProjects || [])
+      .filter(item => item.stateId === stateId);
+    const stateInstitutions = (onlineGame.researchInstitutions || [])
+      .filter(item => item.stateId === stateId);
+    const stateTreasury = onlineGame.territories.find(item => item.stateId === stateId)?.treasury || 0;
+    $('technology-status').textContent = technologies.length
+      ? technologies.length + ' catalog entry(s) · selected State: ' +
+        (territory?.name || 'none') + ' · discovery does not imply adoption.'
+      : 'Technology catalog and initial knowledge are pending scenario data.';
+    if (!technologies.length) addPoliticalRow(technologyList, 'No technology catalog', 'No unlocks are inferred.');
+    for (const technology of technologies) {
+      const prerequisites = (technology.prerequisiteTechnologyIds || [])
+        .map(id => technologies.find(item => item.id === id)?.name || id);
+      const project = stateProjects.find(item => item.technologyId === technology.id &&
+        ['proposed', 'active', 'suspended'].includes(String(item.status).toLowerCase()));
+      const institution = stateInstitutions.find(item => item.id === project?.institutionId);
+      const missingPrerequisite = (technology.prerequisiteTechnologyIds || [])
+        .some(id => !unlockedIds.has(id));
+      const missingKnowledge = Object.keys(technology.requiredKnowledge || {})
+        .some(id => !unlockedIds.has(id));
+      const missingMaterials = Object.entries(technology.requiredMaterials || {})
+        .some(([id, quantity]) => Number(project?.materialsReserved?.[id] || 0) < Number(quantity));
+      const enoughFunding = project && institution &&
+        Number(project.dailyFunding) > 0 &&
+        Number(project.dailyProgress) > 0 &&
+        (String(project.status).toLowerCase() === 'suspended'
+          ? Number(project.fundingRemaining) >=
+            Math.ceil(Math.max(0, Number(project.requiredProgress) - Number(project.progress)) /
+              Math.max(1, Number(project.dailyProgress))) * Number(project.dailyFunding)
+          : Number(project.budget) >= Number(project.dailyFunding) &&
+            Number(project.budget) >=
+              Math.ceil(Math.max(0, Number(project.requiredProgress) - Number(project.progress)) /
+                Math.max(1, Number(project.dailyProgress))) * Number(project.dailyFunding) &&
+            (String(institution.type).toLowerCase() === 'private'
+              ? Number(institution.funding) >= Number(project.budget)
+              : stateTreasury >= Number(project.budget)));
+      const enoughStaff = project && institution &&
+        Number(project.staff) > 0 && Number(project.staff) <= Number(institution.staff);
+      const status = adoptedIds.has(technology.id) ? 'adopted'
+        : unlockedIds.has(technology.id) ? 'discovered'
+          : project && String(project.status).toLowerCase() === 'active' ? 'in progress'
+            : project && String(project.status).toLowerCase() === 'suspended' ? 'suspended'
+              : project && !missingPrerequisite && !missingKnowledge &&
+                  !missingMaterials && enoughFunding && enoughStaff ? 'researchable'
+                : project ? 'blocked' : 'not configured';
+      const row = addPoliticalRow(
+        technology.name,
+        String(technology.domain) + ' · ' + status,
+        'Prerequisites: ' + (prerequisites.join(', ') || 'none') +
+          (missingKnowledge
+            ? ' · required knowledge unavailable'
+            : '') +
+          (missingMaterials
+            ? ' · required materials not reserved'
+            : '') +
+          (project && !enoughFunding
+            ? ' · configured funding unavailable'
+            : '') +
+          (project && !enoughStaff
+            ? ' · configured staff unavailable'
+            : '') +
+          ' · effects: ' + ((technology.effects || []).map(item => item.effectId).join(', ') || 'not configured'));
+      const adoptedAtState = (onlineGame.technologyAdoptions || []).some(item =>
+        item.stateId === stateId &&
+        item.technologyId === technology.id &&
+        !item.provinceId &&
+        !item.sector);
+      if (unlockedIds.has(technology.id) && !adoptedAtState) {
+        const adoptButton = document.createElement('button');
+        adoptButton.type = 'button';
+        adoptButton.className = 'secondary-button';
+        adoptButton.textContent = 'Adopt for State';
+        const membership = membershipsFor(currentPlayer())
+          .find(item => item.stateId === stateId);
+        adoptButton.disabled = !stateId ||
+          !membership ||
+          membership.permissionSetId === 'government-observer' ||
+          socket?.readyState !== WebSocket.OPEN;
+        adoptButton.addEventListener('click', () => sendAction({
+          type: 'adoptTechnology',
+          stateId,
+          technologyId: technology.id
+        }));
+        row.appendChild(adoptButton);
+      }
+    }
+
+    const institutions = stateInstitutions;
+    const projects = stateProjects;
+    if (!institutions.length && !projects.length)
+      addPoliticalRow(projectList, 'No research institutions or projects', 'Research rules and funding are not inferred.');
+    for (const institution of institutions) {
+      addPoliticalRow(
+        institution.name,
+        String(institution.type) + ' · ' + institution.staff + ' staff · funding ' + institution.funding,
+        'Specializations: ' + (institution.specializations || []).join(', ') || 'No specialization recorded.');
+    }
+    for (const project of projects) {
+      const technology = technologies.find(item => item.id === project.technologyId);
+      const row = addPoliticalRow(
+        technology?.name || project.technologyId,
+        String(project.status) + ' · progress ' + project.progress + ' / ' + project.requiredProgress,
+        'Started ' + formatWorldDate(project.startedOn) + ' · configured daily progress ' +
+          (project.dailyProgress || 0) + ' · daily funding ' + (project.dailyFunding || 0) +
+          ' · reserved materials ' +
+          Object.entries(project.materialsReserved || {})
+            .map(([id, amount]) => id + ': ' + amount).join(', '));
+      if (['proposed', 'suspended'].includes(String(project.status).toLowerCase())) {
+        const startButton = document.createElement('button');
+        startButton.type = 'button';
+        startButton.className = 'secondary-button';
+        startButton.textContent =
+          String(project.status).toLowerCase() === 'suspended'
+            ? 'Resume research'
+            : 'Start research';
+        const projectTechnology = technologies.find(item => item.id === project.technologyId);
+        const projectInstitution = institutions.find(item => item.id === project.institutionId);
+        const membership = membershipsFor(currentPlayer())
+          .find(item => item.stateId === stateId);
+        const projectNeeds = projectTechnology?.requiredMaterials || {};
+        const isResuming = String(project.status).toLowerCase() === 'suspended';
+        const configuredFunding = isResuming
+          ? Number(project.fundingRemaining) >=
+            Math.ceil(Math.max(0, Number(project.requiredProgress) - Number(project.progress)) /
+              Math.max(1, Number(project.dailyProgress))) * Number(project.dailyFunding)
+          : Number(project.budget) >= Number(project.dailyFunding) &&
+            Number(project.budget) >=
+              Math.ceil(Number(project.requiredProgress) / Number(project.dailyProgress)) *
+                Number(project.dailyFunding) &&
+            (String(projectInstitution?.type).toLowerCase() === 'private'
+              ? Number(projectInstitution?.funding) >= Number(project.budget)
+              : stateTreasury >= Number(project.budget));
+        const validProjectConfiguration = projectTechnology && projectInstitution &&
+          Number(project.dailyProgress) > 0 &&
+          Number(project.dailyFunding) > 0 &&
+          Number(project.staff) > 0 &&
+          Number(project.staff) <= Number(projectInstitution.staff) &&
+          configuredFunding &&
+          Object.keys(projectTechnology.requiredKnowledge || {})
+            .every(id => unlockedIds.has(id)) &&
+          (projectTechnology.prerequisiteTechnologyIds || [])
+            .every(id => unlockedIds.has(id)) &&
+          Object.entries(projectNeeds)
+            .every(([id, quantity]) => Number(project.materialsReserved?.[id] || 0) >= Number(quantity)) &&
+          (!isResuming || Number(project.fundingRemaining) >= Number(project.dailyFunding));
+        startButton.disabled = !stateId ||
+          !membership ||
+          ['government-observer'].includes(membership.permissionSetId) ||
+          !validProjectConfiguration ||
+          socket?.readyState !== WebSocket.OPEN;
+        startButton.addEventListener('click', () => sendAction({
+          type: 'startProject',
+          stateId,
+          researchProjectId: project.id
+        }));
+        row.appendChild(startButton);
+        if (!validProjectConfiguration) {
+          const restriction = document.createElement('span');
+          restriction.textContent =
+            'Cannot start: configure eligible staff, prerequisites, reserved materials, daily progress, and sufficient funding.';
+          row.appendChild(restriction);
+        }
+      }
+      if (!['completed', 'cancelled'].includes(String(project.status).toLowerCase())) {
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.className = 'secondary-button';
+        cancelButton.textContent = 'Cancel project';
+        const membership = membershipsFor(currentPlayer())
+          .find(item => item.stateId === stateId);
+        cancelButton.disabled = !stateId ||
+          !membership ||
+          membership.permissionSetId === 'government-observer' ||
+          socket?.readyState !== WebSocket.OPEN;
+        cancelButton.addEventListener('click', () => sendAction({
+          type: 'cancelProject',
+          stateId,
+          researchProjectId: project.id
+        }));
+        row.appendChild(cancelButton);
+      }
+    }
+
+    const adoptions = (onlineGame.technologyAdoptions || []).filter(item =>
+      item.stateId === stateId);
+    if (!adoptions.length) addPoliticalRow(adoptionList, 'No adoption records', 'No technology is assumed to be in use.');
+    for (const adoption of adoptions) {
+      const technology = technologies.find(item => item.id === adoption.technologyId);
+      addPoliticalRow(
+        technology?.name || adoption.technologyId,
+        (adoption.sector || 'State-wide') + ' · ' + formatWorldDate(adoption.adoptedOn),
+        adoption.cause);
+    }
+  }
+
+  function canConfigureScenario() {
+    return Boolean(onlineGame && !onlineGame.started &&
+      onlineGame.hostPlayerId === onlineSession?.playerId);
+  }
+
+  function loadScenarioConfiguration(textareaId, fields) {
+    if (!onlineGame) return;
+    const configuration = {};
+    for (const [requestKey, snapshotKey] of Object.entries(fields))
+      configuration[requestKey] = onlineGame[snapshotKey] || [];
+    $(textareaId).value = JSON.stringify(configuration, null, 2);
+  }
+
+  async function saveScenarioConfiguration(endpoint, textareaId, keys, label) {
+    if (!canConfigureScenario()) {
+      showMessage('Only the host can configure this technical scenario before the world starts.', true);
+      return;
+    }
+
+    let configuration;
+    try {
+      configuration = JSON.parse($(textareaId).value);
+    } catch (error) {
+      showMessage(label + ' scenario JSON is invalid: ' +
+        (error instanceof Error ? error.message : 'parse error'), true);
+      return;
+    }
+    if (!configuration || keys.some(key => !Array.isArray(configuration[key]))) {
+      showMessage(label + ' scenario requires: ' + keys.join(', ') + '.', true);
+      return;
+    }
+    try {
+      const game = await apiRequest(
+        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/' + endpoint,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...configuration,
+            expectedWorldVersion: onlineGame.worldVersion
+          })
+        },
+        onlineSession.playerToken);
+      applySnapshot(game);
+      showMessage(label + ' scenario validated and saved.');
+    } catch (error) {
+      showServerError(error);
     }
   }
 
@@ -663,6 +1127,10 @@
     state.selected = index;
     const territory = state.states[index];
     const territoryView = onlineGame?.territories[index];
+    if (selectedProvinceId &&
+        onlineGame?.provinces.find(item => item.id === selectedProvinceId)?.sovereignStateId !==
+          territoryView?.stateId)
+      selectedProvinceId = null;
     const owner = onlineGame?.players.find(player => player.id === territoryView?.ownerPlayerId);
     const governmentMembers = governmentMembersFor(territoryView);
     const mine = state.owned.includes(index);
@@ -732,6 +1200,17 @@
     highlightMap(index);
   }
 
+  function selectProvince(province) {
+    const territory = onlineGame?.territories.find(item =>
+      item.stateId === province.sovereignStateId);
+    if (!territory) return;
+    selectState(territory.index, false);
+    selectedProvinceId = province.id;
+    renderTerritory();
+    highlightMap(territory.index);
+    document.querySelector('.tab[data-view="territory"]')?.click();
+  }
+
   function highlightMap(selectedIndex) {
     const object = $('world-map');
     try {
@@ -753,6 +1232,15 @@
         path.style.stroke = governmentMembers.length || owner ? '#d8e6ae' : '#59645c';
         path.style.strokeWidth = index === selectedIndex ? '3' : '1.1';
         path.style.filter = index === selectedIndex ? 'brightness(1.18)' : 'none';
+      }
+      for (const province of onlineGame?.provinces || []) {
+        const element = document.getElementById(province.svgElementId);
+        if (!element) continue;
+        const selected = province.id === selectedProvinceId;
+        element.style.cursor = 'pointer';
+        element.style.pointerEvents = 'all';
+        element.style.stroke = selected ? '#f3d37a' : '';
+        element.style.strokeWidth = selected ? '3' : '';
       }
     } catch (error) {
       console.warn('[new-world] Could not update map territory styles:', error);
@@ -783,6 +1271,14 @@
     const target = event.target.closest?.('[id^="state"]');
     if (target && /^state(?:[1-9]|1[0-6])$/.test(target.id)) return target;
     return territoryAtPoint(svgDocument, event);
+  }
+
+  function provinceAtEvent(event) {
+    for (let element = event.target; element?.id; element = element.parentElement) {
+      const province = onlineGame?.provinces.find(item => item.svgElementId === element.id);
+      if (province) return province;
+    }
+    return null;
   }
 
   const map = $('world-map');
@@ -823,6 +1319,11 @@
       return;
     }
     svgDocument.addEventListener('click', event => {
+      const province = provinceAtEvent(event);
+      if (province) {
+        selectProvince(province);
+        return;
+      }
       const path = territoryAtEvent(svgDocument, event);
       if (path) selectState(Number(path.id.slice(5)) - 1);
     });
@@ -838,22 +1339,27 @@
         hideMapTooltip();
         return;
       }
+      const province = provinceAtEvent(event);
       const path = territoryAtEvent(svgDocument, event);
-      if (!path) {
+      if (!path && !province) {
         hideMapTooltip();
         return;
       }
-      const index = Number(path.id.slice(5)) - 1;
+      const stateIndex = path
+        ? Number(path.id.slice(5)) - 1
+        : onlineGame?.territories.find(item => item.stateId === province.sovereignStateId)?.index;
       if (hoveredState !== path) {
         if (hoveredState) hoveredState.style.filter =
           Number(hoveredState.id.slice(5)) - 1 === state.selected ? 'brightness(1.18)' : 'none';
         hoveredState = path;
-        path.style.filter = 'brightness(1.15)';
+        if (path) path.style.filter = 'brightness(1.15)';
       }
       const mapRect = map.getBoundingClientRect();
       const svgRect = svgDocument.documentElement.getBoundingClientRect();
       const viewRect = viewport.getBoundingClientRect();
-      mapTooltip.textContent = names[index] + ' · ' + state.states[index].pop.toLocaleString('en-US') + ' POP';
+      mapTooltip.textContent = province
+        ? province.name + ' · ' + Number(province.population).toLocaleString('en-US') + ' POP'
+        : names[stateIndex] + ' · ' + state.states[stateIndex].pop.toLocaleString('en-US') + ' POP';
       mapTooltip.style.left = (mapRect.left - viewRect.left + event.clientX * mapRect.width / svgRect.width) + 'px';
       mapTooltip.style.top = (mapRect.top - viewRect.top + event.clientY * mapRect.height / svgRect.height) + 'px';
       mapTooltip.hidden = false;
@@ -952,7 +1458,12 @@
     } catch {
       data = null;
     }
-    if (!response.ok) throw new Error(data?.error || data?.detail || 'Server returned HTTP ' + response.status + '.');
+    if (!response.ok) {
+      const error = new Error(data?.error || data?.detail || 'Server returned HTTP ' + response.status + '.');
+      error.status = response.status;
+      error.code = data?.code || data?.title;
+      throw error;
+    }
     return data;
   }
 
@@ -970,6 +1481,7 @@
   function showServerError(error) {
     console.error('[new-world] Multiplayer request failed:', error);
     const message = error instanceof Error ? error.message : 'The multiplayer request failed.';
+    $('recover-previous-save').hidden = error?.code !== 'SAVE_INVALID';
     $('server-status').textContent = 'Server unavailable.';
     $('server-status').classList.add('error');
     showMessage(message, true);
@@ -1039,6 +1551,7 @@
           '?afterEventSequence=' + encodeURIComponent(lastEventSequence),
         {},
         onlineSession.playerToken);
+      $('recover-previous-save').hidden = true;
       applySnapshot(game);
       openSocket();
     } catch (error) {
@@ -1047,8 +1560,40 @@
     }
   }
 
+  async function recoverPreviousSave() {
+    if (!onlineSession) return;
+    if (!window.confirm('Restore the previous validated save? Changes after that save will be lost.'))
+      return;
+
+    try {
+      const game = await apiRequest(
+        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/recover',
+        {method: 'POST'},
+        onlineSession.playerToken);
+      $('recover-previous-save').hidden = true;
+      applySnapshot(game);
+      openSocket();
+      showMessage('Previous validated save restored. Unconfirmed local orders were discarded.');
+    } catch (error) {
+      showServerError(error);
+    }
+  }
+
   function applySnapshot(game) {
-    const lastEventSequence = Number(onlineSession?.lastEventSequence) || 0;
+    const previousEventSequence = Number(onlineSession?.lastEventSequence) || 0;
+    const previousWorldVersion = Number(onlineSession?.lastWorldVersion) || 0;
+    const recoveryEvent = (game.events || []).some(event =>
+      event.type === 'world.recovered' && event.sequence === game.eventSequence);
+    const worldVersionRegressed = previousWorldVersion > 0 &&
+      Number(game.worldVersion) < previousWorldVersion;
+    const recoverySnapshot = recoveryEvent || worldVersionRegressed;
+    if (recoverySnapshot) recoveryOrdersNeedCleanup = true;
+    if (recoveryOrdersNeedCleanup && discardPendingOrdersForCurrentSession())
+      recoveryOrdersNeedCleanup = false;
+
+    const lastEventSequence = recoverySnapshot
+      ? Math.max(0, Number(game.eventSequence) - 1)
+      : previousEventSequence;
     const recoveredEvents = (game.events || []).filter(event => event.sequence > lastEventSequence);
     if (recoveredEvents.length) {
       game.activity = [
@@ -1062,8 +1607,16 @@
       showMessage('Your player record is not in this world. Rejoin using a valid invitation.', true);
       return;
     }
-    if (onlineSession && game.eventSequence > lastEventSequence) {
-      storeSession({...onlineSession, lastEventSequence: game.eventSequence});
+    if (onlineSession && (
+      recoverySnapshot ||
+      game.eventSequence > previousEventSequence ||
+      game.worldVersion !== previousWorldVersion
+    )) {
+      storeSession({
+        ...onlineSession,
+        lastEventSequence: game.eventSequence,
+        lastWorldVersion: game.worldVersion
+      });
     }
     const governmentIndex = player.countryIndex ?? membershipsFor(player)[0]?.stateIndex;
     const governmentFinance = game.territories.find(territory => territory.index === governmentIndex) || null;
@@ -1212,7 +1765,12 @@
       APPOINTEE_NOT_MEMBER: 'The selected appointee must be an active member of this State government.',
       APPOINTEE_ALREADY_HOLDS_OFFICE: 'That player already holds the selected office.',
       OFFICE_APPOINTMENT_PENDING: 'An appointment decision is already pending for that office.',
-      ORDER_ID_REUSED: 'This order ID was already used for a different request.'
+      ORDER_ID_REUSED: 'This order ID was already used for a different request.',
+      MILITARY_RULES_PENDING: 'This military order is not available until its rules are configured.',
+      UNIT_NOT_OPERATIONAL: 'This unit is not operational.',
+      ROUTE_CAPACITY_EXCEEDED: 'The configured route does not have enough capacity.',
+      TERRITORY_ACCESS_DENIED: 'This route crosses territory without configured access.',
+      MILITARY_CAPACITY_UNIT_UNSUPPORTED: 'This route uses a capacity unit that cannot yet be validated.'
     };
     return messages[code] || 'The server rejected the order.';
   }
@@ -1468,10 +2026,51 @@
   $('create-world').addEventListener('click', createWorld);
   $('join-world').addEventListener('click', joinWorld);
   $('reconnect-world').addEventListener('click', restoreSession);
+  $('recover-previous-save').addEventListener('click', recoverPreviousSave);
   $('start-world').addEventListener('click', startWorld);
   $('leave-world').addEventListener('click', disconnect);
   $('load-economy-config').addEventListener('click', loadEconomyConfiguration);
   $('save-economy-config').addEventListener('click', saveEconomyConfiguration);
+  $('load-territory-config').addEventListener('click', () => loadScenarioConfiguration(
+    'territory-config',
+    {
+      provinces: 'provinces',
+      settlements: 'settlements',
+      connections: 'provinceConnections',
+      controls: 'territorialControls',
+      sovereigntyHistory: 'sovereigntyHistory'
+    }));
+  $('save-territory-config').addEventListener('click', () => saveScenarioConfiguration(
+    'territory', 'territory-config',
+    ['provinces', 'settlements', 'connections', 'controls', 'sovereigntyHistory'],
+    'Territorial'));
+  $('load-military-config').addEventListener('click', () => loadScenarioConfiguration(
+    'military-config',
+    {
+      unitTypes: 'militaryUnitTypes',
+      commanders: 'militaryCommanders',
+      units: 'militaryUnits',
+      routes: 'militaryRoutes',
+      supplyRoutes: 'supplyRoutes',
+      occupations: 'occupations'
+    }));
+  $('save-military-config').addEventListener('click', () => saveScenarioConfiguration(
+    'military', 'military-config',
+    ['unitTypes', 'commanders', 'units', 'routes', 'supplyRoutes', 'occupations'],
+    'Military'));
+  $('load-technology-config').addEventListener('click', () => loadScenarioConfiguration(
+    'technology-config',
+    {
+      technologies: 'technologies',
+      researchInstitutions: 'researchInstitutions',
+      researchProjects: 'researchProjects',
+      technologyUnlocks: 'technologyUnlocks',
+      technologyAdoptions: 'technologyAdoptions'
+    }));
+  $('save-technology-config').addEventListener('click', () => saveScenarioConfiguration(
+    'technology', 'technology-config',
+    ['technologies', 'researchInstitutions', 'researchProjects', 'technologyUnlocks', 'technologyAdoptions'],
+    'Technology'));
   $('copy-invite').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText($('invite-share').value);

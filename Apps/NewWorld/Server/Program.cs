@@ -84,17 +84,50 @@ app.MapPost("/api/games/join", async (JoinGameRequest request, GameStore gameSto
 
 app.MapGet("/api/games/{gameId:guid}", async (
     Guid gameId, long? afterEventSequence, HttpContext context, GameStore gameStore, GameHub hub,
-    CancellationToken cancellationToken) =>
+    ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     var token = GetBearerToken(context);
     if (token is null)
         return Results.Unauthorized();
-    var (game, player) = await gameStore.GetAuthorizedAsync(gameId, token, cancellationToken);
+    WorldState? game;
+    PlayerState? player;
+    try
+    {
+        (game, player) = await gameStore.GetAuthorizedAsync(gameId, token, cancellationToken);
+    }
+    catch (Exception exception) when (exception is InvalidDataException or JsonException)
+    {
+        logger.LogError(exception, "World {GameId} failed validation while loading its current save.", gameId);
+        return Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "SAVE_INVALID",
+            detail: "The saved world failed integrity validation. The host can attempt recovery from its previous validated save.");
+    }
     if (game is null || player is null)
         return Results.Unauthorized();
     return Results.Ok(GameHub.BuildSnapshot(
         game, hub.ConnectedPlayers(gameId),
         Math.Clamp(afterEventSequence ?? 0, 0, game.EventSequence)));
+});
+
+app.MapPost("/api/games/{gameId:guid}/recover", async (
+    Guid gameId, HttpContext context, GameStore gameStore, GameHub hub,
+    CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+
+    var result = await gameStore.RecoverPreviousAsync(gameId, token, cancellationToken);
+    if (result.Unauthorized)
+        return Results.Unauthorized();
+    if (result.NotFound)
+        return Results.NotFound(new ApiError(result.Error ?? "World not found."));
+    if (result.Error is not null || result.Game is null)
+        return Results.Conflict(new ApiError(result.Error ?? "The previous save could not be restored."));
+
+    await hub.BroadcastRecoveredAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game, hub.ConnectedPlayers(gameId)));
 });
 
 app.MapGet("/api/games/{gameId:guid}/orders", async (
@@ -181,6 +214,34 @@ app.MapPost("/api/games/{gameId:guid}/start", async (
     return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
 });
 
+app.MapPut("/api/games/{gameId:guid}/memberships/{membershipId:guid}/permissions", async (
+    Guid gameId, Guid membershipId, UpdateGovernmentPermissionRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can manage government membership roles.";
+            if (request.MembershipId != membershipId)
+                return "The membership ID in the route and payload do not match.";
+            return GovernmentMembershipRules.SetPermissionSet(game, membershipId, request.PermissionSetId);
+        },
+        cancellationToken,
+        "government.permissions_updated");
+
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
 app.MapPut("/api/games/{gameId:guid}/economy", async (
     Guid gameId, EconomyScenarioRequest request, HttpContext context,
     GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
@@ -223,6 +284,78 @@ app.MapPut("/api/games/{gameId:guid}/politics", async (
         },
         cancellationToken,
         "politics.configured");
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
+app.MapPut("/api/games/{gameId:guid}/territory", async (
+    Guid gameId, TerritoryScenarioRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can configure territorial data before the world starts.";
+            return TerritorySetupRules.Configure(game, request);
+        },
+        cancellationToken,
+        "territory.scenario_configured");
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
+app.MapPut("/api/games/{gameId:guid}/military", async (
+    Guid gameId, MilitaryScenarioRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can configure military data before the world starts.";
+            return MilitarySetupRules.Configure(game, request);
+        },
+        cancellationToken,
+        "military.scenario_configured");
+    if (result.Error is not null)
+        return Results.BadRequest(new ApiError(result.Error));
+    await hub.BroadcastAsync(gameId, cancellationToken);
+    return Results.Ok(GameHub.BuildSnapshot(result.Game!, hub.ConnectedPlayers(gameId)));
+});
+
+app.MapPut("/api/games/{gameId:guid}/technology", async (
+    Guid gameId, TechnologyScenarioRequest request, HttpContext context,
+    GameStore gameStore, GameHub hub, CancellationToken cancellationToken) =>
+{
+    var token = GetBearerToken(context);
+    if (token is null)
+        return Results.Unauthorized();
+    var result = await gameStore.MutateAsync(
+        gameId,
+        token,
+        (game, player) =>
+        {
+            if (!player.IsHost)
+                return "Only the host can configure technology data before the world starts.";
+            return TechnologySetupRules.Configure(game, request);
+        },
+        cancellationToken,
+        "technology.scenario_configured");
     if (result.Error is not null)
         return Results.BadRequest(new ApiError(result.Error));
     await hub.BroadcastAsync(gameId, cancellationToken);

@@ -6,7 +6,6 @@ namespace NewWorld.Server.Services;
 public sealed class WorldClock(
     GameStore store, GameHub hub, TimeProvider timeProvider, ILogger<WorldClock> logger) : BackgroundService
 {
-    private static readonly TimeSpan DayLength = TimeSpan.FromMinutes(5);
     private readonly ConcurrentDictionary<Guid, ClockAnchor> _clockAnchors = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -46,9 +45,9 @@ public sealed class WorldClock(
                     }
 
                     var elapsed = timeProvider.GetElapsedTime(anchor.Timestamp, nowTimestamp);
-                    var accumulatedTicks = checked(game.ClockAccumulatorTicks + elapsed.Ticks);
-                    var daysDue = accumulatedTicks / DayLength.Ticks;
-                    game.ClockAccumulatorTicks = accumulatedTicks % DayLength.Ticks;
+                    var advance = WorldClockRules.Accumulate(game.ClockAccumulatorTicks, elapsed);
+                    var daysDue = advance.DaysDue;
+                    game.ClockAccumulatorTicks = advance.RemainingTicks;
                     for (long day = 0; day < daysDue; day++)
                     {
                         if (game.Day == int.MaxValue || game.WorldDate == DateOnly.MaxValue)
@@ -56,7 +55,7 @@ public sealed class WorldClock(
 
                         game.Day++;
                         game.WorldDate = game.WorldDate.AddDays(1);
-                        game.LastTickUtc = game.LastTickUtc.Add(DayLength);
+                        game.LastTickUtc = game.LastTickUtc.Add(WorldClockRules.DayLength);
                         foreach (var government in game.Territories)
                         {
                             var balance = SimulationRules.CalculateGovernmentBalance(game, government);
@@ -117,10 +116,44 @@ public sealed class WorldClock(
                                 marketDescription,
                                 worldVersion: game.WorldVersion + 1);
                         }
-                        if (game.WorldDate.Month == 1 && game.WorldDate.Day == 1)
+                        foreach (var movement in MilitaryRules.AdvanceDailyMovement(game))
                         {
-                            foreach (var territory in game.Territories.Where(item => item.OwnerPlayerId is not null))
-                                territory.Population = (int)Math.Round(territory.Population * 1.003);
+                            GameStore.AddActivity(game, movement.Description);
+                            GameStore.AddWorldEvent(
+                                game,
+                                movement.EventType,
+                                movement.PlayerId,
+                                movement.StateId,
+                                movement.OrderId,
+                                movement.Description,
+                                occurredAtUtc: game.LastTickUtc,
+                                worldVersion: game.WorldVersion + 1);
+                        }
+                        foreach (var research in ResearchRules.AdvanceDailyResearch(game))
+                        {
+                            GameStore.AddActivity(game, research.Description);
+                            GameStore.AddWorldEvent(
+                                game,
+                                research.EventType,
+                                null,
+                                research.StateId,
+                                research.ProjectId,
+                                research.Description,
+                                occurredAtUtc: game.LastTickUtc,
+                                worldVersion: game.WorldVersion + 1);
+                        }
+                        foreach (var occupation in OccupationRules.AdvanceDaily(game))
+                        {
+                            GameStore.AddActivity(game, occupation.Description);
+                            GameStore.AddWorldEvent(
+                                game,
+                                occupation.EventType,
+                                null,
+                                occupation.StateId,
+                                occupation.OccupationId,
+                                occupation.Description,
+                                occurredAtUtc: game.LastTickUtc,
+                                worldVersion: game.WorldVersion + 1);
                         }
                         var description = $"{game.WorldDate:yyyy-MM-dd} began (day {game.Day}).";
                         GameStore.AddActivity(game, description);

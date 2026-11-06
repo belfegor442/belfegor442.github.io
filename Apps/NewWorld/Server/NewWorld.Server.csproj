@@ -7,4 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="8.0.7" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\beleland-map-geometry.json" LogicalName="NewWorld.Server.Data.beleland-map-geometry.json" />
+  </ItemGroup>
 </Project>

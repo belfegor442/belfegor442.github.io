@@ -25,9 +25,12 @@
   <main class="game-shell">
     <nav class="nav-rail" aria-label="National administration">
       <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
+      <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
       <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>CITY</span></button>
       <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
       <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
+      <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
+      <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><span class="nav-icon">⌘</span><span>RESEARCH</span></button>
       <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
       <div class="nav-rail-foot">NA</div>
     </nav>
@@ -72,6 +75,26 @@
           <div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
           <button id="claim-btn" class="action-btn" disabled>ESTABLISH ADMINISTRATION <span>¤ 450</span></button>
           <p class="microcopy">Establishing an administration costs treasury. Administered states contribute revenue.</p>
+        </section>
+
+        <section id="territory-view" class="view">
+          <p class="panel-kicker">PROVINCES / SOVEREIGNTY / CONTROL</p>
+          <h2 id="territory-title">Territorial administration</h2>
+          <p id="territory-status" class="muted" role="status">Connect to a multiplayer world to load province data.</p>
+          <div id="province-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SETTLEMENTS</p>
+          <div id="settlement-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">CONTROL AND SOVEREIGNTY HISTORY</p>
+          <div id="territorial-control-list" class="political-list"></div>
+          <details id="territory-setup-panel" hidden>
+            <summary>Technical territorial scenario setup · lobby only</summary>
+            <p class="microcopy">Geometry is referenced by SVG element ID in external scenario data. The original map SVG is never modified.</p>
+            <button id="load-territory-config" class="secondary-button" type="button">Load current configuration</button>
+            <textarea id="territory-config" class="text-field" rows="12" spellcheck="false" aria-label="Territorial scenario JSON"></textarea>
+            <button id="save-territory-config" class="primary-button" type="button">Validate and save scenario</button>
+          </details>
         </section>
 
         <section id="city-view" class="view">
@@ -161,6 +184,46 @@
           <p id="law-restriction" class="microcopy">Law-making requires an explicitly configured Constitution and permitted government membership.</p>
         </section>
 
+        <section id="military-view" class="view">
+          <p class="panel-kicker">ARMED FORCES / ORDERS / OCCUPATION</p>
+          <h2 id="military-title">Military situation</h2>
+          <p id="military-status" class="muted" role="status">Connect to a multiplayer world to load military data.</p>
+          <div id="military-unit-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">OPERATIONS AND BATTLES</p>
+          <div id="military-operation-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">OCCUPATION / CONTROL</p>
+          <div id="occupation-list" class="political-list"></div>
+          <details id="military-setup-panel" hidden>
+            <summary>Technical military scenario setup · lobby only</summary>
+            <p class="microcopy">Combat balance, morale scales, and logistics parameters remain scenario data; no default combat formula is assumed.</p>
+            <button id="load-military-config" class="secondary-button" type="button">Load current configuration</button>
+            <textarea id="military-config" class="text-field" rows="12" spellcheck="false" aria-label="Military scenario JSON"></textarea>
+            <button id="save-military-config" class="primary-button" type="button">Validate and save scenario</button>
+          </details>
+        </section>
+
+        <section id="technology-view" class="view">
+          <p class="panel-kicker">TECHNOLOGY / RESEARCH / ADOPTION</p>
+          <h2>Knowledge and innovation</h2>
+          <p id="technology-status" class="muted" role="status">Connect to a multiplayer world to load technology data.</p>
+          <div id="technology-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">RESEARCH INSTITUTIONS AND PROJECTS</p>
+          <div id="research-project-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ADOPTION</p>
+          <div id="technology-adoption-list" class="political-list"></div>
+          <details id="technology-setup-panel" hidden>
+            <summary>Technical technology scenario setup · lobby only</summary>
+            <p class="microcopy">Discovery and adoption are separate. Each project must explicitly configure its daily progress and funding; no historical date unlock is applied.</p>
+            <button id="load-technology-config" class="secondary-button" type="button">Load current configuration</button>
+            <textarea id="technology-config" class="text-field" rows="12" spellcheck="false" aria-label="Technology scenario JSON"></textarea>
+            <button id="save-technology-config" class="primary-button" type="button">Validate and save scenario</button>
+          </details>
+        </section>
+
         <section id="multiplayer-view" class="view">
           <p class="panel-kicker">PRIVATE WORLD / NETWORK</p>
           <h2>Multiplayer</h2>
@@ -182,6 +245,7 @@
             <p id="session-summary" class="muted"></p>
             <p id="pending-orders-status" class="muted" role="status">No pending orders.</p>
             <button id="reconnect-world" class="quiet-btn" type="button">RECONNECT</button>
+            <button id="recover-previous-save" class="quiet-btn" type="button" hidden>RECOVER PREVIOUS SAVE · HOST ONLY</button>
             <div id="invite-panel" class="invite-panel" hidden>
               <label class="field-label" for="invite-share">PRIVATE INVITATION — SHARE ONLY WITH FRIENDS</label>
               <div class="field-row"><input id="invite-share" class="text-field" readonly><button id="copy-invite" class="quiet-btn" type="button">COPY</button></div>
