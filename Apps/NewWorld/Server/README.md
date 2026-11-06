@@ -50,7 +50,7 @@ dotnet test .\Apps\NewWorld\Server.Tests\Server.Tests.csproj
 Deploy this server and a PostgreSQL database on a host that supports long-running .NET services and WebSockets. Configure these environment variables on the server:
 
 - `ConnectionStrings__NewWorld`: PostgreSQL connection string, kept in the hosting provider's secret manager.
-- `NEW_WORLD_ALLOWED_ORIGINS`: semicolon-separated, exact browser origins allowed to call the API and open WebSockets, for example `https://belfegor442.github.io`.
+- `NEW_WORLD_ALLOWED_ORIGINS`: semicolon-separated, exact browser origins allowed to call the API and open WebSockets, including `https://northassembly.work.gd` (and `https://belfegor442.github.io` if that mirror is used).
 
 Expose the API over HTTPS/WSS and enter its origin in the browser's **SERVER URL** field. Check `GET /api/health` before inviting players. GitHub Pages only hosts the browser files; it does not deploy this API or its database.
 
