@@ -460,7 +460,7 @@
     return {id:order.orderId,accepted:true,code:null,error:null,replayed:false};
   }
 
-  function hostReceive(message,topic) {
+  function hostReceive(topic,message) {
     if (!runtime || runtime.role !== 'host') return;
     if (topic.endsWith('/presence')) {
       const match = topic.match(/\/p\/([^/]+)\/presence$/);
@@ -640,7 +640,7 @@
     return {ok:true};
   }
 
-  function receiveGuest(message,topic) {
+  function receiveGuest(topic,message) {
     if (!runtime || runtime.role !== 'guest') return;
     if (topic === runtime.topics.host && message.t === 'presence') {
       runtime.hostOnline = message.online === true;
