@@ -57,3 +57,31 @@ Expose the API over HTTPS/WSS and enter its origin in the browser's **SERVER URL
 Run a single server instance for this MVP: WebSocket presence and the five-minute world clock are process-local. PostgreSQL persists game state, including world date, session version, memberships, State currency identities, treasury transaction history, and fractional daily economic accrual, but horizontal scaling, database backup automation, identity accounts, diplomacy, and moderation are not implemented yet.
 
 Invitation codes and player tokens are generated with cryptographic randomness; only their hashes are stored in PostgreSQL. Player tokens are kept by the browser for reconnection. Disconnecting a device does not delete its player or pause a world while another player remains connected. The world clock pauses when no player is connected.
+
+## Host-run matches with central PostgreSQL
+
+The host-run deployment keeps the authoritative .NET match server on the host's computer while PostgreSQL remains on North Assembly infrastructure. The host machine runs the simulation, validates orders, owns the WebSocket connections, and writes saves to the central database. Players connect to the host's HTTPS/WSS address; they never receive PostgreSQL credentials.
+
+This deployment is separate from the local development stack:
+
+1. Keep PostgreSQL on the central server. Give each trusted match host a database login with only the required access to the New World database. Do not expose PostgreSQL to the public internet.
+2. Connect the host computer to the database server through a private network such as Tailscale or WireGuard. Use the private VPN address in the connection string.
+3. On the host computer, copy `Apps/NewWorld/.env.host.example` to `.env.host`. Set a long random database password and a unique `NEW_WORLD_INSTANCE_ID` for this independently hosted server. Never commit `.env.host`.
+4. From `Apps/NewWorld`, start the match server:
+
+   ```powershell
+   docker compose --env-file .env.host -f docker-compose.host.yml up --build -d
+   ```
+
+5. Keep the container bound to localhost (the default). Put a TLS reverse proxy in front of it; `Caddyfile.host.example` shows the Caddy configuration. Only expose the reverse proxy's HTTPS port to players. WebSockets are supported through the proxy.
+6. Open New World, enter the host's HTTPS address in **SERVER URL**, create the world, and share both that same address and the invitation code. Joining players must use the same host address.
+
+The central database must accept connections only from the private VPN network. Use a dedicated database account, a strong password, backups, and firewall rules. Do not publish port 5432. The host server's HTTP port should not be exposed directly to the public internet because player tokens and session traffic require HTTPS/WSS in transit.
+
+### Match isolation and current trust boundary
+
+Each world is assigned the `NEW_WORLD_INSTANCE_ID` of the server that created it. Lobby lookup, world reads, mutations, recovery, and the world-clock worker are scoped to that instance. Different trusted host processes can therefore share the same PostgreSQL database without ticking or accepting invitation codes for one another's worlds. Existing worlds are migrated to the legacy `default` instance; keep using `NEW_WORLD_INSTANCE_ID=default` for a server that must continue hosting those existing worlds.
+
+This is an MVP trust model, not hostile-host isolation: a match host holds database credentials and is trusted with the New World database. Application queries are instance-scoped, but PostgreSQL row-level security and a separate central persistence API are not yet implemented. Do not give database credentials to untrusted public hosts. A host process should be treated as authoritative for the worlds it owns.
+
+The local `docker-compose.yml` remains available for single-machine development with a local PostgreSQL container. The host deployment file deliberately does not start or expose a database.
