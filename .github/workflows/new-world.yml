@@ -31,6 +31,13 @@ jobs:
       - name: Restore and run server tests
         run: dotnet test Apps/NewWorld/Server.Tests/Server.Tests.csproj --configuration Release
 
+
+      - name: Validate host deployment Compose configuration
+        env:
+          NEW_WORLD_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=newworld;Username=ci;Password=ci
+          NEW_WORLD_INSTANCE_ID: ci-host
+        run: docker compose --env-file Apps/NewWorld/.env.host.example -f Apps/NewWorld/docker-compose.host.yml config --quiet
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
