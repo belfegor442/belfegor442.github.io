@@ -1,6 +1,8 @@
-# New World multiplayer server
+# New World legacy .NET server reference
 
-The browser client is static and cannot host an authoritative shared world. This .NET 8 service provides private lobbies, authenticated WebSockets, server-validated actions, and PostgreSQL persistence. The persisted world record includes session metadata, a Gregorian world date, stable State IDs, government memberships, State-specific currency identities, shared treasuries, and a financial transaction ledger. Legacy player treasuries are migrated into their assigned State with an opening-balance record.
+**This service is no longer used by the published New World web application.** The active browser client follows the BREW model: the player who creates a room runs the authoritative game state and rules in their browser. Other players connect through a public MQTT relay; the relay transports messages but does not simulate or persist the world. Do not deploy this .NET service or provision PostgreSQL for normal New World multiplayer.
+
+The .NET 8 project and its tests are retained as a reference for domain rules and validation while those rules are migrated into the browser-hosted runtime. Its former API, WebSocket, and PostgreSQL deployment instructions below are historical and do not describe the active multiplayer architecture. The persisted world record includes session metadata, a Gregorian world date, stable State IDs, government memberships, State-specific currency identities, shared treasuries, and a financial transaction ledger. Legacy player treasuries are migrated into their assigned State with an opening-balance record.
 
 ## Run locally
 
@@ -45,15 +47,13 @@ Run the deterministic simulation tests from the repository root:
 dotnet test .\Apps\NewWorld\Server.Tests\Server.Tests.csproj
 ```
 
-## Deploy
+## Active browser-hosted multiplayer
 
-Deploy this server and a PostgreSQL database on a host that supports long-running .NET services and WebSockets. Configure these environment variables on the server:
+The published client loads `docs/Apps/NewWorld/multiplayer.js` after the MQTT browser library. The room owner is the authority for lobby membership, State assignment, world start, supported orders, snapshots, and the host-side save. Guests send commands to the host; the host validates them and publishes the resulting shared state.
 
-- `ConnectionStrings__NewWorld`: PostgreSQL connection string, kept in the hosting provider's secret manager.
-- `NEW_WORLD_ALLOWED_ORIGINS`: semicolon-separated, exact browser origins allowed to call the API and open WebSockets, for example `https://belfegor442.github.io`.
+- The host must keep the original browser tab and device available while the world is online.
+- Host saves are stored in that browser's local storage. They are not cloud backups and cannot be restored from another device.
+- The public MQTT brokers are message relays only. They are not trusted storage and should not receive confidential personal information.
+- The current browser port covers room creation/join, reconnect, State assignment, starting, pause/resume voting, territory administration, construction, and daily treasury accrual. Advanced political, military, research, production, and market rules still need migration from the legacy .NET rule set before those gameplay actions can be considered supported.
 
-Expose the API over HTTPS/WSS and enter its origin in the browser's **SERVER URL** field. Check `GET /api/health` before inviting players. GitHub Pages only hosts the browser files; it does not deploy this API or its database.
-
-Run a single server instance for this MVP: WebSocket presence and the five-minute world clock are process-local. PostgreSQL persists game state, including world date, session version, memberships, State currency identities, treasury transaction history, and fractional daily economic accrual, but horizontal scaling, database backup automation, identity accounts, diplomacy, and moderation are not implemented yet.
-
-Invitation codes and player tokens are generated with cryptographic randomness; only their hashes are stored in PostgreSQL. Player tokens are kept by the browser for reconnection. Disconnecting a device does not delete its player or pause a world while another player remains connected. The world clock pauses when no player is connected.
+The old `.NET` service is not part of the live web deployment. Running the legacy tests only validates the reference implementation, not the browser-hosted runtime.
