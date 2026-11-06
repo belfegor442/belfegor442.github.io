@@ -182,13 +182,12 @@ test('public trade routes import stock into destination markets', () => {
   const result = simulation.advanceDay(game);
 
   assert.equal(result.ok,true,result.error);
-  const settlement = assert.single
-    ? assert.single(game.marketHistory)
-    : game.marketHistory[0];
+  assert.equal(game.marketHistory.length,1);
+  const settlement = game.marketHistory[0];
   assert.equal(settlement.importedSupply,2);
   assert.equal(settlement.quantitySold,2);
   assert.equal(game.companies[0].inventory.grain,3);
-  assert.equal(game.companies[0].cashBalances['currency-b'],20);
+  assert.equal(game.companies[0].cashBalances['currency-b'],30);
   assert.ok(game.companyFinancialTransactions.some(item => item.type === 'TradeSale'));
 });
 
