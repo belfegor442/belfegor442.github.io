@@ -513,7 +513,7 @@
       {id:'farm',name:'Agricultural Cooperative',sector:'Agriculture',
         inventory:{grain:40},recipeId:'grow-grain',batchesPerCycle:1},
       {id:'mill',name:'Flour Mill',sector:'Food processing',
-        inventory:{grain:60,flour:8},recipeId:'mill-flour',batchesPerCycle:1},
+        inventory:{grain:100,flour:8},recipeId:'mill-flour',batchesPerCycle:1},
       {id:'sawmill',name:'Timber Works',sector:'Forestry',
         inventory:{timber:20},recipeId:'harvest-timber',batchesPerCycle:1},
       {id:'foundry',name:'Tool Foundry',sector:'Manufacturing',
