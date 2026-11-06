@@ -158,3 +158,69 @@ test('a failed economic cycle is atomic and does not advance the world date', ()
   assert.match(result.error,/browser simulation limit/);
   assert.deepEqual(game,before);
 });
+
+test('public trade routes import stock into destination markets', () => {
+  const game = baseWorld();
+  game.territories.push({
+    stateId:'state-b',currencyId:'currency-b',index:1,name:'Import State',
+    treasury:0,dailyBalanceRemainder:0,population:30000,prosperity:50,infrastructure:1,ownerPlayerId:null
+  });
+  game.goods = [{id:'grain',name:'Grain',unit:'tonnes',storageCapacity:100}];
+  game.companies = [{
+    id:'exporter',stateId:'state-a',currencyId:'currency-a',
+    inventory:{grain:5},cashBalances:{'currency-b':0},facilities:[]
+  }];
+  game.markets = [{
+    stateId:'state-b',goodId:'grain',dailyDemand:3,dailyConsumerBudget:100,
+    basePrice:10,currentPrice:10,minimumPrice:1,maximumPrice:50,priceSmoothingPercent:100
+  }];
+  game.tradeRoutes = [{
+    id:'route-a',exportStateId:'state-a',importStateId:'state-b',goodId:'grain',
+    dailyCapacity:2,enabled:true
+  }];
+
+  const result = simulation.advanceDay(game);
+
+  assert.equal(result.ok,true,result.error);
+  const settlement = assert.single
+    ? assert.single(game.marketHistory)
+    : game.marketHistory[0];
+  assert.equal(settlement.importedSupply,2);
+  assert.equal(settlement.quantitySold,2);
+  assert.equal(game.companies[0].inventory.grain,3);
+  assert.equal(game.companies[0].cashBalances['currency-b'],20);
+  assert.ok(game.companyFinancialTransactions.some(item => item.type === 'TradeSale'));
+});
+
+test('bilateral trade contracts respect buyer funds and destination storage', () => {
+  const game = baseWorld();
+  game.territories.push({
+    stateId:'state-b',currencyId:'currency-b',index:1,name:'Import State',
+    treasury:0,dailyBalanceRemainder:0,population:30000,prosperity:50,infrastructure:1,ownerPlayerId:null
+  });
+  game.goods = [{id:'grain',name:'Grain',unit:'tonnes',storageCapacity:3}];
+  game.companies = [
+    {
+      id:'exporter',stateId:'state-a',currencyId:'currency-a',
+      inventory:{grain:5},cashBalances:{'currency-b':0},facilities:[]
+    },
+    {
+      id:'importer',stateId:'state-b',currencyId:'currency-b',
+      inventory:{grain:0},cashBalances:{'currency-b':8},facilities:[]
+    }
+  ];
+  game.tradeRoutes = [{
+    id:'contract-a',exportStateId:'state-a',importStateId:'state-b',goodId:'grain',
+    dailyCapacity:5,dailyQuantity:5,unitPrice:4,
+    exporterCompanyId:'exporter',importerCompanyId:'importer',enabled:true
+  }];
+
+  const result = simulation.advanceDay(game);
+
+  assert.equal(result.ok,true,result.error);
+  assert.equal(game.companies[0].inventory.grain,3);
+  assert.equal(game.companies[1].inventory.grain,2);
+  assert.equal(game.companies[1].cashBalances['currency-b'],0);
+  assert.equal(game.companies[0].cashBalances['currency-b'],8);
+  assert.ok(game.companyFinancialTransactions.some(item => item.type === 'TradePurchase'));
+});
