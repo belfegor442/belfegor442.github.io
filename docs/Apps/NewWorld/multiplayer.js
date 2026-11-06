@@ -350,7 +350,7 @@
   function publishSnapshot() {
     if (!runtime || runtime.role !== 'host') return;
     const game = snapshot(runtime.game);
-    runtime.link.publish(runtime.topics.server,{t:'snapshot',game,hostTime:Date.now()},{retain:true,qos:1});
+    runtime.link.publish(runtime.topics.server,{t:'snapshot',game,hostTime:Date.now()},{qos:1});
     runtime.onSnapshot(game);
   }
 
@@ -373,30 +373,30 @@
     return (permissions[permissionSetId] || []).includes(action);
   }
 
-  function reject(code,error) { return {accepted:false,code,error,replayed:false}; }
+  function reject(code,error) { return {id:null,accepted:false,code,error,replayed:false}; }
 
   function applyOrder(game,player,order) {
-    if (!order || !order.orderId) return reject('INVALID_PAYLOAD','A valid order ID is required.');
+    if (!order || !order.orderId) return reject('INVALID_PAYLOAD','A valid order ID is required.',order?.orderId || null);
     const duplicate = game.orders.find(item => item.id === order.orderId);
-    if (duplicate) return reject('ORDER_ID_REUSED','This order ID was already used.');
+    if (duplicate) return reject('ORDER_ID_REUSED','This order ID was already used.',order.orderId);
     if (Number(order.expectedWorldVersion) !== game.worldVersion)
-      return reject('STALE_WORLD_VERSION','The world changed. Review the latest state before trying again.');
+      return reject('STALE_WORLD_VERSION','The world changed. Review the latest state before trying again.',order.orderId);
     const orderType = order.type;
     const isPause = orderType === 'pause' || orderType === 'resume';
-    if (!game.started) return reject('WORLD_NOT_STARTED','The host must start the world before actions are allowed.');
+    if (!game.started) return reject('WORLD_NOT_STARTED','The host must start the world before actions are allowed.',order.orderId);
     if ((orderType === 'pause' && game.status !== 'running') ||
         (orderType === 'resume' && game.status !== 'paused'))
-      return reject('PAUSE_STATE_CONFLICT','The world pause state changed before this order was processed.');
+      return reject('PAUSE_STATE_CONFLICT','The world pause state changed before this order was processed.',order.orderId);
     if (!isPause && game.status !== 'running')
-      return reject('WORLD_NOT_RUNNING','This action is unavailable while the world is paused or closed.');
+      return reject('WORLD_NOT_RUNNING','This action is unavailable while the world is paused or closed.',order.orderId);
     const memberships = activeMemberships(game,player.id);
-    if (!memberships.length) return reject('NOT_MEMBER','This player has not been assigned a state.');
+    if (!memberships.length) return reject('NOT_MEMBER','This player has not been assigned a state.',order.orderId);
     const membership = isPause ? memberships[0] :
       memberships.find(item => item.stateId === order.stateId) || null;
-    if (!isPause && !membership) return reject('NOT_MEMBER','You are not a member of the selected government.');
+    if (!isPause && !membership) return reject('NOT_MEMBER','You are not a member of the selected government.',order.orderId);
     let message = null;
     if (orderType === 'pause' || orderType === 'resume') {
-      if (!player.connected) return reject('NOT_CONNECTED','Only connected players can vote.');
+      if (!player.connected) return reject('NOT_CONNECTED','Only connected players can vote.',order.orderId);
       const votes = new Set(game.pauseVotePlayerIds);
       if (votes.has(player.id)) votes.delete(player.id); else votes.add(player.id);
       game.pauseVotePlayerIds = [...votes];
@@ -413,13 +413,13 @@
       }
     } else if (orderType === 'claim') {
       if (!canPermission(membership.permissionSetId,'claim'))
-        return reject('INSUFFICIENT_PERMISSION','Your government permissions do not allow establishing an administration.');
+        return reject('INSUFFICIENT_PERMISSION','Your government permissions do not allow establishing an administration.',order.orderId);
       const territory = game.territories[Number(order.territoryIndex)];
       if (!territory || territory.ownerPlayerId)
-        return reject('TARGET_UNAVAILABLE','This territory is already administered or invalid.');
+        return reject('TARGET_UNAVAILABLE','This territory is already administered or invalid.',order.orderId);
       const government = game.territories.find(item => item.stateId === membership.stateId);
       if (!government || government.treasury < 450)
-        return reject('INSUFFICIENT_FUNDS','Insufficient treasury (¤450 required).');
+        return reject('INSUFFICIENT_FUNDS','Insufficient treasury (¤450 required).',order.orderId);
       government.treasury -= 450;
       territory.ownerPlayerId = player.id;
       territory.infrastructure++;
@@ -431,15 +431,15 @@
       pushActivity(game,player.name + ' established an administration in ' + territory.name + '.');
     } else if (orderType === 'build') {
       if (!canPermission(membership.permissionSetId,'build'))
-        return reject('INSUFFICIENT_PERMISSION','Your government permissions do not allow construction.');
+        return reject('INSUFFICIENT_PERMISSION','Your government permissions do not allow construction.',order.orderId);
       const plot = Number(order.plotIndex);
       const building = BUILDINGS[order.buildingId];
       if (!Number.isInteger(plot) || plot < 0 || plot >= 144 || !building)
-        return reject('INVALID_PAYLOAD','Invalid construction request.');
-      if (player.buildings[plot]) return reject('TARGET_UNAVAILABLE','This plot is already developed.');
+        return reject('INVALID_PAYLOAD','Invalid construction request.',order.orderId);
+      if (player.buildings[plot]) return reject('TARGET_UNAVAILABLE','This plot is already developed.',order.orderId);
       const government = game.territories.find(item => item.stateId === membership.stateId);
       if (!government || government.treasury < building.cost)
-        return reject('INSUFFICIENT_FUNDS','Insufficient treasury.');
+        return reject('INSUFFICIENT_FUNDS','Insufficient treasury.',order.orderId);
       government.treasury -= building.cost;
       player.buildings[plot] = clone(building);
       game.financialTransactions.push({
@@ -449,7 +449,7 @@
       });
       pushActivity(game,player.name + ' constructed a ' + building.name.toLowerCase() + '.');
     } else {
-      return reject('UNSUPPORTED_ORDER','This order is not yet available in the host-authoritative ruleset.');
+      return reject('UNSUPPORTED_ORDER','This order is not yet available in the host-authoritative ruleset.',order.orderId);
     }
 
     game.worldVersion++;
@@ -515,7 +515,7 @@
       }
       const session = {
         gameId:runtime.game.id,playerId:player.id,playerToken:player.token,
-        inviteCode:runtime.room,isHost:false
+        inviteCode:runtime.room,isHost:false,playerName:player.name
       };
       runtime.link.publish(pendingTopic,{t:'welcome',session,game:snapshot(runtime.game)},{qos:1});
       persistHost();
@@ -534,6 +534,17 @@
       emitOrderResult(player.id,result);
       persistHost();
       publishSnapshot();
+    }
+    if (message.t === 'bye') {
+      const leaving = runtime.game.players.find(item =>
+        item.id === message.playerId && item.token === message.playerToken);
+      if (leaving) {
+        leaving.connected = false;
+        runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== leaving.id);
+        persistHost();
+        publishSnapshot();
+      }
+      return;
     }
     if (message.t === 'admin') {
       const player = runtime.game.players.find(item =>
@@ -690,6 +701,7 @@
     };
     runtime.session.inviteCode = runtime.room;
     runtime.session.roomCode = runtime.room;
+    runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
     runtime.link = new BrokerLink('host',runtime.room,session.playerId,
       hostReceive,(status) => {
         if (status === 'ready') {
@@ -784,7 +796,7 @@
     }
     if (!session?.inviteCode || !session.playerToken)
       return Promise.reject(new Error('The saved multiplayer session is incomplete.'));
-    const name = session.playerName || 'PLAYER';
+    const name = session.playerName || handlers.playerName || 'PLAYER';
     return joinWorld(session.inviteCode,name,handlers,session).then(restored => ({
       session:restored,game:null
     }));
@@ -837,7 +849,7 @@
     if (!pending) return;
     clearTimeout(pending.timer);
     runtime.adminRequests.delete(message.requestId);
-    if (message.ok) pending.resolve(true);
+    if (message.ok) pending.resolve(message.game || true);
     else pending.reject(new Error(message.error || 'The host rejected the request.'));
   }
 
