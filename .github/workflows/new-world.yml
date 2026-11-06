@@ -30,3 +30,6 @@ jobs:
         run: |
           node --check docs/Apps/NewWorld/game.js
           node --check docs/Apps/NewWorld/multiplayer.js
+          node --check docs/Apps/NewWorld/simulation.js
+      - name: Test browser simulation rules
+        run: node --test docs/Apps/NewWorld/tests/*.test.cjs

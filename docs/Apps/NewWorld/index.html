@@ -227,7 +227,7 @@
         <section id="multiplayer-view" class="view">
           <p class="panel-kicker">PRIVATE WORLD / NETWORK</p>
           <h2>Multiplayer</h2>
-          <p class="muted">Create a private world or join one with an invitation. The server validates actions and keeps the shared world.</p>
+          <p class="muted">Create a private world or join one with an invitation. The host runs and validates the shared world; the public relay only carries messages.</p>
           <label class="field-label">NETWORK SERVICE</label>
           <div class="field-row"><span id="server-endpoint" class="microcopy">Loading multiplayer service…</span><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
           <p id="server-status" class="connection-status" role="status">Server not connected.</p>
@@ -274,6 +274,7 @@
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
+  <script src="./simulation.js"></script>
   <script src="./multiplayer.js"></script>
   <script src="./game.js"></script>
 </body>
