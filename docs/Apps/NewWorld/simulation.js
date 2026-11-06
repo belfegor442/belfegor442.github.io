@@ -383,7 +383,8 @@
 
       const totalSupply = offers.reduce((sum, offer) => sum + offer.quantity, 0n);
       const price = calculateMarketPrice(market, totalDemand, totalSupply);
-      const affordableDemand = BigInt(market.dailyConsumerBudget || 0) / BigInt(price.after);
+      const consumerBudget = integer(market.dailyConsumerBudget || 0, 'Daily consumer budget');
+      const affordableDemand = consumerBudget / BigInt(price.after);
       const sold = [totalDemand, totalSupply, affordableDemand]
         .reduce((minimum, value) => value < minimum ? value : minimum);
       const spending = sold * BigInt(price.after);
@@ -426,7 +427,7 @@
         quantitySold:number(sold, 'Quantity sold'),
         unmetDemand:number(totalDemand - sold, 'Unmet demand'),
         priceBefore:price.before, priceAfter:price.after,
-        consumerBudget:Number(market.dailyConsumerBudget || 0),
+        consumerBudget:number(consumerBudget, 'Daily consumer budget'),
         consumerSpending:number(spending, 'Consumer spending'),
         populationDemand:number(groupDemand, 'Population demand'),
         populationQuantitySold:number(populationSold, 'Population quantity sold'),
@@ -495,10 +496,10 @@
       {id:'tools',name:'Tools',unit:'items',category:'Capital',storageCapacity:12000}
     ];
     const productionRecipes = [
-      {id:'grow-grain',name:'Grain harvest',daysPerBatch:1,inputs:{},outputs:{grain:150}},
-      {id:'mill-flour',name:'Flour milling',daysPerBatch:1,inputs:{grain:30},outputs:{flour:24}},
+      {id:'grow-grain',name:'Grain harvest',daysPerBatch:1,inputs:{},outputs:{grain:300}},
+      {id:'mill-flour',name:'Flour milling',daysPerBatch:1,inputs:{grain:100},outputs:{flour:100}},
       {id:'harvest-timber',name:'Timber harvest',daysPerBatch:1,inputs:{},outputs:{timber:50}},
-      {id:'forge-tools',name:'Tool manufacturing',daysPerBatch:1,inputs:{timber:20},outputs:{tools:6}}
+      {id:'forge-tools',name:'Tool manufacturing',daysPerBatch:1,inputs:{timber:20},outputs:{tools:10}}
     ];
     const companies = [];
     const markets = [];
@@ -533,14 +534,15 @@
         population:territory.population,
         needs:[
           {goodId:'grain',dailyQuantityPerThousandPeople:1},
-          {goodId:'flour',dailyQuantityPerThousandPeople:0.3},
-          {goodId:'tools',dailyQuantityPerThousandPeople:0.05}
+          {goodId:'flour',dailyQuantityPerThousandPeople:1}
         ],
         dailyDemandRemainders:{}
       });
       for (const goodId of ['grain','flour','tools']) {
         markets.push({
-          stateId:territory.stateId,goodId,dailyDemand:0,dailyConsumerBudget:25000,
+          stateId:territory.stateId,goodId,
+          dailyDemand:goodId === 'tools' ? Math.max(1,Math.floor(territory.population / 10000)) : 0,
+          dailyConsumerBudget:25000,
           basePrice:10,currentPrice:10,minimumPrice:2,maximumPrice:60,
           priceSmoothingPercent:25
         });
