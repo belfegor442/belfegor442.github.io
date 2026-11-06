@@ -8,8 +8,17 @@ using NpgsqlTypes;
 
 namespace NewWorld.Server.Services;
 
-public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> logger)
+public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> logger, IConfiguration configuration)
 {
+    private readonly string instanceId = ResolveInstanceId(configuration["NEW_WORLD_INSTANCE_ID"]);
+
+    private static string ResolveInstanceId(string? value)
+    {
+        var id = string.IsNullOrWhiteSpace(value) ? "default" : value.Trim();
+        if (id.Length > 64 || !id.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+            throw new InvalidOperationException("NEW_WORLD_INSTANCE_ID must contain 1–64 ASCII letters, digits, hyphens, or underscores.");
+        return id;
+    }
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
@@ -21,12 +30,16 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         await using var command = new NpgsqlCommand("""
             CREATE TABLE IF NOT EXISTS new_world_games (
                 id uuid PRIMARY KEY,
+                server_instance_id text NOT NULL DEFAULT 'default',
                 invite_code_hash text NOT NULL UNIQUE,
                 state jsonb NOT NULL,
                 updated_at timestamptz NOT NULL DEFAULT now()
             )
             """, connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await using (var migrationCommand = new NpgsqlCommand(
+            "ALTER TABLE new_world_games ADD COLUMN IF NOT EXISTS server_instance_id text NOT NULL DEFAULT 'default'", connection))
+            await migrationCommand.ExecuteNonQueryAsync(cancellationToken);
         await using var backupCommand = new NpgsqlCommand("""
             CREATE TABLE IF NOT EXISTS new_world_game_backups (
                 game_id uuid PRIMARY KEY REFERENCES new_world_games(id) ON DELETE CASCADE,
@@ -87,9 +100,10 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            "INSERT INTO new_world_games (id, invite_code_hash, state) VALUES (@id, @codeHash, @state)",
+            "INSERT INTO new_world_games (id, server_instance_id, invite_code_hash, state) VALUES (@id, @instanceId, @codeHash, @state)",
             connection, transaction);
         command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("instanceId", instanceId);
         command.Parameters.AddWithValue("codeHash", Hash(inviteCode));
         command.Parameters.AddWithValue("state", NpgsqlDbType.Jsonb, initialSnapshot);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -113,10 +127,11 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         await using (var lockCommand = new NpgsqlCommand(
-            "SELECT id FROM new_world_games WHERE id = @id FOR UPDATE",
+            "SELECT id FROM new_world_games WHERE id = @id AND server_instance_id = @instanceId FOR UPDATE",
             connection, transaction))
         {
             lockCommand.Parameters.AddWithValue("id", gameId);
+            lockCommand.Parameters.AddWithValue("instanceId", instanceId);
             if (await lockCommand.ExecuteScalarAsync(cancellationToken) is null)
                 return (null, "World not found.", true, false);
         }
@@ -377,7 +392,9 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
     public async Task<List<Guid>> GetGameIdsAsync(CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand("SELECT id FROM new_world_games", connection);
+        await using var command = new NpgsqlCommand(
+            "SELECT id FROM new_world_games WHERE server_instance_id = @instanceId", connection);
+        command.Parameters.AddWithValue("instanceId", instanceId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var ids = new List<Guid>();
         while (await reader.ReadAsync(cancellationToken))
@@ -391,22 +408,24 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
         return await FindByIdAsync(connection, null, gameId, false, cancellationToken);
     }
 
-    private static async Task<WorldState?> FindByIdAsync(
+    private async Task<WorldState?> FindByIdAsync(
         NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid gameId, bool forUpdate, CancellationToken cancellationToken)
     {
-        var sql = "SELECT state FROM new_world_games WHERE id = @id" + (forUpdate ? " FOR UPDATE" : "");
+        var sql = "SELECT state FROM new_world_games WHERE id = @id AND server_instance_id = @instanceId" + (forUpdate ? " FOR UPDATE" : "");
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("id", gameId);
+        command.Parameters.AddWithValue("instanceId", instanceId);
         var value = await command.ExecuteScalarAsync(cancellationToken);
         return DeserializeState(value, gameId);
     }
 
-    private static async Task<WorldState?> FindByInviteCodeAsync(
+    private async Task<WorldState?> FindByInviteCodeAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction, string codeHash, bool forUpdate, CancellationToken cancellationToken)
     {
-        var sql = "SELECT state FROM new_world_games WHERE invite_code_hash = @codeHash" + (forUpdate ? " FOR UPDATE" : "");
+        var sql = "SELECT state FROM new_world_games WHERE invite_code_hash = @codeHash AND server_instance_id = @instanceId" + (forUpdate ? " FOR UPDATE" : "");
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("codeHash", codeHash);
+        command.Parameters.AddWithValue("instanceId", instanceId);
         var value = await command.ExecuteScalarAsync(cancellationToken);
         return DeserializeState(value);
     }
