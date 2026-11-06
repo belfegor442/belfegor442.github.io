@@ -73,7 +73,7 @@
     game.financialTransactions ||= [];
     for (const territory of game.territories) {
       const monthlyBalance = calculateGovernmentFinance(game, territory).monthlyBalance;
-      const accumulated = integer(territory.dailyBalanceRemainder || 0, 'Treasury remainder') +
+      const accumulated = integer(territory.dailyBalanceRemainder || 0, 'Treasury remainder', -Number.MAX_SAFE_INTEGER) +
         BigInt(monthlyBalance);
       let dailyChange = accumulated / BigInt(DAYS_PER_FINANCIAL_PERIOD);
       territory.dailyBalanceRemainder = number(
@@ -360,14 +360,17 @@
       }
 
       const publicRoutes = routes.filter(route => route.importStateId === market.stateId &&
-        route.goodId === market.goodId && !route.exporterCompanyId);
+        route.goodId === market.goodId && !route.exporterCompanyId &&
+        route.exportStateId !== market.stateId);
+      const routeReservations = new Map();
       for (const route of publicRoutes) {
         const exporters = [...companies.values()]
           .filter(company => company.stateId === route.exportStateId)
           .sort((a, b) => String(a.id).localeCompare(String(b.id)))
           .map(company => ({
             company,
-            quantity:amount(company.inventory, market.goodId) - blockedAmount(company.id, market.goodId),
+            quantity:amount(company.inventory, market.goodId) - blockedAmount(company.id, market.goodId) -
+              (routeReservations.get(company.id) || 0n),
             routeId:route.id
           })).filter(offer => offer.quantity > 0n);
         const capacity = integer(route.dailyCapacity, 'Public trade route capacity', 0);
@@ -376,6 +379,8 @@
         for (const allocation of proportionalAllocation(exporters, routed)) {
           if (allocation.quantity > 0n) {
             offers.push({company:allocation.offer.company, quantity:allocation.quantity, routeId:route.id});
+            routeReservations.set(allocation.offer.company.id,
+              (routeReservations.get(allocation.offer.company.id) || 0n) + allocation.quantity);
             importedSupply += allocation.quantity;
           }
         }
