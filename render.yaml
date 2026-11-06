@@ -10,7 +10,7 @@ services:
       - key: ASPNETCORE_URLS
         value: http://+:8080
       - key: NEW_WORLD_ALLOWED_ORIGINS
-        value: https://belfegor442.github.io;https://northassembly.work.gd
+        value: https://belfegor442.github.io;https://northassembly.work.gd;https://www.northassembly.work.gd
       - key: DATABASE_URL
         fromDatabase:
           name: na-new-world-db
