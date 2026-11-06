@@ -1610,6 +1610,11 @@
   }
 
   function sendAction(action) {
+    const browserHostActions = new Set(['claim','build','pause','resume']);
+    if (!browserHostActions.has(action.type)) {
+      showMessage('This gameplay action has not yet been migrated to the browser-hosted rules engine.',true);
+      return;
+    }
     if (!socket || !window.NewWorldMultiplayer?.isConnected()) {
       showMessage('The host or relay is disconnected. Reconnect before acting.',true);
       return;
