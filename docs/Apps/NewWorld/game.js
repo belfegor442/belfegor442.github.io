@@ -1656,6 +1656,13 @@
 
   function openSocket() {
     if (!onlineSession) return;
+    const sessionGameId = onlineSession.gameId;
+    const sessionPlayerId = onlineSession.playerId;
+    const sessionPlayerToken = onlineSession.playerToken;
+    const isCurrentSession = () =>
+      onlineSession?.gameId === sessionGameId &&
+      onlineSession?.playerId === sessionPlayerId &&
+      onlineSession?.playerToken === sessionPlayerToken;
     let base;
     try {
       base = getApiBase();
@@ -1675,17 +1682,28 @@
       return;
     }
     socket = currentSocket;
+    const isCurrentSocket = () => socket === currentSocket && isCurrentSession();
     sentOrderIds = new Set();
     $('server-status').textContent = 'Connecting to the world…';
     currentSocket.addEventListener('open', () => {
-      currentSocket.send(JSON.stringify({
-        type: 'authenticate',
-        gameId: onlineSession.gameId,
-        token: onlineSession.playerToken,
-        lastEventSequence: Number(onlineSession.lastEventSequence) || 0
-      }));
+      if (!isCurrentSocket()) {
+        currentSocket.close();
+        return;
+      }
+      try {
+        currentSocket.send(JSON.stringify({
+          type: 'authenticate',
+          gameId: sessionGameId,
+          token: sessionPlayerToken,
+          lastEventSequence: Number(onlineSession.lastEventSequence) || 0
+        }));
+      } catch (error) {
+        console.error('[new-world] Could not authenticate the WebSocket:', error);
+        currentSocket.close();
+      }
     });
     currentSocket.addEventListener('message', event => {
+      if (!isCurrentSocket()) return;
       let message;
       try {
         message = JSON.parse(event.data);
@@ -1714,12 +1732,13 @@
       }
     });
     currentSocket.addEventListener('error', () => {
+      if (!isCurrentSocket()) return;
       $('server-status').textContent = 'Connection error.';
       $('server-status').classList.add('error');
     });
     currentSocket.addEventListener('close', () => {
       if (socket === currentSocket) socket = null;
-      if (!onlineSession || manuallyDisconnected) return;
+      if (!isCurrentSession() || manuallyDisconnected) return;
       renderMultiplayer();
       scheduleReconnect();
     });
