@@ -32,7 +32,6 @@
     {id:'housing',name:'HOUSING',cost:180,income:8,icon:'▦',desc:'Raises the settlement population.'}
   ];
   const SESSION_KEY = 'new-world-session-v1';
-  const API_KEY = 'new-world-api-v1';
   const NAME_KEY = 'new-world-player-name-v1';
   const PENDING_ORDERS_KEY = 'new-world-pending-orders-v1';
 
