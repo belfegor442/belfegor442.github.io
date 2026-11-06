@@ -26,6 +26,8 @@ jobs:
           node-version: "20"
       - name: Build legacy .NET domain reference
         run: dotnet build Apps/NewWorld/Server/NewWorld.Server.csproj --configuration Release
+      - name: Test legacy domain and versioned map geometry
+        run: dotnet test Apps/NewWorld/Server.Tests/Server.Tests.csproj --configuration Release
       - name: Check browser client syntax
         run: |
           node --check docs/Apps/NewWorld/game.js
