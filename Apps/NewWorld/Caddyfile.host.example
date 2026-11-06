@@ -1,0 +1,4 @@
+# Replace with a domain whose DNS points to the host machine.
+new-world.example.com {
+    reverse_proxy 127.0.0.1:5000
+}
