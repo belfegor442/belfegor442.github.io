@@ -258,7 +258,9 @@
       stateId:territory.stateId,configurationPending:true,regime:null,constitution:null,
       government:null,institutions:[],offices:[],parties:[],laws:[],decisions:[],stability:null
     }));
-    pushEvent(game,'world.created',playerId,null,'A private multiplayer world was created.');
+    if (!window.NewWorldSimulation) throw new Error('The New World simulation engine failed to load.');
+    Object.assign(game, window.NewWorldSimulation.createStarterEconomy(game.territories, byId));
+    pushEvent(game,'world.created',playerId,null,'A private multiplayer world was created with the Beleland starter economy.');
     return {
       game,
       session:{gameId,playerId,playerToken:hostToken,inviteCode:'',roomCode:'',isHost:true}
@@ -489,59 +491,27 @@
   }
 
 
-  function accrueDailyBalance(territory, monthlyBalance) {
-    const accumulated = (territory.dailyBalanceRemainder || 0) + monthlyBalance;
-    let dailyChange = Math.trunc(accumulated / DAYS_PER_FINANCIAL_PERIOD);
-    territory.dailyBalanceRemainder = accumulated % DAYS_PER_FINANCIAL_PERIOD;
-    const nextBalance = territory.treasury + dailyChange;
-    if (nextBalance < 0) {
-      dailyChange = -territory.treasury;
-      territory.treasury = 0;
-      territory.dailyBalanceRemainder = 0;
-    } else if (nextBalance > MAX_TREASURY) {
-      dailyChange = MAX_TREASURY - territory.treasury;
-      territory.treasury = MAX_TREASURY;
-      territory.dailyBalanceRemainder = 0;
-    } else {
-      territory.treasury = nextBalance;
-    }
-    return dailyChange;
-  }
-
   function advanceHostDay() {
     if (!runtime || runtime.role !== 'host') return false;
     const game = runtime.game;
     if (!game.started || game.status !== 'running' || !runtime.link.connected) return false;
-    if (game.day >= 2147483647) {
+
+    const result = window.NewWorldSimulation?.advanceDay(game);
+    if (!result?.ok) {
       game.status = 'paused';
       game.paused = true;
-      pushActivity(game,'The world paused because the supported calendar limit was reached.');
+      game.pauseVotePlayerIds = [];
+      game.worldVersion++;
+      const reason = result?.error || 'The browser simulation engine is unavailable.';
+      pushActivity(game,'The world was paused because its simulation cycle failed: ' + reason);
+      pushEvent(game,'world.paused.simulation_error',null,null,
+        'Simulation cycle rejected atomically: ' + reason);
+      persistHost();
+      publishSnapshot();
+      runtime.onStatus('World paused: simulation error — ' + reason);
       return true;
     }
-    const nextDate = new Date(game.worldDate + 'T00:00:00Z');
-    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-    if (!Number.isFinite(nextDate.getTime())) return false;
-    game.day++;
-    game.worldDate = nextDate.toISOString().slice(0,10);
-    for (const government of game.territories) {
-      const before = government.treasury;
-      const monthly = finance(game,government).monthlyBalance;
-      const change = accrueDailyBalance(government,monthly);
-      if (change !== 0) {
-        game.financialTransactions.push({
-          id:byId(),stateId:government.stateId,currencyId:government.currencyId,
-          type:'dailyBalance',amount:change,balanceBefore:before,balanceAfter:government.treasury,
-          worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:null,membershipId:null,
-          description:'Daily balance change from a monthly balance of ' + monthly + '.'
-        });
-      }
-    }
-    if (game.financialTransactions.length > 1000)
-      game.financialTransactions.splice(0,game.financialTransactions.length-1000);
-    game.worldVersion++;
-    const description = game.worldDate + ' began (day ' + game.day + ').';
-    pushActivity(game,description);
-    pushEvent(game,'world.day_advanced',null,null,description);
+
     persistHost();
     publishSnapshot();
     return true;
