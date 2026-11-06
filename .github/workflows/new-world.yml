@@ -5,14 +5,12 @@ on:
     paths:
       - "Apps/NewWorld/**"
       - "docs/Apps/NewWorld/**"
-      - "render.yaml"
       - ".github/workflows/new-world.yml"
   push:
     branches: [main]
     paths:
       - "Apps/NewWorld/**"
       - "docs/Apps/NewWorld/**"
-      - "render.yaml"
       - ".github/workflows/new-world.yml"
 
 jobs:
@@ -26,9 +24,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Build authoritative server
+      - name: Build legacy .NET domain reference
         run: dotnet build Apps/NewWorld/Server/NewWorld.Server.csproj --configuration Release
       - name: Check browser client syntax
-        run: node --check docs/Apps/NewWorld/game.js
-      - name: Validate deployment blueprint YAML
-        run: ruby -e "require 'yaml'; YAML.load_file('render.yaml')"
+        run: |
+          node --check docs/Apps/NewWorld/game.js
+          node --check docs/Apps/NewWorld/multiplayer.js
