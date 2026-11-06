@@ -113,6 +113,7 @@
         client.on('offline', () => {
           this.connected = false;
           this.onStatus('Relay offline — reconnecting…');
+          this.scheduleBrokerRotation();
         });
         client.on('error', error => {
           this.onStatus('Relay error: ' + (error?.message || 'connection failed'));
@@ -134,7 +135,9 @@
       if (client !== this.client || this.closed) return;
       this.connected = true;
       if (this.rotateTimer) clearTimeout(this.rotateTimer);
+      if (this.retryTimer) clearTimeout(this.retryTimer);
       this.rotateTimer = null;
+      this.retryTimer = null;
       const subscriptions = this.role === 'host'
         ? [this.topics.clients, this.topics.root + 'p/+/presence']
         : [this.topics.server, this.topics.host, this.topics.pending(this.clientNonce),
@@ -545,7 +548,11 @@
   }
 
   function hostPulse() {
-    if (!runtime || runtime.role !== 'host' || !runtime.link.connected) return;
+    if (!runtime || runtime.role !== 'host') return;
+    if (!runtime.link.connected) {
+      runtime.lastPulseAt = Date.now();
+      return;
+    }
     const game = runtime.game;
     if (!game.started || game.status !== 'running') {
       runtime.lastPulseAt = Date.now();
@@ -821,13 +828,35 @@
     runtime.lastPulseAt = Date.now();
     runtime.clockAccumulatorMs = 0;
     runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
+    runtime.hasConnected = false;
     runtime.link = new BrokerLink('host',runtime.room,session.playerId,
       hostReceive,(status) => {
         if (status === 'ready') {
+          runtime.hasConnected = true;
+          const host = runtime.game.players.find(player => player.id === runtime.session.playerId);
+          if (host) host.connected = true;
+          runtime.lastPulseAt = Date.now();
           runtime.onStatus('ready');
           persistHost();
           publishSnapshot();
-        } else runtime.onStatus(status);
+        } else {
+          if (runtime.hasConnected && !runtime.link.connected) {
+            const host = runtime.game.players.find(player => player.id === runtime.session.playerId);
+            if (host) host.connected = false;
+            runtime.lastPulseAt = Date.now();
+            if (runtime.game.started && runtime.game.status === 'running') {
+              runtime.game.status = 'paused';
+              runtime.game.paused = true;
+              runtime.game.pauseVotePlayerIds = [];
+              runtime.game.worldVersion++;
+              pushActivity(runtime.game,'The world paused because the host lost its relay connection.');
+              pushEvent(runtime.game,'world.paused.no_players',null,null,
+                'The world paused because the host lost its relay connection.');
+            }
+            persistHost();
+          }
+          runtime.onStatus(status);
+        }
       });
   }
 
