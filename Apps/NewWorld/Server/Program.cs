@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 var allowedOrigins = (Environment.GetEnvironmentVariable("NEW_WORLD_ALLOWED_ORIGINS") ??
-        "http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io")
+        "http://localhost:8765;http://127.0.0.1:8765;https://belfegor442.github.io;https://northassembly.work.gd")
     .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 var connectionString = builder.Configuration.GetConnectionString("NewWorld")
