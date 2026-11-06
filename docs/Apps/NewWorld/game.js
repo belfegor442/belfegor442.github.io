@@ -1497,7 +1497,34 @@
     return name;
   }
 
+  function validateMultiplayerSetup(joining = false) {
+    const serverInput = $('api-url');
+    try {
+      getApiBase();
+    } catch (error) {
+      showMessage(error.message, true);
+      serverInput.focus();
+      return false;
+    }
+
+    const nameInput = $('player-name');
+    const name = nameInput.value.trim();
+    if (name.length < 2 || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) {
+      showMessage('Enter a player name containing 2–24 valid characters.', true);
+      nameInput.focus();
+      return false;
+    }
+
+    if (joining && !$('invite-code').value.trim()) {
+      showMessage('Paste the invitation code before joining a world.', true);
+      $('invite-code').focus();
+      return false;
+    }
+    return true;
+  }
+
   async function createWorld() {
+    if (!validateMultiplayerSetup()) return;
     try {
       const response = await apiRequest('/api/games', {
         method: 'POST',
@@ -1520,6 +1547,7 @@
   }
 
   async function joinWorld() {
+    if (!validateMultiplayerSetup(true)) return;
     try {
       const response = await apiRequest('/api/games/join', {
         method: 'POST',
