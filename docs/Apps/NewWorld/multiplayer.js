@@ -333,7 +333,17 @@
       financialTransactions:clone(game.financialTransactions),
       companyFinancialTransactions:clone(game.companyFinancialTransactions),
       marketHistory:clone(game.marketHistory),
-      companies:game.companies.map(company => ({...clone(company),facilities:clone(company.facilities || [])})),
+      companies:game.companies.map(company => ({
+        ...clone(company),
+        facilities:(company.facilities || []).map(facility => {
+          const recipe = game.productionRecipes.find(item => item.id === facility.recipeId);
+          return {
+            ...clone(facility),
+            recipeName:recipe?.name || facility.recipeId,
+            daysPerBatch:recipe?.daysPerBatch || 1
+          };
+        })
+      })),
       provinces:clone(game.provinces),settlements:clone(game.settlements),
       provinceConnections:clone(game.provinceConnections),territorialControls:clone(game.territorialControls),
       sovereigntyHistory:clone(game.sovereigntyHistory),militaryUnitTypes:clone(game.militaryUnitTypes),
