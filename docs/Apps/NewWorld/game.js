@@ -107,6 +107,7 @@
   let offlineBackup = null;
   let socket = null;
   let reconnectTimer = null;
+  let reconnectAttempts = 0;
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
@@ -1496,7 +1497,34 @@
     return name;
   }
 
+  function validateMultiplayerSetup(joining = false) {
+    const serverInput = $('api-url');
+    try {
+      getApiBase();
+    } catch (error) {
+      showMessage(error.message, true);
+      serverInput.focus();
+      return false;
+    }
+
+    const nameInput = $('player-name');
+    const name = nameInput.value.trim();
+    if (name.length < 2 || name.length > 24 || /[\u0000-\u001f\u007f]/.test(name)) {
+      showMessage('Enter a player name containing 2–24 valid characters.', true);
+      nameInput.focus();
+      return false;
+    }
+
+    if (joining && !$('invite-code').value.trim()) {
+      showMessage('Paste the invitation code before joining a world.', true);
+      $('invite-code').focus();
+      return false;
+    }
+    return true;
+  }
+
   async function createWorld() {
+    if (!validateMultiplayerSetup()) return;
     try {
       const response = await apiRequest('/api/games', {
         method: 'POST',
@@ -1519,6 +1547,7 @@
   }
 
   async function joinWorld() {
+    if (!validateMultiplayerSetup(true)) return;
     try {
       const response = await apiRequest('/api/games/join', {
         method: 'POST',
@@ -1540,6 +1569,17 @@
     }
   }
 
+  function scheduleReconnect() {
+    if (!onlineSession || manuallyDisconnected) return;
+    clearTimeout(reconnectTimer);
+    const delay = Math.min(3000 * (2 ** Math.min(reconnectAttempts, 4)), 30000);
+    reconnectAttempts++;
+    $('server-status').textContent = 'Disconnected — retrying in ' + Math.ceil(delay / 1000) + 's…';
+    reconnectTimer = setTimeout(() => {
+      if (onlineSession && !manuallyDisconnected) restoreSession();
+    }, delay);
+  }
+
   async function restoreSession() {
     if (!onlineSession) return;
     manuallyDisconnected = false;
@@ -1557,6 +1597,7 @@
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
+      scheduleReconnect();
     }
   }
 
@@ -1643,6 +1684,13 @@
 
   function openSocket() {
     if (!onlineSession) return;
+    const sessionGameId = onlineSession.gameId;
+    const sessionPlayerId = onlineSession.playerId;
+    const sessionPlayerToken = onlineSession.playerToken;
+    const isCurrentSession = () =>
+      onlineSession?.gameId === sessionGameId &&
+      onlineSession?.playerId === sessionPlayerId &&
+      onlineSession?.playerToken === sessionPlayerToken;
     let base;
     try {
       base = getApiBase();
@@ -1652,19 +1700,38 @@
     }
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const socketUrl = base.replace(/^http/, 'ws') + '/ws';
-    const currentSocket = new WebSocket(socketUrl);
+    let currentSocket;
+    try {
+      currentSocket = new WebSocket(socketUrl);
+    } catch (error) {
+      socket = null;
+      showServerError(error);
+      scheduleReconnect();
+      return;
+    }
     socket = currentSocket;
+    const isCurrentSocket = () => socket === currentSocket && isCurrentSession();
     sentOrderIds = new Set();
     $('server-status').textContent = 'Connecting to the world…';
     currentSocket.addEventListener('open', () => {
-      currentSocket.send(JSON.stringify({
-        type: 'authenticate',
-        gameId: onlineSession.gameId,
-        token: onlineSession.playerToken,
-        lastEventSequence: Number(onlineSession.lastEventSequence) || 0
-      }));
+      if (!isCurrentSocket()) {
+        currentSocket.close();
+        return;
+      }
+      try {
+        currentSocket.send(JSON.stringify({
+          type: 'authenticate',
+          gameId: sessionGameId,
+          token: sessionPlayerToken,
+          lastEventSequence: Number(onlineSession.lastEventSequence) || 0
+        }));
+      } catch (error) {
+        console.error('[new-world] Could not authenticate the WebSocket:', error);
+        currentSocket.close();
+      }
     });
     currentSocket.addEventListener('message', event => {
+      if (!isCurrentSocket()) return;
       let message;
       try {
         message = JSON.parse(event.data);
@@ -1674,6 +1741,8 @@
         return;
       }
       if (message.type === 'snapshot' && message.game) {
+        reconnectAttempts = 0;
+        clearTimeout(reconnectTimer);
         applySnapshot(message.game);
         replayPendingOrders(currentSocket);
         $('server-status').textContent = 'Connected to the shared world.';
@@ -1685,22 +1754,21 @@
         } else {
           showMessage(orderErrorMessage(message.order.code), true);
         }
-        if (message.order.replayed) replayPendingOrders(currentSocket);
+        replayPendingOrders(currentSocket);
       } else if (message.type === 'error') {
         showMessage(message.error || 'The server rejected the request.', true);
       }
     });
     currentSocket.addEventListener('error', () => {
+      if (!isCurrentSocket()) return;
       $('server-status').textContent = 'Connection error.';
       $('server-status').classList.add('error');
     });
     currentSocket.addEventListener('close', () => {
       if (socket === currentSocket) socket = null;
-      if (!onlineSession || manuallyDisconnected) return;
-      $('server-status').textContent = 'Disconnected — reconnecting…';
+      if (!isCurrentSession() || manuallyDisconnected) return;
       renderMultiplayer();
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(restoreSession, 3000);
+      scheduleReconnect();
     });
   }
 
