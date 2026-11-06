@@ -9,7 +9,7 @@ The repository includes a Render Blueprint in `render.yaml`.
 1. Import this repository into Render and select the Blueprint deployment.
 2. Review the service and PostgreSQL database plans and approve provisioning. The blueprint uses paid plans so the database is persistent; do not deploy it without reviewing the current provider pricing.
 3. Wait until the web service reports healthy at `/api/health`.
-4. The client is configured for `https://na-new-world-api.onrender.com`. If Render assigns a different hostname, update `window.NEW_WORLD_API` in `docs/Apps/NewWorld/index.html` to the actual service origin and publish the static site.
+4. Copy the actual Render service origin (for example, the hostname shown in the service dashboard; do not use a guessed hostname). Set `window.NEW_WORLD_API` in `docs/Apps/NewWorld/index.html` to that origin, then publish the static site. Until this is done, the browser intentionally reports that the multiplayer service is not configured.
 
 The API accepts the PostgreSQL URI supplied by Render through `DATABASE_URL`, converts it to an Npgsql connection string, and requires TLS for the managed database connection.
 
