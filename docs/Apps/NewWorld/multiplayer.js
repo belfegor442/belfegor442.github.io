@@ -373,7 +373,7 @@
     return (permissions[permissionSetId] || []).includes(action);
   }
 
-  function reject(code,error) { return {id:null,accepted:false,code,error,replayed:false}; }
+  function reject(code,error,id = null) { return {id,accepted:false,code,error,replayed:false}; }
 
   function applyOrder(game,player,order) {
     if (!order || !order.orderId) return reject('INVALID_PAYLOAD','A valid order ID is required.',order?.orderId || null);
@@ -556,7 +556,8 @@
       }
       const result = applyAdmin(runtime.game,message.action,message.payload);
       runtime.link.publish(runtime.topics.server,{t:'adminResult',to:player.id,
-        requestId:message.requestId,ok:result.ok,error:result.error});
+        requestId:message.requestId,ok:result.ok,error:result.error,
+        game:result.ok ? snapshot(runtime.game) : null});
       if (result.ok) { persistHost(); publishSnapshot(); }
     }
   }
