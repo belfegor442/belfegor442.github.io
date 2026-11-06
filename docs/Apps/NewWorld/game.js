@@ -107,6 +107,7 @@
   let offlineBackup = null;
   let socket = null;
   let reconnectTimer = null;
+  let reconnectAttempts = 0;
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
@@ -1557,7 +1558,25 @@
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
+      if ([400, 401, 403, 404].includes(error?.status)) {
+        manuallyDisconnected = true;
+        return;
+      }
+      scheduleReconnect();
     }
+  }
+
+  function scheduleReconnect() {
+    if (!onlineSession || manuallyDisconnected || reconnectTimer !== null) return;
+    const delay = Math.min(30000, 1000 * 2 ** Math.min(reconnectAttempts, 5)) +
+      Math.floor(Math.random() * 500);
+    reconnectAttempts++;
+    $('server-status').textContent = 'Disconnected — retrying in ' +
+      Math.ceil(delay / 1000) + 's…';
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      restoreSession();
+    }, delay);
   }
 
   async function recoverPreviousSave() {
@@ -1665,6 +1684,7 @@
       }));
     });
     currentSocket.addEventListener('message', event => {
+      if (currentSocket !== socket) return;
       let message;
       try {
         message = JSON.parse(event.data);
@@ -1674,6 +1694,7 @@
         return;
       }
       if (message.type === 'snapshot' && message.game) {
+        reconnectAttempts = 0;
         applySnapshot(message.game);
         replayPendingOrders(currentSocket);
         $('server-status').textContent = 'Connected to the shared world.';
@@ -1691,16 +1712,16 @@
       }
     });
     currentSocket.addEventListener('error', () => {
+      if (currentSocket !== socket) return;
       $('server-status').textContent = 'Connection error.';
       $('server-status').classList.add('error');
     });
     currentSocket.addEventListener('close', () => {
-      if (socket === currentSocket) socket = null;
+      if (socket !== currentSocket) return;
+      socket = null;
       if (!onlineSession || manuallyDisconnected) return;
-      $('server-status').textContent = 'Disconnected — reconnecting…';
       renderMultiplayer();
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(restoreSession, 3000);
+      scheduleReconnect();
     });
   }
 
@@ -1913,9 +1934,11 @@
     manuallyDisconnected = true;
     clearTimeout(reconnectTimer);
     if (socket) {
-      socket.close();
+      const currentSocket = socket;
       socket = null;
+      currentSocket.close();
     }
+    reconnectAttempts = 0;
     onlineSession = null;
     onlineGame = null;
     try {
