@@ -23,7 +23,7 @@
       owner: 'Unassigned'
     })),
     buildings: {},
-    activity: ['Preview only. Connect to a multiplayer server to load the authoritative world.']
+    activity: ['Local preview. Create or join a world to play online.']
   };
   const buildingTypes = [
     {id:'farm',name:'FARM',cost:120,income:18,icon:'♧',desc:'Food production and rural employment.'},
@@ -205,7 +205,7 @@
     $('world-time').hidden = !isOnline();
     $('world-time').textContent = isOnline()
       ? onlineGame?.started
-        ? onlineGame.paused ? 'PAUSED · SERVER CLOCK' : '1 DAY / 5 MIN · SERVER CLOCK'
+        ? onlineGame.paused ? 'PAUSED · HOST CLOCK' : '1 DAY / 5 MIN · HOST CLOCK'
         : 'LOBBY · CLOCK PAUSED'
       : '';
     renderCity();
@@ -345,8 +345,8 @@
     $('territory-setup-panel').hidden = !canConfigureScenario();
     if (!onlineGame || !territory) {
       $('territory-status').textContent = 'Connect to a multiplayer world and select a State to inspect territorial data.';
-      addPoliticalRow(provinceList, 'No province data', 'Province records are loaded from the server scenario.');
-      addPoliticalRow(settlementList, 'No settlement data', 'Settlement records are loaded from the server scenario.');
+      addPoliticalRow(provinceList, 'No province data', 'Province records are loaded from the host scenario.');
+      addPoliticalRow(settlementList, 'No settlement data', 'Settlement records are loaded from the host scenario.');
       addPoliticalRow(controlList, 'No control history', 'Control and sovereignty records are kept separately.');
       return;
     }
@@ -420,8 +420,8 @@
     $('military-setup-panel').hidden = !canConfigureScenario();
     if (!onlineGame || !territory) {
       $('military-status').textContent = 'Connect to a multiplayer world and select a State to inspect military data.';
-      addPoliticalRow(unitsList, 'No military units', 'No server-authoritative unit data is available.');
-      addPoliticalRow(operationsList, 'No operations or battles', 'Operations are recorded by the server.');
+      addPoliticalRow(unitsList, 'No military units', 'No host-authoritative unit data is available.');
+      addPoliticalRow(operationsList, 'No operations or battles', 'Operations are recorded by the host.');
       addPoliticalRow(occupationsList, 'No occupation data', 'Occupation never changes sovereignty by itself.');
       return;
     }
@@ -1135,7 +1135,7 @@
         ? 'An independent territory. You can establish an administration by investing in local governance.'
         : 'This state has no government membership yet.';
     } else {
-      $('state-description').textContent = 'Connect to a multiplayer server to inspect the authoritative world.';
+      $('state-description').textContent = 'Create or join a multiplayer world to inspect its shared state.';
     }
     $('state-pop').textContent = onlineGame ? territory.pop.toLocaleString('en-US') : '—';
     $('state-prosperity').textContent = onlineGame ? territory.prosperity + '/100' : '—';
@@ -1155,7 +1155,7 @@
       claimButton.innerHTML = isGovernmentMember ? 'YOUR GOVERNMENT <span>✓</span>' : 'ALREADY ADMINISTERED <span>✓</span>';
     } else if (!isOnline()) {
       claimButton.disabled = true;
-      claimButton.textContent = 'MULTIPLAYER SERVER REQUIRED';
+      claimButton.textContent = 'MULTIPLAYER WORLD REQUIRED';
     } else if (owner) {
       claimButton.disabled = true;
       claimButton.textContent = 'ADMINISTERED BY ' + owner.name.toUpperCase();
@@ -1427,7 +1427,7 @@
     console.error('[new-world] Multiplayer request failed:', error);
     const message = error instanceof Error ? error.message : 'The multiplayer request failed.';
     $('recover-previous-save').hidden = error?.code !== 'SAVE_INVALID';
-    $('server-status').textContent = 'Server unavailable.';
+    $('server-status').textContent = 'Multiplayer connection error.';
     $('server-status').classList.add('error');
     showMessage(message, true);
     toast('MULTIPLAYER ERROR');
@@ -1678,7 +1678,7 @@
       TERRITORY_ACCESS_DENIED: 'This route crosses territory without configured access.',
       MILITARY_CAPACITY_UNIT_UNSUPPORTED: 'This route uses a capacity unit that cannot yet be validated.'
     };
-    return messages[code] || 'The server rejected the order.';
+    return messages[code] || 'The host rejected the order.';
   }
 
   async function assignCountry(playerId,countryIndex) {
@@ -1802,7 +1802,7 @@
     } else {
       const status = document.createElement('p');
       status.className = 'muted';
-      status.textContent = 'Waiting for the server to restore the lobby.';
+      status.textContent = 'Waiting for the host to restore the lobby.';
       list.appendChild(status);
       $('start-world').hidden = true;
       $('pause-controls').hidden = true;
