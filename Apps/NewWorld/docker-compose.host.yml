@@ -1,0 +1,12 @@
+services:
+  match-server:
+    build:
+      context: ./Server
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__NewWorld: ${NEW_WORLD_CONNECTION_STRING:?Set NEW_WORLD_CONNECTION_STRING in .env.host}
+      NEW_WORLD_INSTANCE_ID: ${NEW_WORLD_INSTANCE_ID:?Set a unique NEW_WORLD_INSTANCE_ID for this host}
+      NEW_WORLD_ALLOWED_ORIGINS: "${NEW_WORLD_ALLOWED_ORIGINS:-https://belfegor442.github.io}"
+    ports:
+      - "${NEW_WORLD_BIND_ADDRESS:-127.0.0.1}:${NEW_WORLD_PORT:-5000}:8080"
