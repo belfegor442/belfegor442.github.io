@@ -384,7 +384,19 @@
   function applyOrder(game,player,order) {
     if (!order || !order.orderId) return reject('INVALID_PAYLOAD','A valid order ID is required.',order?.orderId || null);
     const duplicate = game.orders.find(item => item.id === order.orderId);
-    if (duplicate) return reject('ORDER_ID_REUSED','This order ID was already used.',order.orderId);
+    if (duplicate) {
+      const payload = Object.fromEntries(Object.entries(order).filter(([key]) =>
+        !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
+      const samePayload = duplicate.playerId === player.id &&
+        duplicate.type === order.type &&
+        duplicate.stateId === order.stateId &&
+        duplicate.expectedWorldVersion === order.expectedWorldVersion &&
+        JSON.stringify(duplicate.payload || {}) === JSON.stringify(payload);
+      return samePayload
+        ? {id:order.orderId,accepted:duplicate.status === 'executed',
+            code:duplicate.resultCode || null,error:duplicate.result || null,replayed:true}
+        : reject('ORDER_ID_REUSED','This order ID was already used.',order.orderId);
+    }
     if (Number(order.expectedWorldVersion) !== game.worldVersion)
       return reject('STALE_WORLD_VERSION','The world changed. Review the latest state before trying again.',order.orderId);
     const orderType = order.type;
@@ -463,8 +475,11 @@
     }
 
     game.worldVersion++;
+    const orderPayload = Object.fromEntries(Object.entries(order).filter(([key]) =>
+      !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
     game.orders.push({id:order.orderId,playerId:player.id,type:orderType,stateId:order.stateId,
-      status:'executed',expectedWorldVersion:order.expectedWorldVersion,worldVersion:game.worldVersion});
+      payload:orderPayload,status:'executed',expectedWorldVersion:order.expectedWorldVersion,
+      worldVersion:game.worldVersion,resultCode:null,result:null});
     pushEvent(game,'order.executed',player.id,order.stateId,
       game.activity[0] || ('Executed ' + orderType + '.'),order.orderId);
     return {id:order.orderId,accepted:true,code:null,error:null,replayed:false};
