@@ -7,6 +7,25 @@
  <pattern id="sea-grid" width="72" height="72" patternUnits="userSpaceOnUse"><path d="M72 0H0V72" fill="none" stroke="#71909a" stroke-opacity=".07" stroke-width="1"/></pattern>
  <pattern id="paper-grain" width="44" height="44" patternUnits="userSpaceOnUse"><circle cx="8" cy="9" r="1" fill="#fff" opacity=".11"/><circle cx="31" cy="28" r=".8" fill="#15201a" opacity=".12"/><path d="M0 38L12 36 M29 4L39 7" stroke="#fff" opacity=".07"/></pattern>
  <filter id="coast-shadow" x="-15%" y="-15%" width="130%" height="130%"><feGaussianBlur stdDeviation="16"/></filter>
+<style><![CDATA[
+ .state-label{pointer-events:none}
+ .state-label text{fill:#26352d;font:700 9px Arial,sans-serif;letter-spacing:1.2px;paint-order:stroke;stroke:#e4d9b9;stroke-width:4px;stroke-linejoin:round}
+ .state-label .state-name{font-size:13px;letter-spacing:1.4px}
+ .mountain path:first-child{fill:#69755c;stroke:#4b5948;stroke-width:2;opacity:.82}
+ .mountain path:last-child{fill:none;stroke:#d6c8a0;stroke-width:2;opacity:.72}
+ .tree path:first-child{fill:#526e52;stroke:#3e573f;stroke-width:1}
+ .tree path:last-child{fill:none;stroke:#665c43;stroke-width:2}
+ .rivers path{fill:none;stroke:#6e9eab;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.72}
+ .rivers path+path{stroke:#8ab6bd;stroke-width:3;opacity:.65}
+ .roads path{fill:none;stroke:#a58d60;stroke-width:4;stroke-dasharray:2 5;stroke-linecap:round;opacity:.82}
+ .roads .rail{stroke:#6b5550;stroke-width:3;stroke-dasharray:9 6;opacity:.9}
+ .settlement circle:first-child{fill:#27362e;stroke:#e6d7ae;stroke-width:2}
+ .settlement .halo{fill:none;stroke:#27362e;stroke-width:1.2;opacity:.55}
+ .settlement text{fill:#26352d;font:700 10px Arial,sans-serif;letter-spacing:.4px;paint-order:stroke;stroke:#e5d9b9;stroke-width:3px;stroke-linejoin:round}
+ .settlement.cap circle:first-child{fill:#a06e4e;stroke:#f1dfb8;stroke-width:2.5}
+ .map-annotations text{fill:#d8ceb1;paint-order:stroke;stroke:#3d4b3b;stroke-width:3px}
+ .map-frame-ornament{pointer-events:none}
+]]></style>
 </defs>
 <rect width="1600" height="1100" fill="#142832"/>
 <rect width="1600" height="1100" fill="url(#sea-grid)"/>
