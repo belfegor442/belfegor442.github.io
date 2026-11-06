@@ -1708,7 +1708,7 @@
         } else {
           showMessage(orderErrorMessage(message.order.code), true);
         }
-        if (message.order.replayed) replayPendingOrders(currentSocket);
+        replayPendingOrders(currentSocket);
       } else if (message.type === 'error') {
         showMessage(message.error || 'The server rejected the request.', true);
       }
