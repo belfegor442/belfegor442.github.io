@@ -1676,6 +1676,10 @@
     sentOrderIds = new Set();
     $('server-status').textContent = 'Connecting to the world…';
     currentSocket.addEventListener('open', () => {
+      if (currentSocket !== socket || !onlineSession) {
+        currentSocket.close();
+        return;
+      }
       currentSocket.send(JSON.stringify({
         type: 'authenticate',
         gameId: onlineSession.gameId,
