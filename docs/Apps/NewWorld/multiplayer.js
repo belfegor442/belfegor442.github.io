@@ -12,6 +12,9 @@
   ];
   const NS = 'north-assembly/new-world/v1/';
   const HOST_SAVE = 'new-world-host-state-v2:';
+  const DAY_LENGTH_MS = 5 * 60 * 1000;
+  const DAYS_PER_FINANCIAL_PERIOD = 30;
+  const MAX_TREASURY = 2147483647;
   const MAX_PLAYERS = 20;
   const BUILDINGS = {
     farm: {id:'farm',name:'FARM',cost:120,income:18,icon:'♧',description:'Food production and rural employment.'},
@@ -245,6 +248,9 @@
       activity:[name + ' created a private world.'],
       ...emptyCollections()
     };
+    game.currencies = game.territories.map(territory => ({
+      id:territory.currencyId,stateId:territory.stateId,name:null,code:null,minorUnitScale:null
+    }));
     game.politicalSystems = game.territories.map(territory => ({
       stateId:territory.stateId,configurationPending:true,regime:null,constitution:null,
       government:null,institutions:[],offices:[],parties:[],laws:[],decisions:[],stability:null
@@ -424,9 +430,11 @@
       territory.ownerPlayerId = player.id;
       territory.infrastructure++;
       game.financialTransactions.push({
-        id:byId(),stateId:government.stateId,type:'administrationCost',amount:-450,
+        id:byId(),stateId:government.stateId,currencyId:government.currencyId,
+        type:'administrationCost',amount:-450,balanceBefore:government.treasury+450,
         balanceAfter:government.treasury,description:'Administration established in ' + territory.name + '.',
-        worldDate:game.worldDate
+        worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
+        membershipId:membership.id
       });
       pushActivity(game,player.name + ' established an administration in ' + territory.name + '.');
     } else if (orderType === 'build') {
@@ -443,9 +451,11 @@
       government.treasury -= building.cost;
       player.buildings[plot] = clone(building);
       game.financialTransactions.push({
-        id:byId(),stateId:government.stateId,type:'constructionCost',amount:-building.cost,
+        id:byId(),stateId:government.stateId,currencyId:government.currencyId,
+        type:'constructionCost',amount:-building.cost,balanceBefore:government.treasury+building.cost,
         balanceAfter:government.treasury,description:'Constructed ' + building.name + '.',
-        worldDate:game.worldDate
+        worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
+        membershipId:membership.id
       });
       pushActivity(game,player.name + ' constructed a ' + building.name.toLowerCase() + '.');
     } else {
@@ -458,6 +468,87 @@
     pushEvent(game,'order.executed',player.id,order.stateId,
       game.activity[0] || ('Executed ' + orderType + '.'),order.orderId);
     return {id:order.orderId,accepted:true,code:null,error:null,replayed:false};
+  }
+
+
+  function accrueDailyBalance(territory, monthlyBalance) {
+    const accumulated = (territory.dailyBalanceRemainder || 0) + monthlyBalance;
+    let dailyChange = Math.trunc(accumulated / DAYS_PER_FINANCIAL_PERIOD);
+    territory.dailyBalanceRemainder = accumulated % DAYS_PER_FINANCIAL_PERIOD;
+    const nextBalance = territory.treasury + dailyChange;
+    if (nextBalance < 0) {
+      dailyChange = -territory.treasury;
+      territory.treasury = 0;
+      territory.dailyBalanceRemainder = 0;
+    } else if (nextBalance > MAX_TREASURY) {
+      dailyChange = MAX_TREASURY - territory.treasury;
+      territory.treasury = MAX_TREASURY;
+      territory.dailyBalanceRemainder = 0;
+    } else {
+      territory.treasury = nextBalance;
+    }
+    return dailyChange;
+  }
+
+  function advanceHostDay() {
+    if (!runtime || runtime.role !== 'host') return false;
+    const game = runtime.game;
+    if (!game.started || game.status !== 'running' || !runtime.link.connected) return false;
+    if (game.day >= 2147483647) {
+      game.status = 'paused';
+      game.paused = true;
+      pushActivity(game,'The world paused because the supported calendar limit was reached.');
+      return true;
+    }
+    const nextDate = new Date(game.worldDate + 'T00:00:00Z');
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    if (!Number.isFinite(nextDate.getTime())) return false;
+    game.day++;
+    game.worldDate = nextDate.toISOString().slice(0,10);
+    for (const government of game.territories) {
+      const before = government.treasury;
+      const monthly = finance(game,government).monthlyBalance;
+      const change = accrueDailyBalance(government,monthly);
+      if (change !== 0) {
+        game.financialTransactions.push({
+          id:byId(),stateId:government.stateId,currencyId:government.currencyId,
+          type:'dailyBalance',amount:change,balanceBefore:before,balanceAfter:government.treasury,
+          worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:null,membershipId:null,
+          description:'Daily balance change from a monthly balance of ' + monthly + '.'
+        });
+      }
+    }
+    if (game.financialTransactions.length > 1000)
+      game.financialTransactions.splice(0,game.financialTransactions.length-1000);
+    game.worldVersion++;
+    const description = game.worldDate + ' began (day ' + game.day + ').';
+    pushActivity(game,description);
+    pushEvent(game,'world.day_advanced',null,null,description);
+    persistHost();
+    publishSnapshot();
+    return true;
+  }
+
+  function hostPulse() {
+    if (!runtime || runtime.role !== 'host' || !runtime.link.connected) return;
+    const game = runtime.game;
+    if (!game.started || game.status !== 'running') {
+      runtime.lastPulseAt = Date.now();
+      return;
+    }
+    const now = Date.now();
+    const previous = Number(runtime.lastPulseAt) || now;
+    runtime.clockAccumulatorMs = (runtime.clockAccumulatorMs || 0) +
+      Math.max(0,Math.min(now-previous,DAY_LENGTH_MS));
+    runtime.lastPulseAt = now;
+    let advanced = 0;
+    while (runtime.clockAccumulatorMs >= DAY_LENGTH_MS && advanced < 24 &&
+           runtime.game.status === 'running') {
+      runtime.clockAccumulatorMs -= DAY_LENGTH_MS;
+      if (!advanceHostDay()) break;
+      advanced++;
+    }
+    if (advanced) persistHost();
   }
 
   function hostReceive(topic,message) {
@@ -572,8 +663,16 @@
         return {ok:false,error:'Invalid state assignment.'};
       player.countryIndex = payload.countryIndex;
       if (payload.countryIndex === null) {
-        for (const membership of game.memberships.filter(item =>
-          item.playerId === player.id && item.status === 'active')) membership.status = 'left';
+        const leaving = game.memberships.filter(item =>
+          item.playerId === player.id && item.status === 'active');
+        for (const membership of leaving) membership.status = 'left';
+        for (const stateId of new Set(leaving.map(item => item.stateId))) {
+          const territory = game.territories.find(item => item.stateId === stateId);
+          const stillHasMembers = game.memberships.some(item =>
+            item.stateId === stateId && item.status === 'active');
+          if (territory?.ownerPlayerId === player.id && !stillHasMembers)
+            territory.ownerPlayerId = null;
+        }
       } else {
         const territory = game.territories[payload.countryIndex];
         const active = activeMemberships(game,player.id);
@@ -606,6 +705,8 @@
       game.status = 'running';
       game.paused = false;
       game.lastTickUtc = new Date().toISOString();
+      runtime.lastPulseAt = Date.now();
+      runtime.clockAccumulatorMs = 0;
       pushActivity(game,'The world began.');
     } else if (action === 'configure') {
       if (game.started) return {ok:false,error:'Scenario configuration is locked after the world starts.'};
@@ -702,6 +803,8 @@
     };
     runtime.session.inviteCode = runtime.room;
     runtime.session.roomCode = runtime.room;
+    runtime.lastPulseAt = Date.now();
+    runtime.clockAccumulatorMs = 0;
     runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
     runtime.link = new BrokerLink('host',runtime.room,session.playerId,
       hostReceive,(status) => {
@@ -903,6 +1006,8 @@
       }
     });
   }
+
+  setInterval(hostPulse,1000);
 
   window.NewWorldMultiplayer = {
     createWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
