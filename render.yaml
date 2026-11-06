@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: na-new-world-api
+    runtime: docker
+    plan: starter
+    dockerContext: ./Apps/NewWorld/Server
+    dockerfilePath: ./Apps/NewWorld/Server/Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: NEW_WORLD_ALLOWED_ORIGINS
+        value: https://belfegor442.github.io;https://northassembly.work.gd
+      - key: DATABASE_URL
+        fromDatabase:
+          name: na-new-world-db
+          property: connectionString
+
+databases:
+  - name: na-new-world-db
+    databaseName: newworld
+    user: newworld
+    plan: basic-256mb
