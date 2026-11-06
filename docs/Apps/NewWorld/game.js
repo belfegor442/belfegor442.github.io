@@ -110,6 +110,7 @@
   let drag = null;
   let hoveredState = null;
   let selectedProvinceId = null;
+  let activeMapMode = 'political';
 
   function toast(message) {
     const element = $('toast');
@@ -1195,6 +1196,25 @@
     try {
       const document = object.contentDocument;
       if (!document) return;
+      const mix = (from, to, amount) => {
+        const a = from.match(/[0-9a-f]{2}/gi).map(value => parseInt(value,16));
+        const b = to.match(/[0-9a-f]{2}/gi).map(value => parseInt(value,16));
+        return '#' + a.map((value,index) =>
+          Math.round(value + (b[index] - value) * amount).toString(16).padStart(2,'0')
+        ).join('');
+      };
+      const terrainPalette = [
+        '#9b9d82','#a69b7b','#8e9d8b','#a99a82',
+        '#9f9279','#8c9b8a','#a69b82','#91a092',
+        '#a3977e','#8fa08e','#aa987b','#929d8c',
+        '#9d987f','#8a9c8c','#a69a82','#8f9d91'
+      ];
+      const populationColor = index => {
+        const population = onlineGame?.territories[index]?.population || state.states[index]?.pop || 0;
+        const ratio = Math.max(0,Math.min(1,
+          (Math.log10(Math.max(1,population)) - 4.2) / (5.15 - 4.2)));
+        return mix('#b7aa8a','#657f91',ratio);
+      };
       for (let index = 0; index < 16; index++) {
         const path = document.getElementById('state' + (index + 1));
         if (!path) continue;
@@ -1203,14 +1223,25 @@
         const governmentMembers = governmentMembersFor(territory);
         const isGovernmentMember = membershipsFor(currentPlayer())
           .some(membership => membership.stateId === territory?.stateId);
+        const isMine = state.owned.includes(index) || isGovernmentMember;
+        let fill = '';
+        if (activeMapMode === 'political') {
+          fill = isMine ? '#829b70' : governmentMembers.length || owner ? '#b88570' : '';
+        } else if (activeMapMode === 'economy') {
+          const prosperity = territory?.prosperity ?? state.states[index]?.prosperity ?? 50;
+          fill = mix('#a66e64','#91a878',Math.max(0,Math.min(1,prosperity / 100)));
+        } else if (activeMapMode === 'population') {
+          fill = populationColor(index);
+        } else if (activeMapMode === 'terrain') {
+          fill = terrainPalette[index];
+        }
         path.style.cursor = 'pointer';
         path.style.pointerEvents = 'all';
-        path.style.fill = state.owned.includes(index) || isGovernmentMember
-          ? '#8d9f72'
-          : governmentMembers.length || owner ? '#b88470' : '';
-        path.style.stroke = governmentMembers.length || owner ? '#d8e6ae' : '#59645c';
-        path.style.strokeWidth = index === selectedIndex ? '3' : '1.1';
-        path.style.filter = index === selectedIndex ? 'brightness(1.18)' : 'none';
+        path.style.fill = fill;
+        path.style.stroke = index === selectedIndex ? '#f4dfac' :
+          governmentMembers.length || owner ? '#e7c99c' : '#657061';
+        path.style.strokeWidth = index === selectedIndex ? '4' : '2';
+        path.style.filter = index === selectedIndex ? 'brightness(1.13)' : 'none';
       }
       for (const province of onlineGame?.provinces || []) {
         const element = document.getElementById(province.svgElementId);
@@ -1259,6 +1290,24 @@
     }
     return null;
   }
+
+  const mapModeNames = {
+    political:'POLITICAL',
+    economy:'ECONOMY',
+    population:'POPULATION',
+    terrain:'TERRAIN'
+  };
+  document.querySelectorAll('.map-mode').forEach(button => {
+    button.addEventListener('click', () => {
+      const mode = button.dataset.mapMode;
+      if (!Object.hasOwn(mapModeNames,mode)) return;
+      activeMapMode = mode;
+      document.querySelectorAll('.map-mode').forEach(item =>
+        item.classList.toggle('active',item === button));
+      $('map-layer-label').textContent = mapModeNames[mode];
+      highlightMap(state.selected);
+    });
+  });
 
   const map = $('world-map');
   const viewport = $('map-viewport');

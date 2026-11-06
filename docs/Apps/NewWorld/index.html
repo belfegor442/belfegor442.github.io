@@ -7,22 +7,29 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css">
+  <link rel="stylesheet" href="./game.css?v=20261106-command-ui">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">NORTH ASSEMBLY <span>/</span> NEW WORLD</a>
-    <div class="world-tag"><span class="live-dot"></span> BELELAND <span class="world-number">WORLD 001</span></div>
-    <div class="top-stats">
-      <div><small>SIMULATION DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
-      <div><small>GOVERNMENT TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
-      <div><small>POPULATION</small><strong id="population">—</strong></div>
-      <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
-    </div>
-    <button id="save-btn" class="quiet-btn" hidden>SAVE</button>
-  </header>
+  <a class="brand" href="/" aria-label="North Assembly home">
+    <span class="brand-emblem">NW</span>
+    <span class="brand-wordmark"><strong>NORTH ASSEMBLY</strong><small>GRAND STRATEGY DIVISION</small></span>
+  </a>
+  <div class="campaign-identity">
+    <span class="campaign-overline">BELELAND CAMPAIGN / 001</span>
+    <strong>THE AGE OF STATES</strong>
+    <span class="campaign-subline">A world shaped by borders, cities and decisions</span>
+  </div>
+  <div class="top-stats">
+    <div class="stat-date"><small>WORLD DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
+    <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
+    <div><small>POPULATION</small><strong id="population">—</strong></div>
+    <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
+  </div>
+  <button id="save-btn" class="quiet-btn" hidden>SAVE</button>
+</header>
 
-  <main class="game-shell">
+  <main class="game-shell" aria-label="New World strategy interface">
     <nav class="nav-rail" aria-label="National administration">
       <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
       <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
@@ -36,31 +43,45 @@
     </nav>
 
     <div class="play-area">
-      <section class="map-frame" aria-label="Beleland political map">
+      <section class="map-frame" aria-label="Beleland strategic map">
         <div class="map-tools">
-          <div class="map-title"><span class="panel-kicker">WORLD MAP</span><span class="map-divider">/</span><span id="map-layer-label">POLITICAL</span></div>
+          <div class="map-heading">
+            <span class="map-heading-mark">◈</span>
+            <span class="map-title"><b>BELELAND</b><small>STRATEGIC MAP</small></span>
+            <span class="map-divider">/</span>
+            <span id="map-layer-label">POLITICAL</span>
+          </div>
+          <div class="map-modes" role="group" aria-label="Map mode">
+            <button class="map-mode active" type="button" data-map-mode="political">POLITICAL</button>
+            <button class="map-mode" type="button" data-map-mode="economy">ECONOMY</button>
+            <button class="map-mode" type="button" data-map-mode="population">POPULATION</button>
+            <button class="map-mode" type="button" data-map-mode="terrain">TERRAIN</button>
+          </div>
           <div class="map-controls">
             <button id="zoom-out" aria-label="Zoom out">−</button>
             <button id="zoom-in" aria-label="Zoom in">+</button>
-            <button id="reset-map">RESET VIEW</button>
+            <button id="reset-map">RESET</button>
           </div>
         </div>
         <div id="map-viewport" class="map-viewport">
           <div id="map-stage" class="map-stage">
-            <object id="world-map" data="./map.svg" type="image/svg+xml" aria-label="Interactive map of Beleland"></object>
+            <object id="world-map" data="./map.svg?v=20261106-beleland-v2" type="image/svg+xml" aria-label="Original interactive map of Beleland"></object>
             <div id="map-fallback" class="map-fallback" hidden></div>
           </div>
           <div id="map-tooltip" class="map-tooltip" hidden></div>
-          <div class="map-compass" aria-hidden="true">N<br>▲</div>
+          <div class="map-compass" aria-hidden="true"><span>N</span><b>▲</b></div>
+          <div class="map-scale" aria-hidden="true"><span></span><small>500 KM</small></div>
+          <div class="map-coordinates" aria-hidden="true">BELELAND · WORLD 001</div>
         </div>
         <div class="map-foot">
-          <span><i class="legend owned"></i> <span id="legend-owned">GOVERNMENT MEMBERSHIP</span></span>
-          <span><i class="legend other"></i> <span id="legend-other">WORLD DATA UNAVAILABLE</span></span>
-          <span>SELECT A STATE TO INSPECT</span>
+          <span><i class="legend owned"></i> <span id="legend-owned">YOUR GOVERNMENT</span></span>
+          <span><i class="legend other"></i> <span id="legend-other">OTHER STATES</span></span>
+          <span><i class="legend independent"></i> INDEPENDENT</span>
+          <span class="map-foot-hint">CLICK A STATE TO INSPECT · DRAG TO PAN · SCROLL TO ZOOM</span>
         </div>
       </section>
 
-      <aside class="command-panel" aria-live="polite">
+      <aside class="command-panel" aria-live="polite"><div class="inspector-heading"><div><span class="panel-kicker">NATIONAL DESK</span><small>COMMAND / INTELLIGENCE / MANAGEMENT</small></div><span class="inspector-classification">FIELD OFFICE 01</span></div>
         <section id="world-view" class="view active">
           <p class="panel-kicker">TERRITORY / INSPECTION</p>
           <h1 id="state-name">Select a territory</h1>
@@ -266,16 +287,16 @@
     </div>
 
     <footer class="game-footer">
-      <div class="world-status"><span>NA / INTERACTIVE SYSTEMS</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
+      <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND STRATEGY SIMULATION</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
       <span id="world-time" class="world-time" hidden></span>
       <button id="next-month" class="advance" hidden>ADVANCE MONTH <b>→</b></button>
-      <a href="/Apps/">APPLICATION DIRECTORY ↗</a>
+      <a href="/Apps/">NORTH ASSEMBLY ↗</a>
     </footer>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js"></script>
-  <script src="./multiplayer.js"></script>
-  <script src="./game.js"></script>
+  <script src="./simulation.js?v=20261106-economy-core"></script>
+  <script src="./multiplayer.js?v=20261106-command-ui"></script>
+  <script src="./game.js?v=20261106-command-ui"></script>
 </body>
 </html>
