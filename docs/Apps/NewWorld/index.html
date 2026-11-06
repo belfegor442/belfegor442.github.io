@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css">
+  <link rel="stylesheet" href="./game.css?v=20261106-command-ui">
 </head>
 <body>
   <header class="topbar">
@@ -65,7 +65,7 @@
         </div>
         <div id="map-viewport" class="map-viewport">
           <div id="map-stage" class="map-stage">
-            <object id="world-map" data="./map.svg" type="image/svg+xml" aria-label="Original interactive map of Beleland"></object>
+            <object id="world-map" data="./map.svg?v=20261106-beleland-v2" type="image/svg+xml" aria-label="Original interactive map of Beleland"></object>
             <div id="map-fallback" class="map-fallback" hidden></div>
           </div>
           <div id="map-tooltip" class="map-tooltip" hidden></div>
@@ -295,8 +295,8 @@
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js"></script>
-  <script src="./multiplayer.js"></script>
-  <script src="./game.js"></script>
+  <script src="./simulation.js?v=20261106-economy-core"></script>
+  <script src="./multiplayer.js?v=20261106-command-ui"></script>
+  <script src="./game.js?v=20261106-command-ui"></script>
 </body>
 </html>
