@@ -1,0 +1,34 @@
+name: New World Multiplayer
+
+on:
+  pull_request:
+    paths:
+      - "Apps/NewWorld/**"
+      - "docs/Apps/NewWorld/**"
+      - "render.yaml"
+      - ".github/workflows/new-world.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Apps/NewWorld/**"
+      - "docs/Apps/NewWorld/**"
+      - "render.yaml"
+      - ".github/workflows/new-world.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build authoritative server
+        run: dotnet build Apps/NewWorld/Server/NewWorld.Server.csproj --configuration Release
+      - name: Check browser client syntax
+        run: node --check docs/Apps/NewWorld/game.js
+      - name: Validate deployment blueprint YAML
+        run: ruby -e "require 'yaml'; YAML.load_file('render.yaml')"
