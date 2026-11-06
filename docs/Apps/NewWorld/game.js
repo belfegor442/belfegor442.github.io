@@ -83,18 +83,12 @@
     }
   }
 
-  function replayPendingOrders(currentSocket) {
-    if (currentSocket !== socket || currentSocket.readyState !== WebSocket.OPEN ||
-        sentOrderIds.size > 0 || recoveryOrdersNeedCleanup) return;
+  function replayPendingOrders() {
+    if (!window.NewWorldMultiplayer?.isConnected() || sentOrderIds.size > 0 ||
+        recoveryOrdersNeedCleanup) return;
     const order = ordersForCurrentSession()[0];
     if (!order || sentOrderIds.has(order.orderId)) return;
-    try {
-      currentSocket.send(JSON.stringify(order));
-      sentOrderIds.add(order.orderId);
-    } catch (error) {
-      console.error('[new-world] Could not resend pending order:', error);
-      showMessage('An order is queued and will be retried after reconnecting.', true);
-    }
+    if (window.NewWorldMultiplayer.sendOrder(order)) sentOrderIds.add(order.orderId);
   }
 
   let state = structuredClone(initial);
@@ -755,41 +749,34 @@
     $(textareaId).value = JSON.stringify(configuration, null, 2);
   }
 
-  async function saveScenarioConfiguration(endpoint, textareaId, keys, label) {
+  async function saveScenarioConfiguration(endpoint,textareaId,keys,label) {
     if (!canConfigureScenario()) {
-      showMessage('Only the host can configure this technical scenario before the world starts.', true);
+      showMessage('Only the host can configure this technical scenario before the world starts.',true);
       return;
     }
-
     let configuration;
     try {
       configuration = JSON.parse($(textareaId).value);
     } catch (error) {
       showMessage(label + ' scenario JSON is invalid: ' +
-        (error instanceof Error ? error.message : 'parse error'), true);
+        (error instanceof Error ? error.message : 'parse error'),true);
       return;
     }
     if (!configuration || keys.some(key => !Array.isArray(configuration[key]))) {
-      showMessage(label + ' scenario requires: ' + keys.join(', ') + '.', true);
+      showMessage(label + ' scenario requires: ' + keys.join(', ') + '.',true);
       return;
     }
     try {
-      const game = await apiRequest(
-        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/' + endpoint,
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            ...configuration,
-            expectedWorldVersion: onlineGame.worldVersion
-          })
-        },
-        onlineSession.playerToken);
-      applySnapshot(game);
-      showMessage(label + ' scenario validated and saved.');
+      const game = await window.NewWorldMultiplayer.admin('configure',{
+        kind:endpoint,configuration
+      });
+      if (game && typeof game === 'object') applySnapshot(game);
+      showMessage(label + ' scenario saved to the host device and shared with the room.');
     } catch (error) {
       showServerError(error);
     }
   }
+
 
   function loadEconomyConfiguration() {
     if (!onlineGame) return;
@@ -821,44 +808,36 @@
   async function saveEconomyConfiguration() {
     if (!onlineSession || !onlineGame || onlineGame.started ||
         onlineGame.hostPlayerId !== onlineSession.playerId) {
-      showMessage('Only the host can configure the technical economy before the world starts.', true);
+      showMessage('Only the host can configure the technical economy before the world starts.',true);
       return;
     }
-
     let configuration;
     try {
       configuration = JSON.parse($('economy-config').value);
     } catch (error) {
       showMessage('Economic scenario JSON is invalid: ' +
-        (error instanceof Error ? error.message : 'parse error'), true);
+        (error instanceof Error ? error.message : 'parse error'),true);
       return;
     }
     const collections = [
-      'goods', 'productionRecipes', 'companies', 'markets', 'tradeRoutes', 'populationGroups'
+      'goods','productionRecipes','companies','markets','tradeRoutes','populationGroups'
     ];
     if (!configuration || collections.some(key => !Array.isArray(configuration[key]))) {
-      showMessage('The scenario must include goods, productionRecipes, companies, markets, tradeRoutes, and populationGroups arrays.', true);
+      showMessage('The scenario must include goods, productionRecipes, companies, markets, tradeRoutes, and populationGroups arrays.',true);
       return;
     }
-
     try {
-      const game = await apiRequest(
-        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/economy',
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            ...configuration,
-            expectedWorldVersion: onlineGame.worldVersion
-          })
-        },
-        onlineSession.playerToken);
-      applySnapshot(game);
+      const game = await window.NewWorldMultiplayer.admin('configure',{
+        kind:'economy',configuration
+      });
+      if (game && typeof game === 'object') applySnapshot(game);
       $('economy-config').value = '';
-      showMessage('Economic scenario validated and saved. Markets and trade routes are now active configuration.');
+      showMessage('Economic scenario saved to the host device and shared with the room.');
     } catch (error) {
       showServerError(error);
     }
   }
+
 
   function renderFinancialLedger() {
     const list = $('transaction-list');
@@ -1422,47 +1401,15 @@
     sendAction({type: 'build', plotIndex: selectedPlot, buildingId: id});
   }
 
-  function getApiBase() {
-    const raw = String(window.NEW_WORLD_API || '').trim();
-    if (!raw) throw new Error('The New World multiplayer service is not configured yet.');
-    let url;
+  function storeSession(session) {
+    onlineSession = session;
+    manuallyDisconnected = false;
     try {
-      url = new URL(raw);
-    } catch {
-      throw new Error('The configured multiplayer service URL is invalid.');
-    }
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
-        url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
-      throw new Error('The configured multiplayer service must be an HTTP(S) origin.');
-    }
-    return url.origin;
-  }
-
-  async function apiRequest(path, options = {}, token = null) {
-    const base = getApiBase();
-    const headers = new Headers(options.headers || {});
-    if (options.body) headers.set('Content-Type', 'application/json');
-    if (token) headers.set('Authorization', 'Bearer ' + token);
-    let response;
-    try {
-      response = await fetch(base + path, {...options, headers});
+      localStorage.setItem(SESSION_KEY,JSON.stringify(session));
     } catch (error) {
-      throw new Error('Cannot reach the game server. Check its URL, availability, and allowed website origins.');
+      console.error('[new-world] Could not persist the multiplayer session:',error);
+      showMessage('This browser could not save the session token. Keep this tab open.',true);
     }
-    const text = await response.text();
-    let data;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = null;
-    }
-    if (!response.ok) {
-      const error = new Error(data?.error || data?.detail || 'Server returned HTTP ' + response.status + '.');
-      error.status = response.status;
-      error.code = data?.code || data?.title;
-      throw error;
-    }
-    return data;
   }
 
   function storeSession(session) {
@@ -1494,22 +1441,55 @@
     return name;
   }
 
+  function multiplayerHandlers() {
+    return {
+      playerName:$('player-name').value.trim(),
+      onSession:session => {
+        if (session) storeSession({...session,playerName:$('player-name').value.trim()});
+      },
+      onSnapshot:game => {
+        if (!game) return;
+        socket = {readyState:WebSocket.OPEN};
+        reconnectAttempts = 0;
+        applySnapshot(game);
+        replayPendingOrders();
+        $('server-status').textContent = window.NewWorldMultiplayer.isHost()
+          ? 'This device is hosting the authoritative world.'
+          : 'Connected to the host device.';
+        $('server-status').classList.remove('error');
+      },
+      onStatus:status => {
+        if (status === 'ready' || status === 'connected') {
+          socket = {readyState:WebSocket.OPEN};
+          $('server-status').textContent = status === 'ready'
+            ? 'Host active · this device owns the world.'
+            : 'Relay connected · waiting for the host.';
+          $('server-status').classList.remove('error');
+          return;
+        }
+        socket = null;
+        $('server-status').textContent = status || 'Disconnected from the relay.';
+        if (/offline|failed|error|could not/i.test(status || ''))
+          $('server-status').classList.add('error');
+      },
+      onOrderResult:result => {
+        if (!result) return;
+        if (result.id) removePendingOrder(result.id);
+        if (result.accepted) showMessage('Order accepted by the host.');
+        else showMessage(orderErrorMessage(result.code) || result.error ||
+          'The host rejected the order.',true);
+      }
+    };
+  }
+
   async function createWorld() {
     try {
-      const response = await apiRequest('/api/games', {
-        method: 'POST',
-        body: JSON.stringify({playerName: playerName()})
-      });
+      const name = playerName();
       offlineBackup = structuredClone(state);
-      storeSession({
-        gameId: response.gameId,
-        playerId: response.playerId,
-        playerToken: response.playerToken,
-        inviteCode: response.inviteCode
-      });
-      applySnapshot(response.game);
-      openSocket();
-      showMessage('World created. Copy the invitation code and assign a state to every player.');
+      const result = await window.NewWorldMultiplayer.createWorld(name,multiplayerHandlers());
+      storeSession({...result.session,playerName:name});
+      applySnapshot(result.game);
+      showMessage('World created on this device. Keep this browser open while the world is running.');
       toast('PRIVATE WORLD CREATED');
     } catch (error) {
       showServerError(error);
@@ -1518,20 +1498,12 @@
 
   async function joinWorld() {
     try {
-      const response = await apiRequest('/api/games/join', {
-        method: 'POST',
-        body: JSON.stringify({inviteCode: $('invite-code').value.trim(), playerName: playerName()})
-      });
+      const name = playerName();
       offlineBackup = structuredClone(state);
-      storeSession({
-        gameId: response.gameId,
-        playerId: response.playerId,
-        playerToken: response.playerToken,
-        inviteCode: ''
-      });
-      applySnapshot(response.game);
-      openSocket();
-      showMessage('You joined the lobby. The host must assign your state.');
+      const session = await window.NewWorldMultiplayer.joinWorld(
+        $('invite-code').value.trim(),name,multiplayerHandlers());
+      storeSession({...session,playerName:name});
+      showMessage('Connected to the host. The host must assign your State.');
       toast('JOINED PRIVATE WORLD');
     } catch (error) {
       showServerError(error);
@@ -1543,57 +1515,29 @@
     manuallyDisconnected = false;
     try {
       if (!offlineBackup) offlineBackup = structuredClone(state);
-      const lastEventSequence = Number(onlineSession.lastEventSequence) || 0;
-      const game = await apiRequest(
-        '/api/games/' + encodeURIComponent(onlineSession.gameId) +
-          '?afterEventSequence=' + encodeURIComponent(lastEventSequence),
-        {},
-        onlineSession.playerToken);
-      $('recover-previous-save').hidden = true;
-      applySnapshot(game);
-      openSocket();
+      const result = await window.NewWorldMultiplayer.restoreSession(
+        onlineSession,multiplayerHandlers());
+      if (result.session) storeSession({...result.session,
+        playerName:$('player-name').value.trim() || result.session.playerName});
+      if (result.game) applySnapshot(result.game);
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
-      if ([400, 401, 403, 404].includes(error?.status)) {
-        manuallyDisconnected = true;
-        return;
-      }
-      scheduleReconnect();
     }
   }
 
   function scheduleReconnect() {
     if (!onlineSession || manuallyDisconnected || reconnectTimer !== null) return;
-    const delay = Math.min(30000, 1000 * 2 ** Math.min(reconnectAttempts, 5)) +
-      Math.floor(Math.random() * 500);
-    reconnectAttempts++;
-    $('server-status').textContent = 'Disconnected — retrying in ' +
-      Math.ceil(delay / 1000) + 's…';
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
-      restoreSession();
-    }, delay);
+      if (!window.NewWorldMultiplayer?.isConnected()) restoreSession();
+    },5000);
   }
 
   async function recoverPreviousSave() {
-    if (!onlineSession) return;
-    if (!window.confirm('Restore the previous validated save? Changes after that save will be lost.'))
-      return;
-
-    try {
-      const game = await apiRequest(
-        '/api/games/' + encodeURIComponent(onlineSession.gameId) + '/recover',
-        {method: 'POST'},
-        onlineSession.playerToken);
-      $('recover-previous-save').hidden = true;
-      applySnapshot(game);
-      openSocket();
-      showMessage('Previous validated save restored. Unconfirmed local orders were discarded.');
-    } catch (error) {
-      showServerError(error);
-    }
+    showMessage('Saves are stored on the host device. Reopen the original host browser to restore this world.',true);
   }
+
 
   function applySnapshot(game) {
     const previousEventSequence = Number(onlineSession?.lastEventSequence) || 0;
@@ -1659,76 +1603,15 @@
 
   function openSocket() {
     if (!onlineSession) return;
-    let base;
-    try {
-      base = getApiBase();
-    } catch (error) {
-      showServerError(error);
-      return;
-    }
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const socketUrl = base.replace(/^http/, 'ws') + '/ws';
-    const currentSocket = new WebSocket(socketUrl);
-    socket = currentSocket;
-    sentOrderIds = new Set();
-    $('server-status').textContent = 'Connecting to the world…';
-    currentSocket.addEventListener('open', () => {
-      if (currentSocket !== socket || !onlineSession) {
-        currentSocket.close();
-        return;
-      }
-      currentSocket.send(JSON.stringify({
-        type: 'authenticate',
-        gameId: onlineSession.gameId,
-        token: onlineSession.playerToken,
-        lastEventSequence: Number(onlineSession.lastEventSequence) || 0
-      }));
-    });
-    currentSocket.addEventListener('message', event => {
-      if (currentSocket !== socket) return;
-      let message;
-      try {
-        message = JSON.parse(event.data);
-      } catch (error) {
-        console.error('[new-world] The server sent an invalid message:', error);
-        showMessage('Received an unreadable update from the server.', true);
-        return;
-      }
-      if (message.type === 'snapshot' && message.game) {
-        reconnectAttempts = 0;
-        applySnapshot(message.game);
-        replayPendingOrders(currentSocket);
-        $('server-status').textContent = 'Connected to the shared world.';
-        $('server-status').classList.remove('error');
-      } else if (message.type === 'orderResult' && message.order) {
-        removePendingOrder(message.order.id);
-        if (message.order.accepted) {
-          showMessage(message.order.replayed ? 'Order already applied; world state synchronized.' : 'Order accepted.');
-        } else {
-          showMessage(orderErrorMessage(message.order.code), true);
-        }
-        if (message.order.replayed) replayPendingOrders(currentSocket);
-      } else if (message.type === 'error') {
-        showMessage(message.error || 'The server rejected the request.', true);
-      }
-    });
-    currentSocket.addEventListener('error', () => {
-      if (currentSocket !== socket) return;
-      $('server-status').textContent = 'Connection error.';
-      $('server-status').classList.add('error');
-    });
-    currentSocket.addEventListener('close', () => {
-      if (socket !== currentSocket) return;
-      socket = null;
-      if (!onlineSession || manuallyDisconnected) return;
-      renderMultiplayer();
-      scheduleReconnect();
-    });
+    socket = window.NewWorldMultiplayer?.isConnected()
+      ? {readyState:WebSocket.OPEN}
+      : null;
+    if (!socket) restoreSession();
   }
 
   function sendAction(action) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      showMessage('Not connected to the game server. Reconnect before acting.', true);
+    if (!socket || !window.NewWorldMultiplayer?.isConnected()) {
+      showMessage('The host or relay is disconnected. Reconnect before acting.',true);
       return;
     }
     const player = currentPlayer();
@@ -1740,21 +1623,22 @@
     const isGameWideVote = action.type === 'pause' || action.type === 'resume';
     const order = {
       ...action,
-      orderId: crypto.randomUUID(),
-      gameId: onlineSession.gameId,
-      playerId: onlineSession.playerId,
-      expectedWorldVersion: onlineGame?.worldVersion,
-      stateId: selectedMembership?.stateId ?? action.stateId ?? null
+      orderId:crypto.randomUUID(),
+      gameId:onlineSession.gameId,
+      playerId:onlineSession.playerId,
+      expectedWorldVersion:onlineGame?.worldVersion,
+      stateId:selectedMembership?.stateId ?? action.stateId ?? null
     };
     if (!order.expectedWorldVersion || (!isGameWideVote && !order.stateId)) {
-      showMessage('The authoritative world version or government membership is unavailable.', true);
+      showMessage('The authoritative world version or government membership is unavailable.',true);
       return;
     }
-    const queued = [...getPendingOrders(), order];
+    const queued = [...getPendingOrders(),order];
     if (!savePendingOrders(queued)) return;
     renderMultiplayer();
-    replayPendingOrders(socket);
+    replayPendingOrders();
   }
+
 
   function orderErrorMessage(code) {
     const messages = {
@@ -1797,38 +1681,32 @@
     return messages[code] || 'The server rejected the order.';
   }
 
-  async function assignCountry(playerId, countryIndex) {
+  async function assignCountry(playerId,countryIndex) {
     try {
-      const game = await apiRequest('/api/games/' + encodeURIComponent(onlineSession.gameId) + '/assign', {
-        method: 'POST',
-        body: JSON.stringify({playerId, countryIndex})
-      }, onlineSession.playerToken);
-      applySnapshot(game);
-      await requestSnapshotBroadcast();
-      showMessage('State assignment saved.');
+      const game = await window.NewWorldMultiplayer.admin('assign',{playerId,countryIndex});
+      if (game && typeof game === 'object') applySnapshot(game);
+      showMessage('State assignment saved on the host.');
     } catch (error) {
       showServerError(error);
     }
   }
 
   async function requestSnapshotBroadcast() {
-    if (socket?.readyState === WebSocket.OPEN) return;
+    if (window.NewWorldMultiplayer?.isConnected()) return;
     await restoreSession();
   }
 
   async function startWorld() {
     try {
-      const game = await apiRequest('/api/games/' + encodeURIComponent(onlineSession.gameId) + '/start', {
-        method: 'POST',
-        body: '{}'
-      }, onlineSession.playerToken);
-      applySnapshot(game);
-      showMessage('The world has started. The server advances one day every five minutes while a player is connected.');
+      const game = await window.NewWorldMultiplayer.admin('start',{});
+      if (game && typeof game === 'object') applySnapshot(game);
+      showMessage('The world has started. The host device must remain connected.');
       toast('WORLD STARTED');
     } catch (error) {
       showServerError(error);
     }
   }
+
 
   function renderMultiplayer() {
     const sessionPanel = $('multiplayer-session');
@@ -1934,26 +1812,32 @@
   function disconnect() {
     manuallyDisconnected = true;
     clearTimeout(reconnectTimer);
-    if (socket) {
-      const currentSocket = socket;
-      socket = null;
-      currentSocket.close();
+    const hosted = Boolean(onlineSession?.isHost ||
+      onlineGame?.hostPlayerId === onlineSession?.playerId);
+    try {
+      window.NewWorldMultiplayer?.disconnect(hosted);
+    } catch (error) {
+      console.error('[new-world] Could not close the multiplayer connection:',error);
     }
+    socket = null;
     reconnectAttempts = 0;
     onlineSession = null;
     onlineGame = null;
     try {
       localStorage.removeItem(SESSION_KEY);
     } catch (error) {
-      console.error('[new-world] Could not clear the stored multiplayer token:', error);
-      showMessage('This browser could not clear the saved reconnection token.', true);
+      console.error('[new-world] Could not clear the saved multiplayer token:',error);
+      showMessage('This browser could not clear the saved session.',true);
     }
     if (offlineBackup) state = offlineBackup;
     offlineBackup = null;
-    $('server-status').textContent = 'Disconnected from the world.';
+    $('server-status').textContent = hosted
+      ? 'Host disconnected. The world is now offline.'
+      : 'Disconnected from the host.';
     update();
-    toast('DISCONNECTED ON THIS DEVICE');
+    toast(hosted ? 'WORLD CLOSED ON THIS DEVICE' : 'DISCONNECTED ON THIS DEVICE');
   }
+
 
   $('claim-btn').addEventListener('click', () => {
     const index = state.selected;
@@ -2033,18 +1917,15 @@
     setZoom(zoom * (event.deltaY < 0 ? 1.08 : .92));
   }, {passive: false});
 
-  const endpoint = String(window.NEW_WORLD_API || '').trim();
   const endpointLabel = $('server-endpoint');
-  if (endpointLabel) endpointLabel.textContent = endpoint || 'MULTIPLAYER SERVICE NOT CONFIGURED';
+  if (endpointLabel) endpointLabel.textContent = 'MQTT RELAY · HOST RUNS THE WORLD';
   $('player-name').value = localStorage.getItem(NAME_KEY) || '';
-  $('test-server').addEventListener('click', async () => {
+  $('test-server').addEventListener('click',async () => {
     try {
-      const response = await apiRequest('/api/health');
-      $('server-status').textContent = response.status === 'ready'
-        ? 'Server and database are ready.'
-        : 'Unexpected health response.';
-      showMessage(response.status === 'ready' ? 'The multiplayer server is ready.' : 'Unexpected health response.',
-        response.status !== 'ready');
+      await window.NewWorldMultiplayer.testRelay();
+      $('server-status').textContent = 'Public relay reachable.';
+      $('server-status').classList.remove('error');
+      showMessage('Relay reachable. The host device, not the relay, runs the world.');
     } catch (error) {
       showServerError(error);
     }
@@ -2109,6 +1990,6 @@
     }
   });
   update();
-  if (!onlineSession) showMessage('Preview data only. Connect to a multiplayer server to play.');
+  if (!onlineSession) showMessage('Create a world to host it on this device, or join a host with an invitation code.');
   if (onlineSession?.gameId && onlineSession?.playerToken) restoreSession();
 })();
