@@ -1,0 +1,40 @@
+name: New World multiplayer validation
+
+on:
+  push:
+    paths:
+      - "Apps/NewWorld/**"
+      - "docs/Apps/NewWorld/**"
+      - ".github/workflows/new-world.yml"
+  pull_request:
+    paths:
+      - "Apps/NewWorld/**"
+      - "docs/Apps/NewWorld/**"
+      - ".github/workflows/new-world.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore and run server tests
+        run: dotnet test Apps/NewWorld/Server.Tests/Server.Tests.csproj --configuration Release
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check multiplayer client syntax
+        run: node --check docs/Apps/NewWorld/game.js
