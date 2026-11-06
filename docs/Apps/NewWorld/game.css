@@ -218,6 +218,7 @@ a { color: inherit; }
 .political-text { min-height: 90px; resize: vertical; font-family: var(--sans); line-height: 1.45; }
 .text-field:focus, .field-row input:focus, .player-assignment select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 .field-row { display: flex; gap: 5px; }
+.field-row #server-endpoint { min-width: 0; flex: 1; padding: 8px; border: 1px solid var(--line); background: var(--panel-deep); color: var(--muted); font: 9px var(--mono); overflow-wrap: anywhere; }
 .field-row .quiet-btn { flex: 0 0 auto; }
 .connection-status, .multiplayer-message { min-height: 15px; margin: 6px 0; color: var(--muted); font: 8px/1.5 var(--mono); overflow-wrap: anywhere; }
 .multiplayer-actions { margin-top: 9px; }
