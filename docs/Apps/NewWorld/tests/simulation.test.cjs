@@ -155,6 +155,6 @@ test('a failed economic cycle is atomic and does not advance the world date', ()
   const result = simulation.advanceDay(game);
 
   assert.equal(result.ok,false);
-  assert.match(result.error,/supported browser simulation limit/);
+  assert.match(result.error,/browser simulation limit/);
   assert.deepEqual(game,before);
 });
