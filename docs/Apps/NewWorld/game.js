@@ -107,6 +107,7 @@
   let offlineBackup = null;
   let socket = null;
   let reconnectTimer = null;
+  let reconnectAttempts = 0;
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
@@ -1540,6 +1541,17 @@
     }
   }
 
+  function scheduleReconnect() {
+    if (!onlineSession || manuallyDisconnected) return;
+    clearTimeout(reconnectTimer);
+    const delay = Math.min(3000 * (2 ** Math.min(reconnectAttempts, 4)), 30000);
+    reconnectAttempts++;
+    $('server-status').textContent = 'Disconnected — retrying in ' + Math.ceil(delay / 1000) + 's…';
+    reconnectTimer = setTimeout(() => {
+      if (onlineSession && !manuallyDisconnected) restoreSession();
+    }, delay);
+  }
+
   async function restoreSession() {
     if (!onlineSession) return;
     manuallyDisconnected = false;
@@ -1557,6 +1569,7 @@
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
+      scheduleReconnect();
     }
   }
 
@@ -1652,7 +1665,15 @@
     }
     if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const socketUrl = base.replace(/^http/, 'ws') + '/ws';
-    const currentSocket = new WebSocket(socketUrl);
+    let currentSocket;
+    try {
+      currentSocket = new WebSocket(socketUrl);
+    } catch (error) {
+      socket = null;
+      showServerError(error);
+      scheduleReconnect();
+      return;
+    }
     socket = currentSocket;
     sentOrderIds = new Set();
     $('server-status').textContent = 'Connecting to the world…';
@@ -1674,6 +1695,8 @@
         return;
       }
       if (message.type === 'snapshot' && message.game) {
+        reconnectAttempts = 0;
+        clearTimeout(reconnectTimer);
         applySnapshot(message.game);
         replayPendingOrders(currentSocket);
         $('server-status').textContent = 'Connected to the shared world.';
@@ -1697,10 +1720,8 @@
     currentSocket.addEventListener('close', () => {
       if (socket === currentSocket) socket = null;
       if (!onlineSession || manuallyDisconnected) return;
-      $('server-status').textContent = 'Disconnected — reconnecting…';
       renderMultiplayer();
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(restoreSession, 3000);
+      scheduleReconnect();
     });
   }
 
