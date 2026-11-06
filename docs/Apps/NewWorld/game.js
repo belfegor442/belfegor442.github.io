@@ -1423,21 +1423,19 @@
   }
 
   function getApiBase() {
-    const raw = $('api-url').value.trim();
-    if (!raw) throw new Error('Enter the URL of the multiplayer server.');
+    const raw = String(window.NEW_WORLD_API || '').trim();
+    if (!raw) throw new Error('The New World multiplayer service is not configured yet.');
     let url;
     try {
       url = new URL(raw);
     } catch {
-      throw new Error('The server URL is not valid.');
+      throw new Error('The configured multiplayer service URL is invalid.');
     }
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
         url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
-      throw new Error('Use an HTTP(S) server origin without a path, query, or credentials.');
+      throw new Error('The configured multiplayer service must be an HTTP(S) origin.');
     }
-    const base = url.origin;
-    localStorage.setItem(API_KEY, base);
-    return base;
+    return url.origin;
   }
 
   async function apiRequest(path, options = {}, token = null) {
@@ -2009,7 +2007,9 @@
     setZoom(zoom * (event.deltaY < 0 ? 1.08 : .92));
   }, {passive: false});
 
-  $('api-url').value = localStorage.getItem(API_KEY) || window.NEW_WORLD_API || '';
+  const endpoint = String(window.NEW_WORLD_API || '').trim();
+  const endpointLabel = $('server-endpoint');
+  if (endpointLabel) endpointLabel.textContent = endpoint || 'MULTIPLAYER SERVICE NOT CONFIGURED';
   $('player-name').value = localStorage.getItem(NAME_KEY) || '';
   $('test-server').addEventListener('click', async () => {
     try {
