@@ -55,14 +55,24 @@ public sealed class GameStore(NpgsqlDataSource dataSource, ILogger<GameStore> lo
             HostPlayerId = playerId,
             LastTickUtc = DateTimeOffset.UtcNow,
             Players = [new PlayerState { Id = playerId, Name = playerName, IsHost = true, TokenHash = Hash(playerToken) }],
-            Territories = GameCatalog.InitialTerritories.Select((definition, index) => new TerritoryState
+            Territories = GameCatalog.InitialTerritories.Select((definition, index) =>
             {
-                StateId = ScenarioIdentity.Create("state", definition.StableKey),
-                Index = index,
-                Name = definition.Name,
-                Population = Math.Clamp(26000 + ((index * 7919 + 1337) % 56000), 1, 2000000),
-                Prosperity = 42 + (index * 13 % 48),
-                Infrastructure = 1 + index % 4
+                var population = Math.Clamp(26000 + ((index * 7919 + 1337) % 56000), 1, 2000000);
+                return new TerritoryState
+                {
+                    StateId = ScenarioIdentity.Create("state", definition.StableKey),
+                    Index = index,
+                    Name = definition.Name,
+                    Population = population,
+                    BaseHousingCapacity = population,
+                    BaseFoodCapacity = population,
+                    BaseWaterCapacity = population,
+                    BaseHealthCapacity = population / 5,
+                    BaseEducationCapacity = population / 6,
+                    BaseJobSlots = population * 35 / 100,
+                    Prosperity = 42 + (index * 13 % 48),
+                    Infrastructure = 1 + index % 4
+                };
             }).ToList(),
             Activity = [$"{playerName} created a private world."]
         };

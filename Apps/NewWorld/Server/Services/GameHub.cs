@@ -241,10 +241,16 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
             {
                 var (territoryIncome, cityIncome, upkeep, monthlyBalance) =
                     SimulationRules.CalculateGovernmentBalance(game, territory);
+                var settlement = SettlementRules.CalculateMetrics(territory);
                 return new TerritoryView(
                     territory.StateId, territory.Index, territory.Name, territory.Treasury, territoryIncome,
                     cityIncome, upkeep, monthlyBalance, territory.Population, territory.Prosperity,
-                    territory.Infrastructure, territory.OwnerPlayerId, territory.CurrencyId);
+                    territory.Infrastructure, territory.OwnerPlayerId, territory.CurrencyId,
+                    new Dictionary<int, BuildingState>(territory.Buildings),
+                    settlement.HousingCapacity, settlement.FoodCapacity, settlement.WaterCapacity,
+                    settlement.JobCapacity, settlement.WorkingAgePopulation, settlement.AvailableJobs,
+                    settlement.HealthCapacity, settlement.EducationCapacity, territory.LastPopulationGrowth,
+                    settlement.BuildingCount, settlement.ConstructionCount);
             }).ToList(),
             game.Activity,
             game.Name,
@@ -429,24 +435,30 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                             governmentMembership!.PermissionSetId, GovernmentAction.ConstructBuilding))
                         return new OrderRejection(
                             "INSUFFICIENT_PERMISSION", "Your government permissions do not allow construction.");
-                    if (!GameCatalog.IsValidConstructionPlotIndex(message.PlotIndex))
-                        return new OrderRejection("INVALID_PAYLOAD", "Invalid construction plot.");
-                    var plot = GameCatalog.NormalizeConstructionPlotIndex(message.PlotIndex!.Value);
-                    if (message.BuildingId is null || !GameCatalog.Buildings.TryGetValue(message.BuildingId, out var building))
-                        return new OrderRejection("INVALID_PAYLOAD", "Unknown building.");
-                    if (player.Buildings.Keys.Any(existing =>
-                            GameCatalog.NormalizeConstructionPlotIndex(existing) == plot))
-                        return new OrderRejection("TARGET_UNAVAILABLE", "This plot is already developed.");
-                    if (government!.Treasury < building.Cost)
+                    var constructionError = SettlementRules.ValidateConstruction(
+                        government!, message.PlotIndex, message.BuildingId, out var plot, out var building);
+                    if (constructionError is not null)
+                    {
+                        var description = constructionError switch
+                        {
+                            "INVALID_TERRAIN" => "Construction is only possible on dry land; this plot is water.",
+                            "TARGET_UNAVAILABLE" => "This plot is already developed in this territory.",
+                            _ => "Invalid construction plot or unknown building."
+                        };
+                        return new OrderRejection(constructionError, description);
+                    }
+                    var buildingBlueprint = building!;
+                    if (government!.Treasury < buildingBlueprint.Cost)
                         return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury.");
                     var constructionBalanceBefore = government.Treasury;
-                    government.Treasury -= building.Cost;
+                    government.Treasury -= buildingBlueprint.Cost;
                     GameStore.AddEconomicTransaction(
                         game, government, EconomicTransactionType.ConstructionCost,
                         constructionBalanceBefore, government.Treasury,
-                        $"Constructed {building.Name}.", orderId);
-                    player.Buildings.Add(plot, building);
-                    GameStore.AddActivity(game, $"{player.Name} constructed a {building.Name.ToLowerInvariant()}.");
+                        $"Started construction of {buildingBlueprint.Name}.", orderId);
+                    government.Buildings.Add(plot, buildingBlueprint with { DaysRemaining = buildingBlueprint.ConstructionDays });
+                    GameStore.AddActivity(game,
+                        $"{player.Name} started a {buildingBlueprint.Name.ToLowerInvariant()} in {government.Name}; completion in {buildingBlueprint.ConstructionDays} day(s).");
                     return null;
 
                 case "proposeLaw":

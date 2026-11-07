@@ -31,10 +31,14 @@
     activity: ['Local preview. Create or join a world to play online.']
   };
   const buildingTypes = [
-    {id:'farm',name:'FARM',cost:120,income:18,icon:'♧',desc:'Food production and rural employment.'},
-    {id:'market',name:'MARKET',cost:220,income:34,icon:'⌂',desc:'Local exchange and commercial activity.'},
-    {id:'workshop',name:'WORKSHOP',cost:360,income:52,icon:'⚒',desc:'Small-scale manufacturing.'},
-    {id:'housing',name:'HOUSING',cost:180,income:8,icon:'▦',desc:'Raises the settlement population.'}
+    {id:'farm',name:'FARM',cost:120,income:18,icon:'F',desc:'Adds food capacity for 5,000 residents and supports 1,200 agricultural jobs.',foodCapacity:5000,jobSlots:1200,upkeep:3,days:2},
+    {id:'market',name:'MARKET',cost:220,income:34,icon:'M',desc:'Creates 800 commercial jobs and local exchange.',jobSlots:800,upkeep:3,days:3},
+    {id:'workshop',name:'WORKSHOP',cost:360,income:52,icon:'W',desc:'Creates 1,800 industrial jobs.',jobSlots:1800,upkeep:5,days:4},
+    {id:'housing',name:'HOUSING',cost:180,income:8,icon:'H',desc:'Adds housing for 1,000 new residents.',housingCapacity:1000,upkeep:2,days:2},
+    {id:'waterworks',name:'WATERWORKS',cost:300,income:6,icon:'U',desc:'Provides water capacity for 5,000 residents.',waterCapacity:5000,jobSlots:250,upkeep:5,days:4},
+    {id:'clinic',name:'CLINIC',cost:420,income:4,icon:'C',desc:'Provides healthcare for 5,000 residents.',healthCapacity:5000,jobSlots:300,upkeep:7,days:5},
+    {id:'school',name:'SCHOOL',cost:360,income:5,icon:'S',desc:'Provides education for 5,000 residents.',educationCapacity:5000,jobSlots:350,upkeep:6,days:5},
+    {id:'road',name:'ROAD',cost:65,income:0,icon:'R',desc:'Improves local access and creates 40 maintenance jobs.',jobSlots:40,upkeep:1,days:1}
   ];
   const SESSION_KEY = 'new-world-session-v1';
   const NAME_KEY = 'new-world-player-name-v1';
@@ -201,15 +205,12 @@
     return onlineSession !== null;
   }
 
-  function update() {
+  function renderFinancialSummary() {
     $('treasury').textContent = onlineGame ? money(state.treasury) : '—';
     $('population').textContent = onlineGame ? totalPopulation().toLocaleString('en-US') : '—';
     $('balance').textContent = onlineGame
       ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
       : '—';
-    $('date-label').textContent = isOnline()
-      ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
-      : 'MULTIPLAYER REQUIRED';
     $('city-income').textContent = onlineGame ? money(cityIncome()) : '—';
     $('ledger-treasury').textContent = onlineGame ? money(state.treasury) : '—';
     $('ledger-territory').textContent = onlineGame ? money(ownedIncome()) : '—';
@@ -219,6 +220,14 @@
       ? (balance() >= 0 ? '+' : '−') + money(Math.abs(balance()))
       : '—';
     renderFinancialLedger();
+  }
+
+  function update() {
+    if (state.selected !== null) selectState(state.selected, false, false);
+    renderFinancialSummary();
+    $('date-label').textContent = isOnline()
+      ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
+      : 'MULTIPLAYER REQUIRED';
     $('activity').innerHTML = state.activity.slice(0, 8)
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
     $('world-mode').textContent = isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
@@ -240,7 +249,6 @@
     renderTerritory();
     renderMilitary();
     renderTechnology();
-    if (state.selected !== null) selectState(state.selected, false);
   }
 
   function renderEconomy() {
@@ -1125,12 +1133,18 @@
     })[character]);
   }
 
-  function selectState(index, notify = true) {
+  function selectState(index, notify = true, refreshSettlement = true) {
     if (index < 0 || index >= 16) return;
     state.selected = index;
     mapDetailRenderer?.setRegion(index, state.states[index]?.name);
     const territory = state.states[index];
-    const territoryView = onlineGame?.territories[index];
+    const territoryView = onlineGame?.territories.find(item => item.index === index);
+    if (territoryView) {
+      state.governmentFinance = territoryView;
+      state.treasury = Number(territoryView.treasury) || 0;
+      state.buildings = normalizeBuildings(territoryView.buildings || {});
+      mapDetailRenderer?.setBuildings(state.buildings);
+    }
     if (selectedProvinceId &&
         onlineGame?.provinces.find(item => item.id === selectedProvinceId)?.sovereignStateId !==
           territoryView?.stateId)
@@ -1202,6 +1216,11 @@
     }
     if (notify) toast(territory.name.toUpperCase() + ' SELECTED');
     highlightMap(index);
+    if (refreshSettlement) {
+      renderFinancialSummary();
+      renderCity();
+      renderOptions();
+    }
   }
 
   function selectProvince(province) {
@@ -1217,12 +1236,17 @@
 
   function enterCityMap(index) {
     if (!Number.isInteger(index) || index < 0 || index >= 16) return;
-    selectState(index, false);
+    selectState(index, false, false);
     hideMapTooltip();
     zoom = 0.05;
     pan = {x: 0, y: 0};
     $('map-stage').style.transform = 'translate3d(0,0,0) scale(1)';
     mapDetailRenderer?.setCamera(zoom, true);
+    mapDetailRenderer?.centerOnPlot(selectedPlot);
+    renderFinancialSummary();
+    document.querySelector('.tab[data-view="city"]')?.click();
+    renderCity();
+    renderOptions();
   }
 
   function highlightMap(selectedIndex) {
@@ -1362,7 +1386,7 @@
         $('plot-title').textContent = building ? building.name :
           cell ? 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1) : 'Selected plot';
         $('plot-description').textContent = building
-          ? 'This building generates ' + money(building.income) + ' per month.'
+          ? describeBuilding(building)
           : 'Choose a building to develop this open-territory plot.';
         renderOptions();
       }
@@ -1489,7 +1513,71 @@
     if (map.dataset.loaded !== 'true') renderFallback();
   }, 1800);
 
+  function describeBuilding(building) {
+    if (Number(building.daysRemaining) > 0)
+      return 'UNDER CONSTRUCTION · ' + building.daysRemaining + ' world day(s) remaining.';
+    const details = [];
+    if (building.housingCapacity) details.push('Housing for ' + building.housingCapacity.toLocaleString('en-US'));
+    if (building.foodCapacity) details.push('Food for ' + building.foodCapacity.toLocaleString('en-US'));
+    if (building.waterCapacity) details.push('Water for ' + building.waterCapacity.toLocaleString('en-US'));
+    if (building.healthCapacity) details.push('Healthcare for ' + building.healthCapacity.toLocaleString('en-US'));
+    if (building.educationCapacity) details.push('Education for ' + building.educationCapacity.toLocaleString('en-US'));
+    if (building.jobSlots) details.push(building.jobSlots + ' jobs');
+    details.push(money(building.income || 0) + ' monthly income');
+    details.push(money(building.upkeep || 0) + ' monthly upkeep');
+    return details.join(' · ');
+  }
+
+  function renderSettlement() {
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    const population = Math.max(0, Number(territory?.population) || 0);
+    const capacity = Math.min(Number(territory?.housingCapacity) || 0,
+      Number(territory?.foodCapacity) || 0, Number(territory?.waterCapacity) || 0);
+    const available = Math.max(0, capacity - population);
+    $('settlement-residents').textContent = onlineGame ? population.toLocaleString('en-US') : '—';
+    $('settlement-capacity').textContent = onlineGame ? available.toLocaleString('en-US') : '—';
+    const buildings = Math.max(0, Number(territory?.buildingCount) || 0);
+    const construction = Math.min(buildings, Math.max(0, Number(territory?.constructionCount) || 0));
+    $('settlement-buildings').textContent = onlineGame
+      ? Math.max(0, buildings - construction).toLocaleString('en-US') : '—';
+    $('settlement-construction').textContent = onlineGame
+      ? construction.toLocaleString('en-US') : '—';
+    $('settlement-growth').textContent = onlineGame
+      ? (Number(territory.populationGrowthLastDay) > 0 ? '+' : '') + (Number(territory.populationGrowthLastDay) || 0).toLocaleString('en-US')
+      : '—';
+    $('settlement-employment').textContent = onlineGame
+      ? Number(territory.availableJobs || 0).toLocaleString('en-US') + ' / ' +
+        Number(territory.workingAgePopulation || 0).toLocaleString('en-US')
+      : '—';
+    const services = [
+      ['HOUSING', territory?.housingCapacity, population],
+      ['FOOD', territory?.foodCapacity, population],
+      ['WATER', territory?.waterCapacity, population],
+      ['JOBS', territory?.jobCapacity, territory?.workingAgePopulation],
+      ['HEALTH', territory?.healthCapacity, population],
+      ['EDUCATION', territory?.educationCapacity, population]
+    ];
+    $('settlement-services').innerHTML = services.map(([name, rawCapacity, rawNeed]) => {
+      const supply = Math.max(0, Number(rawCapacity) || 0);
+      const need = Math.max(0, Number(rawNeed) || 0);
+      const coverage = need === 0 ? 100 : Math.min(100, supply / need * 100);
+      const shortfall = Math.max(0, need - supply);
+      return '<div class="service-row"><div><span>' + name + '</span><strong>' +
+        (onlineGame ? supply.toLocaleString('en-US') + ' / ' + need.toLocaleString('en-US') : '—') +
+        '</strong></div><div class="service-track"><i style="width:' + coverage.toFixed(1) + '%"></i></div>' +
+        (onlineGame && shortfall > 0 ? '<small>SHORTAGE ' + shortfall.toLocaleString('en-US') + '</small>' : '') + '</div>';
+    }).join('');
+    $('settlement-status').textContent = !onlineGame
+      ? 'Connect to a multiplayer world to simulate residents and services.'
+      : available > 0
+        ? 'Room for growth: housing, food and water must all have spare capacity.'
+        : 'Growth is constrained. Expand housing, food and water capacity to attract residents.';
+  }
+
   function renderCity() {
+    $('city-title').textContent = state.states[state.selected]?.name || 'Territory settlement';
+    $('city-level').textContent = 'LEVEL ' + String(state.states[state.selected]?.infra || 1).padStart(2, '0');
+    renderSettlement();
     const grid = $('city-grid');
     grid.innerHTML = '';
     for (let index = 0; index < 144; index++) {
@@ -1498,6 +1586,7 @@
       const cell = plotIndex === null ? null : mapDetailRenderer?.getPlotCell(plotIndex);
       const element = document.createElement('button');
       element.className = 'plot' + (building ? ' built' : '') +
+        (Number(building?.daysRemaining) > 0 ? ' constructing' : '') +
         (selectedPlot === plotIndex ? ' selected' : '');
       element.type = 'button';
       element.disabled = plotIndex === null;
@@ -1505,18 +1594,20 @@
         : building ? building.name
           : 'Open land · Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
       element.innerHTML = building
-        ? building.icon + '<span class="plot-label">' + building.name + '</span>'
+        ? (building.icon || building.id.slice(0, 1).toUpperCase()) + '<span class="plot-label">' +
+          (Number(building.daysRemaining) > 0 ? 'BUILDING' : building.name) + '</span>'
         : '·';
       element.addEventListener('click', () => {
         if (plotIndex === null) return;
         selectedPlot = plotIndex;
+        mapDetailRenderer?.centerOnPlot(selectedPlot);
         mapDetailRenderer?.setSelectedPlot(selectedPlot);
         renderCity();
         $('plot-title').textContent = building
           ? building.name
           : 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
         $('plot-description').textContent = building
-          ? 'This building generates ' + money(building.income) + ' per month.'
+          ? describeBuilding(building)
           : 'Choose a building to develop this open-territory plot.';
         renderOptions();
       });
@@ -1528,23 +1619,38 @@
 
   function renderOptions() {
     const building = state.buildings[selectedPlot];
-    const player = currentPlayer();
-    const canBuild = onlineGame?.started && membershipsFor(player).length > 0 &&
-      socket?.readyState === WebSocket.OPEN;
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
+    const canBuild = Boolean(onlineGame?.started && territory && membership &&
+      membership.permissionSetId !== 'government-observer' && socket?.readyState === WebSocket.OPEN);
     $('building-options').innerHTML = building
-      ? '<p class="muted">This plot is developed. Buildings cannot currently be demolished.</p>'
-      : buildingTypes.map(item =>
-        '<button class="build-option" data-build="' + item.id + '" ' +
-        (state.treasury < item.cost || selectedPlot === null || !canBuild ? 'disabled' : '') + '>' +
-        item.icon + ' ' + item.name + '<span>' + money(item.cost) + '</span></button>').join('');
+      ? '<p class="muted">' + describeBuilding(building) + '</p>'
+      : buildingTypes.map(item => {
+        const effects = [
+          item.housingCapacity && '+' + item.housingCapacity + ' housing',
+          item.foodCapacity && '+' + item.foodCapacity + ' food capacity',
+          item.waterCapacity && '+' + item.waterCapacity + ' water capacity',
+          item.jobSlots && '+' + item.jobSlots + ' jobs',
+          item.healthCapacity && '+' + item.healthCapacity + ' healthcare',
+          item.educationCapacity && '+' + item.educationCapacity + ' education'
+        ].filter(Boolean).join(' · ') || 'Local infrastructure';
+        const disabled = state.treasury < item.cost || selectedPlot === null || !canBuild;
+        return '<button class="build-option" data-build="' + item.id + '" ' +
+          (disabled ? 'disabled' : '') + '><strong><b>' + item.icon + '</b>' + item.name +
+          '<span>' + money(item.cost) + '</span></strong><small>' + effects +
+          '</small><small>BUILD ' + item.days + ' WORLD DAY(S) · INCOME ' + money(item.income) + '/MONTH · UPKEEP ' + money(item.upkeep) + '/MONTH</small></button>';
+      }).join('');
     $('building-options').querySelectorAll('[data-build]').forEach(button =>
       button.addEventListener('click', () => build(button.dataset.build)));
   }
 
   function build(id) {
     const building = buildingTypes.find(item => item.id === id);
-    if (!building || selectedPlot === null || state.buildings[selectedPlot] || state.treasury < building.cost) return;
-    sendAction({type: 'build', plotIndex: selectedPlot, buildingId: id});
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
+    if (!building || !territory || !membership || membership.permissionSetId === 'government-observer' ||
+        selectedPlot === null || state.buildings[selectedPlot] || state.treasury < building.cost) return;
+    sendAction({type: 'build', stateId: territory.stateId, plotIndex: selectedPlot, buildingId: id});
   }
 
   function storeSession(session) {
@@ -1741,9 +1847,11 @@
         owner: governmentMembersFor(territory).map(member => member.name).join(', ') ||
           game.players.find(owner => owner.id === territory.ownerPlayerId)?.name || 'Independent'
       })),
-      buildings: {...player.buildings},
+      buildings: normalizeBuildings(governmentFinance?.buildings || player.buildings || {}),
       activity: [...game.activity]
     };
+    mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
+    mapDetailRenderer?.setBuildings(state.buildings);
     update();
   }
 
@@ -1800,6 +1908,7 @@
       GOVERNMENT_NOT_CONFIGURED: 'This State has no configured government budget.',
       NO_ELIGIBLE_VOTERS: 'No active member can vote under this constitutional procedure.',
       INVALID_PAYLOAD: 'The order contains invalid details.',
+      INVALID_TERRAIN: 'Construction is only possible on dry land. Choose a plot outside the water.',
       INSUFFICIENT_FUNDS: 'The government treasury does not have enough funds.',
       TARGET_UNAVAILABLE: 'The selected target is no longer available.',
       TARGET_DATE_IN_PAST: 'The requested world date has already passed.',

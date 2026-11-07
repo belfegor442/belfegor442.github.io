@@ -27,6 +27,8 @@ public static class WorldStateCompatibility
     public static void Normalize(WorldState game)
     {
         game.Players ??= [];
+        foreach (var player in game.Players)
+            player.Buildings ??= [];
         game.Memberships ??= [];
         game.Territories ??= [];
         game.Provinces ??= [];
@@ -95,6 +97,36 @@ public static class WorldStateCompatibility
         {
             if (territory.StateId == Guid.Empty)
                 territory.StateId = CreateStableId($"{game.Id:N}:state:{territory.Index}");
+            territory.Buildings ??= [];
+            if (territory.Population < 0)
+                throw new InvalidDataException("The saved world contains an invalid territory population.");
+            var normalizedBuildings = new Dictionary<int, BuildingState>();
+            foreach (var (plotIndex, building) in territory.Buildings)
+            {
+                if (!GameCatalog.IsValidConstructionPlotIndex(plotIndex) || building is null ||
+                    !GameCatalog.Buildings.TryGetValue(building.Id, out var definition) ||
+                    building.DaysRemaining < 0 || building.DaysRemaining > definition.ConstructionDays)
+                    throw new InvalidDataException("The saved world contains invalid settlement buildings.");
+                var normalizedPlot = GameCatalog.NormalizeConstructionPlotIndex(plotIndex);
+                if (!normalizedBuildings.TryAdd(normalizedPlot,
+                        definition with { DaysRemaining = building.DaysRemaining }))
+                    throw new InvalidDataException("The saved world contains overlapping settlement buildings.");
+            }
+            territory.Buildings = normalizedBuildings;
+            territory.BaseHousingCapacity = territory.BaseHousingCapacity > 0
+                ? territory.BaseHousingCapacity : Math.Max(territory.Population, 0);
+            territory.BaseFoodCapacity = territory.BaseFoodCapacity > 0
+                ? territory.BaseFoodCapacity : Math.Max(territory.Population, 0);
+            territory.BaseWaterCapacity = territory.BaseWaterCapacity > 0
+                ? territory.BaseWaterCapacity : Math.Max(territory.Population, 0);
+            territory.BaseHealthCapacity = territory.BaseHealthCapacity > 0
+                ? territory.BaseHealthCapacity : Math.Max(territory.Population / 5, 0);
+            territory.BaseEducationCapacity = territory.BaseEducationCapacity > 0
+                ? territory.BaseEducationCapacity : Math.Max(territory.Population / 6, 0);
+            territory.BaseJobSlots = territory.BaseJobSlots > 0
+                ? territory.BaseJobSlots : Math.Max(territory.Population * 35 / 100, 0);
+            if (territory.PopulationGrowthRemainder is < 0 or >= 10000)
+                throw new InvalidDataException("The saved world contains an invalid population growth remainder.");
         }
 
         var stateIds = game.Territories.Select(territory => territory.StateId).ToHashSet();
@@ -578,6 +610,30 @@ public static class WorldStateCompatibility
                 StateId = territory.StateId,
                 JoinedAtWorldDate = game.WorldDate
             });
+        }
+
+        foreach (var player in game.Players.Where(item => item.Buildings.Count > 0))
+        {
+            var activeMemberships = game.Memberships.Where(membership =>
+                membership.PlayerId == player.Id && membership.Status == MembershipStatus.Active).ToList();
+            if (activeMemberships.Count == 0)
+                continue;
+            var membership = activeMemberships.FirstOrDefault(item =>
+                game.Territories.Single(territory => territory.StateId == item.StateId).Index ==
+                player.LegacyCountryIndex) ?? activeMemberships[0];
+            var territory = game.Territories.Single(item => item.StateId == membership.StateId);
+            foreach (var (legacyPlot, building) in player.Buildings)
+            {
+                var plot = GameCatalog.NormalizeConstructionPlotIndex(legacyPlot);
+                if (!GameCatalog.IsValidConstructionPlotIndex(plot))
+                    throw new InvalidDataException("A legacy player building references an invalid plot.");
+                if (building is null || !GameCatalog.Buildings.TryGetValue(building.Id, out var definition) ||
+                    building.DaysRemaining < 0 || building.DaysRemaining > definition.ConstructionDays)
+                    throw new InvalidDataException("A legacy player building contains invalid construction data.");
+                if (!territory.Buildings.TryAdd(plot, definition with { DaysRemaining = building.DaysRemaining }))
+                    throw new InvalidDataException("Legacy buildings overlap existing territory construction.");
+            }
+            player.Buildings.Clear();
         }
 
         foreach (var membership in game.Memberships)
