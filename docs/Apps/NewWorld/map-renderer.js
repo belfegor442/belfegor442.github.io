@@ -90,24 +90,84 @@
       if (!Number.isInteger(row) || !Number.isInteger(col) ||
           row < 0 || col < 0 || row >= this.worldSize || col >= this.worldSize) return null;
 
-      const moisture = this.valueNoise(row, col, 23, 17);
-      const elevation = this.valueNoise(row, col, 37, 31);
-      const soil = this.valueNoise(row, col, 15, 53);
-      const fine = this.hash(row, col, 71);
-      const water = elevation < 0.105 && moisture > 0.77;
-      const dry = !water && soil > 0.69 && moisture < 0.48;
-      const woodland = moisture > 0.69;
-      const treeChance = woodland ? 0.17 : 0.006;
-      const tree = !water && this.hash(row, col, 83) < treeChance;
-      const rock = !water && !tree && this.hash(row, col, 97) < 0.005;
+      const phase = this.regionIndex * 0.61;
+      const warpRow = (this.valueNoise(row, col, 190, 11) - 0.5) * 120 +
+        (this.valueNoise(row, col, 68, 13) - 0.5) * 36;
+      const warpCol = (this.valueNoise(row, col, 175, 19) - 0.5) * 116 +
+        (this.valueNoise(row, col, 62, 23) - 0.5) * 34;
+      const y = row + warpRow;
+      const x = col + warpCol;
+
+      const continentalDistance = Math.hypot(
+        (y - 510 - 34 * Math.sin(x / 230 + phase)) / 565,
+        (x - 512 - 45 * Math.sin(y / 260 + phase * 0.8)) / 560
+      );
+      const coastNoise = this.valueNoise(y, x, 142, 29) * 0.65 +
+        this.valueNoise(y, x, 58, 31) * 0.35;
+      const coast = continentalDistance + (0.5 - coastNoise) * 0.27;
+
+      const mainRiverCol = 279 + row * 0.537 +
+        62 * Math.sin(row / 118 + phase) + 22 * Math.sin(row / 37 + phase * 0.7);
+      const mainRiverDistance = Math.abs(col - mainRiverCol) / Math.sqrt(1 + 0.537 * 0.537);
+      const tributaryRow = 850 - col * 0.28 + 36 * Math.sin(col / 110 + phase + 1.1);
+      const tributaryDistance = Math.abs(row - tributaryRow) / Math.sqrt(1 + 0.28 * 0.28);
+      const northernLake = Math.pow((row - 255 + 10 * Math.sin(col / 90)) / 92, 2) +
+        Math.pow((col - 770 + 12 * Math.sin(row / 75)) / 122, 2);
+      const southernLake = Math.pow((row - 815 + 8 * Math.sin(col / 58)) / 58, 2) +
+        Math.pow((col - 215 + 10 * Math.sin(row / 62)) / 72, 2);
+
+      const ocean = coast > 1.0;
+      const river = mainRiverDistance < 2.15 || tributaryDistance < 1.7;
+      const lake = northernLake < 1 || southernLake < 1;
+      const water = ocean || river || lake;
+      const riverbank = !water && (mainRiverDistance < 7.5 || tributaryDistance < 6.5);
+      const shoreline = !water && coast > 0.94;
+
+      const baseElevation = this.valueNoise(y, x, 210, 37) * 0.58 +
+        this.valueNoise(y, x, 96, 41) * 0.29 +
+        this.valueNoise(y, x, 38, 43) * 0.13;
+      const ridgeCenter = 250 + 100 * Math.sin(x / 145 + phase) +
+        30 * Math.sin(x / 53 + phase * 0.7);
+      const ridgeDistance = Math.abs(y - ridgeCenter);
+      const ridgeInfluence = Math.max(0, 1 - ridgeDistance / 108);
+      const elevation = baseElevation * 0.67 + ridgeInfluence * 0.33;
+      const moisture = this.valueNoise(y, x, 190, 47) * 0.55 +
+        this.valueNoise(y, x, 84, 53) * 0.3 +
+        this.valueNoise(y, x, 34, 59) * 0.15 +
+        (Math.min(mainRiverDistance, tributaryDistance) < 22 ? 0.13 : 0);
+
+      const mountain = !water && !riverbank && !shoreline &&
+        ridgeDistance < 24 && elevation > 0.43;
+      const hills = !water && !riverbank && !shoreline && !mountain &&
+        (ridgeDistance < 64 || elevation > 0.79);
+      const wetland = !water && !riverbank && !shoreline && !mountain &&
+        moisture > 0.78 && elevation < 0.58;
+      const dry = !water && !riverbank && !shoreline && !mountain && !hills &&
+        moisture < 0.27 && baseElevation > 0.3;
+      const woodland = !water && !riverbank && !shoreline && !mountain &&
+        !hills && !wetland && !dry && moisture > 0.63;
+
+      const type = water ? 'water' : riverbank || shoreline ? 'shore' :
+        mountain ? 'mountain' : hills ? 'hills' : wetland ? 'wetland' :
+        dry ? 'dry' : woodland ? 'forest' : 'grass';
+      const variation = this.valueNoise(y, x, 34, 71);
+      const forestChance = woodland ? 0.34 + Math.max(0, moisture - 0.68) * 0.28 :
+        wetland ? 0.12 : hills ? 0.035 : 0.004;
+      const tree = !water && !mountain && this.hash(row, col, 83) < forestChance;
+      const peak = mountain && this.hash(Math.floor(y / 8), Math.floor(x / 8), 97) < 0.28;
+      const rock = !water && !tree && (peak ||
+        (hills && this.hash(row, col, 97) < 0.018));
 
       return {
-        type: water ? 'water' : dry ? 'dry' : 'grass',
-        variation: fine,
+        type,
+        variation,
+        elevation,
+        moisture,
         tree,
         rock,
-        treeScale: 0.72 + this.hash(row, col, 89) * 0.54,
-        treeTone: this.hash(row, col, 101)
+        peak,
+        treeScale: 0.82 + this.hash(row, col, 89) * 0.48,
+        treeTone: this.valueNoise(y, x, 27, 101)
       };
     }
 
@@ -391,62 +451,122 @@
 
     drawTree(x, y, scale, tone) {
       const ctx = this.ctx;
-      ctx.fillStyle = 'rgba(23, 34, 26, .2)';
+      const canopy = tone > 0.67 ? '#344d37' : tone > 0.34 ? '#405e3d' : '#526c45';
+      const highlight = tone > 0.55 ? '#72865a' : '#8b9765';
+      ctx.fillStyle = 'rgba(28, 40, 29, .2)';
       ctx.beginPath();
-      ctx.ellipse(x + 2 * scale, y + 4 * scale, 7 * scale, 3.2 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 2.2 * scale, y + 4.4 * scale,
+        7.8 * scale, 3.1 * scale, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#594b39';
-      ctx.fillRect(x - scale, y - 2 * scale, 2 * scale, 7 * scale);
-      const foliage = tone > 0.66 ? '#526b43' : tone > 0.33 ? '#60794a' : '#718454';
-      ctx.fillStyle = foliage;
+      ctx.fillStyle = '#66543d';
+      ctx.fillRect(x - 0.8 * scale, y - 2 * scale, 1.8 * scale, 7 * scale);
+      ctx.fillStyle = canopy;
       ctx.beginPath();
-      ctx.arc(x, y - 7 * scale, 6.5 * scale, 0, Math.PI * 2);
-      ctx.arc(x - 4.2 * scale, y - 4 * scale, 4.8 * scale, 0, Math.PI * 2);
-      ctx.arc(x + 4.2 * scale, y - 4 * scale, 4.8 * scale, 0, Math.PI * 2);
+      ctx.moveTo(x, y - 17 * scale);
+      ctx.lineTo(x + 7.3 * scale, y - 4 * scale);
+      ctx.lineTo(x + 4.4 * scale, y - 4 * scale);
+      ctx.lineTo(x + 8.7 * scale, y + 1.1 * scale);
+      ctx.lineTo(x - 8.7 * scale, y + 1.1 * scale);
+      ctx.lineTo(x - 4.4 * scale, y - 4 * scale);
+      ctx.lineTo(x - 7.3 * scale, y - 4 * scale);
+      ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = 'rgba(184, 190, 126, .42)';
+      ctx.fillStyle = highlight;
       ctx.beginPath();
-      ctx.arc(x - 1.8 * scale, y - 9 * scale, 2.4 * scale, 0, Math.PI * 2);
+      ctx.moveTo(x, y - 14 * scale);
+      ctx.lineTo(x - 1.8 * scale, y - 5.5 * scale);
+      ctx.lineTo(x - 5.2 * scale, y - 3.2 * scale);
+      ctx.closePath();
       ctx.fill();
+    }
+
+    drawMountain(x, y, tileW, tileH, strength) {
+      const ctx = this.ctx;
+      const scale = Math.min(1, Math.max(0.2, tileW / 32));
+      const height = tileH * (0.58 + strength * 0.36);
+      const halfWidth = tileW * (0.23 + strength * 0.08);
+      ctx.fillStyle = 'rgba(35, 39, 34, .2)';
+      ctx.beginPath();
+      ctx.ellipse(x + tileW * 0.07, y + tileH * 0.2,
+        halfWidth * 1.45, tileH * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#777e76';
+      ctx.beginPath();
+      ctx.moveTo(x - halfWidth, y + tileH * 0.2);
+      ctx.lineTo(x - halfWidth * 0.12, y - height);
+      ctx.lineTo(x + halfWidth * 1.05, y + tileH * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#b5b5a3';
+      ctx.beginPath();
+      ctx.moveTo(x - halfWidth * 0.12, y - height);
+      ctx.lineTo(x + halfWidth * 0.45, y - height * 0.18);
+      ctx.lineTo(x + halfWidth * 1.05, y + tileH * 0.2);
+      ctx.lineTo(x - halfWidth * 0.12, y + tileH * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      if (strength > 0.68) {
+        ctx.fillStyle = '#e2dfd0';
+        ctx.beginPath();
+        ctx.moveTo(x - halfWidth * 0.12, y - height);
+        ctx.lineTo(x + halfWidth * 0.2, y - height * 0.52);
+        ctx.lineTo(x + halfWidth * 0.45, y - height * 0.18);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     drawTerrain(cell, row, col, cx, cy, tileW, tileH, scale) {
       const ctx = this.ctx;
       const halfW = tileW / 2;
       const halfH = tileH / 2;
-      const grass = ['#738761', '#7d9068', '#84946e', '#6e805c', '#788b63'];
-      const dry = ['#998d69', '#a39670', '#8e8663'];
+      const palettes = {
+        water: ['#527b85', '#587f88', '#4b737f', '#60858c'],
+        shore: ['#b2a47d', '#b9aa82', '#a89d78'],
+        grass: ['#87966d', '#8d9a71', '#7e9069', '#929d75'],
+        dry: ['#aa976d', '#b3a075', '#a3926b'],
+        forest: ['#5f7957', '#68825b', '#58724f', '#6e855f'],
+        wetland: ['#74866b', '#7d8e70', '#6b7e67'],
+        hills: ['#7c896d', '#858f72', '#727f67'],
+        mountain: ['#80867b', '#898d81', '#767e75']
+      };
+      const palette = palettes[cell.type] || palettes.grass;
+      const colourIndex = Math.min(palette.length - 1,
+        Math.floor(clamp(cell.variation, 0, 0.9999) * palette.length));
 
       this.polygon(cx, cy, halfW, halfH);
-      ctx.fillStyle = cell.type === 'water'
-        ? '#547a7d'
-        : cell.type === 'dry'
-          ? dry[Math.floor(cell.variation * dry.length)]
-          : grass[Math.floor(cell.variation * grass.length)];
+      ctx.fillStyle = palette[colourIndex];
       ctx.fill();
-      ctx.strokeStyle = cell.type === 'water'
-        ? 'rgba(183, 213, 198, .22)'
-        : 'rgba(35, 48, 31, .12)';
-      ctx.lineWidth = Math.max(0.45, scale * 0.42);
-      ctx.stroke();
 
       if (cell.type === 'water') {
-        ctx.strokeStyle = 'rgba(195, 218, 202, .24)';
-        ctx.lineWidth = Math.max(0.7, scale * 0.65);
+        if (this.hash(row, col, 107) < 0.12 && scale > 0.12) {
+          ctx.strokeStyle = 'rgba(202, 221, 207, .22)';
+          ctx.lineWidth = Math.max(0.6, scale * 0.7);
+          ctx.beginPath();
+          ctx.moveTo(cx - halfW * 0.36, cy - halfH * 0.08);
+          ctx.quadraticCurveTo(cx, cy + halfH * 0.12, cx + halfW * 0.3, cy + halfH * 0.02);
+          ctx.stroke();
+        }
+      } else if (cell.type === 'mountain' && cell.peak) {
+        this.drawMountain(cx, cy, tileW, tileH, cell.elevation);
+      } else if (cell.type === 'hills' && this.hash(row, col, 109) < 0.08 && scale > 0.2) {
+        ctx.strokeStyle = 'rgba(55, 68, 47, .13)';
+        ctx.lineWidth = Math.max(0.5, scale * 0.55);
         ctx.beginPath();
-        ctx.moveTo(cx - halfW * 0.38, cy - halfH * 0.12);
-        ctx.lineTo(cx + halfW * 0.28, cy + halfH * 0.04);
+        ctx.arc(cx, cy + tileH * 0.1, tileW * 0.21, Math.PI * 1.08, Math.PI * 1.88);
         ctx.stroke();
       } else if (cell.tree) {
-        this.drawTree(cx - tileW * 0.03, cy - tileH * 0.02,
+        this.drawTree(cx - tileW * 0.03, cy - tileH * 0.03,
           scale * cell.treeScale, cell.treeTone);
       } else if (cell.rock) {
-        ctx.fillStyle = '#77776b';
+        ctx.fillStyle = '#74786d';
         ctx.beginPath();
-        ctx.ellipse(cx + tileW * 0.06, cy, tileW * 0.105, tileH * 0.12, -0.3, 0, Math.PI * 2);
+        ctx.moveTo(cx - tileW * 0.12, cy + tileH * 0.05);
+        ctx.lineTo(cx - tileW * 0.04, cy - tileH * 0.11);
+        ctx.lineTo(cx + tileW * 0.12, cy - tileH * 0.02);
+        ctx.lineTo(cx + tileW * 0.09, cy + tileH * 0.12);
+        ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = 'rgba(220, 215, 188, .28)';
-        ctx.fillRect(cx + tileW * 0.025, cy - tileH * 0.055, tileW * 0.055, Math.max(1, scale));
       }
 
       const blockStep = Math.max(1, Math.round(tileW / this.tileWidth()));

@@ -878,6 +878,8 @@
     companyList.replaceChildren();
     if (!onlineGame) {
       $('state-currency').textContent = 'Connect to a multiplayer world to load currency and transaction data.';
+      addPoliticalRow(list, 'No financial records', 'Connect to a shared world to inspect public treasury activity.');
+      addPoliticalRow(companyList, 'No company records', 'Company sales and market transactions appear after the world starts.');
       return;
     }
 
@@ -892,16 +894,16 @@
       .reverse();
     if (!transactions.length) {
       addPoliticalRow(list, 'No transactions recorded', 'The State has no financial activity in the available history.');
-      return;
-    }
-    for (const transaction of transactions) {
-      const sign = transaction.amount > 0 ? '+' : transaction.amount < 0 ? '−' : '';
-      addPoliticalRow(
-        list,
-        String(transaction.type).replaceAll(/([A-Z])/g, ' $1').toUpperCase() +
-          ' · ' + formatWorldDate(transaction.worldDate),
-        transaction.description + ' · ' + sign + money(Math.abs(transaction.amount)) +
-          ' · balance ' + money(transaction.balanceAfter));
+    } else {
+      for (const transaction of transactions) {
+        const sign = transaction.amount > 0 ? '+' : transaction.amount < 0 ? '−' : '';
+        addPoliticalRow(
+          list,
+          String(transaction.type).replaceAll(/([A-Z])/g, ' $1').toUpperCase() +
+            ' · ' + formatWorldDate(transaction.worldDate),
+          transaction.description + ' · ' + sign + money(Math.abs(transaction.amount)) +
+            ' · balance ' + money(transaction.balanceAfter));
+      }
     }
 
     const companyTransactions = (onlineGame.companyFinancialTransactions || [])
@@ -910,17 +912,18 @@
       .reverse();
     if (!companyTransactions.length) {
       addPoliticalRow(companyList, 'No company sales recorded', 'Market revenue appears after a configured market clears.');
-      return;
-    }
-    for (const transaction of companyTransactions) {
-      const company = onlineGame.companies?.find(item => item.id === transaction.companyId);
-      const currency = onlineGame.currencies?.find(item => item.id === transaction.currencyId);
-      addPoliticalRow(
-        company?.name || 'Company',
-        formatWorldDate(transaction.worldDate) + ' · ' + transaction.quantity + ' ' +
-        transaction.goodId + ' × ' + money(transaction.unitPrice) + ' · +' +
-        money(transaction.amount) + ' ' + (currency?.code || currency?.name || 'currency units') +
-        (transaction.tradeRouteId ? ' · trade route ' + transaction.tradeRouteId.slice(0, 8) : ' · domestic sale'));
+    } else {
+      for (const transaction of companyTransactions) {
+        const company = onlineGame.companies?.find(item => item.id === transaction.companyId);
+        const currency = onlineGame.currencies?.find(item => item.id === transaction.currencyId);
+        addPoliticalRow(
+          companyList,
+          company?.name || 'Company',
+          formatWorldDate(transaction.worldDate) + ' · ' + transaction.quantity + ' ' +
+            transaction.goodId + ' at ' + money(transaction.unitPrice) + ' · +' +
+            money(transaction.amount) + ' ' + (currency?.code || currency?.name || 'currency units') +
+            (transaction.tradeRouteId ? ' · trade route ' + transaction.tradeRouteId.slice(0, 8) : ' · domestic sale'));
+      }
     }
   }
 
@@ -1755,7 +1758,11 @@
       const session = await window.NewWorldMultiplayer.joinWorld(
         $('invite-code').value.trim(),name,multiplayerHandlers());
       storeSession({...session,playerName:name});
-      showMessage('Connected to the host. The host must assign your State.');
+      const membership = membershipsFor(currentPlayer())[0];
+      const assignedState = onlineGame?.territories.find(item => item.stateId === membership?.stateId);
+      showMessage(assignedState
+        ? 'Connected and assigned to ' + assignedState.name + '. The host can change this before starting.'
+        : 'Connected to the host. Waiting for a State assignment.');
       toast('JOINED PRIVATE WORLD');
     } catch (error) {
       showServerError(error);
@@ -2042,6 +2049,9 @@
       const startButton = $('start-world');
       startButton.hidden = !isHost || onlineGame.started;
       startButton.disabled = onlineGame.players.some(player => membershipsFor(player).length === 0);
+      startButton.title = startButton.disabled
+        ? 'Waiting for every player to receive a State assignment.'
+        : 'All players are assigned. Start the shared world.';
 
       const pauseControls = $('pause-controls');
       pauseControls.hidden = !onlineGame.started;
