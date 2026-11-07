@@ -282,6 +282,21 @@ public sealed record InitialTerritoryDefinition(string StableKey, string Name);
 public static class GameCatalog
 {
     public const int MaxHumanPlayers = 20;
+    public const int LegacyConstructionPlotCount = 144;
+    public const int WorldMapSize = 1024;
+    public const int MaximumConstructionPlotIndexExclusive =
+        LegacyConstructionPlotCount + WorldMapSize * WorldMapSize;
+
+    public static bool IsValidConstructionPlotIndex(int? plotIndex) =>
+        plotIndex is >= 0 && plotIndex < MaximumConstructionPlotIndexExclusive;
+
+    public static int NormalizeConstructionPlotIndex(int plotIndex)
+    {
+        if (plotIndex < 0 || plotIndex >= LegacyConstructionPlotCount) return plotIndex;
+        var row = WorldMapSize / 2 - 6 + plotIndex / 12;
+        var col = WorldMapSize / 2 - 6 + plotIndex % 12;
+        return LegacyConstructionPlotCount + row * WorldMapSize + col;
+    }
 
     public static readonly InitialTerritoryDefinition[] InitialTerritories =
     [
