@@ -132,25 +132,33 @@ test('terrain outside the world bounds is not generated', () => {
   assert.equal(renderer.terrainAt(1024, 1024), null);
 });
 
-test('city map opens with a wide 0.35x camera scale without strategic zoom', () => {
+test('city map opens in a full-territory overview with coarse terrain rendering', () => {
   const renderer = createRenderer();
   const viewStates = [];
   renderer.failed = true;
   renderer.viewport.classList.toggle = (name, active) => viewStates.push(active);
 
-  renderer.setCamera(0.35, true);
+  renderer.setCamera(0.05, true);
 
   assert.equal(renderer.active, true);
-  assert.equal(renderer.zoom, 0.35);
-  assert.equal(renderer.tileWidth(), 54 * 0.35);
+  assert.equal(renderer.zoom, 0.05);
+  assert.equal(renderer.tileWidth(), 54 * 0.05);
+  assert.equal(renderer.renderStep(), 8);
   assert.deepEqual(viewStates, [true]);
 
-  renderer.setZoomAt(0.18, 600, 350);
-  assert.equal(renderer.zoom, 0.18);
-  assert.equal(renderer.tileWidth(), 54 * 0.18);
+  renderer.setZoomAt(0.04, 600, 350);
+  assert.equal(renderer.zoom, 0.04);
+  assert.equal(renderer.tileWidth(), 54 * 0.04);
+
+  renderer.setCamera(0.08, true);
+  assert.equal(renderer.renderStep(), 4);
+  renderer.setCamera(0.18, true);
+  assert.equal(renderer.renderStep(), 2);
+  renderer.setCamera(0.35, true);
+  assert.equal(renderer.renderStep(), 1);
 
   renderer.setCamera(1);
   assert.equal(renderer.active, false);
   assert.equal(renderer.zoom, 1);
-  assert.deepEqual(viewStates, [true, false]);
+  assert.deepEqual(viewStates, [true, true, true, true, false]);
 });
