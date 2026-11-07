@@ -263,10 +263,10 @@ a{color:inherit}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 
-/* Sprite-based district rendering, blended in at close zoom levels. */
+/* Procedural open-territory rendering, activated at close map zoom. */
 .map-detail-canvas{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;opacity:0;pointer-events:none;transition:opacity .34s ease}
 .map-viewport.is-city-detail .map-stage{opacity:0;pointer-events:none}
-.map-viewport.is-city-detail .map-detail-canvas{opacity:1}
+.map-viewport.is-city-detail .map-detail-canvas{opacity:1;pointer-events:auto;cursor:grab}
 .map-viewport.is-city-detail .map-scale{display:none}
 .map-zoom-level{margin-left:4px;color:#bdb18d;font:700 7px var(--mono);letter-spacing:.55px;white-space:nowrap}
 .map-controls{flex-shrink:0}

@@ -429,11 +429,13 @@ public sealed class GameHub(GameStore store, ILogger<GameHub> logger)
                             governmentMembership!.PermissionSetId, GovernmentAction.ConstructBuilding))
                         return new OrderRejection(
                             "INSUFFICIENT_PERMISSION", "Your government permissions do not allow construction.");
-                    if (message.PlotIndex is not int plot || plot < 0 || plot >= 144)
+                    if (!GameCatalog.IsValidConstructionPlotIndex(message.PlotIndex))
                         return new OrderRejection("INVALID_PAYLOAD", "Invalid construction plot.");
+                    var plot = GameCatalog.NormalizeConstructionPlotIndex(message.PlotIndex!.Value);
                     if (message.BuildingId is null || !GameCatalog.Buildings.TryGetValue(message.BuildingId, out var building))
                         return new OrderRejection("INVALID_PAYLOAD", "Unknown building.");
-                    if (player.Buildings.ContainsKey(plot))
+                    if (player.Buildings.Keys.Any(existing =>
+                            GameCatalog.NormalizeConstructionPlotIndex(existing) == plot))
                         return new OrderRejection("TARGET_UNAVAILABLE", "This plot is already developed.");
                     if (government!.Treasury < building.Cost)
                         return new OrderRejection("INSUFFICIENT_FUNDS", "Insufficient treasury.");

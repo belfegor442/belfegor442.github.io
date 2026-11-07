@@ -2,6 +2,11 @@
   'use strict';
 
   const $ = id => document.getElementById(id);
+  const WORLD_MAP_SIZE = 1024;
+  const WORLD_MAP_CENTER = WORLD_MAP_SIZE / 2;
+  const LEGACY_PLOT_OFFSET = 144;
+  const INITIAL_MAP_PLOT = LEGACY_PLOT_OFFSET +
+    WORLD_MAP_CENTER * WORLD_MAP_SIZE + WORLD_MAP_CENTER;
   const names = [
     'Kingdom of Coimbrila', 'United Provinces of Gania', 'Chungia', 'Calcilacia',
     'Pician Empire', 'Meityeun Theocracy', 'Swabing', 'Alba', 'Knosian Despotate',
@@ -104,7 +109,7 @@
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
-  let selectedPlot = null;
+  let selectedPlot = INITIAL_MAP_PLOT;
   let zoom = 1;
   let mapDetailRenderer = null;
   let pan = {x: 0, y: 0};
@@ -130,6 +135,23 @@
 
   function money(amount) {
     return '¤ ' + Math.round(amount).toLocaleString('en-US');
+  }
+
+  function normalizeBuildings(buildings) {
+    const normalized = {};
+    for (const [key, building] of Object.entries(buildings || {})) {
+      let plotIndex = Number(key);
+      if (!Number.isInteger(plotIndex) || plotIndex < 0) continue;
+      if (plotIndex < 144) {
+        const row = WORLD_MAP_CENTER - 6 + Math.floor(plotIndex / 12);
+        const col = WORLD_MAP_CENTER - 6 + (plotIndex % 12);
+        plotIndex = LEGACY_PLOT_OFFSET + row * WORLD_MAP_SIZE + col;
+      }
+      if (plotIndex >= LEGACY_PLOT_OFFSET &&
+          plotIndex < LEGACY_PLOT_OFFSET + WORLD_MAP_SIZE * WORLD_MAP_SIZE)
+        normalized[plotIndex] = building;
+    }
+    return normalized;
   }
 
   function cityIncome() {
@@ -1318,10 +1340,24 @@
     ? new window.NewWorldMapRenderer({
       canvas: $('map-detail-canvas'),
       viewport,
-      manifestUrl: './assets/sprite-manifest.json'
+      manifestUrl: './assets/sprite-manifest.json',
+      onPlotSelected: index => {
+        selectedPlot = index;
+        const building = state.buildings[index];
+        const cell = mapDetailRenderer?.getPlotCell(index);
+        renderCity();
+        $('plot-title').textContent = building ? building.name :
+          cell ? 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1) : 'Selected plot';
+        $('plot-description').textContent = building
+          ? 'This building generates ' + money(building.income) + ' per month.'
+          : 'Choose a building to develop this open-territory plot.';
+        renderOptions();
+      }
     })
     : null;
   mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
+  mapDetailRenderer?.setSelectedPlot(selectedPlot);
+  mapDetailRenderer?.setBuildings(state.buildings);
 
   function hideMapTooltip() {
     mapTooltip.hidden = true;
@@ -1420,23 +1456,37 @@
     const grid = $('city-grid');
     grid.innerHTML = '';
     for (let index = 0; index < 144; index++) {
-      const building = state.buildings[index];
+      const plotIndex = mapDetailRenderer?.getAdjacentPlotIndex(selectedPlot, index) ?? null;
+      const building = plotIndex === null ? null : state.buildings[plotIndex];
+      const cell = plotIndex === null ? null : mapDetailRenderer?.getPlotCell(plotIndex);
       const element = document.createElement('button');
-      element.className = 'plot' + (building ? ' built' : '') + (selectedPlot === index ? ' selected' : '');
+      element.className = 'plot' + (building ? ' built' : '') +
+        (selectedPlot === plotIndex ? ' selected' : '');
       element.type = 'button';
-      element.title = building ? building.name : 'Empty plot';
-      element.innerHTML = building ? building.icon + '<span class="plot-label">' + building.name + '</span>' : '·';
+      element.disabled = plotIndex === null;
+      element.title = plotIndex === null ? 'Outside the world boundary'
+        : building ? building.name
+          : 'Open land · Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
+      element.innerHTML = building
+        ? building.icon + '<span class="plot-label">' + building.name + '</span>'
+        : '·';
       element.addEventListener('click', () => {
-        selectedPlot = index;
+        if (plotIndex === null) return;
+        selectedPlot = plotIndex;
+        mapDetailRenderer?.setSelectedPlot(selectedPlot);
         renderCity();
-        $('plot-title').textContent = building ? building.name : 'Plot ' + (index + 1);
+        $('plot-title').textContent = building
+          ? building.name
+          : 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
         $('plot-description').textContent = building
           ? 'This building generates ' + money(building.income) + ' per month.'
-          : 'Choose a building to develop this plot.';
+          : 'Choose a building to develop this open-territory plot.';
         renderOptions();
       });
       grid.appendChild(element);
     }
+    mapDetailRenderer?.setBuildings(state.buildings);
+    mapDetailRenderer?.setSelectedPlot(selectedPlot);
   }
 
   function renderOptions() {
@@ -1964,6 +2014,14 @@
     const anchorX = Number.isFinite(clientX) ? clientX - rect.left : rect.width / 2;
     const anchorY = Number.isFinite(clientY) ? clientY - rect.top : rect.height / 2;
     const nextZoom = Math.max(.65, Math.min(6, value));
+
+    if (mapDetailRenderer?.active && nextZoom >= 1.65) {
+      zoom = nextZoom;
+      mapDetailRenderer.setZoomAt(zoom, anchorX, anchorY);
+      mapDetailRenderer.setCamera(zoom);
+      return;
+    }
+
     const localX = (anchorX - pan.x) / zoom;
     const localY = (anchorY - pan.y) / zoom;
     pan = { x: anchorX - localX * nextZoom, y: anchorY - localY * nextZoom };
@@ -1986,16 +2044,19 @@
     mapDetailRenderer?.setCamera(zoom, pan);
   }
   viewport.addEventListener('pointerdown', event => {
+    if (mapDetailRenderer?.active) return;
     if (event.target.closest('object') && event.target !== viewport) return;
     drag = {x: event.clientX - pan.x, y: event.clientY - pan.y};
     viewport.setPointerCapture(event.pointerId);
   });
   viewport.addEventListener('pointermove', event => {
-    if (!drag) return;
+    if (mapDetailRenderer?.active || !drag) return;
     pan = {x: event.clientX - drag.x, y: event.clientY - drag.y};
     applyMapTransform();
   });
-  viewport.addEventListener('pointerup', () => { drag = null; });
+  viewport.addEventListener('pointerup', () => {
+    if (!mapDetailRenderer?.active) drag = null;
+  });
   viewport.addEventListener('wheel', event => {
     event.preventDefault();
     setZoom(zoom * Math.exp(-event.deltaY * 0.00115), event.clientX, event.clientY);

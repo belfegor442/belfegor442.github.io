@@ -30,6 +30,7 @@ jobs:
         run: dotnet test Apps/NewWorld/Server.Tests/Server.Tests.csproj --configuration Release
       - name: Check browser client syntax
         run: |
+          node --check docs/Apps/NewWorld/map-renderer.js
           node --check docs/Apps/NewWorld/game.js
           node --check docs/Apps/NewWorld/multiplayer.js
           node --check docs/Apps/NewWorld/simulation.js
