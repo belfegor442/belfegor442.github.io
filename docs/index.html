@@ -117,7 +117,7 @@ footer a:hover{color:var(--ink)}
 
 .header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}.brand-banner{position:absolute;left:0;top:0;width:245px;height:82px;display:block;overflow:hidden;border-radius:0}.brand-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:left center}.brand-banner-label{display:flex;align-items:center;width:100%;height:100%;padding:12px 16px;background:#11110f;color:#f4f3ef;font:600 13px/1.05 monospace;letter-spacing:2px}.nav-name{position:absolute;left:calc(6vw + 265px);top:calc(env(safe-area-inset-top,0px) + 18px)}@media(max-width:900px){.brand-banner{width:185px;height:70px}.nav-name{left:calc(6vw + 205px)}}@media(max-width:620px){.brand-banner{left:0;width:135px;height:58px}.nav-name{display:none}nav{padding-left:0}}
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261028-3">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261107-1">
 </head>
 <body>
 <div class="gl" aria-hidden="true"></div>
@@ -126,6 +126,11 @@ footer a:hover{color:var(--ink)}
 
 <main>
 <section class="sec hero" id="top">
+ <aside class="news-ticker" aria-label="North Assembly news">
+  <span class="news-label"><i aria-hidden="true"></i> NA / NEWS</span>
+  <div class="news-window"><span class="news-headline" id="news-headline">North Assembly — independent software and systems.</span><span class="news-caret" aria-hidden="true"></span></div>
+  <span class="news-caption">GLOBAL BROADCAST</span>
+ </aside>
  <div class="mw" data-m="0" data-sp=".22" data-x="26"></div>
  <div class="ht" data-sp="-.38" data-x="12">
   <small class="fi">North Assembly / Independent software studio</small>
@@ -150,8 +155,8 @@ footer a:hover{color:var(--ink)}
   <div class="cw"><a class="card" style="--i:0" href="https://northassembly.work.gd/Apps/Brew/"><div class="k"><span>Game</span><span>07.</span></div><h3>Brew</h3><p>Two-player coinflip duel played in the browser through shared room codes.</p><div class="k"><span>Web Game <span class="tag">Beta</span></span><span class="pl">Open ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:0" href="/Apps/NewWorld/"><div class="k"><span>Strategy Game</span><span>09.</span></div><h3>NEW WORLD</h3><p>A territorial strategy and city-building simulation set in Beleland.</p><div class="k"><span>Web Game <span class="tag">Prototype</span></span><span class="pl">Play ↗</span></div></a></div>
   <div class="cw"><a class="card" style="--i:1" href="/Apps/msg.mesh/"><div class="k"><span>Messaging</span><span>08.</span></div><h3>msg.mesh</h3><p>Real-time messaging with accounts, contacts and live conversations synchronized across clients.</p><div class="k"><span>Web</span><span class="pl">Open ↗</span></div></a></div>
-  <div class="cw"><a class="card" style="--i:2" href="https://northassembly.work.gd/Apps/Web98/"><div class="k"><span>Browser</span><span>09.</span></div><h3>Web98</h3><p>A desktop web browser with a classic Windows 98 and Internet Explorer 5 interface, built for the modern web.</p><div class="k"><span>Desktop / Electron <span class="tag">v0.1.0</span></span><span class="pl">Open ↗</span></div></a></div>
-  <div class="cw"><a class="card" style="--i:0" href="https://northassembly.work.gd/Apps/NA.Firmware/" rel="noopener noreferrer"><div class="k"><span>Firmware / Systems</span><span>10.</span></div><h3>NA.Firmware</h3><p>Custom firmware project with a POST diagnostic environment and hardware-validation interfaces.</p><div class="k"><span>UEFI / C <span class="tag">In development</span></span><span class="pl">Open project ↗</span></div></a></div>
+  <div class="cw"><a class="card" style="--i:2" href="https://northassembly.work.gd/Apps/Web98/"><div class="k"><span>Browser</span><span>10.</span></div><h3>Web98</h3><p>A desktop web browser with a classic Windows 98 and Internet Explorer 5 interface, built for the modern web.</p><div class="k"><span>Desktop / Electron <span class="tag">v0.1.0</span></span><span class="pl">Open ↗</span></div></a></div>
+  <div class="cw"><a class="card" style="--i:0" href="https://northassembly.work.gd/Apps/NA.Firmware/" rel="noopener noreferrer"><div class="k"><span>Firmware / Systems</span><span>11.</span></div><h3>NA.Firmware</h3><p>Custom firmware project with a POST diagnostic environment and hardware-validation interfaces.</p><div class="k"><span>UEFI / C <span class="tag">In development</span></span><span class="pl">Open project ↗</span></div></a></div>
  </div>
 </div></section>
 
@@ -182,11 +187,20 @@ footer a:hover{color:var(--ink)}
 
 <section class="sec" id="team"><div class="mw" data-m="3" data-sp="-.2" data-x="22"></div><div class="c">
  <h2 class="rv" data-split="People"></h2>
- <p class="lead fi">The people currently forming the organization.</p>
- <div class="people">
-  <div class="fi"><b>belfegor442</b><span>CEO / Director</span></div>
-  <div class="fi"><b>Anti</b><span>CEO / Director</span></div>
-  <div class="fi"><b>Doughtking12</b><span>Manager</span></div>
+ <p class="lead fi">The people currently forming the organization, with open roles listed separately.</p>
+ <div class="people-directory">
+  <div class="people-directory-head"><span>ACTIVE PERSONNEL</span><span>2026 / DIRECTORY</span></div>
+  <div class="employee-list" role="list" aria-label="North Assembly employees">
+   <div class="employee-row fi" role="listitem"><span class="employee-number">01</span><div class="employee-name"><b>belfegor442</b><small>EXECUTIVE</small></div><span class="employee-role">CEO / DIRECTOR</span><span class="employee-status">ACTIVE</span></div>
+   <div class="employee-row fi" role="listitem"><span class="employee-number">02</span><div class="employee-name"><b>ANTI_TW</b><small>EXECUTIVE</small></div><span class="employee-role">CEO / DIRECTOR</span><span class="employee-status">ACTIVE</span></div>
+   <div class="employee-row fi" role="listitem"><span class="employee-number">03</span><div class="employee-name"><b>DOUGHTKING12</b><small>MANAGEMENT</small></div><span class="employee-role">MANAGER</span><span class="employee-status">ACTIVE</span></div>
+  </div>
+  <div class="people-directory-head vacancies-head"><span>OPEN POSITIONS</span><span>RECRUITMENT</span></div>
+  <div class="employee-list" role="list" aria-label="North Assembly open positions">
+   <div class="employee-row vacancy-row fi" role="listitem"><span class="employee-number">—</span><div class="employee-name"><b>DEVELOPMENT</b><small>ENGINEERING</small></div><span class="employee-role">DEVELOPER</span><span class="employee-status is-open">OPEN</span></div>
+   <div class="employee-row vacancy-row fi" role="listitem"><span class="employee-number">—</span><div class="employee-name"><b>DESIGN</b><small>CREATIVE</small></div><span class="employee-role">DESIGNER</small></span><span class="employee-status is-open">OPEN</span></div>
+  </div>
+  <div class="people-directory-foot"><span>3 ACTIVE MEMBERS</span><span>2 OPEN POSITIONS</span></div>
  </div>
 </div></section>
 
@@ -287,6 +301,116 @@ footer a:hover{color:var(--ink)}
   navA.forEach(function(a){a.classList.toggle('on',a.dataset.t===secs[act].id)});
   requestAnimationFrame(frame)}
  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+  const ticker = document.getElementById("news-headline");
+  const DEFAULT_HEADLINE = "North Assembly — independent software and systems.";
+  const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let typingTimer = 0;
+  let activeText = DEFAULT_HEADLINE;
+
+  function displayHeadline(value) {
+    if (!ticker) return;
+    window.clearTimeout(typingTimer);
+    activeText = Array.from(String(value || DEFAULT_HEADLINE).trim()).slice(0, 180).join("") || DEFAULT_HEADLINE;
+    if (REDUCED_MOTION) {
+      ticker.textContent = activeText;
+      return;
+    }
+    const characters = Array.from(activeText);
+    let position = 0;
+    ticker.textContent = "";
+    const reveal = () => {
+      ticker.textContent = characters.slice(0, position).join("");
+      if (position < characters.length) {
+        position += 1;
+        typingTimer = window.setTimeout(reveal, 68);
+      } else {
+        typingTimer = window.setTimeout(() => {
+          position = 0;
+          reveal();
+        }, 3800);
+      }
+    };
+    reveal();
+  }
+
+  async function loadHeadline() {
+    try {
+      const response = await fetch("/news.json?v=" + Date.now(), { cache: "no-store" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      displayHeadline(typeof data.headline === "string" ? data.headline : DEFAULT_HEADLINE);
+    } catch (error) {
+      displayHeadline(DEFAULT_HEADLINE);
+      console.error("[North Assembly] No se pudo cargar /news.json:", error);
+    }
+  }
+
+  async function updateNews(headline) {
+    const nextHeadline = String(headline || "").trim();
+    if (!nextHeadline || Array.from(nextHeadline).length > 180) {
+      throw new Error("El titular debe contener entre 1 y 180 caracteres.");
+    }
+
+    const token = window.prompt("GitHub Fine-grained token de belfegor442, limitado a este repositorio y con Contents: Read and write.");
+    if (!token) return false;
+
+    const api = "https://api.github.com/repos/belfegor442/belfegor442.github.io/contents/docs/news.json";
+    const headers = {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + token.trim(),
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json"
+    };
+
+    const identityResponse = await fetch("https://api.github.com/user", { headers, cache: "no-store" });
+    if (!identityResponse.ok) throw new Error("No se pudo verificar GitHub (" + identityResponse.status + ").");
+    const identity = await identityResponse.json();
+    if (String(identity.login || "").toLowerCase() !== "belfegor442") {
+      throw new Error("Acceso denegado: solo la cuenta belfegor442 puede publicar noticias.");
+    }
+
+    const fileResponse = await fetch(api + "?ref=main", { headers, cache: "no-store" });
+    if (!fileResponse.ok) throw new Error("No se pudo leer docs/news.json (" + fileResponse.status + "). Comprueba el alcance Contents del token.");
+    const file = await fileResponse.json();
+    const payload = JSON.stringify({ headline: nextHeadline }, null, 2) + "\n";
+    const bytes = new TextEncoder().encode(payload);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    const content = btoa(binary);
+
+    const saveResponse = await fetch(api, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        message: "Update North Assembly global news headline",
+        content,
+        sha: file.sha,
+        branch: "main"
+      })
+    });
+
+    if (!saveResponse.ok) {
+      const error = await saveResponse.json().catch(() => ({}));
+      throw new Error("GitHub rechazó la publicación (" + saveResponse.status + "): " + (error.message || "Error desconocido"));
+    }
+
+    displayHeadline(nextHeadline);
+    console.info("[North Assembly] Noticia guardada en GitHub. Se publicará globalmente al actualizar Pages.");
+    return true;
+  }
+
+  window.NorthAssembly = Object.freeze({
+    updateNews,
+    getNews: () => activeText
+  });
+
+  loadHeadline();
+  console.info("[North Assembly] Administrador disponible. Usa NorthAssembly.updateNews(\"Tu titular\").");
 })();
 </script>
 </body>
