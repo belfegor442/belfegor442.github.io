@@ -81,7 +81,7 @@ a{color:inherit}
 .map-viewport{position:relative;min-height:0;width:100%;height:100%;overflow:hidden;background:#142832;cursor:grab;touch-action:none;isolation:isolate}
 .map-viewport:active{cursor:grabbing}
 .map-viewport:before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,#07111624,transparent 18%,transparent 82%,#0711162c),linear-gradient(180deg,#07111616,transparent 18%,transparent 84%,#07111638)}
-.map-stage{position:absolute;inset:0;display:grid;place-items:center;transform-origin:center;will-change:transform}
+.map-stage{position:absolute;inset:0;display:grid;place-items:center;transform-origin:0 0;will-change:transform;z-index:0;transition:opacity .3s ease}
 .map-stage object{display:block;width:100%;height:100%;border:0;object-fit:contain;pointer-events:auto}
 .map-fallback{position:absolute;inset:0;z-index:2;padding:22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-content:center;overflow:auto;background:#1b2b2e}
 .map-fallback[hidden]{display:none}
@@ -261,3 +261,13 @@ a{color:inherit}
  .inspector-heading{margin:0 -11px 13px;padding:11px}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Sprite-based district rendering, blended in at close zoom levels. */
+.map-detail-canvas{position:absolute;inset:0;z-index:2;display:block;width:100%;height:100%;opacity:0;pointer-events:none;transition:opacity .34s ease}
+.map-viewport.is-city-detail .map-stage{opacity:0;pointer-events:none}
+.map-viewport.is-city-detail .map-detail-canvas{opacity:1}
+.map-viewport.is-city-detail .map-scale{display:none}
+.map-zoom-level{margin-left:4px;color:#bdb18d;font:700 7px var(--mono);letter-spacing:.55px;white-space:nowrap}
+.map-controls{flex-shrink:0}
+@media(max-width:1050px){.map-zoom-level{display:none}}

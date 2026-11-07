@@ -657,6 +657,7 @@ public sealed class WorldModuleSetupRulesTests
         {
             Id = Guid.NewGuid(),
             WorldDate = new DateOnly(1500, 1, 1),
+            MapGeometryVersion = MapGeometryCatalog.MapVersion,
             Territories =
             [
                 new TerritoryState
