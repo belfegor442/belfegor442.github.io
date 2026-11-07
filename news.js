@@ -44,7 +44,7 @@
     if (!nextHeadline || nextHeadline.length > 180) {
       throw new Error("El titular debe contener entre 1 y 180 caracteres.");
     }
-    const token = window.prompt("Introduce tu GitHub fine-grained token con permiso Contents: Read and write para belfegor442/belfegor442.github.io.");
+    const token = window.prompt("Introduce tu GitHub token de GitHub de la cuenta belfegor442 con permiso de escritura Contents en este repositorio.");
     if (!token) return false;
 
     const api = "https://api.github.com/repos/belfegor442/belfegor442.github.io/contents/news.json";
@@ -54,6 +54,13 @@
       "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json"
     };
+    const identity = await fetch("https://api.github.com/user", { headers, cache: "no-store" });
+    if (!identity.ok) throw new Error("No se pudo verificar la cuenta de GitHub (" + identity.status + ").");
+    const account = await identity.json();
+    if (String(account.login || "").toLowerCase() !== "belfegor442") {
+      throw new Error("Acceso denegado: solo la cuenta belfegor442 puede publicar noticias.");
+    }
+
     const existing = await fetch(api + "?ref=main", { headers, cache: "no-store" });
     if (!existing.ok) throw new Error("GitHub no autorizó la lectura (" + existing.status + "). Comprueba el token y sus permisos.");
     const file = await existing.json();
