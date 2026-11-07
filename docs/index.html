@@ -338,15 +338,30 @@ footer a:hover{color:var(--ink)}
     reveal();
   }
 
+  const LIVE_NEWS_URL = "https://raw.githubusercontent.com/belfegor442/belfegor442.github.io/main/docs/news.json";
+
+  let newsLoadPending = false;
+
   async function loadHeadline() {
+    if (newsLoadPending || document.hidden) return;
+    newsLoadPending = true;
     try {
-      const response = await fetch("/news.json?v=" + Date.now(), { cache: "no-store" });
-      if (!response.ok) throw new Error("HTTP " + response.status);
+      const response = await fetch(LIVE_NEWS_URL + "?v=" + Date.now(), { cache: "no-store" });
+      if (!response.ok) throw new Error("GitHub raw HTTP " + response.status);
       const data = await response.json();
-      displayHeadline(typeof data.headline === "string" ? data.headline : DEFAULT_HEADLINE);
-    } catch (error) {
-      displayHeadline(DEFAULT_HEADLINE);
-      console.error("[North Assembly] No se pudo cargar /news.json:", error);
+      if (typeof data.headline !== "string") throw new Error("Titular no válido");
+      displayHeadline(data.headline);
+    } catch (remoteError) {
+      try {
+        const fallback = await fetch("/news.json?v=" + Date.now(), { cache: "no-store" });
+        if (!fallback.ok) throw new Error("HTTP " + fallback.status);
+        const data = await fallback.json();
+        displayHeadline(typeof data.headline === "string" ? data.headline : DEFAULT_HEADLINE);
+      } catch (error) {
+        console.error("[North Assembly] No se pudo actualizar el titular:", remoteError, error);
+      }
+    } finally {
+      newsLoadPending = false;
     }
   }
 
@@ -357,27 +372,28 @@ footer a:hover{color:var(--ink)}
     }
 
     const accessCode = window.prompt("North Assembly dice:");
-    if (accessCode !== "&/&/") {
-      if (accessCode !== null) window.alert("Código incorrecto. Acceso denegado.");
-      return false;
+    if (accessCode === null) return false;
+
+    let response;
+    try {
+      response = await fetch("http://127.0.0.1:43127/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ headline: nextHeadline, code: accessCode })
+      });
+    } catch (error) {
+      throw new Error("No se pudo conectar con North Assembly Publisher en este PC. Inicia Start-North-Assembly-Publisher.bat y vuelve a ejecutar el comando.");
+    }
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "No se pudo publicar el titular.");
     }
 
     displayHeadline(nextHeadline);
-
-    const payload = JSON.stringify({ headline: nextHeadline }, null, 2) + "\n";
-    const file = new Blob([payload], { type: "application/json;charset=utf-8" });
-    const downloadUrl = URL.createObjectURL(file);
-    const downloadLink = document.createElement("a");
-    downloadLink.href = downloadUrl;
-    downloadLink.download = "news.json";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
-    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1500);
-
-    console.info("[North Assembly] Titular actualizado en esta sesión. Se ha descargado news.json.");
-    console.info("[North Assembly] Para publicarlo globalmente, sustituye docs/news.json en GitHub por el archivo descargado y confirma el cambio en main.");
-    window.alert("Titular actualizado en esta sesión.\n\nSe ha descargado news.json. Para publicarlo globalmente, sustituye docs/news.json en GitHub por ese archivo y confirma el cambio en main.");
+    console.info("[North Assembly] Publicación global completada.");
+    if (result.commit) console.info("[North Assembly] GitHub commit: " + result.commit);
+    else console.info("[North Assembly] El titular ya estaba actualizado.");
     return true;
   }
 
@@ -387,6 +403,7 @@ footer a:hover{color:var(--ink)}
   });
 
   loadHeadline();
+  window.setInterval(loadHeadline, 15000);
   console.info("[North Assembly] Administrador disponible. Usa NorthAssembly.updateNews(\"Tu titular\").");
 })();
 </script>
