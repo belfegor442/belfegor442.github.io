@@ -10,7 +10,8 @@ public sealed class MapGeometryCatalogTests
     public void VersionedCatalogMatchesGeometryIdsAndHashOfOriginalSvg()
     {
         var svgPath = Path.Combine(AppContext.BaseDirectory, "map.svg");
-        var svgBytes = File.ReadAllBytes(svgPath);
+        var svgBytes = System.Text.Encoding.UTF8.GetBytes(
+            File.ReadAllText(svgPath).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'));
         var svg = XDocument.Load(svgPath);
         var excludedDefinitions = new HashSet<string>(
             ["defs", "clipPath", "mask", "pattern", "filter", "symbol"],
