@@ -260,11 +260,40 @@
     }));
     if (!window.NewWorldSimulation) throw new Error('The New World simulation engine failed to load.');
     Object.assign(game, window.NewWorldSimulation.createStarterEconomy(game.territories, byId));
-    pushEvent(game,'world.created',playerId,null,'A private multiplayer world was created with the Beleland starter economy.');
+    const hostAssignment = assignLobbyPlayer(game, game.players[0], 0);
+    if (!hostAssignment.ok)
+      throw new Error('The host could not be assigned to the starting State: ' + hostAssignment.error);
+    pushEvent(game,'world.created',playerId,null,
+      'A private multiplayer world was created. ' + name + ' starts as the government of ' +
+      game.territories[0].name + '.');
     return {
       game,
       session:{gameId,playerId,playerToken:hostToken,inviteCode:'',roomCode:'',isHost:true}
     };
+  }
+
+  function assignLobbyPlayer(game, player, requestedIndex = null) {
+    if (!game || game.started || !player || !game.players.some(item => item.id === player.id))
+      return {ok:false,error:'The player cannot be assigned in this lobby.'};
+    let countryIndex = requestedIndex;
+    if (countryIndex === null) {
+      const counts = game.territories.map(territory => ({
+        territory,
+        members:game.memberships.filter(membership =>
+          membership.stateId === territory.stateId && membership.status === 'active').length
+      }));
+      const available = counts.find(item => item.members === 0);
+      const target = available || counts.sort((a,b) => a.members - b.members || a.territory.index - b.territory.index)[0];
+      countryIndex = target?.territory.index ?? null;
+    }
+    if (countryIndex === null || !Number.isInteger(countryIndex) || !game.territories[countryIndex])
+      return {ok:false,error:'No valid State is available for this player.'};
+    return applyAdmin(game,'assign',{playerId:player.id,countryIndex});
+  }
+
+  function canStartWorld(game) {
+    return Boolean(game && !game.started && game.players.length > 0 &&
+      game.players.every(player => activeMemberships(game,player.id).length > 0));
   }
 
   function pushActivity(game, description) {
@@ -605,6 +634,12 @@
         runtime.game.worldVersion++;
         pushActivity(runtime.game,name + ' joined the world.');
         pushEvent(runtime.game,'player.joined',player.id,null,name + ' joined the world.');
+        const assignment = assignLobbyPlayer(runtime.game,player);
+        if (!assignment.ok) {
+          runtime.game.players = runtime.game.players.filter(item => item.id !== player.id);
+          runtime.link.publish(pendingTopic,{t:'error',error:assignment.error});
+          return;
+        }
       }
       const session = {
         gameId:runtime.game.id,playerId:player.id,playerToken:player.token,
@@ -701,14 +736,16 @@
         (payload.countryIndex === null ? 'no State' : game.territories[payload.countryIndex].name) + '.');
     } else if (action === 'start') {
       if (game.started) return {ok:false,error:'The world has already started.'};
-      if (game.players.some(player => activeMemberships(game,player.id).length === 0))
-        return {ok:false,error:'Assign a state to every player before starting.'};
+      if (!canStartWorld(game))
+        return {ok:false,error:'Every player must have a State assignment before starting.'};
       game.started = true;
       game.status = 'running';
       game.paused = false;
       game.lastTickUtc = new Date().toISOString();
-      runtime.lastPulseAt = Date.now();
-      runtime.clockAccumulatorMs = 0;
+      if (runtime?.role === 'host') {
+        runtime.lastPulseAt = Date.now();
+        runtime.clockAccumulatorMs = 0;
+      }
       pushActivity(game,'The world began.');
     } else if (action === 'configure') {
       if (game.started) return {ok:false,error:'Scenario configuration is locked after the world starts.'};
@@ -1031,7 +1068,8 @@
     });
   }
 
-  setInterval(hostPulse,1000);
+  const hostPulseTimer = setInterval(hostPulse,1000);
+  hostPulseTimer.unref?.();
 
   window.NewWorldMultiplayer = {
     createWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
@@ -1040,4 +1078,14 @@
     currentSession:() => runtime?.session || null,
     currentRoom:() => runtime?.room || ''
   };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Object.freeze({
+      createInitialWorld:newWorld,
+      assignLobbyPlayer,
+      canStartWorld,
+      applyAdmin,
+      snapshot
+    });
+  }
 })();

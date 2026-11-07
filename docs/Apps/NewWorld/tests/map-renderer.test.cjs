@@ -53,6 +53,57 @@ test('terrain generation is deterministic for a selected state', () => {
   assert.ok(['grass', 'dry', 'water'].includes(first.type));
 });
 
+test('physical terrain has distinct coast, riverside, plains, forests, hills, mountains and wetlands', () => {
+  const renderer = createRenderer();
+  const counts = new Map();
+  let treeCells = 0;
+  let rockCells = 0;
+  for (let row = 0; row < renderer.worldSize; row += 12) {
+    for (let col = 0; col < renderer.worldSize; col += 12) {
+      const tile = renderer.terrainAt(row, col);
+      counts.set(tile.type, (counts.get(tile.type) || 0) + 1);
+      if (tile.tree) treeCells++;
+      if (tile.rock) rockCells++;
+    }
+  }
+  for (const type of ['water', 'shore', 'grass', 'forest', 'hills', 'mountain', 'dry', 'wetland']) {
+    assert.ok(counts.get(type) > 0, 'missing terrain biome: ' + type);
+  }
+  assert.ok(counts.get('grass') > counts.get('mountain'));
+  assert.ok(treeCells > 100, 'woodland should contain clustered vegetation');
+  assert.ok(rockCells > 20, 'mountain and hill regions should contain rock outcrops');
+});
+
+test('different States receive distinct but deterministic terrain seeds', () => {
+  const renderer = createRenderer();
+  renderer.setRegion(0, 'Coimbrila');
+  const first = [];
+  for (let row = 120; row <= 900; row += 52) {
+    for (let col = 120; col <= 900; col += 52) {
+      const tile = renderer.terrainAt(row, col);
+      first.push([tile.type, tile.variation, tile.elevation, tile.moisture, tile.tree]);
+    }
+  }
+  renderer.setRegion(1, 'Gania');
+  const second = [];
+  for (let row = 120; row <= 900; row += 52) {
+    for (let col = 120; col <= 900; col += 52) {
+      const tile = renderer.terrainAt(row, col);
+      second.push([tile.type, tile.variation, tile.elevation, tile.moisture, tile.tree]);
+    }
+  }
+  assert.notDeepEqual(first, second);
+  renderer.setRegion(0, 'Coimbrila');
+  const repeated = [];
+  for (let row = 120; row <= 900; row += 52) {
+    for (let col = 120; col <= 900; col += 52) {
+      const tile = renderer.terrainAt(row, col);
+      repeated.push([tile.type, tile.variation, tile.elevation, tile.moisture, tile.tree]);
+    }
+  }
+  assert.deepEqual(first, repeated);
+});
+
 test('terrain has no prebuilt roads, parks or structures', () => {
   const renderer = createRenderer();
   for (let row = 100; row < 130; row++) {

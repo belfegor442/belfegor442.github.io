@@ -6,6 +6,38 @@ namespace NewWorld.Server.Tests;
 
 public sealed class WorldStateCompatibilityTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void NormalizeUpgradesCompatibleBelelandMapGeometryVersions(int previousVersion)
+    {
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            MapGeometryVersion = previousVersion,
+            Players = [],
+            Territories = []
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        Assert.Equal(3, game.MapGeometryVersion);
+    }
+
+    [Fact]
+    public void NormalizeRejectsMapGeometryVersionsFromTheFuture()
+    {
+        var game = new WorldState
+        {
+            Id = Guid.NewGuid(),
+            MapGeometryVersion = MapGeometryCatalog.MapVersion + 1,
+            Players = [],
+            Territories = []
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+    }
+
     [Fact]
     public void NormalizeMigratesLegacyPlayerAssignmentsToStableMemberships()
     {
