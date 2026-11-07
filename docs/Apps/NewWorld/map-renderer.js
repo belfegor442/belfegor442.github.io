@@ -51,11 +51,18 @@
     }
 
     tileWidth() {
-      return 54 * clamp(this.zoom, 0.18, 1.53);
+      return 54 * clamp(this.zoom, 0.04, 1.53);
     }
 
     tileHeight() {
       return this.tileWidth() / 2;
+    }
+
+    renderStep() {
+      if (this.zoom <= 0.06) return 8;
+      if (this.zoom <= 0.12) return 4;
+      if (this.zoom <= 0.22) return 2;
+      return 1;
     }
 
     hash(row, col, salt = 0) {
@@ -331,7 +338,7 @@
     }
 
     setCamera(zoom, detailMode = null) {
-      this.zoom = clamp(Number(zoom) || 1, 0.18, 6);
+      this.zoom = clamp(Number(zoom) || 1, 0.04, 6);
       this.active = detailMode === null ? this.zoom >= 1.65 : Boolean(detailMode);
       this.viewport?.classList.toggle('is-city-detail', this.active);
       if (this.active && !this.ready && !this.loading && !this.failed) this.loadAtlas();
@@ -360,7 +367,7 @@
 
     setZoomAt(zoom, x, y) {
       const oldWidth = this.tileWidth();
-      this.zoom = clamp(Number(zoom) || this.zoom, 0.18, 6);
+      this.zoom = clamp(Number(zoom) || this.zoom, 0.04, 6);
       const ratio = this.tileWidth() / oldWidth;
       const width = this.viewport?.clientWidth || 1;
       const height = this.viewport?.clientHeight || 1;
@@ -521,22 +528,33 @@
       const maxRow = clamp(Math.ceil(Math.max(...corners.map(point => point.row)) + padding), 0, this.worldSize - 1);
       const minCol = clamp(Math.floor(Math.min(...corners.map(point => point.col)) - padding), 0, this.worldSize - 1);
       const maxCol = clamp(Math.ceil(Math.max(...corners.map(point => point.col)) + padding), 0, this.worldSize - 1);
-      const sumMin = Math.max(minRow + minCol, Math.floor(minRow + minCol));
+      const sumMin = minRow + minCol;
       const sumMax = maxRow + maxCol;
       const originX = width / 2 + this.camera.x;
       const originY = height / 2 + this.camera.y;
+      const step = this.renderStep();
+      const blockWidth = tileW * step;
+      const blockHeight = tileH * step;
+      const blockScale = scale * step;
+      const firstDiagonal = Math.floor(sumMin / step) * step;
 
-      for (let diagonal = sumMin; diagonal <= sumMax; diagonal++) {
-        const rowStart = Math.max(minRow, diagonal - maxCol);
-        const rowEnd = Math.min(maxRow, diagonal - minCol);
-        for (let row = rowStart; row <= rowEnd; row++) {
+      for (let diagonal = firstDiagonal; diagonal <= sumMax; diagonal += step) {
+        const rowStart = Math.ceil(Math.max(minRow, diagonal - maxCol) / step) * step;
+        const rowEnd = Math.floor(Math.min(maxRow, diagonal - minCol) / step) * step;
+        for (let row = rowStart; row <= rowEnd; row += step) {
           const col = diagonal - row;
           const cx = originX + (col - row) * tileW / 2;
-          const cy = originY + (row + col - this.worldSize) * tileH / 2;
-          if (cx < -tileW * 2 || cx > width + tileW * 2 ||
-              cy < -tileH * 3 || cy > height + tileH * 3) continue;
-          const terrain = this.terrainAt(row, col);
-          if (terrain) this.drawTerrain(terrain, row, col, cx, cy, tileW, tileH, scale);
+          const cy = originY + (row + col + step - 1 - this.worldSize) * tileH / 2;
+          if (cx < -blockWidth * 2 || cx > width + blockWidth * 2 ||
+              cy < -blockHeight * 3 || cy > height + blockHeight * 3) continue;
+          const sampleOffset = Math.floor((step - 1) / 2);
+          const sampleRow = Math.min(this.worldSize - 1, row + sampleOffset);
+          const sampleCol = Math.min(this.worldSize - 1, col + sampleOffset);
+          const terrain = this.terrainAt(sampleRow, sampleCol);
+          if (terrain) {
+            this.drawTerrain(terrain, row, col, cx, cy,
+              blockWidth, blockHeight, blockScale);
+          }
         }
       }
 
