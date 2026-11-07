@@ -128,7 +128,7 @@ footer a:hover{color:var(--ink)}
 <section class="sec hero" id="top">
  <aside class="news-ticker" aria-label="North Assembly news">
   <span class="news-label"><i aria-hidden="true"></i> NA / NEWS</span>
-  <div class="news-window"><span class="news-headline" id="news-headline">North Assembly — independent software and systems.</span><span class="news-caret" aria-hidden="true"></span></div>
+  <div class="news-window" aria-live="polite"><span class="news-headline" id="news-headline">North Assembly — independent software and systems.</span></div>
   <span class="news-caption">GLOBAL BROADCAST</span>
  </aside>
  <div class="mw" data-m="0" data-sp=".22" data-x="26"></div>
@@ -307,36 +307,48 @@ footer a:hover{color:var(--ink)}
 (() => {
   "use strict";
   const ticker = document.getElementById("news-headline");
+  const newsWindow = ticker?.closest(".news-window");
   const DEFAULT_HEADLINE = "North Assembly — independent software and systems.";
   const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let typingTimer = 0;
-  let activeText = DEFAULT_HEADLINE;
+  let activeText = "";
+  let newsResizeTimer = 0;
 
   function displayHeadline(value) {
-    if (!ticker) return;
-    window.clearTimeout(typingTimer);
-    activeText = Array.from(String(value || DEFAULT_HEADLINE).trim()).slice(0, 180).join("") || DEFAULT_HEADLINE;
+    if (!ticker || !newsWindow) return;
+    const nextText = Array.from(String(value || DEFAULT_HEADLINE).trim()).slice(0, 180).join("") || DEFAULT_HEADLINE;
+    if (nextText === activeText) return;
+
+    activeText = nextText;
+    ticker.textContent = activeText;
+
     if (REDUCED_MOTION) {
-      ticker.textContent = activeText;
+      ticker.style.animation = "none";
+      ticker.style.left = "0";
+      ticker.style.transform = "none";
       return;
     }
-    const characters = Array.from(activeText);
-    let position = 0;
-    ticker.textContent = "";
-    const reveal = () => {
-      ticker.textContent = characters.slice(0, position).join("");
-      if (position < characters.length) {
-        position += 1;
-        typingTimer = window.setTimeout(reveal, 68);
-      } else {
-        typingTimer = window.setTimeout(() => {
-          position = 0;
-          reveal();
-        }, 3800);
-      }
-    };
-    reveal();
+
+    ticker.style.animation = "none";
+    ticker.style.left = "100%";
+    ticker.style.transform = "translateY(-50%)";
+    ticker.style.setProperty("--news-distance", window.innerWidth + "px");
+    const travelPixels = newsWindow.clientWidth + ticker.scrollWidth + window.innerWidth;
+    const duration = Math.max(14, Math.min(42, travelPixels / 92));
+    ticker.style.setProperty("--news-duration", duration.toFixed(2) + "s");
+    void ticker.offsetWidth;
+    ticker.style.animation = "";
   }
+
+  window.addEventListener("resize", () => {
+    window.clearTimeout(newsResizeTimer);
+    newsResizeTimer = window.setTimeout(() => {
+      if (activeText) {
+        const currentText = activeText;
+        activeText = "";
+        displayHeadline(currentText);
+      }
+    }, 180);
+  });
 
   const LIVE_NEWS_URL = "https://raw.githubusercontent.com/belfegor442/belfegor442.github.io/main/docs/news.json";
 
