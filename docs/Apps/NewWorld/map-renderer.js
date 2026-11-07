@@ -51,8 +51,7 @@
     }
 
     tileWidth() {
-      const scale = clamp(0.88 + (this.zoom - 1) * 0.15, 0.72, 1.53);
-      return 54 * scale;
+      return 54 * clamp(this.zoom, 0.18, 1.53);
     }
 
     tileHeight() {
@@ -332,7 +331,7 @@
     }
 
     setCamera(zoom, detailMode = null) {
-      this.zoom = clamp(Number(zoom) || 1, 0.65, 6);
+      this.zoom = clamp(Number(zoom) || 1, 0.18, 6);
       this.active = detailMode === null ? this.zoom >= 1.65 : Boolean(detailMode);
       this.viewport?.classList.toggle('is-city-detail', this.active);
       if (this.active && !this.ready && !this.loading && !this.failed) this.loadAtlas();
@@ -361,7 +360,7 @@
 
     setZoomAt(zoom, x, y) {
       const oldWidth = this.tileWidth();
-      this.zoom = clamp(Number(zoom) || this.zoom, 0.65, 6);
+      this.zoom = clamp(Number(zoom) || this.zoom, 0.18, 6);
       const ratio = this.tileWidth() / oldWidth;
       const width = this.viewport?.clientWidth || 1;
       const height = this.viewport?.clientHeight || 1;

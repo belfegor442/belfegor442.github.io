@@ -1219,7 +1219,7 @@
     if (!Number.isInteger(index) || index < 0 || index >= 16) return;
     selectState(index, false);
     hideMapTooltip();
-    zoom = 1;
+    zoom = 0.35;
     pan = {x: 0, y: 0};
     $('map-stage').style.transform = 'translate3d(0,0,0) scale(1)';
     mapDetailRenderer?.setCamera(zoom, true);
@@ -2050,7 +2050,7 @@
     const rect = viewport.getBoundingClientRect();
     const anchorX = Number.isFinite(clientX) ? clientX - rect.left : rect.width / 2;
     const anchorY = Number.isFinite(clientY) ? clientY - rect.top : rect.height / 2;
-    const nextZoom = Math.max(.65, Math.min(6, value));
+    const nextZoom = Math.max(.18, Math.min(6, value));
 
     if (mapDetailRenderer?.active) {
       zoom = nextZoom;

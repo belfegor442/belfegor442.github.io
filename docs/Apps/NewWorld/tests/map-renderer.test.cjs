@@ -132,20 +132,25 @@ test('terrain outside the world bounds is not generated', () => {
   assert.equal(renderer.terrainAt(1024, 1024), null);
 });
 
-test('city map opens at the normal camera scale without requiring strategic zoom', () => {
+test('city map opens with a wide 0.35x camera scale without strategic zoom', () => {
   const renderer = createRenderer();
   const viewStates = [];
   renderer.failed = true;
   renderer.viewport.classList.toggle = (name, active) => viewStates.push(active);
 
-  renderer.setCamera(1, true);
+  renderer.setCamera(0.35, true);
 
   assert.equal(renderer.active, true);
-  assert.equal(renderer.zoom, 1);
-  assert.equal(renderer.tileWidth(), 54 * 0.88);
+  assert.equal(renderer.zoom, 0.35);
+  assert.equal(renderer.tileWidth(), 54 * 0.35);
   assert.deepEqual(viewStates, [true]);
+
+  renderer.setZoomAt(0.18, 600, 350);
+  assert.equal(renderer.zoom, 0.18);
+  assert.equal(renderer.tileWidth(), 54 * 0.18);
 
   renderer.setCamera(1);
   assert.equal(renderer.active, false);
+  assert.equal(renderer.zoom, 1);
   assert.deepEqual(viewStates, [true, false]);
 });
