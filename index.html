@@ -9,7 +9,7 @@
   <title>North Assembly — Independent Software & Systems</title>
   <link rel="canonical" href="https://northassembly.work.gd/">
   <link rel="icon" type="image/svg+xml" href="/na-mark.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261027-2">
+  <link rel="stylesheet" href="/styles.css?v=20261107-1">
 </head>
 <body>
   <header class="site-header">
@@ -24,6 +24,12 @@
       <button class="menu-button" type="button" aria-expanded="false" aria-controls="nav-links">MENU</button>
     </div>
   </header>
+
+  <aside class="news-ticker" aria-label="North Assembly news">
+    <div class="news-ticker-label"><span class="news-live-dot"></span>NA / NEWS</div>
+    <div class="news-ticker-track"><span id="news-headline" class="news-headline" aria-live="polite">North Assembly — independent software and systems.</span><span class="news-cursor" aria-hidden="true"></span></div>
+    <span class="news-ticker-index">LATEST UPDATE</span>
+  </aside>
 
   <main>
     <section class="hero">
@@ -86,18 +92,18 @@
     <section class="section team" id="team">
       <div class="container">
         <div class="section-header">
-          <div><p class="section-number">04 / TEAM</p><h2 class="section-title">People</h2></div>
-          <p class="section-intro">Current organization and open positions.</p>
+          <div><p class="section-number">04 / ORGANIZATION</p><h2 class="section-title">People</h2></div>
+          <p class="section-intro">North Assembly personnel directory. Roles and vacancies are listed separately.</p>
         </div>
-        <div class="about-grid team-grid">
-          <div class="about-main"><p>North Assembly is directed jointly by BELFEGOR442 and ANTI_TW.</p></div>
-          <div class="about-side">
-            <div class="info-row"><span>BELFEGOR442</span><span>CEO / DIRECTOR</span></div>
-            <div class="info-row"><span>ANTI_TW</span><span>CEO / DIRECTOR</span></div>
-            <div class="info-row"><span>DOUGHTKING12</span><span>MANAGER</span></div>
-            <div class="info-row"><span>DEVELOPMENT</span><span>OPEN</span></div>
-            <div class="info-row"><span>DESIGN</span><span>OPEN</span></div>
-          </div>
+        <div class="team-board">
+          <div class="team-board-head"><span>PERSONNEL DIRECTORY</span><span>STATUS / 2026</span></div>
+          <div class="employee-row"><span class="employee-id">01</span><div class="employee-person"><strong>BELFEGOR442</strong><small>EXECUTIVE</small></div><span class="employee-role">CEO / DIRECTOR</span><span class="employee-state">ACTIVE</span></div>
+          <div class="employee-row"><span class="employee-id">02</span><div class="employee-person"><strong>ANTI_TW</strong><small>EXECUTIVE</small></div><span class="employee-role">CEO / DIRECTOR</span><span class="employee-state">ACTIVE</span></div>
+          <div class="employee-row"><span class="employee-id">03</span><div class="employee-person"><strong>DOUGHTKING12</strong><small>MANAGEMENT</small></div><span class="employee-role">MANAGER</span><span class="employee-state">ACTIVE</span></div>
+          <div class="team-board-head vacancies-head"><span>OPEN POSITIONS</span><span>RECRUITMENT</span></div>
+          <div class="employee-row vacancy-row"><span class="employee-id">—</span><div class="employee-person"><strong>DEVELOPMENT</strong><small>ENGINEERING</small></div><span class="employee-role">DEVELOPER</span><span class="employee-state open-state">OPEN</span></div>
+          <div class="employee-row vacancy-row"><span class="employee-id">—</span><div class="employee-person"><strong>DESIGN</strong><small>CREATIVE</small></div><span class="employee-role">DESIGNER</span><span class="employee-state open-state">OPEN</span></div>
+          <div class="team-board-foot"><span>3 ACTIVE MEMBERS</span><span>2 OPEN POSITIONS</span></div>
         </div>
       </div>
     </section>
@@ -124,6 +130,7 @@
     </div>
   </footer>
 
+  <script src="/news.js?v=20261107-1" defer></script>
   <script>
     const menu=document.querySelector(".menu-button"), nav=document.querySelector(".nav-links");
     menu.addEventListener("click",()=>{const open=nav.classList.toggle("is-open");menu.setAttribute("aria-expanded",String(open));});
