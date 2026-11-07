@@ -65,12 +65,16 @@ public sealed class SimulationRulesTests
         var firstPlayer = new PlayerState
         {
             Id = Guid.NewGuid(),
-            LegacyCountryIndex = 0,
-            Buildings = { [0] = GameCatalog.Buildings["farm"] }
+            LegacyCountryIndex = 0
         };
         var secondPlayer = new PlayerState { Id = Guid.NewGuid(), LegacyCountryIndex = 0 };
         var otherPlayer = new PlayerState { Id = Guid.NewGuid(), LegacyCountryIndex = 2 };
-        var government = new TerritoryState { StateId = Guid.NewGuid(), Index = 0 };
+        var government = new TerritoryState
+        {
+            StateId = Guid.NewGuid(),
+            Index = 0,
+            Buildings = { [150] = GameCatalog.Buildings["farm"] }
+        };
         var game = new WorldState
         {
             Players = [firstPlayer, secondPlayer, otherPlayer],
@@ -91,8 +95,8 @@ public sealed class SimulationRulesTests
 
         Assert.Equal(10, balance.TerritoryIncome);
         Assert.Equal(188, balance.CityIncome);
-        Assert.Equal(2, balance.Upkeep);
-        Assert.Equal(196, balance.MonthlyBalance);
+        Assert.Equal(3, balance.Upkeep);
+        Assert.Equal(195, balance.MonthlyBalance);
     }
 
     [Fact]

@@ -275,8 +275,10 @@
       for (const [index, building] of this.buildingData) {
         let pool = this.pools.residential;
         if (building.id === 'farm') pool = this.pools.village.length ? this.pools.village : this.pools.residential;
-        if (building.id === 'market' || building.id === 'workshop') pool = this.pools.commercial;
-        if (building.id === 'utility') pool = this.pools.utility;
+        if (building.id === 'market' || building.id === 'workshop' ||
+            building.id === 'clinic' || building.id === 'school') pool = this.pools.commercial;
+        if (building.id === 'waterworks' || building.id === 'utility') pool = this.pools.utility;
+        if (building.id === 'road') continue;
         if (!pool.length) continue;
         const cell = this.getPlotCell(index);
         const random = this.hash(cell.row, cell.col, 113);
@@ -352,14 +354,14 @@
       const coordinates = document.getElementById('map-coordinates');
       if (coordinates) {
         coordinates.textContent = this.active
-          ? this.regionName.toUpperCase() + ' · OPEN TERRITORY'
-          : 'BELELAND · WORLD 001';
+          ? this.regionName.toUpperCase() + ' Â· OPEN TERRITORY'
+          : 'BELELAND Â· WORLD 001';
       }
       const hint = document.querySelector('.map-foot-hint');
       if (hint) {
         hint.textContent = this.active
-          ? 'SELECT A DEVELOPMENT PLOT · DRAG TO EXPLORE · SCROLL TO ZOOM'
-          : 'DOUBLE-CLICK A TERRITORY TO OPEN ITS MAP · DRAG TO PAN';
+          ? 'SELECT A DEVELOPMENT PLOT Â· DRAG TO EXPLORE Â· SCROLL TO ZOOM'
+          : 'DOUBLE-CLICK A TERRITORY TO OPEN ITS MAP Â· DRAG TO PAN';
       }
       this.clampCamera();
       this.render();
@@ -447,9 +449,44 @@
         ctx.fillRect(cx + tileW * 0.025, cy - tileH * 0.055, tileW * 0.055, Math.max(1, scale));
       }
 
-      const plotIndex = this.getPlotIndexForCell(row, col);
+      const blockStep = Math.max(1, Math.round(tileW / this.tileWidth()));
+      let plotIndex = this.getPlotIndexForCell(row, col);
+      let buildingData = plotIndex === null ? null : this.buildingData.get(plotIndex);
+      if (!buildingData && blockStep > 1) {
+        for (let blockRow = row; blockRow < Math.min(this.worldSize, row + blockStep) && !buildingData; blockRow++) {
+          for (let blockCol = col; blockCol < Math.min(this.worldSize, col + blockStep); blockCol++) {
+            const candidateIndex = this.getPlotIndexForCell(blockRow, blockCol);
+            const candidate = candidateIndex === null ? null : this.buildingData.get(candidateIndex);
+            if (candidate) {
+              plotIndex = candidateIndex;
+              buildingData = candidate;
+              break;
+            }
+          }
+        }
+      }
       const building = plotIndex === null ? null : this.buildingSprites.get(plotIndex);
-      if (building) this.drawBuilding(building, cx, cy, tileW, tileH);
+      if (buildingData?.id === 'road') {
+        ctx.save();
+        if (Number(buildingData.daysRemaining) > 0) ctx.globalAlpha = 0.48;
+        this.polygon(cx, cy, halfW * 0.92, halfH * 0.92);
+        ctx.fillStyle = '#555d58';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(226, 216, 188, .55)';
+        ctx.lineWidth = Math.max(0.8, scale * 1.15);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(238, 226, 194, .72)';
+        ctx.lineWidth = Math.max(0.55, scale * 0.65);
+        ctx.setLineDash([Math.max(1, tileW * 0.12), Math.max(1, tileW * 0.1)]);
+        ctx.beginPath();
+        ctx.moveTo(cx - tileW * 0.22, cy);
+        ctx.lineTo(cx + tileW * 0.22, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      } else if (building) {
+        this.drawBuilding(building, cx, cy, tileW, tileH, buildingData);
+      }
       if (plotIndex !== null && (plotIndex === this.selectedPlot || plotIndex === this.hoverPlot)) {
         this.polygon(cx, cy, halfW * 0.96, halfH * 0.96);
         ctx.strokeStyle = plotIndex === this.selectedPlot
@@ -460,7 +497,7 @@
       }
     }
 
-    drawBuilding(sprite, cx, cy, tileW, tileH) {
+    drawBuilding(sprite, cx, cy, tileW, tileH, building = null) {
       const ctx = this.ctx;
       const atlas = this.pages[sprite.page];
       if (!atlas) return;
@@ -470,6 +507,7 @@
       const baseY = cy + tileH * 0.32;
 
       ctx.save();
+      if (Number(building?.daysRemaining) > 0) ctx.globalAlpha = 0.48;
       ctx.fillStyle = 'rgba(16, 29, 26, .23)';
       ctx.beginPath();
       ctx.ellipse(cx + tileW * 0.05, baseY - 1, tileW * 0.38, tileH * 0.18, 0, 0, Math.PI * 2);

@@ -190,9 +190,33 @@ public sealed class TerritoryState
     public int Prosperity { get; set; }
     public int Infrastructure { get; set; }
     public Guid? OwnerPlayerId { get; set; }
+    public Dictionary<int, BuildingState> Buildings { get; set; } = [];
+    public int BaseHousingCapacity { get; set; }
+    public int BaseFoodCapacity { get; set; }
+    public int BaseWaterCapacity { get; set; }
+    public int BaseHealthCapacity { get; set; }
+    public int BaseEducationCapacity { get; set; }
+    public int BaseJobSlots { get; set; }
+    public int PopulationGrowthRemainder { get; set; }
+    public int LastPopulationGrowth { get; set; }
 }
 
-public sealed record BuildingState(string Id, string Name, int Cost, int Income, string Icon, string Description);
+public sealed record BuildingState(
+    string Id,
+    string Name,
+    int Cost,
+    int Income,
+    string Icon,
+    string Description,
+    int HousingCapacity = 0,
+    int JobSlots = 0,
+    int FoodCapacity = 0,
+    int WaterCapacity = 0,
+    int HealthCapacity = 0,
+    int EducationCapacity = 0,
+    int Upkeep = 2,
+    int ConstructionDays = 1,
+    int DaysRemaining = 0);
 
 public sealed record CreateGameRequest(string PlayerName);
 public sealed record JoinGameRequest(string InviteCode, string PlayerName);
@@ -257,7 +281,19 @@ public sealed record GovernmentMembershipView(
 public sealed record TerritoryView(
     Guid StateId, int Index, string Name, int Treasury, int TerritoryIncome, int CityIncome, int Upkeep,
     int MonthlyBalance, int Population, int Prosperity, int Infrastructure, Guid? OwnerPlayerId,
-    Guid CurrencyId = default);
+    Guid CurrencyId = default,
+    IReadOnlyDictionary<int, BuildingState>? Buildings = null,
+    long HousingCapacity = 0,
+    long FoodCapacity = 0,
+    long WaterCapacity = 0,
+    long JobCapacity = 0,
+    long WorkingAgePopulation = 0,
+    long AvailableJobs = 0,
+    long HealthCapacity = 0,
+    long EducationCapacity = 0,
+    int PopulationGrowthLastDay = 0,
+    int BuildingCount = 0,
+    int ConstructionCount = 0);
 public sealed record ClientMessage(
     string Type, string? Token, Guid? GameId, int? TerritoryIndex, int? PlotIndex,
     string? BuildingId, Guid? OrderId, long? ExpectedWorldVersion, Guid? StateId,
@@ -324,9 +360,21 @@ public static class GameCatalog
     public static readonly IReadOnlyDictionary<string, BuildingState> Buildings =
         new Dictionary<string, BuildingState>(StringComparer.Ordinal)
         {
-            ["farm"] = new("farm", "FARM", 120, 18, "♧", "Food production and rural employment."),
-            ["market"] = new("market", "MARKET", 220, 34, "⌂", "Local exchange and commercial activity."),
-            ["workshop"] = new("workshop", "WORKSHOP", 360, 52, "⚒", "Small-scale manufacturing."),
-            ["housing"] = new("housing", "HOUSING", 180, 8, "▦", "Raises the settlement population.")
+            ["farm"] = new("farm", "FARM", 120, 18, "F", "Adds food capacity for 5,000 residents and creates 1,200 agricultural jobs.",
+                JobSlots: 1200, FoodCapacity: 5000, Upkeep: 3, ConstructionDays: 2),
+            ["market"] = new("market", "MARKET", 220, 34, "M", "Provides local trade and commercial employment.",
+                JobSlots: 800, Upkeep: 3, ConstructionDays: 3),
+            ["workshop"] = new("workshop", "WORKSHOP", 360, 52, "W", "Creates industrial jobs and manufacturing capacity.",
+                JobSlots: 1800, Upkeep: 5, ConstructionDays: 4),
+            ["housing"] = new("housing", "HOUSING", 180, 8, "H", "Adds housing capacity for 1,000 residents.",
+                HousingCapacity: 1000, Upkeep: 2, ConstructionDays: 2),
+            ["waterworks"] = new("waterworks", "WATERWORKS", 300, 6, "U", "Expands the reliable water supply for 5,000 residents.",
+                JobSlots: 250, WaterCapacity: 5000, Upkeep: 5, ConstructionDays: 4),
+            ["clinic"] = new("clinic", "CLINIC", 420, 4, "C", "Provides healthcare capacity for 5,000 residents.",
+                JobSlots: 300, HealthCapacity: 5000, Upkeep: 7, ConstructionDays: 5),
+            ["school"] = new("school", "SCHOOL", 360, 5, "S", "Provides education capacity for 5,000 residents.",
+                JobSlots: 350, EducationCapacity: 5000, Upkeep: 6, ConstructionDays: 5),
+            ["road"] = new("road", "ROAD", 65, 0, "R", "Improves local access and connects developed plots.",
+                JobSlots: 40, Upkeep: 1, ConstructionDays: 1)
         };
 }

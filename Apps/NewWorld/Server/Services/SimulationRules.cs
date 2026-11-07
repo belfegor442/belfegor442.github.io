@@ -19,9 +19,10 @@ public static class SimulationRules
         var territoryIncome = game.Territories
             .Where(territory => territory.OwnerPlayerId is Guid ownerId && cityOwnerIds.Contains(ownerId))
             .Sum(territory => (int)Math.Round(territory.Population / 1500d * (territory.Prosperity / 100d)));
-        var cityIncome = cityOwners.Count * 85 + cityOwners.Sum(player =>
-            player.Buildings.Values.Sum(building => building.Income));
-        var upkeep = cityOwners.Sum(player => player.Buildings.Count * 2);
+        var completedBuildings = government.Buildings.Values
+            .Where(building => building.DaysRemaining == 0).ToArray();
+        var cityIncome = cityOwners.Count * 85 + completedBuildings.Sum(building => building.Income);
+        var upkeep = completedBuildings.Sum(building => building.Upkeep);
         return (territoryIncome, cityIncome, upkeep, territoryIncome + cityIncome - upkeep);
     }
 

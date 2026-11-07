@@ -56,6 +56,15 @@ public sealed class WorldClock(
                         game.Day++;
                         game.WorldDate = game.WorldDate.AddDays(1);
                         game.LastTickUtc = game.LastTickUtc.Add(WorldClockRules.DayLength);
+                        foreach (var settlementEvent in SettlementRules.AdvanceDaily(game))
+                        {
+                            GameStore.AddActivity(game, settlementEvent.Description);
+                            GameStore.AddWorldEvent(
+                                game, settlementEvent.EventType, null, settlementEvent.StateId, null,
+                                settlementEvent.Description,
+                                occurredAtUtc: game.LastTickUtc,
+                                worldVersion: game.WorldVersion + 1);
+                        }
                         foreach (var government in game.Territories)
                         {
                             var balance = SimulationRules.CalculateGovernmentBalance(game, government);

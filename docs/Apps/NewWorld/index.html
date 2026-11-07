@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261106-command-ui">
+  <link rel="stylesheet" href="./game.css?v=20261107-settlement-playable">
 </head>
 <body>
   <header class="topbar">
@@ -122,9 +122,21 @@
 
         <section id="city-view" class="view">
           <div class="section-bar"><div><p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p><h2 id="city-title">Capital district</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
-          <p class="muted city-intro">Select an empty plot and choose a building to develop the capital.</p>
-          <div id="city-grid" class="city-grid" aria-label="Capital construction plots"></div>
-          <div class="city-legend"><span>144 DEVELOPMENT PLOTS</span><span>SELECT TO BUILD</span></div>
+          <p class="muted city-intro">Develop a functioning settlement. Buildings need time to complete and add real housing, food, water, jobs and public services.</p>
+          <div class="settlement-overview" aria-label="Settlement operations">
+            <div class="settlement-metrics">
+              <div><small>RESIDENTS</small><strong id="settlement-residents">—</strong></div>
+              <div><small>OPEN CAPACITY</small><strong id="settlement-capacity">—</strong></div>
+              <div><small>DAILY GROWTH</small><strong id="settlement-growth">—</strong></div>
+              <div><small>AVAILABLE JOBS / WORKING AGE</small><strong id="settlement-employment">—</strong></div>
+              <div><small>COMPLETED BUILDINGS</small><strong id="settlement-buildings">—</strong></div>
+              <div><small>UNDER CONSTRUCTION</small><strong id="settlement-construction">—</strong></div>
+            </div>
+            <div id="settlement-services" class="settlement-services"></div>
+            <p id="settlement-status" class="settlement-status" role="status">Connect to a multiplayer world to simulate residents and services.</p>
+          </div>
+          <div id="city-grid" class="city-grid" aria-label="Local territory construction plots"></div>
+          <div class="city-legend"><span>12 × 12 LOCAL PLOTS</span><span>SELECT A PLOT TO BUILD</span></div>
           <div class="construction-panel">
             <h3 id="plot-title">Available plots</h3>
             <p class="muted" id="plot-description">Select an empty plot, then choose a building.</p>
@@ -299,7 +311,7 @@
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
   <script src="./simulation.js?v=20261106-economy-core"></script>
   <script src="./multiplayer.js?v=20261106-command-ui"></script>
-  <script src="./map-renderer.js?v=20261107-full-territory-overview"></script>
-  <script src="./game.js?v=20261107-full-territory-overview"></script>
+  <script src="./map-renderer.js?v=20261107-settlement-playable"></script>
+  <script src="./game.js?v=20261107-settlement-playable"></script>
 </body>
 </html>

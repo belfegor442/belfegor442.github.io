@@ -65,6 +65,104 @@ public sealed class WorldStateCompatibilityTests
     }
 
     [Fact]
+    public void NormalizeMigratesLegacyPlayerBuildingsIntoTheirGovernmentTerritory()
+    {
+        var gameId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var game = new WorldState
+        {
+            Id = gameId,
+            EconomyVersion = 3,
+            WorldDate = new DateOnly(1500, 1, 1),
+            Players =
+            [
+                new PlayerState
+                {
+                    Id = playerId,
+                    Name = "Builder",
+                    LegacyCountryIndex = 0,
+                    Buildings = { [0] = GameCatalog.Buildings["farm"] }
+                }
+            ],
+            Territories =
+            [
+                new TerritoryState { Index = 0, Name = "Coimbrila", Population = 10000 }
+            ]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        var migrated = Assert.Single(game.Territories[0].Buildings);
+        Assert.Equal(GameCatalog.NormalizeConstructionPlotIndex(0), migrated.Key);
+        Assert.Equal("farm", migrated.Value.Id);
+        Assert.Equal(0, migrated.Value.DaysRemaining);
+        Assert.Empty(game.Players[0].Buildings);
+        Assert.Equal(10000, game.Territories[0].BaseHousingCapacity);
+        Assert.Equal(10000, game.Territories[0].BaseFoodCapacity);
+        Assert.Equal(10000, game.Territories[0].BaseWaterCapacity);
+
+        WorldStateCompatibility.Normalize(game);
+        Assert.Single(game.Territories[0].Buildings);
+        Assert.Empty(game.Players[0].Buildings);
+    }
+
+    [Fact]
+    public void NormalizeConvertsLegacyTerritoryPlotKeysAndRestoresCanonicalBuildingEffects()
+    {
+        var game = new WorldState
+        {
+            EconomyVersion = 3,
+            Players = [],
+            Territories =
+            [
+                new TerritoryState
+                {
+                    Index = 0,
+                    Name = "Coimbrila",
+                    Population = 10000,
+                    Buildings =
+                    {
+                        [0] = GameCatalog.Buildings["housing"] with { Cost = 1, HousingCapacity = 1 }
+                    }
+                }
+            ]
+        };
+
+        WorldStateCompatibility.Normalize(game);
+
+        var building = Assert.Single(game.Territories[0].Buildings);
+        Assert.Equal(GameCatalog.NormalizeConstructionPlotIndex(0), building.Key);
+        Assert.Equal(180, building.Value.Cost);
+        Assert.Equal(1000, building.Value.HousingCapacity);
+    }
+
+    [Fact]
+    public void NormalizeRejectsLegacyAndCanonicalBuildingsOnTheSamePlot()
+    {
+        var game = new WorldState
+        {
+            EconomyVersion = 3,
+            Players = [],
+            Territories =
+            [
+                new TerritoryState
+                {
+                    Index = 0,
+                    Name = "Coimbrila",
+                    Population = 10000,
+                    Buildings =
+                    {
+                        [0] = GameCatalog.Buildings["housing"],
+                        [GameCatalog.NormalizeConstructionPlotIndex(0)] = GameCatalog.Buildings["farm"]
+                    }
+                }
+            ]
+        };
+
+        Assert.Throws<InvalidDataException>(() => WorldStateCompatibility.Normalize(game));
+    }
+
+    [Fact]
     public void NormalizeRejectsStateTreasuryWithoutFinancialHistory()
     {
         var stateId = Guid.NewGuid();
