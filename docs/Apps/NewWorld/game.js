@@ -1215,6 +1215,16 @@
     document.querySelector('.tab[data-view="territory"]')?.click();
   }
 
+  function enterCityMap(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= 16) return;
+    selectState(index, false);
+    hideMapTooltip();
+    zoom = 1;
+    pan = {x: 0, y: 0};
+    $('map-stage').style.transform = 'translate3d(0,0,0) scale(1)';
+    mapDetailRenderer?.setCamera(zoom, true);
+  }
+
   function highlightMap(selectedIndex) {
     const object = $('world-map');
     try {
@@ -1289,8 +1299,11 @@
     fallback.innerHTML = names.map((name, index) =>
       '<button class="fallback-state" data-state="' + index + '">' +
       String(index + 1).padStart(2, '0') + ' / ' + escapeHtml(name) + '</button>').join('');
-    fallback.querySelectorAll('[data-state]').forEach(button =>
-      button.addEventListener('click', () => selectState(Number(button.dataset.state))));
+    fallback.querySelectorAll('[data-state]').forEach(button => {
+      const index = Number(button.dataset.state);
+      button.addEventListener('click', () => selectState(index));
+      button.addEventListener('dblclick', () => enterCityMap(index));
+    });
   }
 
   function territoryAtPoint(svgDocument, event) {
@@ -1392,14 +1405,35 @@
       renderFallback();
       return;
     }
+    let pendingProvinceClick = null;
     svgDocument.addEventListener('click', event => {
       const province = provinceAtEvent(event);
       if (province) {
-        selectProvince(province);
+        clearTimeout(pendingProvinceClick);
+        pendingProvinceClick = setTimeout(() => {
+          pendingProvinceClick = null;
+          selectProvince(province);
+        }, 240);
         return;
       }
+      clearTimeout(pendingProvinceClick);
+      pendingProvinceClick = null;
       const path = territoryAtEvent(svgDocument, event);
       if (path) selectState(Number(path.id.slice(5)) - 1);
+    });
+    svgDocument.addEventListener('dblclick', event => {
+      const province = provinceAtEvent(event);
+      const territory = province
+        ? onlineGame?.territories.find(item => item.stateId === province.sovereignStateId)
+        : null;
+      const path = territoryAtEvent(svgDocument, event);
+      const index = territory?.index ?? (path ? Number(path.id.slice(5)) - 1 : null);
+      if (index !== null) {
+        clearTimeout(pendingProvinceClick);
+        pendingProvinceClick = null;
+        event.preventDefault();
+        enterCityMap(index);
+      }
     });
     svgDocument.addEventListener('pointerdown', event => {
       if (event.button === 0 && !event.shiftKey && territoryAtEvent(svgDocument, event)) return;
@@ -2015,10 +2049,10 @@
     const anchorY = Number.isFinite(clientY) ? clientY - rect.top : rect.height / 2;
     const nextZoom = Math.max(.65, Math.min(6, value));
 
-    if (mapDetailRenderer?.active && nextZoom >= 1.65) {
+    if (mapDetailRenderer?.active) {
       zoom = nextZoom;
       mapDetailRenderer.setZoomAt(zoom, anchorX, anchorY);
-      mapDetailRenderer.setCamera(zoom);
+      mapDetailRenderer.setCamera(zoom, true);
       return;
     }
 
@@ -2041,7 +2075,7 @@
     }
     $('map-stage').style.transform =
       'translate3d(' + pan.x + 'px,' + pan.y + 'px,0) scale(' + zoom + ')';
-    mapDetailRenderer?.setCamera(zoom, pan);
+    mapDetailRenderer?.setCamera(zoom);
   }
   viewport.addEventListener('pointerdown', event => {
     if (mapDetailRenderer?.active) return;

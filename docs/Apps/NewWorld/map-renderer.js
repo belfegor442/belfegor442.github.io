@@ -51,7 +51,7 @@
     }
 
     tileWidth() {
-      const scale = clamp(0.88 + (this.zoom - 1.65) * 0.15, 0.88, 1.53);
+      const scale = clamp(0.88 + (this.zoom - 1) * 0.15, 0.72, 1.53);
       return 54 * scale;
     }
 
@@ -331,9 +331,9 @@
       }
     }
 
-    setCamera(zoom) {
-      this.zoom = Number(zoom) || 1;
-      this.active = this.zoom >= 1.65;
+    setCamera(zoom, detailMode = null) {
+      this.zoom = clamp(Number(zoom) || 1, 0.65, 6);
+      this.active = detailMode === null ? this.zoom >= 1.65 : Boolean(detailMode);
       this.viewport?.classList.toggle('is-city-detail', this.active);
       if (this.active && !this.ready && !this.loading && !this.failed) this.loadAtlas();
 
@@ -353,7 +353,7 @@
       if (hint) {
         hint.textContent = this.active
           ? 'SELECT A DEVELOPMENT PLOT · DRAG TO EXPLORE · SCROLL TO ZOOM'
-          : 'CLICK A STATE TO INSPECT · DRAG TO PAN · SCROLL TO ZOOM';
+          : 'DOUBLE-CLICK A TERRITORY TO OPEN ITS MAP · DRAG TO PAN';
       }
       this.clampCamera();
       this.render();
@@ -361,7 +361,7 @@
 
     setZoomAt(zoom, x, y) {
       const oldWidth = this.tileWidth();
-      this.zoom = clamp(Number(zoom) || this.zoom, 1.65, 6);
+      this.zoom = clamp(Number(zoom) || this.zoom, 0.65, 6);
       const ratio = this.tileWidth() / oldWidth;
       const width = this.viewport?.clientWidth || 1;
       const height = this.viewport?.clientHeight || 1;
