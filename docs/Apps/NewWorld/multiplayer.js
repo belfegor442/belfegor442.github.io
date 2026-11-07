@@ -15,17 +15,26 @@
   const DAY_LENGTH_MS = 5 * 60 * 1000;
   const DAYS_PER_FINANCIAL_PERIOD = 30;
   const MAX_TREASURY = 2147483647;
-  const MAX_PLAYERS = 20;
+  const MAX_PLAYERS = 100;
+  const STARTING_TERRITORY_INDEX = 0;
+  const LEGACY_PLOT_OFFSET = 144;
+  const WORLD_MAP_SIZE = 1024;
+  const MAX_WORLD_PLOT_INDEX = LEGACY_PLOT_OFFSET + WORLD_MAP_SIZE * WORLD_MAP_SIZE;
   const BUILDINGS = {
-    farm: {id:'farm',name:'FARM',cost:120,income:18,icon:'♧',description:'Food production and rural employment.'},
-    market: {id:'market',name:'MARKET',cost:220,income:34,icon:'⌂',description:'Local exchange and commercial activity.'},
-    workshop: {id:'workshop',name:'WORKSHOP',cost:360,income:52,icon:'⚒',description:'Small-scale manufacturing.'},
-    housing: {id:'housing',name:'HOUSING',cost:180,income:8,icon:'▦',description:'Raises the settlement population.'}
+    farm: {id:'farm',name:'FARM',cost:120,income:18,icon:'F',days:2,foodCapacity:5000,jobSlots:1200,upkeep:3,description:'Adds food capacity and agricultural employment.'},
+    market: {id:'market',name:'MARKET',cost:220,income:34,icon:'M',days:3,jobSlots:800,upkeep:3,description:'Creates commercial jobs and local exchange.'},
+    workshop: {id:'workshop',name:'WORKSHOP',cost:360,income:52,icon:'W',days:4,jobSlots:1800,upkeep:5,description:'Creates industrial jobs.'},
+    housing: {id:'housing',name:'HOUSING',cost:180,income:8,icon:'H',days:2,housingCapacity:1000,upkeep:2,description:'Adds housing capacity for residents.'},
+    waterworks: {id:'waterworks',name:'WATERWORKS',cost:300,income:6,icon:'U',days:4,waterCapacity:5000,jobSlots:250,upkeep:5,description:'Provides clean water capacity.'},
+    clinic: {id:'clinic',name:'CLINIC',cost:420,income:4,icon:'C',days:5,healthCapacity:5000,jobSlots:300,upkeep:7,description:'Provides healthcare services.'},
+    school: {id:'school',name:'SCHOOL',cost:360,income:5,icon:'S',days:5,educationCapacity:5000,jobSlots:350,upkeep:6,description:'Provides education services.'},
+    road: {id:'road',name:'ROAD',cost:65,income:0,icon:'R',days:1,jobSlots:40,upkeep:1,description:'Improves local access and transport.'}
   };
   const NAMES = [
-    'Kingdom of Coimbrila','United Provinces of Gania','Chungia','Calcilacia',
-    'Pician Empire','Meityeun Theocracy','Swabing','Alba','Knosian Despotate',
-    'Kalestos','Gorkirch','Duchy of Shonewesia','Shahtehaq','Kvinian Empire','Shi','Kueopia'
+    "Founders' Reach",'North Coast','Eastern Coast','Upper March',
+    'Western Vale','Highland Basin','Orren Foothills','Eastern Uplands',
+    'Western Lowlands','Central Forest','Southern Plain','Eastern Marches',
+    'South Coast','Great Riverland','Southern Reach','Far Coast'
   ];
   const byId = value => crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -63,6 +72,7 @@
       this.client = null;
       this.closed = false;
       this.connected = false;
+      this.connectionGeneration = 0;
       this.brokerIndex = 0;
       this.rotateTimer = null;
       this.retryTimer = null;
@@ -134,6 +144,7 @@
     handleConnect(client) {
       if (client !== this.client || this.closed) return;
       this.connected = true;
+      this.connectionGeneration++;
       if (this.rotateTimer) clearTimeout(this.rotateTimer);
       if (this.retryTimer) clearTimeout(this.retryTimer);
       this.rotateTimer = null;
@@ -238,17 +249,25 @@
     const game = {
       id:gameId,name:'New World',hostPlayerId:playerId,started:false,paused:false,status:'lobby',
       day:1,worldDate:'1500-01-01',worldVersion:1,eventSequence:0,
-      scenarioId:'beleland',scenarioVersion:'1.0',maxHumanPlayers:MAX_PLAYERS,
+      scenarioId:'beleland-frontier',scenarioVersion:'2.0',maxHumanPlayers:MAX_PLAYERS,
+      startingTerritoryIndex:STARTING_TERRITORY_INDEX,
       pauseVotePlayerIds:[],players:[{
         id:playerId,name,isHost:true,countryIndex:null,treasury:1200,dailyBalanceRemainder:0,
         buildings:{},connected:true,token:hostToken
       }],
       territories:NAMES.map((territoryName,index) => ({
         stateId:byId(),currencyId:byId(),index,name:territoryName,treasury:0,dailyBalanceRemainder:0,
-        population:Math.max(1,Math.min(2000000,26000+((index*7919+1337)%56000))),
-        prosperity:42+(index*13%48),infrastructure:1+index%4,ownerPlayerId:null
+        population:index === STARTING_TERRITORY_INDEX ? 850 : 0,
+        prosperity:index === STARTING_TERRITORY_INDEX ? 28 : 0,
+        infrastructure:index === STARTING_TERRITORY_INDEX ? 1 : 0,
+        ownerPlayerId:null,buildings:{},
+        baseHousingCapacity:index === STARTING_TERRITORY_INDEX ? 1200 : 0,
+        baseFoodCapacity:index === STARTING_TERRITORY_INDEX ? 1200 : 0,
+        baseWaterCapacity:index === STARTING_TERRITORY_INDEX ? 1200 : 0,
+        baseJobCapacity:index === STARTING_TERRITORY_INDEX ? 200 : 0,
+        populationGrowthLastDay:0
       })),
-      activity:[name + ' created a private world.'],
+      activity:[name + ' founded the first settlement. The surrounding regions are unclaimed.'],
       ...emptyCollections()
     };
     game.currencies = game.territories.map(territory => ({
@@ -259,12 +278,13 @@
       government:null,institutions:[],offices:[],parties:[],laws:[],decisions:[],stability:null
     }));
     if (!window.NewWorldSimulation) throw new Error('The New World simulation engine failed to load.');
-    Object.assign(game, window.NewWorldSimulation.createStarterEconomy(game.territories, byId));
-    const hostAssignment = assignLobbyPlayer(game, game.players[0], 0);
+    Object.assign(game, window.NewWorldSimulation.createStarterEconomy(
+      [game.territories[STARTING_TERRITORY_INDEX]],byId));
+    const hostAssignment = assignLobbyPlayer(game, game.players[0], STARTING_TERRITORY_INDEX);
     if (!hostAssignment.ok)
       throw new Error('The host could not be assigned to the starting State: ' + hostAssignment.error);
     pushEvent(game,'world.created',playerId,null,
-      'A private multiplayer world was created. ' + name + ' starts as the government of ' +
+      'A new frontier was founded. ' + name + ' leads the first settlement at ' +
       game.territories[0].name + '.');
     return {
       game,
@@ -277,14 +297,9 @@
       return {ok:false,error:'The player cannot be assigned in this lobby.'};
     let countryIndex = requestedIndex;
     if (countryIndex === null) {
-      const counts = game.territories.map(territory => ({
-        territory,
-        members:game.memberships.filter(membership =>
-          membership.stateId === territory.stateId && membership.status === 'active').length
-      }));
-      const available = counts.find(item => item.members === 0);
-      const target = available || counts.sort((a,b) => a.members - b.members || a.territory.index - b.territory.index)[0];
-      countryIndex = target?.territory.index ?? null;
+      countryIndex = Number.isInteger(game.startingTerritoryIndex)
+        ? game.startingTerritoryIndex
+        : STARTING_TERRITORY_INDEX;
     }
     if (countryIndex === null || !Number.isInteger(countryIndex) || !game.territories[countryIndex])
       return {ok:false,error:'No valid State is available for this player.'};
@@ -312,19 +327,69 @@
   }
 
   function finance(game, territory) {
-    const members = game.memberships.filter(item =>
-      item.stateId === territory.stateId && item.status === 'active')
-      .map(item => game.players.find(player => player.id === item.playerId)).filter(Boolean);
-    const cityOwners = members.filter(player => player.countryIndex === territory.index);
-    const cityOwnerIds = new Set(cityOwners.map(player => player.id));
-    const territoryIncome = game.territories
-      .filter(item => item.ownerPlayerId && cityOwnerIds.has(item.ownerPlayerId))
-      .reduce((total,item) => total + Math.round(item.population / 1500 * (item.prosperity / 100)),0);
-    const cityIncome = cityOwners.length * 85 + cityOwners.reduce((total,player) =>
-      total + Object.values(player.buildings || {}).reduce((sum,building) => sum + (building.income || 0),0),0);
-    const upkeep = cityOwners.reduce((total,player) =>
-      total + Object.keys(player.buildings || {}).length * 2,0);
-    return {territoryIncome,cityIncome,upkeep,monthlyBalance:territoryIncome+cityIncome-upkeep};
+    const buildings = territory.buildings || {};
+    const allBuildings = Object.values(buildings);
+    const completed = allBuildings.filter(building => Number(building.daysRemaining || 0) <= 0);
+    const sumEffect = key => completed.reduce((sum,building) => sum + Number(building[key] || 0),0);
+    const controlled = Boolean(territory.ownerPlayerId);
+    const territoryIncome = controlled
+      ? Math.round(territory.population / 1500 * (territory.prosperity / 100))
+      : 0;
+    const cityIncome = controlled ? 85 + completed.reduce((sum,building) =>
+      sum + Number(building.income || 0),0) : 0;
+    const upkeep = completed.reduce((sum,building) => sum + Number(building.upkeep || 0),0);
+    const metrics = window.NewWorldSimulation?.getSettlementMetrics
+      ? window.NewWorldSimulation.getSettlementMetrics(territory)
+      : {};
+    return {
+      territoryIncome,cityIncome,upkeep,monthlyBalance:territoryIncome+cityIncome-upkeep,
+      buildings:clone(buildings),buildingCount:allBuildings.length,
+      constructionCount:allBuildings.filter(building => Number(building.daysRemaining || 0) > 0).length,
+      housingCapacity:Number(metrics.housingCapacity ?? (Number(territory.baseHousingCapacity || 0)+sumEffect('housingCapacity'))),
+      foodCapacity:Number(metrics.foodCapacity ?? (Number(territory.baseFoodCapacity || 0)+sumEffect('foodCapacity'))),
+      waterCapacity:Number(metrics.waterCapacity ?? (Number(territory.baseWaterCapacity || 0)+sumEffect('waterCapacity'))),
+      healthCapacity:Number(metrics.healthCapacity ?? sumEffect('healthCapacity')),
+      educationCapacity:Number(metrics.educationCapacity ?? sumEffect('educationCapacity')),
+      jobCapacity:Number(metrics.jobCapacity ?? (Number(territory.baseJobCapacity || 0)+sumEffect('jobSlots'))),
+      availableJobs:Number(metrics.availableJobs ?? territory.availableJobs ?? 0),
+      workingAgePopulation:Number(metrics.workingAgePopulation ?? territory.workingAgePopulation ?? 0),
+      populationGrowthLastDay:Number(territory.populationGrowthLastDay || 0)
+    };
+  }
+
+  function playerRecord(game,player) {
+    return {
+      id:player.id,name:player.name,isHost:!!player.isHost,countryIndex:player.countryIndex,
+      treasury:player.treasury,buildings:clone(player.buildings || {}),connected:!!player.connected,
+      memberships:game.memberships.filter(item =>
+        item.playerId === player.id && item.status === 'active').map(item => ({
+          id:item.id,playerId:item.playerId,stateId:item.stateId,
+          stateIndex:game.territories.find(territory => territory.stateId === item.stateId)?.index ?? -1,
+          status:item.status,permissionSetId:item.permissionSetId
+        }))
+    };
+  }
+
+  function publishLobbyCount() {
+    if (!runtime || runtime.role !== 'host') return;
+    runtime.link.publish(runtime.topics.server,{
+      t:'lobbyCount',
+      totalPlayers:runtime.game.players.length,
+      connectedPlayers:runtime.game.players.filter(player => player.connected).length,
+      capacity:MAX_PLAYERS
+    },{qos:0});
+  }
+
+  function notifyPlayerJoined(player) {
+    if (!runtime || runtime.role !== 'host') return;
+    runtime.onPlayerJoined?.(playerRecord(runtime.game,player));
+    publishLobbyCount();
+  }
+
+  function notifyPlayerPresence(player) {
+    if (!runtime || runtime.role !== 'host') return;
+    runtime.onPlayerPresence?.(player.id,!!player.connected);
+    publishLobbyCount();
   }
 
   function snapshot(game) {
@@ -335,15 +400,7 @@
       if (!membershipByPlayer.has(membership.playerId)) membershipByPlayer.set(membership.playerId,[]);
       membershipByPlayer.get(membership.playerId).push(membership);
     }
-    const players = game.players.map(player => ({
-      id:player.id,name:player.name,isHost:!!player.isHost,countryIndex:player.countryIndex,
-      treasury:player.treasury,buildings:clone(player.buildings || {}),connected:!!player.connected,
-      memberships:(membershipByPlayer.get(player.id) || []).map(item => ({
-        id:item.id,playerId:item.playerId,stateId:item.stateId,
-        stateIndex:game.territories.find(territory => territory.stateId === item.stateId)?.index ?? -1,
-        status:item.status,permissionSetId:item.permissionSetId
-      }))
-    }));
+    const players = game.players.map(player => playerRecord(game,player));
     const territories = game.territories.map(territory => ({
       stateId:territory.stateId,index:territory.index,name:territory.name,treasury:territory.treasury,
       ...finance(game,territory),population:territory.population,prosperity:territory.prosperity,
@@ -406,6 +463,8 @@
 
   function emitOrderResult(playerId,result) {
     if (!runtime || runtime.role !== 'host') return;
+    if (playerId === runtime.session.playerId)
+      runtime.onOrderResult(result);
     runtime.link.publish(runtime.topics.server,{t:'orderResult',to:playerId,order:result},{qos:1});
   }
 
@@ -482,30 +541,83 @@
       const government = game.territories.find(item => item.stateId === membership.stateId);
       if (!government || government.treasury < 450)
         return reject('INSUFFICIENT_FUNDS','Insufficient treasury (¤450 required).',order.orderId);
+      const sourceTreasuryBefore = government.treasury;
       government.treasury -= 450;
       territory.ownerPlayerId = player.id;
       territory.infrastructure++;
+      territory.buildings ||= {};
+      if (window.NewWorldSimulation?.createStarterEconomy) {
+        const localEconomy = window.NewWorldSimulation.createStarterEconomy([territory],byId);
+        game.companies ||= [];
+        game.markets ||= [];
+        game.populationGroups ||= [];
+        if (!game.companies.some(item => item.stateId === territory.stateId))
+          game.companies.push(...localEconomy.companies);
+        if (!game.markets.some(item => item.stateId === territory.stateId))
+          game.markets.push(...localEconomy.markets);
+        if (!game.populationGroups.some(item => item.stateId === territory.stateId))
+          game.populationGroups.push(...localEconomy.populationGroups);
+      }
+      const foundingMembers = game.memberships.filter(item =>
+        item.stateId === membership.stateId && item.status === 'active');
+      const settlementGrant = Math.min(600,government.treasury);
+      government.treasury -= settlementGrant;
+      territory.treasury += settlementGrant;
+      for (const member of foundingMembers) {
+        if (game.memberships.some(item => item.playerId === member.playerId &&
+            item.stateId === territory.stateId && item.status === 'active')) continue;
+        game.memberships.push({
+          id:byId(),gameId:game.id,playerId:member.playerId,stateId:territory.stateId,
+          status:'active',permissionSetId:member.permissionSetId || 'government-member',
+          joinedAtWorldDate:game.worldDate
+        });
+      }
       game.financialTransactions.push({
         id:byId(),stateId:government.stateId,currencyId:government.currencyId,
-        type:'administrationCost',amount:-450,balanceBefore:government.treasury+450,
-        balanceAfter:government.treasury,description:'Administration established in ' + territory.name + '.',
+        type:'administrationCost',amount:-450,balanceBefore:sourceTreasuryBefore,
+        balanceAfter:sourceTreasuryBefore-450,description:'Frontier region claimed: ' + territory.name + '.',
         worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
         membershipId:membership.id
       });
-      pushActivity(game,player.name + ' established an administration in ' + territory.name + '.');
+      if (settlementGrant > 0) {
+        game.financialTransactions.push({
+          id:byId(),stateId:government.stateId,currencyId:government.currencyId,
+          type:'frontierSettlementGrantOut',amount:-settlementGrant,
+          balanceBefore:sourceTreasuryBefore-450,balanceAfter:government.treasury,
+          description:'Development reserve transferred to ' + territory.name + '.',
+          worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
+          membershipId:membership.id
+        });
+        game.financialTransactions.push({
+          id:byId(),stateId:territory.stateId,currencyId:territory.currencyId,
+          type:'frontierSettlementGrant',amount:settlementGrant,balanceBefore:0,
+          balanceAfter:territory.treasury,
+          description:'Initial development reserve received by the new frontier settlement.',
+          worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
+          membershipId:null
+        });
+      }
+      pushActivity(game,player.name + ' secured and annexed ' + territory.name + '.');
     } else if (orderType === 'build') {
       if (!canPermission(membership.permissionSetId,'build'))
         return reject('INSUFFICIENT_PERMISSION','Your government permissions do not allow construction.',order.orderId);
       const plot = Number(order.plotIndex);
       const building = BUILDINGS[order.buildingId];
-      if (!Number.isInteger(plot) || plot < 0 || plot >= 144 || !building)
+      const validPlot = Number.isSafeInteger(plot) && plot >= 0 &&
+        (plot < LEGACY_PLOT_OFFSET || plot < MAX_WORLD_PLOT_INDEX);
+      if (!validPlot || !building)
         return reject('INVALID_PAYLOAD','Invalid construction request.',order.orderId);
-      if (player.buildings[plot]) return reject('TARGET_UNAVAILABLE','This plot is already developed.',order.orderId);
       const government = game.territories.find(item => item.stateId === membership.stateId);
-      if (!government || government.treasury < building.cost)
+      if (!government) return reject('NOT_MEMBER','The selected territory has no active administration.',order.orderId);
+      government.buildings ||= {};
+      if (government.buildings[plot]) return reject('TARGET_UNAVAILABLE','This plot is already developed.',order.orderId);
+      if (government.treasury < building.cost)
         return reject('INSUFFICIENT_FUNDS','Insufficient treasury.',order.orderId);
       government.treasury -= building.cost;
-      player.buildings[plot] = clone(building);
+      government.buildings[plot] = {
+        ...clone(building),daysRemaining:building.days,startedOn:game.worldDate,
+        builderPlayerId:player.id
+      };
       game.financialTransactions.push({
         id:byId(),stateId:government.stateId,currencyId:government.currencyId,
         type:'constructionCost',amount:-building.cost,balanceBefore:government.treasury+building.cost,
@@ -513,7 +625,8 @@
         worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
         membershipId:membership.id
       });
-      pushActivity(game,player.name + ' constructed a ' + building.name.toLowerCase() + '.');
+      pushActivity(game,player.name + ' started construction of a ' + building.name.toLowerCase() +
+        ' in ' + government.name + '.');
     } else {
       return reject('UNSUPPORTED_ORDER','This order is not yet available in the host-authoritative ruleset.',order.orderId);
     }
@@ -589,24 +702,28 @@
       const playerId = match && match[1];
       if (!playerId || playerId === runtime.session.playerId) return;
       const player = runtime.game.players.find(item => item.id === playerId);
-      if (player) {
+      if (player && player.connected !== (message.online === true)) {
         player.connected = message.online === true;
-        if (!player.connected) {
+        if (!player.connected)
           runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== playerId);
-        }
-        persistHost();
-        publishSnapshot();
+        notifyPlayerPresence(player);
       }
       return;
     }
     if (topic !== runtime.topics.clients) return;
     if (message.t === 'hello') {
-      const pendingTopic = runtime.topics.pending(String(message.clientNonce || ''));
+      const clientNonce = String(message.clientNonce || '');
+      const pendingTopic = runtime.topics.pending(clientNonce);
       let player = null;
+      let isNewPlayer = false;
       if (message.playerId && message.playerToken) {
         player = runtime.game.players.find(item =>
           item.id === message.playerId && item.token === message.playerToken);
         if (player) player.connected = true;
+      }
+      if (!player && clientNonce) {
+        const pendingPlayerId = runtime.pendingJoins.get(clientNonce);
+        player = runtime.game.players.find(item => item.id === pendingPlayerId) || null;
       }
       if (!player) {
         const name = String(message.name || '').trim().replace(/\s+/g,' ').slice(0,24);
@@ -627,10 +744,11 @@
           return;
         }
         player = {
-          id:byId(),name,isHost:false,countryIndex:null,treasury:1200,dailyBalanceRemainder:0,
+          id:byId(),name,isHost:false,countryIndex:null,treasury:0,dailyBalanceRemainder:0,
           buildings:{},connected:true,token:token()
         };
         runtime.game.players.push(player);
+        isNewPlayer = true;
         runtime.game.worldVersion++;
         pushActivity(runtime.game,name + ' joined the world.');
         pushEvent(runtime.game,'player.joined',player.id,null,name + ' joined the world.');
@@ -640,6 +758,7 @@
           runtime.link.publish(pendingTopic,{t:'error',error:assignment.error});
           return;
         }
+        if (clientNonce) runtime.pendingJoins.set(clientNonce,player.id);
       }
       const session = {
         gameId:runtime.game.id,playerId:player.id,playerToken:player.token,
@@ -647,7 +766,7 @@
       };
       runtime.link.publish(pendingTopic,{t:'welcome',session,game:snapshot(runtime.game)},{qos:1});
       persistHost();
-      publishSnapshot();
+      if (isNewPlayer) notifyPlayerJoined(player);
       return;
     }
     if (message.t === 'order') {
@@ -667,10 +786,12 @@
       const leaving = runtime.game.players.find(item =>
         item.id === message.playerId && item.token === message.playerToken);
       if (leaving) {
-        leaving.connected = false;
-        runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== leaving.id);
-        persistHost();
-        publishSnapshot();
+        if (leaving.connected) {
+          leaving.connected = false;
+          runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== leaving.id);
+          notifyPlayerPresence(leaving);
+          persistHost();
+        }
       }
       return;
     }
@@ -810,6 +931,15 @@
     if (topic === runtime.topics.server) {
       if (message.to && message.to !== runtime.playerId) return;
       if (message.t === 'snapshot' && message.game) runtime.onSnapshot(message.game);
+      if (message.t === 'playerJoined' && message.player) runtime.onPlayerJoined?.(message.player);
+      if (message.t === 'playerPresence')
+        runtime.onPlayerPresence?.(message.playerId,message.online === true);
+      if (message.t === 'lobbyCount')
+        runtime.onPlayerCount?.({
+          totalPlayers:Number(message.totalPlayers) || 0,
+          connectedPlayers:Number(message.connectedPlayers) || 0,
+          capacity:Number(message.capacity) || MAX_PLAYERS
+        });
       if (message.t === 'orderResult' && message.to === runtime.playerId)
         runtime.onOrderResult(message.order);
       if (message.t === 'adminResult' && message.requestId)
@@ -824,21 +954,27 @@
 
   function sendHello() {
     if (!runtime || runtime.role !== 'guest' || !runtime.link.connected) return;
-    runtime.link.publish(runtime.topics.clients,{
+    const generation = runtime.link.connectionGeneration;
+    if (runtime.lastHelloGeneration === generation) return;
+    const sent = runtime.link.publish(runtime.topics.clients,{
       t:'hello',clientNonce:runtime.link.clientNonce,name:runtime.name,
       playerId:runtime.session?.playerId || null,
       playerToken:runtime.session?.playerToken || null
     },{qos:1});
+    if (sent) runtime.lastHelloGeneration = generation;
   }
 
   function setHostRuntime(game,session,handlers) {
     runtime = {
       role:'host',game,session,room:session.inviteCode || session.roomCode,
-      topics:topicSet(session.inviteCode || session.roomCode),
+      topics:topicSet(session.inviteCode || session.roomCode),pendingJoins:new Map(),
       onSnapshot:handlers.onSnapshot || (()=>{}),
       onStatus:handlers.onStatus || (()=>{}),
       onOrderResult:handlers.onOrderResult || (()=>{}),
-      onSession:handlers.onSession || (()=>{})
+      onSession:handlers.onSession || (()=>{}),
+      onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
+      onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
+      onPlayerCount:handlers.onPlayerCount || (()=>{})
     };
     runtime.session.inviteCode = runtime.room;
     runtime.session.roomCode = runtime.room;
@@ -918,11 +1054,14 @@
       return Promise.reject(new Error('Player name must be 2–24 characters.'));
     const active = {
       role:'guest',room,topics:topicSet(room),name:normalized,session:existingSession,
-      playerId:existingSession?.playerId || null,hostOnline:false,
+      playerId:existingSession?.playerId || null,hostOnline:false,lastHelloGeneration:-1,
       onSnapshot:handlers.onSnapshot || (()=>{}),
       onStatus:handlers.onStatus || (()=>{}),
       onOrderResult:handlers.onOrderResult || (()=>{}),
       onSession:handlers.onSession || (()=>{}),
+      onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
+      onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
+      onPlayerCount:handlers.onPlayerCount || (()=>{}),
       resolveJoin:null,rejectJoin:null,adminRequests:new Map()
     };
     runtime = active;
@@ -1085,7 +1224,9 @@
       assignLobbyPlayer,
       canStartWorld,
       applyAdmin,
-      snapshot
+      applyOrder,
+      snapshot,
+      maxPlayers:MAX_PLAYERS
     });
   }
 })();

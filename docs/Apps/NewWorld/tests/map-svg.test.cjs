@@ -21,6 +21,13 @@ test('Beleland atlas retains all sixteen selectable State identities', () => {
   assert.equal(states.length, 16);
   assert.deepEqual(states.map(state => state.index), Array.from({ length: 16 }, (_, i) => i + 1));
   assert.equal(new Set(states.map(state => state.name)).size, 16);
+  assert.deepEqual(states.map(state => state.name),[
+    "FOUNDERS' REACH",'NORTH COAST','EASTERN COAST','UPPER MARCH',
+    'WESTERN VALE','HIGHLAND BASIN','ORREN FOOTHILLS','EASTERN UPLANDS',
+    'WESTERN LOWLANDS','CENTRAL FOREST','SOUTHERN PLAIN','EASTERN MARCHES',
+    'SOUTH COAST','GREAT RIVERLAND','SOUTHERN REACH','FAR COAST'
+  ]);
+  assert.equal(/Kingdom of |Empire|Theocracy|Despotate|Duchy of /i.test(svg),false);
   for (const state of states) {
     assert.ok(state.path.startsWith('M '), state.name + ' has no valid move command');
     assert.ok(state.path.endsWith('Z'), state.name + ' is not a closed polygon');
@@ -46,5 +53,7 @@ test('physical atlas includes independent coastal, hydrological, relief and vege
   }
   assert.ok((svg.match(/class="mountain"/g) || []).length >= 20);
   assert.ok((svg.match(/class="tree"/g) || []).length >= 100);
-  assert.ok((svg.match(/class="settlement(?: cap| city| capital)/g) || []).length >= 16);
+  const settlements = svg.match(/<g class="settlement (?:capital|city)"[\s\S]*?<\/g>/g) || [];
+  assert.equal(settlements.length,1,'only the single founding hamlet may exist at world creation');
+  assert.ok(settlements[0].includes("Founders' Reach"));
 });

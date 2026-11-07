@@ -52,21 +52,19 @@
   }
 
   function calculateGovernmentFinance(game, territory) {
-    const members = (game.memberships || [])
-      .filter(item => item.stateId === territory.stateId && item.status === 'active')
-      .map(item => game.players.find(player => player.id === item.playerId))
-      .filter(Boolean);
-    const cityOwners = members.filter(player => player.countryIndex === territory.index);
-    const ownerIds = new Set(cityOwners.map(player => player.id));
-    const territorialIncome = game.territories
-      .filter(item => item.ownerPlayerId && ownerIds.has(item.ownerPlayerId))
-      .reduce((sum, item) => sum + Math.round(item.population / 1500 * (item.prosperity / 100)), 0);
-    const cityIncome = cityOwners.length * 85 + cityOwners.reduce((sum, player) =>
-      sum + Object.values(player.buildings || {}).reduce((total, building) =>
-        total + Number(building.income || 0), 0), 0);
-    const upkeep = cityOwners.reduce((sum, player) =>
-      sum + Object.keys(player.buildings || {}).length * 2, 0);
-    return {territorialIncome, cityIncome, upkeep, monthlyBalance:territorialIncome + cityIncome - upkeep};
+    const buildings = Object.values(territory.buildings || {});
+    const completed = buildings.filter(building => Number(building.daysRemaining || 0) <= 0);
+    const controlled = Boolean(territory.ownerPlayerId);
+    const territorialIncome = controlled
+      ? Math.round(Number(territory.population || 0) / 1500 *
+        (Number(territory.prosperity || 0) / 100))
+      : 0;
+    const cityIncome = controlled ? 85 + completed.reduce((sum,building) =>
+      sum + Number(building.income || 0),0) : 0;
+    const upkeep = completed.reduce((sum,building) =>
+      sum + Number(building.upkeep || 0),0);
+    return {territorialIncome,cityIncome,upkeep,
+      monthlyBalance:territorialIncome + cityIncome - upkeep};
   }
 
   function accrueGovernmentBalances(game) {
@@ -451,6 +449,69 @@
       game.marketHistory.splice(0, game.marketHistory.length - 1000);
   }
 
+  function getSettlementMetrics(territory) {
+    const buildings = Object.values(territory?.buildings || {});
+    const completed = buildings.filter(building => Number(building.daysRemaining || 0) <= 0);
+    const sum = key => completed.reduce((total,building) =>
+      total + Math.max(0,Number(building[key]) || 0),0);
+    const population = Math.max(0,Number(territory?.population) || 0);
+    return {
+      housingCapacity:Math.max(0,Number(territory?.baseHousingCapacity) || 0)+sum('housingCapacity'),
+      foodCapacity:Math.max(0,Number(territory?.baseFoodCapacity) || 0)+sum('foodCapacity'),
+      waterCapacity:Math.max(0,Number(territory?.baseWaterCapacity) || 0)+sum('waterCapacity'),
+      healthCapacity:sum('healthCapacity'),
+      educationCapacity:sum('educationCapacity'),
+      jobCapacity:Math.max(0,Number(territory?.baseJobCapacity) || 0)+sum('jobSlots'),
+      workingAgePopulation:Math.floor(population * 0.55),
+      availableJobs:Math.max(0,Math.max(0,Number(territory?.baseJobCapacity) || 0)+sum('jobSlots'))
+    };
+  }
+
+  function advanceConstruction(game) {
+    for (const territory of game.territories || []) {
+      for (const [plot,building] of Object.entries(territory.buildings || {})) {
+        const remaining = Number(building.daysRemaining || 0);
+        if (!Number.isSafeInteger(remaining) || remaining < 0)
+          throw new Error('Building at plot ' + plot + ' has an invalid construction duration.');
+        if (remaining === 0) continue;
+        building.daysRemaining = remaining - 1;
+        if (building.daysRemaining === 0) {
+          const description = building.name + ' construction completed in ' + territory.name + '.';
+          pushActivity(game,description);
+          pushEvent(game,'construction.completed',territory.stateId,description);
+        }
+      }
+    }
+  }
+
+  function updateSettlementPopulation(game) {
+    for (const territory of game.territories || []) {
+      const metrics = getSettlementMetrics(territory);
+      Object.assign(territory,metrics);
+      if (!territory.ownerPlayerId) {
+        territory.populationGrowthLastDay = 0;
+        continue;
+      }
+      const capacity = Math.min(metrics.housingCapacity,metrics.foodCapacity,metrics.waterCapacity);
+      const residents = Math.max(0,Number(territory.population) || 0);
+      const room = Math.max(0,capacity-residents);
+      const growth = room > 0 ? Math.min(room,Math.max(1,Math.floor(residents*0.0015))) : 0;
+      territory.population = residents + growth;
+      territory.populationGrowthLastDay = growth;
+      if (growth > 0) {
+        for (const group of game.populationGroups || []) {
+          if (group.stateId === territory.stateId)
+            group.population = Math.max(0,Number(group.population) || 0) + growth;
+        }
+      }
+      if (growth > 0 && growth >= Math.max(10,Math.floor(residents*0.001))) {
+        const description = territory.name + ' population increased by ' + growth.toLocaleString('en-US') + '.';
+        pushActivity(game,description);
+        pushEvent(game,'population.growth',territory.stateId,description);
+      }
+    }
+  }
+
   function advanceDay(game) {
     if (!game || !Array.isArray(game.territories) || !Array.isArray(game.players))
       return {ok:false, error:'The host world snapshot is invalid.'};
@@ -465,7 +526,9 @@
       draft.day++;
       draft.worldDate = date.toISOString().slice(0, 10);
 
-      // The simulation order is deterministic: public finance, production, then markets.
+      // Finish work orders first, then update residents and public finance.
+      advanceConstruction(draft);
+      updateSettlementPopulation(draft);
       accrueGovernmentBalances(draft);
       const production = advanceProduction(draft);
       for (const result of production) {
@@ -559,7 +622,7 @@
     };
   }
 
-  const api = Object.freeze({advanceDay, createStarterEconomy});
+  const api = Object.freeze({advanceDay, createStarterEconomy, getSettlementMetrics});
   globalThis.NewWorldSimulation = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
