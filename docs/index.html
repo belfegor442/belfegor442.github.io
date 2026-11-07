@@ -331,8 +331,8 @@ footer a:hover{color:var(--ink)}
     ticker.style.animation = "none";
     ticker.style.left = "100%";
     ticker.style.transform = "translateY(-50%)";
-    ticker.style.setProperty("--news-distance", window.innerWidth + "px");
-    const travelPixels = newsWindow.clientWidth + ticker.scrollWidth + window.innerWidth;
+    ticker.style.setProperty("--news-distance", newsWindow.clientWidth + "px");
+    const travelPixels = newsWindow.clientWidth + ticker.scrollWidth;
     const duration = Math.max(14, Math.min(42, travelPixels / 92));
     ticker.style.setProperty("--news-duration", duration.toFixed(2) + "s");
     void ticker.offsetWidth;
