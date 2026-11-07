@@ -106,6 +106,7 @@
   let recoveryOrdersNeedCleanup = false;
   let selectedPlot = null;
   let zoom = 1;
+  let mapDetailRenderer = null;
   let pan = {x: 0, y: 0};
   let drag = null;
   let hoveredState = null;
@@ -1105,6 +1106,7 @@
   function selectState(index, notify = true) {
     if (index < 0 || index >= 16) return;
     state.selected = index;
+    mapDetailRenderer?.setRegion(index, state.states[index]?.name);
     const territory = state.states[index];
     const territoryView = onlineGame?.territories[index];
     if (selectedProvinceId &&
@@ -1312,6 +1314,14 @@
   const map = $('world-map');
   const viewport = $('map-viewport');
   const mapTooltip = $('map-tooltip');
+  mapDetailRenderer = typeof window.NewWorldMapRenderer === 'function'
+    ? new window.NewWorldMapRenderer({
+      canvas: $('map-detail-canvas'),
+      viewport,
+      manifestUrl: './assets/sprite-manifest.json'
+    })
+    : null;
+  mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
 
   function hideMapTooltip() {
     mapTooltip.hidden = true;
@@ -1397,7 +1407,7 @@
     svgDocument.addEventListener('pointercancel', () => { drag = null; });
     svgDocument.addEventListener('wheel', event => {
       event.preventDefault();
-      setZoom(zoom * (event.deltaY < 0 ? 1.08 : .92));
+      setZoom(zoom * Math.exp(-event.deltaY * 0.00115), event.clientX, event.clientY);
     }, {passive: false});
     highlightMap(state.selected);
   });
@@ -1941,19 +1951,39 @@
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
     $(button.dataset.view + '-view').classList.add('active');
   }));
-  $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.15));
-  $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.15));
+  $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.2));
+  $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.2));
   $('reset-map').addEventListener('click', () => {
     zoom = 1;
     pan = {x: 0, y: 0};
     applyMapTransform();
   });
-  function setZoom(value) {
-    zoom = Math.max(.65, Math.min(3, value));
+
+  function setZoom(value, clientX, clientY) {
+    const rect = viewport.getBoundingClientRect();
+    const anchorX = Number.isFinite(clientX) ? clientX - rect.left : rect.width / 2;
+    const anchorY = Number.isFinite(clientY) ? clientY - rect.top : rect.height / 2;
+    const nextZoom = Math.max(.65, Math.min(6, value));
+    const localX = (anchorX - pan.x) / zoom;
+    const localY = (anchorY - pan.y) / zoom;
+    pan = { x: anchorX - localX * nextZoom, y: anchorY - localY * nextZoom };
+    zoom = nextZoom;
     applyMapTransform();
   }
+
   function applyMapTransform() {
-    $('map-stage').style.transform = 'translate(' + pan.x + 'px,' + pan.y + 'px) scale(' + zoom + ')';
+    const width = viewport.clientWidth;
+    const height = viewport.clientHeight;
+    if (zoom < 1) {
+      pan.x = width * (1 - zoom) / 2;
+      pan.y = height * (1 - zoom) / 2;
+    } else {
+      pan.x = Math.max(width * (1 - zoom), Math.min(0, pan.x));
+      pan.y = Math.max(height * (1 - zoom), Math.min(0, pan.y));
+    }
+    $('map-stage').style.transform =
+      'translate3d(' + pan.x + 'px,' + pan.y + 'px,0) scale(' + zoom + ')';
+    mapDetailRenderer?.setCamera(zoom, pan);
   }
   viewport.addEventListener('pointerdown', event => {
     if (event.target.closest('object') && event.target !== viewport) return;
@@ -1968,7 +1998,7 @@
   viewport.addEventListener('pointerup', () => { drag = null; });
   viewport.addEventListener('wheel', event => {
     event.preventDefault();
-    setZoom(zoom * (event.deltaY < 0 ? 1.08 : .92));
+    setZoom(zoom * Math.exp(-event.deltaY * 0.00115), event.clientX, event.clientY);
   }, {passive: false});
 
   const endpointLabel = $('server-endpoint');
