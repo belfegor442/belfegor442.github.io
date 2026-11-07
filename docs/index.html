@@ -364,7 +364,7 @@ footer a:hover{color:var(--ink)}
 
     displayHeadline(nextHeadline);
 
-    const payload = JSON.stringify({ headline: nextHeadline }, null, 2) + "\\n";
+    const payload = JSON.stringify({ headline: nextHeadline }, null, 2) + "\n";
     const file = new Blob([payload], { type: "application/json;charset=utf-8" });
     const downloadUrl = URL.createObjectURL(file);
     const downloadLink = document.createElement("a");
