@@ -1377,15 +1377,11 @@
     hoveredState = null;
   }
 
-  map.addEventListener('load', () => {
-    map.dataset.loaded = 'true';
-    $('map-fallback').hidden = true;
+  let mapInitialized = false;
+  function initializeMap() {
+    if (mapInitialized) return;
     const svgDocument = map.contentDocument;
-    if (!svgDocument) {
-      console.error('[new-world] The Beleland SVG loaded without an accessible document.');
-      renderFallback();
-      return;
-    }
+    if (!svgDocument || !svgDocument.getElementById('state1')) return;
     let matched = 0;
     for (let index = 0; index < 16; index++) {
       const path = svgDocument.getElementById('state' + (index + 1));
@@ -1405,6 +1401,9 @@
       renderFallback();
       return;
     }
+    mapInitialized = true;
+    map.dataset.loaded = 'true';
+    $('map-fallback').hidden = true;
     let pendingProvinceClick = null;
     svgDocument.addEventListener('click', event => {
       const province = provinceAtEvent(event);
@@ -1480,9 +1479,13 @@
       setZoom(zoom * Math.exp(-event.deltaY * 0.00115), event.clientX, event.clientY);
     }, {passive: false});
     highlightMap(state.selected);
-  });
+  }
+  map.addEventListener('load', initializeMap);
   map.addEventListener('error', renderFallback);
+  initializeMap();
+  requestAnimationFrame(initializeMap);
   setTimeout(() => {
+    initializeMap();
     if (map.dataset.loaded !== 'true') renderFallback();
   }, 1800);
 
