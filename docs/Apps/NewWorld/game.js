@@ -8,10 +8,10 @@
   const INITIAL_MAP_PLOT = LEGACY_PLOT_OFFSET +
     WORLD_MAP_CENTER * WORLD_MAP_SIZE + WORLD_MAP_CENTER;
   const names = [
-    'Kingdom of Coimbrila', 'United Provinces of Gania', 'Chungia', 'Calcilacia',
-    'Pician Empire', 'Meityeun Theocracy', 'Swabing', 'Alba', 'Knosian Despotate',
-    'Kalestos', 'Gorkirch', 'Duchy of Shonewesia', 'Shahtehaq', 'Kvinian Empire',
-    'Shi', 'Kueopia'
+    "Founders' Reach", 'North Coast', 'Eastern Coast', 'Upper March',
+    'Western Vale', 'Highland Basin', 'Orren Foothills', 'Eastern Uplands',
+    'Western Lowlands', 'Central Forest', 'Southern Plain', 'Eastern Marches',
+    'South Coast', 'Great Riverland', 'Southern Reach', 'Far Coast'
   ];
   const initial = {
     year: 1,
@@ -97,7 +97,9 @@
         recoveryOrdersNeedCleanup) return;
     const order = ordersForCurrentSession()[0];
     if (!order || sentOrderIds.has(order.orderId)) return;
-    if (window.NewWorldMultiplayer.sendOrder(order)) sentOrderIds.add(order.orderId);
+    if (window.NewWorldMultiplayer.sendOrder(order) &&
+        ordersForCurrentSession().some(item => item.orderId === order.orderId))
+      sentOrderIds.add(order.orderId);
   }
 
   let state = structuredClone(initial);
@@ -113,6 +115,7 @@
   let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
+  let startRequestPending = false;
   let selectedPlot = INITIAL_MAP_PLOT;
   let zoom = 1;
   let mapDetailRenderer = null;
@@ -186,6 +189,15 @@
 
   function membershipsFor(player) {
     return player?.memberships?.filter(membership => membership.status === 'active') || [];
+  }
+
+  function claimFundingSource(player = currentPlayer()) {
+    if (!onlineGame || !player) return null;
+    return membershipsFor(player).map(membership => ({
+      membership,
+      territory:onlineGame.territories.find(item => item.stateId === membership.stateId)
+    })).filter(item => item.territory && Number(item.territory.treasury) >= 450)
+      .sort((a,b) => Number(b.territory.treasury) - Number(a.territory.treasury))[0] || null;
   }
 
   function governmentMembersFor(territory) {
@@ -1174,8 +1186,8 @@
       $('state-description').textContent = 'This territory is administered by ' + owner.name + '.';
     } else if (isOnline()) {
       $('state-description').textContent = onlineGame?.started
-        ? 'An independent territory. You can establish an administration by investing in local governance.'
-        : 'This state has no government membership yet.';
+        ? 'Unclaimed frontier. Secure this region with your founding treasury and expand your territory.'
+        : 'Unclaimed frontier. Your group begins with one small founding settlement.';
     } else {
       $('state-description').textContent = 'Create or join a multiplayer world to inspect its shared state.';
     }
@@ -1189,9 +1201,11 @@
       ? 'YOUR ADMINISTRATION'
       : governmentMembers.length
         ? governmentMembers.map(player => player.name.toUpperCase()).join(' · ')
-        : owner ? owner.name.toUpperCase() : onlineGame ? 'INDEPENDENT' : 'NOT CONNECTED';
+        : owner ? owner.name.toUpperCase() : onlineGame ? 'UNCLAIMED' : 'NOT CONNECTED';
 
     const claimButton = $('claim-btn');
+    const fundingSource = claimFundingSource();
+    const claimTreasury = Number(fundingSource?.territory.treasury ?? 0);
     if (mine || isGovernmentMember) {
       claimButton.disabled = true;
       claimButton.innerHTML = isGovernmentMember ? 'YOUR GOVERNMENT <span>✓</span>' : 'ALREADY ADMINISTERED <span>✓</span>';
@@ -1210,12 +1224,12 @@
     } else if (isOnline() && membershipsFor(currentPlayer()).length === 0) {
       claimButton.disabled = true;
       claimButton.textContent = 'STATE ASSIGNMENT REQUIRED';
-    } else if (state.treasury < 450) {
+    } else if (!fundingSource || claimTreasury < 450) {
       claimButton.disabled = true;
-      claimButton.innerHTML = 'INSUFFICIENT TREASURY <span>¤ 450</span>';
+      claimButton.innerHTML = 'FOUNDING TREASURY BELOW <span>¤ 450</span>';
     } else {
       claimButton.disabled = isOnline() && socket?.readyState !== WebSocket.OPEN;
-      claimButton.innerHTML = 'ESTABLISH ADMINISTRATION <span>¤ 450</span>';
+      claimButton.innerHTML = 'CLAIM THIS REGION <span>¤ 450</span>';
     }
     if (notify) toast(territory.name.toUpperCase() + ' SELECTED');
     highlightMap(index);
@@ -1733,6 +1747,36 @@
         if (result.accepted) showMessage('Order accepted by the host.');
         else showMessage(orderErrorMessage(result.code) || result.error ||
           'The host rejected the order.',true);
+      },
+      onPlayerJoined:player => {
+        if (!onlineGame || !player?.id) return;
+        const index = onlineGame.players.findIndex(item => item.id === player.id);
+        if (index < 0) onlineGame.players.push(player);
+        else onlineGame.players[index] = player;
+        onlineGame.memberships = (onlineGame.memberships || [])
+          .filter(item => item.playerId !== player.id)
+          .concat((player.memberships || []).map(item => ({
+            ...item,gameId:onlineGame.id
+          })));
+        onlineGame.lobbyPlayerCount = onlineGame.players.length;
+        onlineGame.lobbyConnectedCount = onlineGame.players.filter(item => item.connected).length;
+        renderMultiplayer();
+      },
+      onPlayerPresence:(playerId,online) => {
+        const player = onlineGame?.players.find(item => item.id === playerId);
+        if (!player) return;
+        player.connected = online === true;
+        onlineGame.lobbyPlayerCount = onlineGame.players.length;
+        onlineGame.lobbyConnectedCount = onlineGame.players.filter(item => item.connected).length;
+        renderMultiplayer();
+      },
+      onPlayerCount:count => {
+        if (!onlineGame || !count) return;
+        onlineGame.lobbyPlayerCount = count.totalPlayers;
+        onlineGame.lobbyConnectedCount = count.connectedPlayers;
+        const element = $('lobby-player-count');
+        if (element) element.textContent = count.connectedPlayers + ' ONLINE / ' +
+          count.totalPlayers + ' OF ' + count.capacity;
       }
     };
   }
@@ -1761,8 +1805,8 @@
       const membership = membershipsFor(currentPlayer())[0];
       const assignedState = onlineGame?.territories.find(item => item.stateId === membership?.stateId);
       showMessage(assignedState
-        ? 'Connected and assigned to ' + assignedState.name + '. The host can change this before starting.'
-        : 'Connected to the host. Waiting for a State assignment.');
+        ? 'Connected to the founding settlement at ' + assignedState.name + '. Your group can expand together.'
+        : 'Connected to the host. Waiting for the founding settlement.');
       toast('JOINED PRIVATE WORLD');
     } catch (error) {
       showServerError(error);
@@ -1821,6 +1865,9 @@
       ].slice(0, 20);
     }
     onlineGame = game;
+    onlineGame.lobbyPlayerCount = Number(game.lobbyPlayerCount) || game.players.length;
+    onlineGame.lobbyConnectedCount = Number(game.lobbyConnectedCount) ||
+      game.players.filter(item => item.connected).length;
     const player = currentPlayer();
     if (!player) {
       showMessage('Your player record is not in this world. Rejoin using a valid invitation.', true);
@@ -1839,11 +1886,18 @@
     }
     const governmentIndex = player.countryIndex ?? membershipsFor(player)[0]?.stateIndex;
     const governmentFinance = game.territories.find(territory => territory.index === governmentIndex) || null;
+    const previousSelectionExists = Number.isInteger(state.selected) &&
+      game.territories.some(territory => territory.index === state.selected);
+    const selectedIndex = previousSelectionExists
+      ? state.selected
+      : (governmentIndex ?? player.countryIndex ?? 0);
+    const selectedFinance = game.territories.find(territory => territory.index === selectedIndex) ||
+      governmentFinance;
     state = {
       ...state,
-      treasury: governmentFinance?.treasury ?? player.treasury,
-      governmentFinance,
-      selected: governmentIndex ?? player.countryIndex ?? state.selected,
+      treasury: selectedFinance?.treasury ?? player.treasury,
+      governmentFinance:selectedFinance,
+      selected:selectedIndex,
       owned: game.territories.filter(territory => territory.ownerPlayerId === player.id)
         .map(territory => territory.index),
       states: game.territories.map(territory => ({
@@ -1852,9 +1906,9 @@
         prosperity: territory.prosperity,
         infra: territory.infrastructure,
         owner: governmentMembersFor(territory).map(member => member.name).join(', ') ||
-          game.players.find(owner => owner.id === territory.ownerPlayerId)?.name || 'Independent'
+          game.players.find(owner => owner.id === territory.ownerPlayerId)?.name || 'Unclaimed'
       })),
-      buildings: normalizeBuildings(governmentFinance?.buildings || player.buildings || {}),
+      buildings: normalizeBuildings(selectedFinance?.buildings || player.buildings || {}),
       activity: [...game.activity]
     };
     mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
@@ -1964,6 +2018,11 @@
   }
 
   async function startWorld() {
+    const button = $('start-world');
+    if (startRequestPending || button.disabled || !onlineSession?.isHost) return;
+    startRequestPending = true;
+    button.disabled = true;
+    button.textContent = 'STARTING WORLD...';
     try {
       const game = await window.NewWorldMultiplayer.admin('start',{});
       if (game && typeof game === 'object') applySnapshot(game);
@@ -1971,6 +2030,9 @@
       toast('WORLD STARTED');
     } catch (error) {
       showServerError(error);
+    } finally {
+      startRequestPending = false;
+      renderMultiplayer();
     }
   }
 
@@ -1999,7 +2061,19 @@
 
     if (onlineGame) {
       const isHost = onlineSession.playerId === onlineGame.hostPlayerId;
-      for (const player of onlineGame.players) {
+      const totalPlayers = Number(onlineGame.lobbyPlayerCount ?? onlineGame.players.length);
+      const connectedPlayers = Number(onlineGame.lobbyConnectedCount ??
+        onlineGame.players.filter(player => player.connected).length);
+      $('lobby-player-count').textContent = connectedPlayers + ' ONLINE / ' +
+        totalPlayers + ' OF ' + (onlineGame.maxHumanPlayers || 100);
+      if (!isHost && !onlineGame.started) {
+        const row = document.createElement('div');
+        row.className = 'player-row';
+        row.textContent = 'You are part of the founding party. ' + totalPlayers +
+          ' player(s) in this lobby; ' + connectedPlayers + ' online.';
+        list.appendChild(row);
+      }
+      for (const player of (!isHost && !onlineGame.started ? [] : onlineGame.players)) {
         const row = document.createElement('div');
         row.className = 'player-row';
         const summary = document.createElement('div');
@@ -2019,39 +2093,23 @@
         summary.append(playerLabel, stateLabel);
         row.appendChild(summary);
 
-        if (isHost && !onlineGame.started) {
-          const assignment = document.createElement('div');
-          assignment.className = 'player-assignment';
-          const select = document.createElement('select');
-          select.setAttribute('aria-label', 'State for ' + player.name);
-          const unassigned = document.createElement('option');
-          unassigned.value = '';
-          unassigned.textContent = 'Unassigned';
-          select.appendChild(unassigned);
-          for (const territory of onlineGame.territories) {
-            const option = document.createElement('option');
-            option.value = String(territory.index);
-            option.textContent = territory.name;
-            option.selected = player.countryIndex === territory.index;
-            select.appendChild(option);
-          }
-          const saveAssignment = document.createElement('button');
-          saveAssignment.type = 'button';
-          saveAssignment.textContent = 'ASSIGN';
-          saveAssignment.addEventListener('click', () => assignCountry(
-            player.id, select.value === '' ? null : Number(select.value)));
-          assignment.append(select, saveAssignment);
-          row.appendChild(assignment);
+        if (!onlineGame.started && membershipsFor(player).length) {
+          const role = document.createElement('span');
+          role.className = 'player-coop-role';
+          role.textContent = player.id === onlineGame.hostPlayerId ? 'FOUNDING PLAYER' : 'FOUNDING PARTY';
+          row.appendChild(role);
         }
         list.appendChild(row);
       }
 
       const startButton = $('start-world');
       startButton.hidden = !isHost || onlineGame.started;
-      startButton.disabled = onlineGame.players.some(player => membershipsFor(player).length === 0);
-      startButton.title = startButton.disabled
-        ? 'Waiting for every player to receive a State assignment.'
-        : 'All players are assigned. Start the shared world.';
+      const missingMembership = onlineGame.players.some(player => membershipsFor(player).length === 0);
+      startButton.disabled = startRequestPending || missingMembership;
+      startButton.textContent = startRequestPending ? 'STARTING WORLD...' : 'START WORLD';
+      startButton.title = missingMembership
+        ? 'Waiting for every player to join the founding party.'
+        : 'Start the shared frontier for all connected players.';
 
       const pauseControls = $('pause-controls');
       pauseControls.hidden = !onlineGame.started;
@@ -2111,13 +2169,13 @@
 
   $('claim-btn').addEventListener('click', () => {
     const index = state.selected;
-    if (state.owned.includes(index) || state.treasury < 450) return;
-    if (!isOnline()) {
-      showMessage('Preview data only. Connect to a multiplayer server to play.');
-      return;
-    }
-    sendAction({type: 'claim', territoryIndex: index});
+    if (!isOnline() || !onlineGame?.started || $('claim-btn').disabled) return;
+    if (state.owned.includes(index)) return;
+    const fundingSource = claimFundingSource();
+    if (!fundingSource) return;
+    sendAction({type:'claim',territoryIndex:index,stateId:fundingSource.membership.stateId});
   });
+  $('open-build-menu').addEventListener('click', () => enterCityMap(state.selected));
   $('pause-vote').addEventListener('click', () => {
     if (!onlineGame?.started) return;
     sendAction({type: onlineGame.paused ? 'resume' : 'pause'});

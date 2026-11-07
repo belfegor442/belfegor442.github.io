@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261107-settlement-playable">
+  <link rel="stylesheet" href="./game.css?v=20261108-frontier-build-v1">
 </head>
 <body>
   <header class="topbar">
@@ -30,10 +30,10 @@
 </header>
 
   <main class="game-shell" aria-label="New World strategy interface">
-    <nav class="nav-rail" aria-label="National administration">
+    <nav class="nav-rail" aria-label="World navigation">
       <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
       <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
-      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>CITY</span></button>
+      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>BUILD</span></button>
       <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
       <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
       <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
@@ -66,7 +66,7 @@
         </div>
         <div id="map-viewport" class="map-viewport">
           <div id="map-stage" class="map-stage">
-            <object id="world-map" data="./map.svg?v=20261107-handcrafted-atlas-v2" type="image/svg+xml" aria-label="Original interactive map of Beleland"></object>
+            <object id="world-map" data="./map.svg?v=20261108-frontier-v1" type="image/svg+xml" aria-label="Original interactive map of Beleland"></object>
             <div id="map-fallback" class="map-fallback" hidden></div>
           </div>
           <canvas id="map-detail-canvas" class="map-detail-canvas" aria-label="Open territory map. Drag to explore and select any available land plot for construction." role="img"></canvas>
@@ -78,7 +78,7 @@
         <div class="map-foot">
           <span><i class="legend owned"></i> <span id="legend-owned">YOUR GOVERNMENT</span></span>
           <span><i class="legend other"></i> <span id="legend-other">OTHER STATES</span></span>
-          <span><i class="legend independent"></i> INDEPENDENT</span>
+          <span><i class="legend independent"></i> UNCLAIMED</span>
           <span class="map-foot-hint">CLICK A STATE TO INSPECT · DRAG TO PAN · SCROLL TO ZOOM</span>
         </div>
       </section>
@@ -87,7 +87,7 @@
         <section id="world-view" class="view active">
           <p class="panel-kicker">TERRITORY / INSPECTION</p>
           <h1 id="state-name">Select a territory</h1>
-          <p id="state-description" class="muted">Choose one of the 16 states on the map to inspect its administration and economy.</p>
+          <p id="state-description" class="muted">Choose a region on the map. Begin with one small settlement and expand into unclaimed land.</p>
           <div class="metric-grid">
             <div><small>POPULATION</small><strong id="state-pop">—</strong></div>
             <div><small>PROSPERITY</small><strong id="state-prosperity">—</strong></div>
@@ -96,8 +96,9 @@
           </div>
           <div class="panel-divider"></div>
           <div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
-          <button id="claim-btn" class="action-btn" disabled>ESTABLISH ADMINISTRATION <span>¤ 450</span></button>
-          <p class="microcopy">Establishing an administration costs treasury. Administered states contribute revenue.</p>
+          <button id="claim-btn" class="action-btn" disabled>CLAIM THIS REGION <span>? 450</span></button>
+          <button id="open-build-menu" class="action-btn secondary-action" type="button">OPEN BUILD MENU</button>
+          <p class="microcopy">Secure unclaimed regions with your founding party. Develop settlements, infrastructure and services one plot at a time.</p>
         </section>
 
         <section id="territory-view" class="view">
@@ -121,8 +122,8 @@
         </section>
 
         <section id="city-view" class="view">
-          <div class="section-bar"><div><p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p><h2 id="city-title">Capital district</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
-          <p class="muted city-intro">Develop a functioning settlement. Buildings need time to complete and add real housing, food, water, jobs and public services.</p>
+          <div class="section-bar"><div><p class="panel-kicker">FRONTIER / CONSTRUCTION</p><h2 id="city-title">Founding settlement</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
+          <p class="muted city-intro">Choose an empty plot and build. Construction advances with the world clock; completed buildings provide housing, food, water, jobs and public services.</p>
           <div class="settlement-overview" aria-label="Settlement operations">
             <div class="settlement-metrics">
               <div><small>RESIDENTS</small><strong id="settlement-residents">—</strong></div>
@@ -183,7 +184,7 @@
           <div class="panel-divider"></div>
           <p class="panel-kicker">SIMULATION RECORD</p>
           <h2>Recent activity</h2>
-          <div id="activity" class="activity-list"><p>World initialized. Your administration controls the capital district.</p></div>
+          <div id="activity" class="activity-list"><p>World initialized. One founding settlement stands in an otherwise unclaimed frontier.</p></div>
         </section>
 
         <section id="government-view" class="view">
@@ -285,7 +286,7 @@
               <label class="field-label" for="invite-share">PRIVATE INVITATION — SHARE ONLY WITH FRIENDS</label>
               <div class="field-row"><input id="invite-share" class="text-field" readonly><button id="copy-invite" class="quiet-btn" type="button">COPY</button></div>
             </div>
-            <p class="field-label">PLAYERS / STATE ASSIGNMENT</p>
+            <p class="field-label">FOUNDING PARTY / ONLINE PLAYERS <span id="lobby-player-count" class="lobby-player-count">1 ONLINE / 1 OF 100</span></p>
             <div id="player-list" class="player-list"></div>
             <button id="start-world" class="action-btn" type="button" hidden>START WORLD</button>
             <div id="pause-controls" class="pause-controls" hidden>
@@ -301,7 +302,7 @@
     </div>
 
     <footer class="game-footer">
-      <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND STRATEGY SIMULATION</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
+      <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND FRONTIER STRATEGY</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
       <span id="world-time" class="world-time" hidden></span>
       <button id="next-month" class="advance" hidden>ADVANCE MONTH <b>→</b></button>
       <a href="/Apps/">NORTH ASSEMBLY ↗</a>
@@ -309,9 +310,9 @@
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js?v=20261106-economy-core"></script>
-  <script src="./multiplayer.js?v=20261107-coop-lobby-v2"></script>
+  <script src="./simulation.js?v=20261108-frontier-build-v1"></script>
+  <script src="./multiplayer.js?v=20261108-frontier-build-v1"></script>
   <script src="./map-renderer.js?v=20261107-natural-terrain-v2"></script>
-  <script src="./game.js?v=20261107-coop-atlas-v2"></script>
+  <script src="./game.js?v=20261108-frontier-build-v1"></script>
 </body>
 </html>

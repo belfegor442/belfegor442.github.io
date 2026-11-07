@@ -197,6 +197,8 @@ a{color:inherit}
 .player-row{padding:9px;border:1px solid var(--line-soft);background:#263337}
 .player-summary{display:flex;justify-content:space-between;gap:8px;color:var(--ink);font:8px/1.5 var(--mono)}
 .player-summary span:last-child{color:var(--muted);text-align:right}
+.player-coop-role{display:block;margin:4px 0 0;color:var(--gold);font:700 7px/1.4 var(--mono);letter-spacing:.7px}
+.lobby-player-count{float:right;color:var(--gold);font:700 7px/1.5 var(--mono);letter-spacing:.35px;text-align:right}
 .player-assignment{display:flex;gap:5px;margin-top:7px}
 .player-assignment select{min-width:0;flex:1;padding:7px;border:1px solid var(--line);background:#172125;color:var(--ink);font:8px var(--mono)}
 .player-assignment button{padding:6px 8px;border:1px solid var(--line);background:#334146;color:var(--ink);font:700 7px var(--mono)}
