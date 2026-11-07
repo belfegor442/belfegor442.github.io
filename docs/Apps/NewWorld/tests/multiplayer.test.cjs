@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 global.window = { NewWorldSimulation: require('../simulation.js') };
 
 const multiplayer = require('../multiplayer.js');
+const simulation = require('../simulation.js');
 
 function guest(id, name) {
   return {
@@ -12,7 +13,7 @@ function guest(id, name) {
     name,
     isHost:false,
     countryIndex:null,
-    treasury:1200,
+    treasury:0,
     dailyBalanceRemainder:0,
     buildings:{},
     connected:true,
@@ -36,21 +37,27 @@ test('a new world assigns its host to the first State and transfers the starting
   assert.equal(multiplayer.canStartWorld(game), true);
 });
 
-test('joining friends are assigned to different free States automatically and can start together', () => {
+test('67 players can join one founding settlement and start the same world', () => {
   const { game } = multiplayer.createInitialWorld('Host');
-  const firstGuest = guest('guest-a', 'Friend A');
-  const secondGuest = guest('guest-b', 'Friend B');
-  game.players.push(firstGuest, secondGuest);
+  const home = game.territories[0];
+  assert.equal(game.territories.filter(item => item.ownerPlayerId).length, 1);
+  assert.equal(game.territories.filter(item => item.ownerPlayerId === game.hostPlayerId).length, 1);
+  assert.equal(game.companies.length, 4);
+  assert.equal(game.markets.length, 3);
+  assert.equal(game.territories.slice(1).every(item => item.ownerPlayerId === null && item.population === 0), true);
 
-  const firstAssignment = multiplayer.assignLobbyPlayer(game, firstGuest);
-  const secondAssignment = multiplayer.assignLobbyPlayer(game, secondGuest);
+  for (let index = 0; index < 66; index++) {
+    const player = guest('guest-' + index, 'Friend ' + index);
+    game.players.push(player);
+    const assigned = multiplayer.assignLobbyPlayer(game, player);
+    assert.equal(assigned.ok, true, assigned.error);
+    assert.equal(player.countryIndex, 0);
+  }
 
-  assert.equal(firstAssignment.ok, true);
-  assert.equal(secondAssignment.ok, true);
-  assert.equal(firstGuest.countryIndex, 1);
-  assert.equal(secondGuest.countryIndex, 2);
-  assert.equal(game.territories[1].treasury, 1200);
-  assert.equal(game.territories[2].treasury, 1200);
+  assert.equal(game.players.length, 67);
+  assert.equal(multiplayer.maxPlayers, 100);
+  assert.equal(game.memberships.filter(item =>
+    item.stateId === home.stateId && item.status === 'active').length, 67);
   assert.equal(multiplayer.canStartWorld(game), true);
 
   const started = multiplayer.applyAdmin(game, 'start', {});
@@ -59,17 +66,115 @@ test('joining friends are assigned to different free States automatically and ca
   assert.equal(game.status, 'running');
 });
 
-test('a lobby player can be assigned to an existing government when every State is occupied', () => {
+test('a group can finance the next conquest from a previously claimed region', () => {
   const { game } = multiplayer.createInitialWorld('Host');
-  const player = guest('guest-shared', 'Shared government member');
-  game.players.push(player);
-  const assigned = multiplayer.assignLobbyPlayer(game, player);
+  const host = game.players[0];
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const home = game.territories[0];
+  const first = game.territories[1];
+  const second = game.territories[2];
 
-  assert.equal(assigned.ok, true);
-  assert.equal(player.countryIndex, 1);
-  const moved = multiplayer.applyAdmin(game, 'assign', { playerId:player.id, countryIndex:0 });
-  assert.equal(moved.ok, true);
-  assert.equal(player.countryIndex, 0);
-  assert.equal(game.memberships.some(item => item.playerId === player.id &&
-    item.stateId === game.territories[0].stateId && item.status === 'active'), true);
+  const firstClaim = multiplayer.applyOrder(game,host,{
+    orderId:'claim-chain-first',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:home.stateId,
+    type:'claim',territoryIndex:1
+  });
+  assert.equal(firstClaim.accepted,true,firstClaim.error);
+  assert.equal(first.treasury,600);
+
+  const secondClaim = multiplayer.applyOrder(game,host,{
+    orderId:'claim-chain-second',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:first.stateId,
+    type:'claim',territoryIndex:2
+  });
+  assert.equal(secondClaim.accepted,true,secondClaim.error);
+  assert.equal(second.ownerPlayerId,host.id);
+  assert.equal(second.treasury,150);
+  assert.equal(first.treasury,0);
+});
+
+test('a cooperative founding member gains membership in a newly conquered region', () => {
+  const { game } = multiplayer.createInitialWorld('Host');
+  const firstGuest = guest('guest-a', 'Friend A');
+  game.players.push(firstGuest);
+  assert.equal(multiplayer.assignLobbyPlayer(game, firstGuest).ok, true);
+  assert.equal(multiplayer.applyAdmin(game, 'start', {}).ok, true);
+
+  const home = game.territories[0];
+  const target = game.territories[1];
+  const host = game.players[0];
+  const result = multiplayer.applyOrder(game,host,{
+    orderId:'claim-frontier-1',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:home.stateId,
+    type:'claim',territoryIndex:1
+  });
+  assert.equal(result.accepted,true,result.error);
+  assert.equal(target.ownerPlayerId,host.id);
+  assert.equal(target.treasury,600);
+  assert.equal(target.population,0);
+  assert.equal(game.companies.filter(item => item.stateId === target.stateId).length,4);
+  assert.equal(game.markets.filter(item => item.stateId === target.stateId).length,3);
+  assert.equal(game.populationGroups.filter(item => item.stateId === target.stateId).length,1);
+  assert.equal(game.memberships.some(item => item.playerId === firstGuest.id &&
+    item.stateId === target.stateId && item.status === 'active'),true);
+});
+
+test('a claimed empty region can fund its first farm, housing and waterworks from its founding grant', () => {
+  const { game } = multiplayer.createInitialWorld('Host');
+  const host = game.players[0];
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const home = game.territories[0];
+  const territory = game.territories[1];
+  const claim = multiplayer.applyOrder(game,host,{
+    orderId:'claim-first-settlement',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:home.stateId,
+    type:'claim',territoryIndex:1
+  });
+  assert.equal(claim.accepted,true,claim.error);
+  assert.equal(territory.treasury,600);
+  assert.equal(territory.population,0);
+
+  const plotBase=144+512*1024+512;
+  for (const [index,buildingId] of ['farm','housing','waterworks'].entries()) {
+    const result=multiplayer.applyOrder(game,host,{
+      orderId:'founding-build-'+buildingId,gameId:game.id,playerId:host.id,
+      expectedWorldVersion:game.worldVersion,stateId:territory.stateId,
+      type:'build',plotIndex:plotBase+index,buildingId
+    });
+    assert.equal(result.accepted,true,result.error);
+  }
+  assert.equal(game.territories[1].treasury,0);
+  assert.equal(game.territories[1].buildings[plotBase].daysRemaining,2);
+  assert.equal(game.territories[1].buildings[plotBase+1].daysRemaining,2);
+  assert.equal(game.territories[1].buildings[plotBase+2].daysRemaining,4);
+
+  for(let day=0;day<3;day++) assert.equal(simulation.advanceDay(game).ok,true);
+  let metrics=simulation.getSettlementMetrics(game.territories[1]);
+  assert.equal(metrics.housingCapacity,1000);
+  assert.equal(metrics.foodCapacity,5000);
+  assert.equal(metrics.waterCapacity,0);
+  assert.equal(game.territories[1].population,0);
+
+  assert.equal(simulation.advanceDay(game).ok,true);
+  metrics=simulation.getSettlementMetrics(game.territories[1]);
+  assert.equal(metrics.housingCapacity,1000);
+  assert.equal(metrics.foodCapacity,5000);
+  assert.equal(metrics.waterCapacity,5000);
+  assert.equal(game.territories[1].population,1);
+});
+
+test('construction accepts world-map plot IDs and stores buildings on the controlled territory', () => {
+  const { game } = multiplayer.createInitialWorld('Host');
+  const host = game.players[0];
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const territory = game.territories[0];
+  const plotIndex = 144 + 512 * 1024 + 512;
+  const result = multiplayer.applyOrder(game,host,{
+    orderId:'build-world-plot-1',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:territory.stateId,
+    type:'build',plotIndex,buildingId:'farm'
+  });
+  assert.equal(result.accepted,true,result.error);
+  assert.equal(territory.buildings[plotIndex].daysRemaining,2);
+  assert.equal(host.buildings[plotIndex],undefined);
 });

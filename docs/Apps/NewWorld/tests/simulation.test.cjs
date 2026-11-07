@@ -54,6 +54,38 @@ test('a host day runs production, population demand and market settlement', () =
   assert.ok(game.activity.some(item => item.includes('market cleared')));
 });
 
+test('construction advances by world days and only finished buildings add capacity', () => {
+  const game = baseWorld();
+  const territory = game.territories[0];
+  territory.population = 500;
+  territory.baseHousingCapacity = 1000;
+  territory.baseFoodCapacity = 1000;
+  territory.baseWaterCapacity = 1000;
+  territory.baseJobCapacity = 100;
+  territory.buildings = {
+    '524944': {
+      id:'farm',name:'FARM',daysRemaining:2,foodCapacity:5000,
+      jobSlots:1200,income:18,upkeep:3
+    }
+  };
+
+  const before = simulation.getSettlementMetrics(territory);
+  assert.equal(before.foodCapacity,1000);
+  assert.equal(before.jobCapacity,100);
+
+  assert.equal(simulation.advanceDay(game).ok,true);
+  assert.equal(game.territories[0].buildings['524944'].daysRemaining,1);
+  assert.equal(simulation.getSettlementMetrics(game.territories[0]).foodCapacity,1000);
+
+  assert.equal(simulation.advanceDay(game).ok,true);
+  assert.equal(game.territories[0].buildings['524944'].daysRemaining,0);
+  assert.equal(simulation.getSettlementMetrics(game.territories[0]).foodCapacity,6000);
+  assert.equal(simulation.getSettlementMetrics(game.territories[0]).jobCapacity,1300);
+  assert.equal(game.territories[0].population,502);
+  assert.equal(game.territories[0].populationGrowthLastDay,1);
+  assert.ok(game.events.some(event => event.type === 'construction.completed'));
+});
+
 test('production respects configured multi-day cycle duration', () => {
   const game = baseWorld({
     goods:[{id:'grain',name:'Grain',unit:'tonnes',storageCapacity:null}],
