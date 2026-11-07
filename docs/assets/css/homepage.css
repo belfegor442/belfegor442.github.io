@@ -244,7 +244,7 @@ h2{
 }
 
 
-/* North Assembly global news ticker — Pro Display */
+/* North Assembly broadcast ticker — moving TV subtitle */
 @font-face{
  font-family:"NA Pro Display";
  src:url("/Pro%20Display%20tfb.ttf") format("truetype");
@@ -253,27 +253,35 @@ h2{
  font-display:swap;
 }
 .news-ticker{
- position:absolute;z-index:8;top:104px;left:6vw;right:6vw;
- display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:20px;
- width:min(1240px,88vw);min-height:58px;margin-inline:auto;padding:11px 16px;
- border:1px solid rgba(165,184,255,.24);border-radius:3px;
- background:rgba(9,13,22,.82);backdrop-filter:blur(16px);
- box-shadow:0 12px 36px rgba(0,0,0,.14);
+ position:absolute;z-index:8;left:0;right:0;bottom:0;
+ display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:22px;
+ width:100%;min-height:68px;margin:0;padding:13px max(6vw,24px);
+ border:0;border-top:1px solid rgba(165,184,255,.28);border-radius:0;
+ background:linear-gradient(90deg,rgba(8,12,21,.98),rgba(13,19,32,.94) 55%,rgba(8,12,21,.98));
+ backdrop-filter:blur(18px);
+ box-shadow:0 -12px 36px rgba(0,0,0,.18);
 }
 .news-label,.news-caption{
  display:flex;align-items:center;gap:9px;white-space:nowrap;
  color:var(--ac-2);font:8px/1.4 var(--fm);letter-spacing:.13em;
 }
 .news-label i{width:6px;height:6px;border-radius:50%;background:var(--ac-2);box-shadow:0 0 0 4px rgba(121,240,224,.09)}
-.news-window{min-width:0;display:flex;align-items:center;overflow:hidden;gap:3px}
-.news-headline{
- display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
- color:#f0f3fb;font:400 clamp(20px,2.4vw,30px)/1.12 "NA Pro Display",var(--display),sans-serif;
- letter-spacing:-.025em;
+.news-window{
+ position:relative;min-width:0;height:1.6em;overflow:hidden;
+ border-left:1px solid rgba(165,184,255,.2);padding-left:18px;
 }
-.news-caret{flex:0 0 1px;width:1px;height:1.02em;background:var(--ac-2);animation:na-news-blink .8s steps(2,end) infinite}
+.news-headline{
+ position:absolute;left:100%;top:50%;display:block;width:max-content;max-width:none;
+ white-space:nowrap;will-change:transform;
+ color:#f0f3fb;font:400 clamp(20px,2.25vw,29px)/1.15 "NA Pro Display",var(--display),sans-serif;
+ letter-spacing:-.025em;
+ animation:na-news-travel var(--news-duration,22s) linear infinite;
+}
+@keyframes na-news-travel{
+ from{transform:translateX(0) translateY(-50%)}
+ to{transform:translateX(calc(-100% - var(--news-distance,100vw))) translateY(-50%)}
+}
 .news-caption{color:#7f8ba4;font-size:7px}
-@keyframes na-news-blink{50%{opacity:0}}
 .people-directory{border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong)}
 .people-directory-head,.people-directory-foot{
  display:flex;justify-content:space-between;gap:16px;padding:14px 0;
@@ -297,8 +305,9 @@ h2{
 .employee-status.is-open:before{background:transparent;border:1px solid #96a4c0}
 .people-directory-foot{padding-top:14px;color:#7f8ba4}
 @media(max-width:760px){
- .news-ticker{top:79px;left:6vw;right:6vw;width:88vw;grid-template-columns:auto minmax(0,1fr);gap:12px;min-height:54px;padding:9px 11px}
+ .news-ticker{grid-template-columns:auto minmax(0,1fr);gap:12px;min-height:58px;padding:10px 5vw}
  .news-caption{display:none}
+ .news-window{padding-left:12px}
  .news-headline{font-size:clamp(18px,5vw,23px)}
  .employee-row{grid-template-columns:24px minmax(0,1fr) auto;gap:9px;min-height:72px}
  .employee-role{grid-column:2;grid-row:2;margin-top:-20px;font-size:7px}
@@ -306,4 +315,4 @@ h2{
  .employee-name b{font-size:18px}
  .people-directory-head,.people-directory-foot{font-size:7px;letter-spacing:.07em}
 }
-@media(prefers-reduced-motion:reduce){.news-caret{animation:none}}
+@media(prefers-reduced-motion:reduce){.news-headline{position:static;left:auto;transform:none;animation:none;white-space:normal}.news-window{height:auto;min-height:1.6em}}
