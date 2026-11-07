@@ -65,6 +65,11 @@ public static class WorldStateCompatibility
         game.Activity ??= [];
         game.PauseVotes ??= [];
 
+        if (game.MapGeometryVersion < 1 || game.MapGeometryVersion > MapGeometryCatalog.MapVersion)
+            throw new InvalidDataException("The saved world references an unsupported map geometry version.");
+        if (game.MapGeometryVersion < MapGeometryCatalog.MapVersion)
+            game.MapGeometryVersion = MapGeometryCatalog.MapVersion;
+
         if (game.Day < 1)
             game.Day = 1;
         if (game.WorldDate == default)

@@ -1,7 +1,7 @@
 {
   "mapId": "beleland",
-  "mapVersion": 2,
-  "svgSha256": "EE5CD82D2B3BDDAAE2A171AFA092E7EA002810CC01D14FCB2BE88F7258731587",
+  "mapVersion": 3,
+  "svgSha256": "783D11BACAC4B4BE84280998CCE3271AE74ECF684DE7C85FF79E1E60D8DC92BC",
   "elementIds": [
     "state1",
     "state2",

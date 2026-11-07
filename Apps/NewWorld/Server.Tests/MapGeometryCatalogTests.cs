@@ -31,7 +31,7 @@ public sealed class MapGeometryCatalogTests
         Assert.Equal(
             Convert.ToHexString(SHA256.HashData(svgBytes)),
             MapGeometryCatalog.SvgSha256);
-        Assert.True(MapGeometryCatalog.MapVersion > 0);
+        Assert.Equal(3, MapGeometryCatalog.MapVersion);
     }
 
     [Fact]
