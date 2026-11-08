@@ -119,6 +119,7 @@
   let selectedPlot = INITIAL_MAP_PLOT;
   let zoom = 1;
   let mapDetailRenderer = null;
+  let buildMenu = null;
   let pan = {x: 0, y: 0};
   let drag = null;
   let hoveredState = null;
@@ -1251,19 +1252,37 @@
     document.querySelector('.tab[data-view="territory"]')?.click();
   }
 
+  function activateView(viewName) {
+    document.querySelectorAll('.tab').forEach(tab => {
+      const active = tab.dataset.view === viewName;
+      tab.classList.toggle('active',active);
+      tab.setAttribute('aria-selected',String(active));
+    });
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    const view = $(viewName + '-view');
+    if (view) view.classList.add('active');
+  }
+
+  function prepareBuilderMap() {
+    if (!mapDetailRenderer?.active) {
+      zoom = 0.05;
+      pan = {x:0,y:0};
+      $('map-stage').style.transform = 'translate3d(0,0,0) scale(1)';
+      mapDetailRenderer?.setCamera(zoom,true);
+      mapDetailRenderer?.centerOnPlot(selectedPlot);
+    }
+  }
+
   function enterCityMap(index) {
     if (!Number.isInteger(index) || index < 0 || index >= 16) return;
-    selectState(index, false, false);
+    selectState(index,false,false);
     hideMapTooltip();
-    zoom = 0.05;
-    pan = {x: 0, y: 0};
-    $('map-stage').style.transform = 'translate3d(0,0,0) scale(1)';
-    mapDetailRenderer?.setCamera(zoom, true);
-    mapDetailRenderer?.centerOnPlot(selectedPlot);
+    prepareBuilderMap();
+    activateView('city');
     renderFinancialSummary();
-    document.querySelector('.tab[data-view="city"]')?.click();
     renderCity();
     renderOptions();
+    buildMenu?.open();
   }
 
   function highlightMap(selectedIndex) {
@@ -1396,22 +1415,68 @@
       viewport,
       manifestUrl: './assets/sprite-manifest.json',
       onPlotSelected: index => {
+        if (buildMenu?.placing) {
+          buildMenu.placeAt(index);
+          return;
+        }
         selectedPlot = index;
-        const building = state.buildings[index];
-        const cell = mapDetailRenderer?.getPlotCell(index);
         renderCity();
-        $('plot-title').textContent = building ? building.name :
-          cell ? 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1) : 'Selected plot';
-        $('plot-description').textContent = building
-          ? describeBuilding(building)
-          : 'Choose a building to develop this open-territory plot.';
-        renderOptions();
+        buildMenu?.updateContext();
       }
     })
     : null;
   mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
   mapDetailRenderer?.setSelectedPlot(selectedPlot);
   mapDetailRenderer?.setBuildings(state.buildings);
+
+  buildMenu = typeof window.NewWorldBuildMenu === 'function'
+    ? new window.NewWorldBuildMenu({
+      mapRenderer:mapDetailRenderer,
+      buildingTypes,
+      getContext:() => {
+        const territory = onlineGame?.territories.find(item => item.index === state.selected);
+        const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
+        return {
+          regionName:territory?.name || state.states[state.selected]?.name || 'No settlement',
+          treasury:Number(state.treasury) || 0,
+          canBuild:Boolean(onlineGame?.started && onlineGame?.status === 'running' &&
+            territory && membership && membership.permissionSetId !== 'government-observer' &&
+            window.NewWorldMultiplayer?.isConnected())
+        };
+      },
+      canPlace:(item,index) => {
+        const territory = onlineGame?.territories.find(entry => entry.index === state.selected);
+        const membership = membershipsFor(currentPlayer()).find(entry => entry.stateId === territory?.stateId);
+        if (!onlineGame?.started || onlineGame.status !== 'running' || !territory || !membership ||
+            membership.permissionSetId === 'government-observer' ||
+            !window.NewWorldMultiplayer?.isConnected() || state.buildings[index] ||
+            state.treasury < Number(item?.cost || 0)) return false;
+        const cell = mapDetailRenderer?.getPlotCell(index);
+        if (!cell) return false;
+        const terrain = mapDetailRenderer?.terrainAt(cell.row,cell.col);
+        return Boolean(terrain && terrain.type !== 'water');
+      },
+      onPlace:(item,index,rotation) => {
+        const territory = onlineGame?.territories.find(entry => entry.index === state.selected);
+        if (!territory || !item) return false;
+        return sendAction({
+          type:'build',
+          stateId:territory.stateId,
+          plotIndex:index,
+          buildingId:item.buildingId,
+          spriteKey:item.spriteKey || '',
+          rotation,
+          variantName:item.name,
+          catalogItemId:item.id
+        });
+      },
+      onSelectedPlot:index => {
+        selectedPlot = index;
+        mapDetailRenderer?.setSelectedPlot(index);
+        renderCity();
+      }
+    })
+    : null;
 
   function hideMapTooltip() {
     mapTooltip.hidden = true;
@@ -1592,82 +1657,21 @@
   }
 
   function renderCity() {
-    $('city-title').textContent = state.states[state.selected]?.name || 'Territory settlement';
-    $('city-level').textContent = 'LEVEL ' + String(state.states[state.selected]?.infra || 1).padStart(2, '0');
+    const territory = onlineGame?.territories.find(item => item.index === state.selected);
+    $('city-title').textContent = territory?.name || state.states[state.selected]?.name || 'Territory settlement';
+    const cell = mapDetailRenderer?.getPlotCell(selectedPlot);
+    $('selected-plot-label').textContent = cell
+      ? 'X ' + (cell.col + 1).toLocaleString('en-US') + ' / Y ' + (cell.row + 1).toLocaleString('en-US')
+      : 'NO PLOT SELECTED';
+    $('build-budget-side').textContent = onlineGame ? money(state.treasury) : '—';
     renderSettlement();
-    const grid = $('city-grid');
-    grid.innerHTML = '';
-    for (let index = 0; index < 144; index++) {
-      const plotIndex = mapDetailRenderer?.getAdjacentPlotIndex(selectedPlot, index) ?? null;
-      const building = plotIndex === null ? null : state.buildings[plotIndex];
-      const cell = plotIndex === null ? null : mapDetailRenderer?.getPlotCell(plotIndex);
-      const element = document.createElement('button');
-      element.className = 'plot' + (building ? ' built' : '') +
-        (Number(building?.daysRemaining) > 0 ? ' constructing' : '') +
-        (selectedPlot === plotIndex ? ' selected' : '');
-      element.type = 'button';
-      element.disabled = plotIndex === null;
-      element.title = plotIndex === null ? 'Outside the world boundary'
-        : building ? building.name
-          : 'Open land · Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
-      element.innerHTML = building
-        ? (building.icon || building.id.slice(0, 1).toUpperCase()) + '<span class="plot-label">' +
-          (Number(building.daysRemaining) > 0 ? 'BUILDING' : building.name) + '</span>'
-        : '·';
-      element.addEventListener('click', () => {
-        if (plotIndex === null) return;
-        selectedPlot = plotIndex;
-        mapDetailRenderer?.centerOnPlot(selectedPlot);
-        mapDetailRenderer?.setSelectedPlot(selectedPlot);
-        renderCity();
-        $('plot-title').textContent = building
-          ? building.name
-          : 'Plot ' + (cell.col + 1) + ', ' + (cell.row + 1);
-        $('plot-description').textContent = building
-          ? describeBuilding(building)
-          : 'Choose a building to develop this open-territory plot.';
-        renderOptions();
-      });
-      grid.appendChild(element);
-    }
     mapDetailRenderer?.setBuildings(state.buildings);
     mapDetailRenderer?.setSelectedPlot(selectedPlot);
+    buildMenu?.updateContext();
   }
 
   function renderOptions() {
-    const building = state.buildings[selectedPlot];
-    const territory = onlineGame?.territories.find(item => item.index === state.selected);
-    const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
-    const canBuild = Boolean(onlineGame?.started && territory && membership &&
-      membership.permissionSetId !== 'government-observer' && socket?.readyState === WebSocket.OPEN);
-    $('building-options').innerHTML = building
-      ? '<p class="muted">' + describeBuilding(building) + '</p>'
-      : buildingTypes.map(item => {
-        const effects = [
-          item.housingCapacity && '+' + item.housingCapacity + ' housing',
-          item.foodCapacity && '+' + item.foodCapacity + ' food capacity',
-          item.waterCapacity && '+' + item.waterCapacity + ' water capacity',
-          item.jobSlots && '+' + item.jobSlots + ' jobs',
-          item.healthCapacity && '+' + item.healthCapacity + ' healthcare',
-          item.educationCapacity && '+' + item.educationCapacity + ' education'
-        ].filter(Boolean).join(' · ') || 'Local infrastructure';
-        const disabled = state.treasury < item.cost || selectedPlot === null || !canBuild;
-        return '<button class="build-option" data-build="' + item.id + '" ' +
-          (disabled ? 'disabled' : '') + '><strong><b>' + item.icon + '</b>' + item.name +
-          '<span>' + money(item.cost) + '</span></strong><small>' + effects +
-          '</small><small>BUILD ' + item.days + ' WORLD DAY(S) · INCOME ' + money(item.income) + '/MONTH · UPKEEP ' + money(item.upkeep) + '/MONTH</small></button>';
-      }).join('');
-    $('building-options').querySelectorAll('[data-build]').forEach(button =>
-      button.addEventListener('click', () => build(button.dataset.build)));
-  }
-
-  function build(id) {
-    const building = buildingTypes.find(item => item.id === id);
-    const territory = onlineGame?.territories.find(item => item.index === state.selected);
-    const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
-    if (!building || !territory || !membership || membership.permissionSetId === 'government-observer' ||
-        selectedPlot === null || state.buildings[selectedPlot] || state.treasury < building.cost) return;
-    sendAction({type: 'build', stateId: territory.stateId, plotIndex: selectedPlot, buildingId: id});
+    buildMenu?.updateContext();
   }
 
   function storeSession(session) {
@@ -1928,11 +1932,11 @@
     const browserHostActions = new Set(['claim','build','pause','resume']);
     if (!browserHostActions.has(action.type)) {
       showMessage('This gameplay action has not yet been migrated to the browser-hosted rules engine.',true);
-      return;
+      return false;
     }
     if (!socket || !window.NewWorldMultiplayer?.isConnected()) {
       showMessage('The host or relay is disconnected. Reconnect before acting.',true);
-      return;
+      return false;
     }
     const player = currentPlayer();
     const activeMemberships = membershipsFor(player);
@@ -1951,12 +1955,13 @@
     };
     if (!order.expectedWorldVersion || (!isGameWideVote && !order.stateId)) {
       showMessage('The authoritative world version or government membership is unavailable.',true);
-      return;
+      return false;
     }
     const queued = [...getPendingOrders(),order];
-    if (!savePendingOrders(queued)) return;
+    if (!savePendingOrders(queued)) return false;
     renderMultiplayer();
     replayPendingOrders();
+    return true;
   }
 
 
@@ -2206,14 +2211,17 @@
     });
   });
 
-  document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(tab => {
-      const active = tab === button;
-      tab.classList.toggle('active', active);
-      tab.setAttribute('aria-selected', String(active));
-    });
-    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-    $(button.dataset.view + '-view').classList.add('active');
+  document.querySelectorAll('.tab').forEach(button => button.addEventListener('click',() => {
+    const viewName = button.dataset.view;
+    activateView(viewName);
+    if (viewName === 'city') {
+      prepareBuilderMap();
+      renderCity();
+      renderOptions();
+      buildMenu?.open();
+    } else {
+      buildMenu?.close();
+    }
   }));
   $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.2));
   $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.2));

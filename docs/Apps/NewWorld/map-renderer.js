@@ -25,6 +25,9 @@
       this.failed = false;
       this.pages = [];
       this.sprites = [];
+      this.spriteIndex = new Map();
+      this.placementPreview = null;
+      this.canPlacePlot = () => false;
       this.pools = { residential: [], commercial: [], utility: [], village: [] };
       this.buildingData = new Map();
       this.buildingSprites = new Map();
@@ -264,7 +267,10 @@
       const nextPlot = this.plotIndexAtScreen(event.clientX, event.clientY);
       if (nextPlot !== this.hoverPlot) {
         this.hoverPlot = nextPlot;
-        this.canvas.style.cursor = nextPlot === null ? 'grab' : 'pointer';
+        const valid = nextPlot !== null && (!this.placementPreview || this.canPlacePlot(nextPlot));
+        this.canvas.style.cursor = this.placementPreview
+          ? (valid ? 'crosshair' : 'not-allowed')
+          : (nextPlot === null ? 'grab' : 'pointer');
         this.render();
       }
     }
@@ -273,7 +279,7 @@
       if (!this.pointer || this.pointer.id !== event.pointerId) return;
       const pointer = this.pointer;
       this.pointer = null;
-      this.canvas.style.cursor = 'grab';
+      this.canvas.style.cursor = this.placementPreview ? 'crosshair' : 'grab';
       if (!pointer.moved) {
         const plot = this.plotIndexAtScreen(event.clientX, event.clientY);
         if (plot !== null) {
@@ -286,7 +292,9 @@
 
     cancelPointer() {
       this.pointer = null;
-      if (this.canvas) this.canvas.style.cursor = this.hoverPlot === null ? 'grab' : 'pointer';
+      if (this.canvas) this.canvas.style.cursor = this.placementPreview
+        ? (this.hoverPlot !== null && this.canPlacePlot(this.hoverPlot) ? 'crosshair' : 'not-allowed')
+        : (this.hoverPlot === null ? 'grab' : 'pointer');
     }
 
     clampCamera() {
@@ -329,10 +337,66 @@
       this.render();
     }
 
+    getSprite(spriteKey, orientation = 0) {
+      if (!spriteKey) return null;
+      const direction = ((Number(orientation) || 0) % 4 + 4) % 4;
+      return this.spriteIndex.get(String(spriteKey) + '/orientation-' + direction) || null;
+    }
+
+    async getCatalogSprites() {
+      if (!this.ready && !this.loading && !this.failed) this.loadAtlas();
+      while (this.loading) await new Promise(resolve => setTimeout(resolve,40));
+      return this.ready
+        ? this.sprites.filter(sprite => sprite.orientation === 0)
+          .map(sprite => ({
+            key:String(sprite.key).replace('/orientation-0',''),
+            category:sprite.category,
+            sourceSheet:sprite.sourceSheet,
+            width:sprite.width,
+            height:sprite.height
+          }))
+        : [];
+    }
+
+    drawSpriteThumbnail(canvas, spriteKey, orientation = 0) {
+      const sprite = this.getSprite(spriteKey,orientation);
+      if (!canvas || !sprite) return false;
+      const atlas = this.pages[sprite.page];
+      const ctx = canvas.getContext('2d');
+      if (!atlas || !ctx) return false;
+      const width = canvas.width || 128;
+      const height = canvas.height || 96;
+      ctx.clearRect(0,0,width,height);
+      ctx.imageSmoothingEnabled = false;
+      const scale = Math.min((width - 10) / sprite.width,(height - 8) / sprite.height);
+      const drawWidth = sprite.width * scale;
+      const drawHeight = sprite.height * scale;
+      ctx.drawImage(atlas,sprite.x,sprite.y,sprite.width,sprite.height,
+        (width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
+      return true;
+    }
+
+    setPlacementPreview(placement, validator = null) {
+      this.placementPreview = placement ? {...placement} : null;
+      this.canPlacePlot = typeof validator === 'function' ? validator : (() => false);
+      if (this.canvas) {
+        const valid = this.hoverPlot !== null && this.canPlacePlot(this.hoverPlot);
+        this.canvas.style.cursor = this.placementPreview
+          ? (valid ? 'crosshair' : 'not-allowed')
+          : (this.hoverPlot === null ? 'grab' : 'pointer');
+      }
+      this.render();
+    }
+
     rebuildBuildingSprites() {
       this.buildingSprites.clear();
       if (!this.ready) return;
       for (const [index, building] of this.buildingData) {
+        const variant = this.getSprite(building.spriteKey,building.rotation || 0);
+        if (variant) {
+          this.buildingSprites.set(index,variant);
+          continue;
+        }
         let pool = this.pools.residential;
         if (building.id === 'farm') pool = this.pools.village.length ? this.pools.village : this.pools.residential;
         if (building.id === 'market' || building.id === 'workshop' ||
@@ -380,6 +444,7 @@
         if (!sprites.length) throw new Error('The sprite atlas contains no usable sprites.');
         this.pages = pages;
         this.sprites = sprites;
+        this.spriteIndex = new Map(sprites.map(sprite => [sprite.key,sprite]));
         this.pools.residential = sprites.filter(sprite =>
           sprite.category === 'houses' || sprite.category === 'village');
         this.pools.village = sprites.filter(sprite => sprite.category === 'village');
@@ -607,6 +672,38 @@
       } else if (building) {
         this.drawBuilding(building, cx, cy, tileW, tileH, buildingData);
       }
+      if (this.placementPreview && plotIndex !== null && plotIndex === this.hoverPlot) {
+        const valid = !buildingData && this.canPlacePlot(plotIndex);
+        const previewSprite = this.getSprite(
+          this.placementPreview.spriteKey,this.placementPreview.orientation || 0);
+        ctx.save();
+        this.polygon(cx,cy,halfW * 0.96,halfH * 0.96);
+        ctx.fillStyle = valid ? 'rgba(114, 170, 91, .28)' : 'rgba(190, 83, 67, .32)';
+        ctx.fill();
+        ctx.strokeStyle = valid ? '#b1df82' : '#e58c79';
+        ctx.lineWidth = Math.max(1.8,scale * 1.8);
+        ctx.setLineDash([Math.max(2,scale * 2),Math.max(1,scale)]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (previewSprite) {
+          ctx.globalAlpha = valid ? 0.72 : 0.25;
+          this.drawBuilding(previewSprite,cx,cy,tileW,tileH,{preview:true});
+        } else if (this.placementPreview.typeId === 'road') {
+          ctx.globalAlpha = valid ? 0.78 : 0.3;
+          this.polygon(cx,cy,halfW * 0.82,halfH * 0.82);
+          ctx.fillStyle = '#555d58';
+          ctx.fill();
+          ctx.strokeStyle = valid ? '#d4d0b1' : '#e58c79';
+          ctx.lineWidth = Math.max(1.2,scale * 1.05);
+          ctx.setLineDash([Math.max(2,tileW * 0.12),Math.max(1,tileW * 0.1)]);
+          ctx.beginPath();
+          ctx.moveTo(cx - tileW * 0.2,cy);
+          ctx.lineTo(cx + tileW * 0.2,cy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
       if (plotIndex !== null && (plotIndex === this.selectedPlot || plotIndex === this.hoverPlot)) {
         this.polygon(cx, cy, halfW * 0.96, halfH * 0.96);
         ctx.strokeStyle = plotIndex === this.selectedPlot
@@ -627,7 +724,8 @@
       const baseY = cy + tileH * 0.32;
 
       ctx.save();
-      if (Number(building?.daysRemaining) > 0) ctx.globalAlpha = 0.48;
+      if (building?.preview) ctx.globalAlpha = Math.min(ctx.globalAlpha,0.72);
+      else if (Number(building?.daysRemaining) > 0) ctx.globalAlpha = 0.48;
       ctx.fillStyle = 'rgba(16, 29, 26, .23)';
       ctx.beginPath();
       ctx.ellipse(cx + tileW * 0.05, baseY - 1, tileW * 0.38, tileH * 0.18, 0, 0, Math.PI * 2);
