@@ -94,7 +94,7 @@ footer a:hover{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-28">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-29">
 </head>
 <body>
 <div class="pg"></div>
@@ -371,6 +371,48 @@ footer a:hover{color:var(--ink)}
   loadHeadline();
   window.setInterval(loadHeadline, 15000);
   console.info("[North Assembly] Publica una noticia o dos separadas por |. Ejemplo: NorthAssembly.updateNews(\"Noticia 1 | Noticia 2\").");
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = window.matchMedia("(pointer: fine)").matches;
+  if (!reduce && finePointer) {
+    const glow = document.createElement("div");
+    glow.className = "na-cursor-glow";
+    glow.setAttribute("aria-hidden", "true");
+    document.body.appendChild(glow);
+    let px = -1000, py = -1000;
+    window.addEventListener("pointermove", event => {
+      if (event.pointerType === "touch") return;
+      px = event.clientX; py = event.clientY;
+      glow.style.setProperty("--cursor-x", px + "px");
+      glow.style.setProperty("--cursor-y", py + "px");
+      root.classList.add("na-cursor-visible");
+    }, { passive: true });
+    document.addEventListener("pointerleave", () => root.classList.remove("na-cursor-visible"));
+    document.querySelectorAll("a, button, .card").forEach(element => {
+      element.addEventListener("pointerenter", () => root.classList.add("na-cursor-hot"));
+      element.addEventListener("pointerleave", () => root.classList.remove("na-cursor-hot"));
+    });
+  }
+  if (!reduce) {
+    const wipe = document.createElement("div");
+    wipe.className = "na-route-wipe";
+    wipe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(wipe);
+    document.addEventListener("click", event => {
+      const link = event.target.closest("a[href^='#']");
+      if (!link) return;
+      const target = link.getAttribute("href");
+      if (!target || target === "#" || !document.querySelector(target)) return;
+      if (root.classList.contains("na-route-transition")) return;
+      root.classList.add("na-route-transition");
+    });
+    wipe.addEventListener("animationend", () => root.classList.remove("na-route-transition"));
+  }
 })();
 </script>
 </body>
