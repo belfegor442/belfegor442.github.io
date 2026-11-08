@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261108-playable-systems-v1">
+  <link rel="stylesheet" href="./game.css?v=20261108-functional-controls-v3">
 </head>
 <body>
   <header class="topbar">
@@ -139,6 +139,17 @@
           <div class="panel-divider"></div>
           <p class="panel-kicker">CAMPAIGN OBJECTIVES</p>
           <div id="campaign-objectives" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <div id="first-steps" class="first-steps">
+            <p class="panel-kicker">QUICK START / HOW TO PLAY</p>
+            <ol>
+              <li><strong>Create or join a world</strong><span>Open MULTIPLAYER. The host creates a private room and shares its code.</span></li>
+              <li><strong>Start the frontier</strong><span>Once everyone is in the founding party, the host presses START WORLD.</span></li>
+              <li><strong>Claim a region</strong><span>Select an UNCLAIMED State on the map, then claim it for ¤450. Your new settlement receives a development reserve.</span></li>
+              <li><strong>Build your settlement</strong><span>Double-click your region, choose an object, press BUILD, then click an empty dry plot.</span></li>
+              <li><strong>Expand and manage</strong><span>Use ECONOMY, GOVERNMENT, MILITARY and RESEARCH to grow, negotiate and compete.</span></li>
+            </ol>
+          </div>
           <div class="panel-divider"></div>
           <div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
           <button id="claim-btn" class="action-btn" disabled>CLAIM THIS REGION <span>? 450</span></button>
@@ -356,8 +367,8 @@
             <p class="panel-kicker">CURRENT WORLD</p>
             <p id="session-summary" class="muted"></p>
             <p id="pending-orders-status" class="muted" role="status">No pending orders.</p>
+            <div id="pending-order-list" class="pending-order-list" aria-live="polite"></div>
             <button id="reconnect-world" class="quiet-btn" type="button">RECONNECT</button>
-            <button id="recover-previous-save" class="quiet-btn" type="button" hidden>RECOVER PREVIOUS SAVE · HOST ONLY</button>
             <div id="invite-panel" class="invite-panel" hidden>
               <label class="field-label" for="invite-share">PRIVATE INVITATION — SHARE ONLY WITH FRIENDS</label>
               <div class="field-row"><input id="invite-share" class="text-field" readonly><button id="copy-invite" class="quiet-btn" type="button">COPY</button></div>
@@ -365,6 +376,11 @@
             <p class="field-label">FOUNDING PARTY / ONLINE PLAYERS <span id="lobby-player-count" class="lobby-player-count">1 ONLINE / 1 OF 100</span></p>
             <div id="player-list" class="player-list"></div>
             <button id="start-world" class="action-btn" type="button" hidden>START WORLD</button>
+            <details id="advanced-scenario-settings" class="advanced-scenario-settings" hidden>
+              <summary>ADVANCED · HOST SCENARIO SETTINGS</summary>
+              <p class="microcopy">Optional technical configuration for the host before the world starts. Normal play does not require editing JSON.</p>
+              <div id="advanced-scenario-content" class="advanced-scenario-content"></div>
+            </details>
             <div id="pause-controls" class="pause-controls" hidden>
               <p class="field-label">SIMULATION / PAUSE VOTE</p>
               <p id="pause-status" class="muted" role="status"></p>
@@ -388,9 +404,9 @@
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
   <script src="./simulation.js?v=20261108-playable-systems-v1"></script>
   <script src="./strategy.js?v=20261108-playable-systems-v1"></script>
-  <script src="./multiplayer.js?v=20261108-playable-systems-v1"></script>
+  <script src="./multiplayer.js?v=20261108-functional-controls-v3"></script>
   <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
-  <script src="./build-menu.js?v=20261108-theotown-builder-v2"></script>
-  <script src="./game.js?v=20261108-playable-systems-v1"></script>
+  <script src="./build-menu.js?v=20261108-functional-controls-v3"></script>
+  <script src="./game.js?v=20261108-functional-controls-v3"></script>
 </body>
 </html>

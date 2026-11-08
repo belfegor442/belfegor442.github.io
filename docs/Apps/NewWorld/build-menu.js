@@ -451,7 +451,7 @@
         if (!this.selectedItem) {
           this.setStatus('CHOOSE AN OBJECT FROM THE CATALOGUE.');
         } else if (!context.canBuild) {
-          this.setStatus('CONNECT TO A RUNNING MULTIPLAYER WORLD TO PLACE BUILDINGS.');
+          this.setStatus(context.buildReason || 'CONNECT TO A RUNNING MULTIPLAYER WORLD TO PLACE BUILDINGS.');
         } else if (Number(context.treasury) < Number(this.selectedItem.cost)) {
           this.setStatus('INSUFFICIENT TREASURY · ' + money(this.selectedItem.cost) + ' REQUIRED.');
         } else {
@@ -464,7 +464,7 @@
       const context = this.getContext() || {};
       const item = this.selectedItem;
       if (!item || !context.canBuild) {
-        this.setStatus('JOIN A GOVERNMENT AND START THE WORLD BEFORE BUILDING.');
+        this.setStatus(context.buildReason || 'JOIN A GOVERNMENT AND START THE WORLD BEFORE BUILDING.');
         return;
       }
       if (Number(context.treasury) < Number(item.cost)) {

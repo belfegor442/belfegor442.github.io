@@ -175,7 +175,8 @@
       client.subscribe(subscriptions, {qos:1}, error => {
         if (error || client !== this.client || this.closed) {
           this.connected = false;
-          this.onStatus('Could not subscribe to the room relay.');
+          this.onStatus('Could not subscribe to this relay. Trying another relay…');
+          if (client === this.client && !this.closed) this.scheduleBrokerRotation();
           return;
         }
         if (this.role === 'host') {
@@ -830,14 +831,15 @@
       const player = runtime.game.players.find(item =>
         item.id === message.playerId && item.token === message.playerToken);
       if (!player) {
+        publishSnapshot();
         emitOrderResult(message.playerId,{id:message.order?.orderId,accepted:false,
           code:'UNAUTHORIZED',error:'Player authentication failed.',replayed:false});
         return;
       }
       const result = applyOrder(runtime.game,player,message.order);
-      emitOrderResult(player.id,result);
       persistHost();
       publishSnapshot();
+      emitOrderResult(player.id,result);
     }
     if (message.t === 'bye') {
       const leaving = runtime.game.players.find(item =>
@@ -1224,15 +1226,39 @@
       try { saved = JSON.parse(localStorage.getItem(HOST_SAVE + session.inviteCode)); } catch {}
       if (!saved?.game || saved.game.id !== session.gameId ||
           saved.game.hostPlayerId !== session.playerId) {
-        return Promise.reject(new Error('The host save is not available in this browser. The original host device is required.'));
+        return Promise.reject(new Error('The host save is not available in this browser. Reopen the original host browser profile.'));
       }
+      const previousRuntime=runtime;
+      previousRuntime?.link?.close(false);
       setHostRuntime(saved.game,saved.session || session,handlers);
-      runtime.link.start();
-      return Promise.resolve({session:runtime.session,game:snapshot(runtime.game)});
+      const active=runtime;
+      return new Promise((resolve,reject) => {
+        const timeout=setTimeout(() => {
+          if(runtime===active) active.link.close(false);
+          reject(new Error('The saved world was loaded, but the host could not reconnect to the public relay. Check the network and press RECONNECT to retry.'));
+        },30000);
+        const previousStatus=active.onStatus;
+        active.onStatus=status => {
+          previousStatus(status);
+          if(runtime!==active) return;
+          if(status==='ready') {
+            clearTimeout(timeout);
+            handlers.onSession?.(active.session);
+            persistHost();
+            resolve({session:active.session,game:snapshot(active.game)});
+          } else if(String(status).startsWith('Relay error:') && !active.link.client) {
+            clearTimeout(timeout);
+            reject(new Error(status));
+          }
+        };
+        active.link.start();
+      });
     }
     if (!session?.inviteCode || !session.playerToken)
       return Promise.reject(new Error('The saved multiplayer session is incomplete.'));
     const name = session.playerName || handlers.playerName || 'PLAYER';
+    const previousRuntime=runtime;
+    previousRuntime?.link?.close(false);
     return joinWorld(session.inviteCode,name,handlers,session).then(restored => ({
       session:restored,game:null
     }));
@@ -1245,9 +1271,10 @@
         item.id === runtime.session.playerId && item.token === runtime.session.playerToken);
       if (!player) return false;
       const result = applyOrder(runtime.game,player,order);
-      runtime.onOrderResult(result);
       persistHost();
       publishSnapshot();
+      const onOrderResult=runtime.onOrderResult;
+      Promise.resolve().then(()=>onOrderResult?.(result));
       return true;
     }
     if (!runtime.link.connected || !runtime.session) return false;
