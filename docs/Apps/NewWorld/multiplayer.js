@@ -30,6 +30,25 @@
     school: {id:'school',name:'SCHOOL',cost:360,income:5,icon:'S',days:5,educationCapacity:5000,jobSlots:350,upkeep:6,description:'Provides education services.'},
     road: {id:'road',name:'ROAD',cost:65,income:0,icon:'R',days:1,jobSlots:40,upkeep:1,description:'Improves local access and transport.'}
   };
+  function isValidBuildSprite(buildingId,spriteKey) {
+    if (!spriteKey) return true;
+    if (typeof spriteKey !== "string" || spriteKey.length > 120) return false;
+    const parts = spriteKey.split("/");
+    if (parts.length !== 2) return false;
+    const [category,asset] = parts;
+    if (!/^[a-z0-9_-]+$/.test(category) || !/^[a-z0-9_-]+$/.test(asset)) return false;
+    switch (buildingId) {
+      case "farm": return category === "village" && ["1x1_farmhouse_barn","1x1_fisherman_hut"].includes(asset);
+      case "market": return (category === "restaurants" || category === "stores") && asset.startsWith("1x1_commercial_") && asset !== "1x1_commercial_57_clinic" || category === "village" && asset === "1x1_market_stall";
+      case "workshop": return category === "village" && asset === "1x1_lumber_shed";
+      case "housing": return category === "houses" && asset.startsWith("1x1_house") && Number.isInteger(Number(asset.slice(9))) || category === "village" && ["1x1_dovecote","1x1_longhouse","1x1_round_cottage"].includes(asset);
+      case "waterworks": return category === "watertower" && asset.startsWith("1x1_");
+      case "clinic": return category === "stores" && asset === "1x1_commercial_57_clinic" || category === "village" && asset === "1x1_apothecary";
+      case "school": return category === "village" && asset === "1x1_village_hall";
+      case "road": return false;
+      default: return false;
+    }
+  }
   const NAMES = [
     "Founders' Reach",'North Coast','Eastern Coast','Upper March',
     'Western Vale','Highland Basin','Orren Foothills','Eastern Uplands',
@@ -605,8 +624,15 @@
       const building = BUILDINGS[order.buildingId];
       const validPlot = Number.isSafeInteger(plot) && plot >= 0 &&
         (plot < LEGACY_PLOT_OFFSET || plot < MAX_WORLD_PLOT_INDEX);
-      if (!validPlot || !building)
+      const spriteKey = String(order.spriteKey || '');
+      const rotation = Number(order.rotation ?? 0);
+      if (!validPlot || !building || !isValidBuildSprite(order.buildingId,spriteKey) ||
+          !Number.isInteger(rotation) || rotation < 0 || rotation > 3)
         return reject('INVALID_PAYLOAD','Invalid construction request.',order.orderId);
+      const variantName = String(order.variantName || building.name)
+        .trim().replace(/\s+/g,' ').slice(0,56);
+      if (!variantName || /[<>\u0000-\u001f]/.test(variantName))
+        return reject('INVALID_PAYLOAD','Invalid construction name.',order.orderId);
       const government = game.territories.find(item => item.stateId === membership.stateId);
       if (!government) return reject('NOT_MEMBER','The selected territory has no active administration.',order.orderId);
       government.buildings ||= {};
@@ -615,17 +641,20 @@
         return reject('INSUFFICIENT_FUNDS','Insufficient treasury.',order.orderId);
       government.treasury -= building.cost;
       government.buildings[plot] = {
-        ...clone(building),daysRemaining:building.days,startedOn:game.worldDate,
+        ...clone(building),name:variantName,
+        ...(spriteKey ? {spriteKey,rotation} : {}),
+        catalogItemId:String(order.catalogItemId || '').slice(0,120) || null,
+        daysRemaining:building.days,startedOn:game.worldDate,
         builderPlayerId:player.id
       };
       game.financialTransactions.push({
         id:byId(),stateId:government.stateId,currencyId:government.currencyId,
         type:'constructionCost',amount:-building.cost,balanceBefore:government.treasury+building.cost,
-        balanceAfter:government.treasury,description:'Constructed ' + building.name + '.',
+        balanceAfter:government.treasury,description:'Constructed ' + variantName + '.',
         worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
         membershipId:membership.id
       });
-      pushActivity(game,player.name + ' started construction of a ' + building.name.toLowerCase() +
+      pushActivity(game,player.name + ' started construction of ' + variantName +
         ' in ' + government.name + '.');
     } else {
       return reject('UNSUPPORTED_ORDER','This order is not yet available in the host-authoritative ruleset.',order.orderId);

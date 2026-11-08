@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261108-frontier-build-v1">
+  <link rel="stylesheet" href="./game.css?v=20261108-theotown-builder-v2">
 </head>
 <body>
   <header class="topbar">
@@ -74,6 +74,45 @@
           <div class="map-compass" aria-hidden="true"><span>N</span><b>▲</b></div>
           <div class="map-scale" aria-hidden="true"><span></span><small>500 KM</small></div>
           <div id="map-coordinates" class="map-coordinates" aria-hidden="true">BELELAND · WORLD 001</div>
+          <section id="theotown-build-menu" class="theotown-build-menu" role="dialog" aria-label="Build catalogue" hidden>
+            <div class="build-menu-top">
+              <div class="build-menu-title"><span class="build-menu-hammer" aria-hidden="true">⚒</span><div><strong>BUILD</strong><small>OBJECT CATALOGUE</small></div></div>
+              <div class="build-menu-context"><small id="build-region-name">NO SETTLEMENT</small><strong id="build-budget">¤ 0</strong><span>TREASURY</span></div>
+              <button id="build-menu-close" class="build-menu-close" type="button" aria-label="Close build menu">×</button>
+            </div>
+            <nav id="build-categories" class="build-categories" aria-label="Build categories"></nav>
+            <div class="build-menu-main">
+              <section class="build-catalog-column" aria-label="Available buildings">
+                <div class="build-catalog-heading"><strong id="build-category-title">ALL BUILDINGS</strong><span id="build-category-count">0 ITEMS</span></div>
+                <div class="build-search-row">
+                  <input id="build-search" type="search" autocomplete="off" placeholder="Search catalogue…" aria-label="Search buildings">
+                  <span id="build-catalog-total">LOADING</span>
+                </div>
+                <div id="build-catalog-grid" class="build-catalog-grid" aria-live="polite"></div>
+              </section>
+              <section id="build-selected-panel" class="build-selected-panel" aria-label="Selected building information">
+                <div class="build-selected-preview-wrap">
+                  <canvas id="build-selected-preview" width="240" height="170" aria-label="Selected building preview"></canvas>
+                  <span class="build-preview-caption">OBJECT PREVIEW</span>
+                </div>
+                <div class="build-selected-copy">
+                  <span id="build-selected-category" class="build-selected-type">NO BUILDING SELECTED</span>
+                  <strong id="build-selected-title">Choose an object</strong>
+                  <p id="build-selected-description">Select an item from the catalogue to inspect its description, cost and effects.</p>
+                  <div id="build-selected-stats" class="build-selected-stats"></div>
+                  <div class="build-selected-cost"><strong id="build-selected-cost">—</strong><span id="build-selected-time">— WORLD DAYS</span></div>
+                  <button id="build-confirm" class="build-confirm" type="button" disabled><span aria-hidden="true">⚒</span> BUILD</button>
+                </div>
+              </section>
+            </div>
+            <footer class="build-placement-controls">
+              <div id="build-placement-status" class="build-placement-status" role="status">SELECT AN OBJECT, THEN PRESS BUILD TO PLACE IT ON THE MAP.</div>
+              <div class="build-placement-buttons">
+                <button id="build-rotate" type="button" class="secondary-button" disabled>ROTATE <kbd>R</kbd></button>
+                <button id="build-cancel-placement" type="button" class="secondary-button" disabled>CANCEL <kbd>ESC</kbd></button>
+              </div>
+            </footer>
+          </section>
         </div>
         <div class="map-foot">
           <span><i class="legend owned"></i> <span id="legend-owned">YOUR GOVERNMENT</span></span>
@@ -114,7 +153,7 @@
           <div id="territorial-control-list" class="political-list"></div>
           <details id="territory-setup-panel" hidden>
             <summary>Technical territorial scenario setup · lobby only</summary>
-            <p class="microcopy">Geometry is referenced by SVG element ID in external scenario data. The original map SVG is never modified.</p>
+            <p class="microcopy">Geometry is referenced by SVG element ID in external scenario data. The map remains editable only through the placement tools and authoritative world orders.</p>
             <button id="load-territory-config" class="secondary-button" type="button">Load current configuration</button>
             <textarea id="territory-config" class="text-field" rows="12" spellcheck="false" aria-label="Territorial scenario JSON"></textarea>
             <button id="save-territory-config" class="primary-button" type="button">Validate and save scenario</button>
@@ -122,29 +161,30 @@
         </section>
 
         <section id="city-view" class="view">
-          <div class="section-bar"><div><p class="panel-kicker">FRONTIER / CONSTRUCTION</p><h2 id="city-title">Founding settlement</h2></div><span class="city-level" id="city-level">LEVEL 01</span></div>
-          <p class="muted city-intro">Choose an empty plot and build. Construction advances with the world clock; completed buildings provide housing, food, water, jobs and public services.</p>
-          <div class="settlement-overview" aria-label="Settlement operations">
-            <div class="settlement-metrics">
-              <div><small>RESIDENTS</small><strong id="settlement-residents">—</strong></div>
-              <div><small>OPEN CAPACITY</small><strong id="settlement-capacity">—</strong></div>
-              <div><small>DAILY GROWTH</small><strong id="settlement-growth">—</strong></div>
-              <div><small>AVAILABLE JOBS / WORKING AGE</small><strong id="settlement-employment">—</strong></div>
-              <div><small>COMPLETED BUILDINGS</small><strong id="settlement-buildings">—</strong></div>
-              <div><small>UNDER CONSTRUCTION</small><strong id="settlement-construction">—</strong></div>
-            </div>
-            <div id="settlement-services" class="settlement-services"></div>
-            <p id="settlement-status" class="settlement-status" role="status">Connect to a multiplayer world to simulate residents and services.</p>
-          </div>
-          <div id="city-grid" class="city-grid" aria-label="Local territory construction plots"></div>
-          <div class="city-legend"><span>12 × 12 LOCAL PLOTS</span><span>SELECT A PLOT TO BUILD</span></div>
-          <div class="construction-panel">
-            <h3 id="plot-title">Available plots</h3>
-            <p class="muted" id="plot-description">Select an empty plot, then choose a building.</p>
-            <div id="building-options" class="building-options"></div>
+          <p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p>
+          <h2 id="city-title">Founding settlement</h2>
+          <p class="muted">Select a plot on the terrain, choose an asset from the Build catalogue, then place it directly into the world. Buildings are constructed over world days and affect the settlement economy.</p>
+          <div class="build-side-summary">
+            <div><small>SELECTED PLOT</small><strong id="selected-plot-label">CENTRAL PLOT</strong></div>
+            <div><small>AVAILABLE TREASURY</small><strong id="build-budget-side">—</strong></div>
           </div>
           <div class="panel-divider"></div>
-          <div class="ownership-row"><span>MONTHLY CITY INCOME</span><strong id="city-income">¤ 85</strong></div>
+          <details id="settlement-details" class="settlement-details" open>
+            <summary>SETTLEMENT / POPULATION / SERVICES</summary>
+            <div class="settlement-overview" aria-label="Settlement operations">
+              <div class="settlement-metrics">
+                <div><small>RESIDENTS</small><strong id="settlement-residents">—</strong></div>
+                <div><small>OPEN CAPACITY</small><strong id="settlement-capacity">—</strong></div>
+                <div><small>DAILY GROWTH</small><strong id="settlement-growth">—</strong></div>
+                <div><small>AVAILABLE JOBS / WORKING AGE</small><strong id="settlement-employment">—</strong></div>
+                <div><small>COMPLETED BUILDINGS</small><strong id="settlement-buildings">—</strong></div>
+                <div><small>UNDER CONSTRUCTION</small><strong id="settlement-construction">—</strong></div>
+              </div>
+              <div id="settlement-services" class="settlement-services"></div>
+              <p id="settlement-status" class="settlement-status" role="status">Connect to a multiplayer world to simulate residents and services.</p>
+            </div>
+            <div class="ownership-row"><span>MONTHLY CITY INCOME</span><strong id="city-income">—</strong></div>
+          </details>
         </section>
 
         <section id="ledger-view" class="view">
@@ -311,8 +351,9 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
   <script src="./simulation.js?v=20261108-frontier-build-v1"></script>
-  <script src="./multiplayer.js?v=20261108-frontier-build-v1"></script>
-  <script src="./map-renderer.js?v=20261107-natural-terrain-v2"></script>
-  <script src="./game.js?v=20261108-frontier-build-v1"></script>
+  <script src="./multiplayer.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./build-menu.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./game.js?v=20261108-theotown-builder-v2"></script>
 </body>
 </html>

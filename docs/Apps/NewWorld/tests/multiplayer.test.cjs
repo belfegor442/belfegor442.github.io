@@ -178,3 +178,43 @@ test('construction accepts world-map plot IDs and stores buildings on the contro
   assert.equal(territory.buildings[plotIndex].daysRemaining,2);
   assert.equal(host.buildings[plotIndex],undefined);
 });
+
+
+test('sprite construction preserves the exact catalogue name, asset and rotation', () => {
+  const {game} = multiplayer.createInitialWorld('Host');
+  const host = game.players[0];
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const territory = game.territories[0];
+  const plotIndex = 144 + 512 * 1024 + 512;
+  const result = multiplayer.applyOrder(game,host,{
+    orderId:'build-catalogue-variant-1',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:territory.stateId,
+    type:'build',plotIndex,buildingId:'farm',
+    spriteKey:'village/1x1_fisherman_hut',
+    rotation:1,
+    variantName:"Fisherman's hut",
+    catalogItemId:'village/1x1_fisherman_hut'
+  });
+  assert.equal(result.accepted,true,result.error);
+  assert.equal(territory.buildings[plotIndex].name,"Fisherman's hut");
+  assert.equal(territory.buildings[plotIndex].spriteKey,'village/1x1_fisherman_hut');
+  assert.equal(territory.buildings[plotIndex].rotation,1);
+  assert.equal(territory.buildings[plotIndex].catalogItemId,'village/1x1_fisherman_hut');
+});
+
+test('construction rejects a catalogue sprite incompatible with its building type', () => {
+  const {game} = multiplayer.createInitialWorld('Host');
+  const host = game.players[0];
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const territory = game.territories[0];
+  const treasury = territory.treasury;
+  const result = multiplayer.applyOrder(game,host,{
+    orderId:'build-invalid-catalogue-variant',gameId:game.id,playerId:host.id,
+    expectedWorldVersion:game.worldVersion,stateId:territory.stateId,
+    type:'build',plotIndex:144+512*1024+512,buildingId:'farm',
+    spriteKey:'houses/1x1_house1',rotation:0,variantName:'House 1'
+  });
+  assert.equal(result.accepted,false);
+  assert.equal(result.code,'INVALID_PAYLOAD');
+  assert.equal(territory.treasury,treasury);
+});
