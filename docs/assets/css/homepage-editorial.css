@@ -848,3 +848,83 @@ a:hover,.project-row:hover .project-title b{
   .ht h1{font-family:"NA Mr Tech","NA Pro Display",sans-serif!important}
   h2{font-family:"NA Pro Display",Manrope,sans-serif!important}
 }
+
+/* NORTH ASSEMBLY signature motion — restore the designed effects, not gimmicks. */
+html.na-motion .sec:not(.hero){
+  isolation:isolate;
+}
+html.na-motion .sec:not(.hero)::after{
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  pointer-events:none;
+  opacity:0;
+  background:linear-gradient(180deg,transparent 0%,rgba(197,31,50,0) 47.8%,rgba(197,31,50,.04) 49.3%,rgba(239,70,85,.2) 50%,rgba(197,31,50,.04) 50.7%,rgba(197,31,50,0) 52.2%,transparent 100%);
+  transform:translate3d(0,-100%,0);
+  mix-blend-mode:screen;
+}
+html.na-motion .sec.in:not(.hero)::after{
+  animation:na-section-scanner 1.15s cubic-bezier(.22,.72,.22,1) .06s both;
+}
+@keyframes na-section-scanner{
+  0%{transform:translate3d(0,-100%,0);opacity:0}
+  14%{opacity:.8}
+  78%{opacity:.55}
+  100%{transform:translate3d(0,100%,0);opacity:0}
+}
+html.na-motion .sec:not(.hero)>.c{
+  opacity:.82;
+  filter:blur(3px);
+  transform:translate3d(0,22px,0);
+  transition:opacity .8s ease,filter .9s ease,transform .9s cubic-bezier(.2,.7,.2,1);
+}
+html.na-motion .sec.in:not(.hero)>.c{
+  opacity:1;filter:blur(0);transform:none;
+}
+html.na-motion h2 .na-letter{
+  display:inline-block;
+  opacity:0;
+  filter:blur(5px);
+  transform:translate3d(0,.55em,0) rotateX(-45deg);
+  transform-origin:50% 100%;
+  transition:opacity .5s ease,filter .65s ease,transform .72s cubic-bezier(.2,.7,.2,1);
+  transition-delay:calc(var(--letter-index)*18ms);
+}
+html.na-motion .sec.in h2 .na-letter{
+  opacity:1;filter:blur(0);transform:none;
+}
+.na-cursor-glow{
+  position:fixed;z-index:79;left:0;top:0;
+  width:230px;aspect-ratio:1;border-radius:50%;
+  pointer-events:none;opacity:0;
+  transform:translate3d(var(--cursor-x,-1000px),var(--cursor-y,-1000px),0) translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(197,31,50,.11),rgba(197,31,50,.045) 38%,transparent 72%);
+  mix-blend-mode:screen;filter:blur(2px);
+  transition:opacity .18s ease,width .22s ease;
+}
+html.na-cursor-visible .na-cursor-glow{opacity:1}
+html.na-cursor-hot .na-cursor-glow{width:300px}
+.na-route-wipe{
+  position:fixed;z-index:100;inset:0;pointer-events:none;
+  visibility:hidden;opacity:0;transform:translate3d(-110%,0,0) skewX(-8deg);
+  background:linear-gradient(105deg,transparent 0%,rgba(130,8,18,.12) 25%,rgba(197,31,50,.2) 47%,rgba(8,8,8,.92) 50%,rgba(197,31,50,.15) 54%,transparent 76%);
+  border-right:1px solid rgba(239,70,85,.45);
+}
+html.na-route-transition .na-route-wipe{
+  visibility:visible;opacity:1;
+  animation:na-route-wipe .68s cubic-bezier(.72,0,.22,1) both;
+}
+@keyframes na-route-wipe{
+  0%{transform:translate3d(-110%,0,0) skewX(-8deg);opacity:0}
+  16%{opacity:1}
+  52%{transform:translate3d(0,0,0) skewX(-8deg);opacity:1}
+  100%{transform:translate3d(110%,0,0) skewX(-8deg);opacity:0}
+}
+@media(pointer:coarse){.na-cursor-glow{display:none!important}}
+@media(prefers-reduced-motion:reduce){
+  html.na-motion .sec:not(.hero)>.c{opacity:1;filter:none;transform:none;transition:none}
+  html.na-motion .sec:not(.hero)::after{display:none}
+  html.na-motion h2 .na-letter{opacity:1;filter:none;transform:none;transition:none}
+  .na-cursor-glow,.na-route-wipe{display:none!important;animation:none!important;transition:none!important}
+}

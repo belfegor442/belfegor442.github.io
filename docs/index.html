@@ -95,7 +95,7 @@ footer a:hover{color:var(--ink)}
 
 </style>
 <link rel="stylesheet" href="/assets/css/homepage.css?v=20261109-31">
-<link rel="stylesheet" href="/assets/css/homepage-editorial.css?v=20261109-33">
+<link rel="stylesheet" href="/assets/css/homepage-editorial.css?v=20261109-34">
 </head>
 <body>
 <nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><img src="/na-mark.svg?v=20261108-1" alt=""></a><b class="nav-name">NORTH ASSEMBLY</b><div><a href="#apps" data-t="apps">Applications</a><a href="#systems" data-t="systems">Systems</a><a href="#about" data-t="about">About</a><a href="#team" data-t="team">Team</a><a class="pill" href="/hub/">Hub</a></div></nav>
@@ -336,6 +336,78 @@ footer a:hover{color:var(--ink)}
   loadHeadline();
   window.setInterval(loadHeadline, 15000);
   console.info("[North Assembly] Publica una noticia o dos separadas por |. Ejemplo: NorthAssembly.updateNews(\"Noticia 1 | Noticia 2\").");
+})();
+</script>
+
+
+<script>
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+  if (!reduce && "IntersectionObserver" in window) {
+    const headings = document.querySelectorAll(".sec:not(.hero) h2");
+    headings.forEach((heading) => {
+      if (heading.dataset.motionReady) return;
+      heading.dataset.motionReady = "1";
+      const label = heading.textContent.trim();
+      heading.setAttribute("aria-label", label);
+      heading.setAttribute("aria-live", "off");
+      let index = 0;
+      heading.innerHTML = Array.from(label).map((character) => {
+        if (character === " ") return '<span class="na-letter" aria-hidden="true" style="--letter-index:' + index++ + '">&nbsp;</span>';
+        return '<span class="na-letter" aria-hidden="true" style="--letter-index:' + index++ + '">' + character.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) + '</span>';
+      }).join("");
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("in");
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+
+    document.querySelectorAll(".sec:not(.hero)").forEach(section => observer.observe(section));
+    const hero = document.querySelector(".hero");
+    if (hero) requestAnimationFrame(() => hero.classList.add("in"));
+    root.classList.add("na-motion");
+  } else {
+    document.querySelectorAll(".sec").forEach(section => section.classList.add("in"));
+  }
+
+  if (!reduce && finePointer) {
+    const glow = document.createElement("div");
+    glow.className = "na-cursor-glow";
+    glow.setAttribute("aria-hidden", "true");
+    document.body.appendChild(glow);
+    window.addEventListener("pointermove", event => {
+      if (event.pointerType === "touch") return;
+      glow.style.setProperty("--cursor-x", event.clientX + "px");
+      glow.style.setProperty("--cursor-y", event.clientY + "px");
+      root.classList.add("na-cursor-visible");
+      root.classList.toggle("na-cursor-hot", !!event.target.closest("a,button"));
+    }, { passive: true });
+    document.addEventListener("pointerleave", () => root.classList.remove("na-cursor-visible","na-cursor-hot"));
+  }
+
+  if (!reduce) {
+    const wipe = document.createElement("div");
+    wipe.className = "na-route-wipe";
+    wipe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(wipe);
+    document.addEventListener("click", event => {
+      const link = event.target.closest('a[href^="#"]');
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = link.getAttribute("href");
+      if (!target || target === "#" || !document.querySelector(target)) return;
+      if (root.classList.contains("na-route-transition")) return;
+      root.classList.add("na-route-transition");
+    });
+    wipe.addEventListener("animationend", () => root.classList.remove("na-route-transition"));
+  }
 })();
 </script>
 
