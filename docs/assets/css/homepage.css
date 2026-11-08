@@ -973,3 +973,29 @@ footer a:hover{color:#ff636b}
   .news-headline{font-size:clamp(18px,5vw,23px)}
   .hint span{font-size:10px}
 }
+
+/* Complete the original North Assembly font map where generic fallbacks remained. */
+
+/* Mr Tech was the intended display face for the main North Assembly wordmark. */
+.ht h1{
+  font-family:"NA Mr Tech","NA Pro Display",sans-serif!important;
+  font-weight:400;
+  letter-spacing:-.045em;
+  line-height:.94;
+  text-transform:uppercase;
+  font-synthesis:none;
+}
+@media(max-width:760px){
+  .ht h1{letter-spacing:-.04em;line-height:.98}
+}
+
+/* Techno fills the remaining technical/meta labels; prose remains Manrope. */
+.ht li,
+.ht li b,
+dt,
+.conn small,
+footer{
+  font-family:"NA Techno","IBM Plex Mono",Consolas,monospace!important;
+  font-weight:400;
+  letter-spacing:.045em;
+}
