@@ -349,7 +349,7 @@ footer a:hover{color:var(--ink)}
       '<span class="news-cycle">' + storyMarkup + '</span>'
     ).join("");
     ticker.style.setProperty("--news-loop-distance", loopDistance + "px");
-    const duration = Math.max(14, Math.min(42, (newsWindow.clientWidth + loopDistance) / 92));
+    const duration = Math.max(14, Math.min(42, loopDistance / 92));
     ticker.style.setProperty("--news-duration", duration.toFixed(2) + "s");
     void ticker.offsetWidth;
     ticker.style.animation = "";
