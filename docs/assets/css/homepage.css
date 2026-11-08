@@ -336,3 +336,64 @@ h2{
   from{transform:translateX(0) translateY(-50%)}
   to{transform:translateX(calc(-1 * var(--news-loop-distance,100vw))) translateY(-50%)}
 }
+
+
+/* NORTH ASSEMBLY — locally hosted type system */
+@font-face{
+  font-family:"NA Mr Tech";
+  src:url("/fonts/Mr%20Tech-Ly%20St.ttf") format("truetype");
+  font-style:normal;font-weight:400 800;font-display:swap;
+}
+@font-face{
+  font-family:"NA Techno";
+  src:url("/fonts/Techno.ttf") format("truetype");
+  font-style:normal;font-weight:400;font-display:swap;
+}
+@font-face{
+  font-family:"NA VHS Gothic";
+  src:url("/fonts/vhs-gothic.ttf") format("truetype");
+  font-style:normal;font-weight:400;font-display:swap;
+}
+@font-face{
+  font-family:"NA Pro Display";
+  src:url("/fonts/Pro%20Display%20tfb.ttf") format("truetype");
+  font-style:normal;font-weight:400 800;font-display:swap;
+}
+/* Clear typographic hierarchy: display, editorial and technical metadata. */
+:root{
+  --display:"NA Pro Display","Space Grotesk",sans-serif;
+  --fm:"IBM Plex Mono",Consolas,monospace;
+}
+.ht h1{
+  font-family:"NA Mr Tech","NA Pro Display",sans-serif;
+  font-weight:400;
+  letter-spacing:-.045em;
+  line-height:.94;
+}
+h2,.card h3,.sys b,.people b,.conn b{
+  font-family:"NA Pro Display","Space Grotesk",sans-serif;
+  font-weight:400;
+  letter-spacing:-.035em;
+}
+.ht small,.nav-name,.news-label,.news-caption,
+.card .k,.card .pl,.tag,.employee-number,
+.employee-name small,.employee-role,.employee-status,
+.people-directory-head,.people-directory-foot{
+  font-family:"NA Techno",var(--fm);
+  letter-spacing:.055em;
+}
+.news-label,.news-caption{
+  font-family:"NA VHS Gothic","NA Techno",var(--fm);
+  letter-spacing:.09em;
+}
+.news-headline{
+  font-family:"NA Pro Display","NA Mr Tech",sans-serif;
+  font-weight:400;
+  letter-spacing:-.018em;
+}
+nav div{font-family:"NA Techno",var(--fm);letter-spacing:.035em}
+.card h3{letter-spacing:-.025em}
+.ht h1,.card h3,h2{font-synthesis:none}
+@media(max-width:760px){
+  .ht h1{letter-spacing:-.04em}
+}
