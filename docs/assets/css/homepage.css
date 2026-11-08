@@ -594,3 +594,343 @@ html:not(.na-ticker-ready) .news-window{height:auto;min-height:1.6em}
   nav div{gap:3px}
   nav div a{font-size:6.5px}
 }
+
+
+
+/* NORTH ASSEMBLY — BLACKOUT visual pass */
+:root{
+  --bg:#030303;
+  --surface:#0a0a0a;
+  --surface-2:#111111;
+  --ink:#f7f7f7;
+  --mute:#999999;
+  --line:rgba(255,255,255,.12);
+  --line-strong:rgba(255,255,255,.25);
+  --ac:#f02b36;
+  --ac-2:#ff4b50;
+  --ease:cubic-bezier(.2,.75,.25,1);
+}
+html,body{background-color:#030303;color:var(--ink)}
+body{
+  background:
+    radial-gradient(ellipse at 80% 18%,rgba(180,12,24,.19),transparent 34rem),
+    radial-gradient(ellipse at 5% 72%,rgba(100,0,8,.10),transparent 34rem),
+    #030303;
+}
+body:before{
+  opacity:.16;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:linear-gradient(to bottom,#000,transparent 88%);
+}
+::selection{background:#ed2938;color:#fff}
+a:focus-visible,button:focus-visible{outline-color:#ff545c}
+.pg{height:3px;background:linear-gradient(90deg,#7f080f,#ed2938,#ff7378)}
+nav{
+  background:linear-gradient(180deg,rgba(3,3,3,.98),rgba(3,3,3,.88));
+  border-bottom-color:rgba(255,255,255,.12);
+  box-shadow:0 8px 28px rgba(0,0,0,.22);
+}
+nav:before{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(240,43,54,.7) 24%,rgba(240,43,54,.08) 70%,transparent);
+  pointer-events:none;
+}
+nav a:hover,nav a.on{color:#fff}
+nav sup{color:var(--ac)}
+nav .pill{
+  border-color:rgba(240,43,54,.72);
+  background:rgba(240,43,54,.08);
+  color:#fff;
+}
+nav .pill:hover{background:var(--ac);border-color:var(--ac);color:#fff}
+.nav-name{color:#f7f7f7!important}
+.hero{
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse at 78% 46%,rgba(186,10,25,.15),transparent 35%),
+    linear-gradient(115deg,#030303 0%,#080808 55%,#050303 100%);
+}
+.hero:before{
+  content:"";position:absolute;z-index:0;
+  top:8%;right:5%;width:min(56vw,720px);height:76%;
+  background:
+    radial-gradient(ellipse at 62% 50%,rgba(232,31,48,.19),transparent 54%),
+    radial-gradient(ellipse at 85% 30%,rgba(255,255,255,.035),transparent 45%);
+  filter:blur(18px);
+  pointer-events:none;
+  animation:na-red-breathe 9s ease-in-out infinite alternate;
+}
+.hero:after{
+  content:"";position:absolute;left:0;top:23%;bottom:18%;width:2px;
+  background:linear-gradient(transparent,rgba(240,43,54,.85),transparent);
+  box-shadow:0 0 24px rgba(240,43,54,.55);
+  pointer-events:none;
+}
+@keyframes na-red-breathe{
+  from{transform:translate3d(0,-1.2%,0) scale(.96);opacity:.65}
+  to{transform:translate3d(-1.5%,1.2%,0) scale(1.04);opacity:1}
+}
+.ht{z-index:2}
+.ht small{
+  color:#ff656b;
+  letter-spacing:.19em;
+}
+.ht small:before{
+  color:#ff3a45;
+  text-shadow:0 0 12px rgba(240,43,54,.9);
+}
+.ht h1{
+  color:#fff;
+  font-weight:800;
+  -webkit-text-stroke:.45px rgba(255,255,255,.8);
+  text-shadow:0 5px 35px rgba(255,255,255,.035);
+  letter-spacing:-.025em;
+}
+.ht p{
+  color:#c4c4c4;
+  border-left:2px solid var(--ac);
+  text-shadow:0 1px 10px rgba(0,0,0,.5);
+}
+.ht ul{
+  border-color:rgba(255,255,255,.22);
+}
+.ht li{
+  color:#b7b7b7;
+  border-color:rgba(255,255,255,.14);
+}
+.ht li b{color:#fff;font-weight:700}
+.hero-banner{
+  border:1px solid rgba(240,43,54,.45);
+  border-radius:2px;
+  background:#000;
+  box-shadow:0 24px 75px rgba(0,0,0,.58),0 0 55px rgba(190,15,28,.13);
+  transition:border-color .35s,box-shadow .35s,transform .5s var(--ease);
+}
+.hero-banner:after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.07) 50%,transparent 65%);
+  transform:translateX(-120%);
+  animation:na-banner-sweep 8s ease-in-out infinite;
+}
+@keyframes na-banner-sweep{
+  0%,55%{transform:translateX(-120%)}
+  82%,100%{transform:translateX(120%)}
+}
+.hero-banner:hover{
+  border-color:rgba(255,72,82,.85);
+  box-shadow:0 28px 85px rgba(0,0,0,.65),0 0 65px rgba(220,18,34,.2);
+}
+.hint{color:#b0b0b0}
+.hint i{background:linear-gradient(var(--ac),transparent)}
+h2{
+  color:#fff;
+  font-weight:800;
+  -webkit-text-stroke:.2px rgba(255,255,255,.6);
+  letter-spacing:-.045em;
+}
+#apps h2:before,#systems h2:before,#team h2:before,#connect h2:before{
+  color:#ff565e;
+  letter-spacing:.2em;
+}
+.lead{color:#a9a9a9}
+.sec:not(.hero){border-top:1px solid rgba(255,255,255,.055)}
+.stack{gap:14px}
+.card{
+  background:linear-gradient(145deg,#111 0%,#090909 72%,#0d0506 100%);
+  border-color:rgba(255,255,255,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.card:before{
+  background:
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.22),transparent 58%),
+    linear-gradient(125deg,rgba(255,255,255,.025),transparent 44%);
+}
+.card:after{
+  width:54px;height:2px;
+  background:linear-gradient(90deg,var(--ac),transparent);
+  opacity:.95;
+  transition:width .4s var(--ease);
+}
+.card.in:hover{
+  border-color:rgba(240,43,54,.62);
+  box-shadow:0 22px 58px rgba(0,0,0,.58),0 0 26px rgba(180,12,24,.10);
+  transform:translateY(-7px);
+}
+.card.in:hover:after{width:100%}
+.card .k:first-child span:last-child{color:#ff6068}
+.card h3{
+  color:#fff;
+  font-weight:700;
+  letter-spacing:-.045em;
+}
+.card p{color:#a9a9a9}
+.card .pl{border-color:rgba(255,255,255,.3);color:#eee}
+.card:hover .pl{background:var(--ac);border-color:var(--ac);color:#fff}
+.tag{
+  border-color:rgba(240,43,54,.58);
+  color:#ff6b72;
+  background:rgba(240,43,54,.08);
+}
+.sys a{
+  border-color:rgba(255,255,255,.12);
+  transition:padding .35s var(--ease),background .3s,border-color .3s;
+}
+.sys a:before{background:var(--ac);box-shadow:0 0 15px rgba(240,43,54,.65)}
+.sys a:hover{
+  background:rgba(240,43,54,.045);
+  border-color:rgba(240,43,54,.35);
+}
+.sys b{color:#fff;font-weight:700}
+.sys span{color:#999}
+.about{
+  position:relative;
+  padding:clamp(24px,4vw,50px);
+  border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(135deg,rgba(255,255,255,.025),rgba(240,43,54,.035));
+}
+.about:before{
+  content:"";position:absolute;left:0;top:0;width:72px;height:3px;
+  background:var(--ac);box-shadow:0 0 20px rgba(240,43,54,.5);
+}
+.about h2{max-width:12ch}
+.about .lead{border-left-color:var(--ac)}
+.about p:not(.lead){color:#b6b6b6}
+dl div{border-color:rgba(255,255,255,.14)}
+dt{color:#999}
+dd{color:#efefef}
+.people-directory{
+  border-color:rgba(255,255,255,.28);
+  background:linear-gradient(180deg,rgba(255,255,255,.018),transparent);
+}
+.people-directory-head,.people-directory-foot{color:#a4a4a4}
+.employee-row{border-color:rgba(255,255,255,.12)}
+.employee-number{color:#ff626b}
+.employee-name b{color:#fff;font-weight:700}
+.employee-name small{color:#858585}
+.employee-role{color:#a7a7a7}
+.employee-status{color:#ff7178}
+.employee-status:before{
+  background:var(--ac);
+  box-shadow:0 0 12px rgba(240,43,54,.6);
+}
+.vacancies-head{border-top-color:rgba(240,43,54,.38)}
+.vacancy-row .employee-name b,.vacancy-row .employee-role{color:#9b9b9b}
+.employee-status.is-open{color:#c6c6c6}
+.employee-status.is-open:before{background:transparent;border-color:#9b9b9b;box-shadow:none}
+.conn a{
+  border-color:rgba(255,255,255,.14);
+  background:linear-gradient(145deg,#111,#080808);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.conn a:after{color:#ff5a63}
+.conn a:hover{
+  border-color:rgba(240,43,54,.62);
+  background:linear-gradient(145deg,#16090a,#090909);
+  box-shadow:0 15px 40px rgba(0,0,0,.45),0 0 24px rgba(180,12,24,.10);
+}
+.conn b{color:#fff;font-weight:700}
+footer{
+  border-top-color:rgba(255,255,255,.19);
+  color:#858585;
+}
+footer a:hover{color:#ff636b}
+.news-ticker{
+  min-height:72px;
+  border-top:1px solid rgba(240,43,54,.6);
+  background:linear-gradient(90deg,#050505,#100607 48%,#050505);
+  box-shadow:0 -15px 48px rgba(0,0,0,.48);
+}
+.news-label{
+  align-self:stretch;
+  margin:-13px 0;
+  padding:0 18px;
+  background:#d51f2c;
+  color:#fff;
+  letter-spacing:.12em;
+}
+.news-label i{
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,.13),0 0 14px rgba(255,255,255,.5);
+}
+.news-window{border-left-color:rgba(240,43,54,.4)}
+.news-headline{color:#fff;font-weight:600;text-shadow:0 0 18px rgba(240,43,54,.14)}
+.news-separator{color:#ff505a}
+.news-caption{color:#ff777d}
+.news-cycle{padding-right:.18em}
+@media(max-width:760px){
+  .hero{
+    background:
+      radial-gradient(ellipse at 72% 55%,rgba(186,10,25,.14),transparent 55%),
+      #030303;
+  }
+  .hero:before{top:22%;right:-25%;width:100%;height:60%}
+  .hero-banner{
+    border-color:rgba(240,43,54,.5);
+    box-shadow:0 18px 54px rgba(0,0,0,.55),0 0 32px rgba(190,15,28,.12);
+  }
+  .about{padding:22px 16px}
+  .news-ticker{min-height:58px}
+  .news-label{margin:-10px 0;padding:0 10px}
+  .news-caption{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero:before,.hero-banner:after{animation:none}
+  .card,.hero-banner{transition:none}
+}
+
+
+@media(max-width:760px){
+  .ht small{
+    max-width:calc(100vw - 60px);
+    font-size:8px;
+    line-height:1.7;
+    letter-spacing:.085em;
+    white-space:normal;
+  }
+  .ht small:before{margin-right:6px}
+  .hero:after{opacity:.65}
+}
+@media(max-width:420px){
+  .ht small{font-size:7.5px;letter-spacing:.06em}
+}
+
+
+/* Keep the main wordmark heavy and clean, not pixel-rendered. */
+.ht h1{
+  font-family:"NA Pro Display","Space Grotesk",Arial,sans-serif;
+  font-weight:800;
+  -webkit-text-stroke:0;
+  letter-spacing:-.075em;
+  line-height:.9;
+  text-transform:uppercase;
+  text-shadow:0 8px 42px rgba(255,255,255,.055);
+}
+@media(max-width:760px){
+  .ht h1{letter-spacing:-.055em;line-height:1.02}
+}
+
+
+.ht h1{
+  font-family:"Manrope",Arial,sans-serif!important;
+  font-weight:800;
+  -webkit-text-stroke:0;
+  letter-spacing:-.085em;
+  line-height:.88;
+}
+@media(max-width:760px){
+  .ht h1{letter-spacing:-.06em;line-height:1}
+}
+
+
+/* Intermediate desktop widths: keep the hero inside a stable content grid. */
+.ht{width:min(88vw,1240px)}
+@media(min-width:761px) and (max-width:1100px){
+  .ht{width:88vw;padding-top:110px}
+  .ht h1{font-size:clamp(3.5rem,7vw,5.4rem);max-width:7.6ch}
+  .ht p{max-width:40ch;font-size:14px}
+  .hero-banner{right:0;width:min(34vw,350px)}
+}
