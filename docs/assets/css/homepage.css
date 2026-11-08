@@ -1532,3 +1532,254 @@ html{scroll-padding-bottom:var(--na-news-clearance)}
     transform:none;
   }
 }
+
+
+/* =========================================================
+   BLACKOUT / refinement pass 02
+   Surface depth, navigation feedback and restrained motion.
+   Does not modify news ticker, typography or page content.
+   ========================================================= */
+
+:root{
+  --na-black:#030303;
+  --na-panel:#0b0b0b;
+  --na-panel-hi:#121212;
+  --na-red:#f02b36;
+  --na-red-light:#ff626b;
+  --na-line:rgba(255,255,255,.12);
+  --na-line-hot:rgba(240,43,54,.42);
+  --na-ease:cubic-bezier(.2,.75,.25,1);
+}
+
+/* Navigation: a precise red active marker and better glass separation. */
+nav{
+  border-bottom-color:rgba(255,255,255,.105);
+  background:linear-gradient(180deg,rgba(3,3,3,.985),rgba(5,5,5,.91));
+  box-shadow:0 9px 34px rgba(0,0,0,.36);
+}
+nav div a:not(.pill){
+  position:relative;
+  padding:9px 0;
+  transition:color .22s ease,opacity .22s ease;
+}
+nav div a:not(.pill):after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:2px;
+  height:1px;
+  background:linear-gradient(90deg,var(--na-red-light),rgba(240,43,54,.12));
+  box-shadow:0 0 10px rgba(240,43,54,.28);
+  transform:scaleX(0);
+  transform-origin:left;
+  transition:transform .3s var(--na-ease);
+}
+nav div a:not(.pill):hover:after,
+nav div a:not(.pill).on:after{transform:scaleX(1)}
+nav div a:not(.pill):hover{color:#fff}
+nav .pill{
+  box-shadow:inset 0 0 0 1px rgba(240,43,54,.045);
+  transition:background .25s ease,border-color .25s ease,box-shadow .25s ease,transform .25s var(--na-ease);
+}
+nav .pill:hover{
+  box-shadow:0 0 24px rgba(240,43,54,.19);
+  transform:translateY(-1px);
+}
+
+/* Page progress: subtle glow on the existing progress indicator. */
+.pg{
+  box-shadow:0 0 12px rgba(240,43,54,.26);
+}
+
+/* Sections: faint light pools make the long page feel less flat. */
+.sec:not(.hero){
+  background:
+    radial-gradient(ellipse at 92% 12%,rgba(190,12,26,.035),transparent 35rem),
+    linear-gradient(180deg,rgba(255,255,255,.004),transparent 34%);
+}
+.sec:not(.hero)>.c{
+  position:relative;
+}
+.sec:not(.hero)>.c:before{
+  content:"";
+  position:absolute;
+  top:2px;
+  right:0;
+  width:min(30vw,360px);
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.11));
+  pointer-events:none;
+  opacity:.75;
+}
+#apps,#systems,#about,#team,#connect{
+  scroll-margin-top:94px;
+}
+
+/* Section headings: add a little more editorial definition. */
+#apps h2:after,#systems h2:after,#team h2:after,#connect h2:after{
+  width:72px;
+  height:2px;
+  margin-top:20px;
+  background:linear-gradient(90deg,var(--na-red-light),rgba(240,43,54,.12));
+  box-shadow:0 0 14px rgba(240,43,54,.22);
+}
+#apps .lead,#systems .lead,#team .lead,#connect .lead{
+  color:#b0b0b0;
+  max-width:62ch;
+}
+
+/* Applications: cleaner card faces, sharper metadata and deeper hover response. */
+#apps .stack{row-gap:18px}
+#apps .cw{min-width:0}
+#apps .card{
+  border-color:rgba(255,255,255,.135);
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.026),transparent 38%),
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.085),transparent 56%),
+    linear-gradient(145deg,#111 0%,#090909 70%,#0c0506 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 34px rgba(0,0,0,.13);
+  transition:
+    transform .42s var(--na-ease),
+    border-color .28s ease,
+    box-shadow .38s ease,
+    filter .28s ease;
+}
+#apps .card.in:hover{
+  transform:translateY(-7px) scale(1.006);
+  border-color:rgba(255,82,92,.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 26px 64px rgba(0,0,0,.48),
+    0 0 34px rgba(190,12,26,.10);
+  filter:brightness(1.075);
+}
+#apps .card .k:first-child{
+  padding-bottom:11px;
+  border-bottom:1px solid rgba(255,255,255,.065);
+}
+#apps .card .k:first-child span:first-child{
+  color:#b5b5b5;
+  letter-spacing:.09em;
+}
+#apps .card .k:first-child span:last-child{
+  color:#ff777e;
+  font-size:9px;
+  font-variant-numeric:tabular-nums;
+}
+#apps .card h3{
+  text-shadow:0 3px 22px rgba(255,255,255,.045);
+}
+#apps .card p{color:#b2b2b2}
+#apps .card .k:last-child{
+  border-top-color:rgba(255,255,255,.09);
+}
+#apps .card .pl{
+  position:relative;
+  overflow:hidden;
+  transition:background .24s ease,border-color .24s ease,color .24s ease,transform .24s var(--na-ease);
+}
+#apps .card:hover .pl{transform:translateX(2px)}
+#apps .tag{
+  box-shadow:inset 0 0 12px rgba(240,43,54,.055);
+}
+
+/* Systems: make each destination feel like a deliberate navigation row. */
+#systems .sys>a{
+  border-top-color:rgba(255,255,255,.115);
+  background:linear-gradient(90deg,rgba(255,255,255,.009),transparent 54%);
+}
+#systems .sys>a:after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,rgba(240,43,54,.30),transparent 58%);
+  opacity:0;
+  transition:opacity .3s ease;
+  pointer-events:none;
+}
+#systems .sys>a:hover:after{opacity:1}
+#systems .sys>a b{
+  transition:color .25s ease,transform .32s var(--na-ease);
+}
+#systems .sys>a:hover b{
+  color:#fff;
+  transform:translateX(3px);
+}
+#systems .sys>a span:nth-child(2){transition:color .25s ease}
+#systems .sys>a:hover span:nth-child(2){color:#d0d0d0}
+
+/* About: structured information gets the same panel quality as the apps. */
+#about .about{
+  border-color:rgba(255,255,255,.15);
+  background:
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.09),transparent 48%),
+    linear-gradient(145deg,rgba(255,255,255,.025),rgba(255,255,255,.004) 65%,rgba(240,43,54,.025));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 25px 70px rgba(0,0,0,.25);
+}
+#about dl div{
+  border-color:rgba(255,255,255,.11);
+  background:linear-gradient(145deg,rgba(255,255,255,.018),rgba(0,0,0,.15));
+}
+#about dt{color:#ff747b}
+#about dd{color:#f0f0f0}
+
+/* People: calm directory styling with a subtle live indicator. */
+#team .employee-row{
+  transition:background .25s ease,border-color .25s ease,transform .25s var(--na-ease);
+}
+#team .employee-row:hover{
+  transform:translateX(2px);
+  background:linear-gradient(90deg,rgba(240,43,54,.065),rgba(240,43,54,.012) 54%,transparent);
+}
+#team .employee-status:not(.is-open):before{
+  animation:na-personnel-live 2.8s ease-in-out infinite;
+}
+@keyframes na-personnel-live{
+  0%,100%{box-shadow:0 0 0 0 rgba(240,43,54,.14),0 0 8px rgba(240,43,54,.35)}
+  50%{box-shadow:0 0 0 5px rgba(240,43,54,0),0 0 14px rgba(240,43,54,.55)}
+}
+
+/* Contact: restrained lift and edge highlight, not oversized movement. */
+#connect .conn>a{
+  border-color:rgba(255,255,255,.15);
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.026),transparent 46%),
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.085),transparent 60%),
+    linear-gradient(145deg,#111 0%,#080808 78%);
+}
+#connect .conn>a:hover{
+  transform:translateY(-4px);
+  border-color:rgba(255,82,92,.54);
+  box-shadow:0 22px 54px rgba(0,0,0,.46),0 0 26px rgba(190,12,26,.10);
+}
+#connect .conn>a:focus-visible{
+  outline:2px solid var(--na-red-light);
+  outline-offset:4px;
+}
+
+/* Scrollbar uses the same restrained red accent. */
+html{
+  scrollbar-color:#76242a #080808;
+}
+html::-webkit-scrollbar{width:10px}
+html::-webkit-scrollbar-track{background:#080808}
+html::-webkit-scrollbar-thumb{
+  border:3px solid #080808;
+  border-radius:10px;
+  background:linear-gradient(180deg,#8f252d,#401216);
+}
+html::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#d7333e,#701c24)}
+
+/* Reduced motion: retain all contrast and states without animated effects. */
+@media(prefers-reduced-motion:reduce){
+  #team .employee-status:not(.is-open):before{animation:none}
+  #apps .card.in:hover,#team .employee-row:hover{transform:none}
+}
+@media(max-width:760px){
+  .sec:not(.hero)>.c:before{width:34vw}
+  #apps .stack{row-gap:12px}
+  #apps .card.in:hover{transform:translateY(-2px)}
+  #team .employee-row:hover{transform:none}
+}
