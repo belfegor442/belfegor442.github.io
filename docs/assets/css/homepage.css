@@ -397,3 +397,14 @@ nav div{font-family:"NA Techno",var(--fm);letter-spacing:.035em}
 @media(max-width:760px){
   .ht h1{letter-spacing:-.04em}
 }
+
+@font-face{
+  font-family:"NA Fake Receipt";
+  src:url("/fonts/Fake%20Receipt.otf") format("opentype");
+  font-style:normal;font-weight:400 800;font-display:swap;
+}
+/* Receipt-inspired accent typography for the live news ident and technical tags. */
+.news-label,.tag{
+  font-family:"NA Fake Receipt","NA Techno",var(--fm);
+  letter-spacing:.075em;
+}
