@@ -2469,3 +2469,176 @@ html.na-route-transition .na-route-wipe{
 @media(prefers-reduced-motion:reduce){
   .na-cursor-glow,.na-route-wipe{display:none!important;animation:none!important;transition:none!important}
 }
+
+
+/* =========================================================
+   BLACKOUT / human interface pass
+   Softer hierarchy, clearer reading rhythm and less mechanical
+   card treatment. Keeps the existing brand, content and ticker.
+   ========================================================= */
+:root{
+  --human-radius:8px;
+  --human-ease:cubic-bezier(.22,.68,.18,1);
+}
+body{
+  font-family:"Manrope",Arial,sans-serif;
+  line-height:1.68;
+  letter-spacing:-.012em;
+}
+nav{
+  min-height:76px;
+  padding-left:clamp(24px,5vw,76px);
+  padding-right:clamp(24px,5vw,76px);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+nav div{font-size:11px;letter-spacing:.025em}
+nav a{transition:color .22s ease,opacity .22s ease}
+nav a:not(.pill):hover{opacity:.72}
+.sec:not(.hero){padding-top:clamp(100px,13vh,160px);padding-bottom:clamp(90px,11vh,135px)}
+.c{max-width:1160px}
+h2{
+  max-width:15ch;
+  font-size:clamp(2.8rem,6vw,5.5rem);
+  line-height:.99;
+  letter-spacing:-.065em;
+  text-wrap:balance;
+}
+.lead{
+  max-width:58ch;
+  font-size:clamp(15px,1.35vw,17px);
+  line-height:1.8;
+  letter-spacing:-.018em;
+}
+.ht{max-width:1300px}
+.ht small{font-size:11px;letter-spacing:.14em}
+.ht p{
+  max-width:48ch;
+  padding-left:16px;
+  font-size:clamp(15px,1.35vw,18px);
+  line-height:1.8;
+  border-left-width:1px;
+}
+.ht ul{gap:9px}
+.ht li{
+  border-radius:999px;
+  padding:7px 14px;
+  font-size:10px;
+  letter-spacing:.015em;
+}
+.stack{gap:16px}
+.cw{min-width:0}
+.card{
+  position:relative;
+  overflow:hidden;
+  min-height:248px;
+  padding:25px 24px 22px;
+  border-radius:var(--human-radius);
+  background:linear-gradient(145deg,rgba(20,20,20,.98),rgba(9,9,9,.98));
+  transition:
+    transform .45s var(--human-ease),
+    border-color .3s ease,
+    box-shadow .4s ease,
+    background .35s ease;
+}
+.card:before{
+  opacity:.72;
+  transition:opacity .35s ease,transform .65s var(--human-ease);
+}
+.card:hover:before{opacity:1;transform:scale(1.08)}
+.card .k{font-size:10px;letter-spacing:.045em}
+.card h3{
+  margin:.9rem 0 .2rem;
+  font-size:clamp(2rem,3vw,2.7rem);
+  line-height:1.04;
+  letter-spacing:-.055em;
+}
+.card p{
+  max-width:39ch;
+  font-size:13px;
+  line-height:1.75;
+  letter-spacing:-.012em;
+}
+.card .pl{
+  padding:5px 13px;
+  border-radius:999px;
+  font-size:10px;
+  transition:background .25s ease,border-color .25s ease,transform .25s ease;
+}
+.card:hover .pl{transform:translateX(3px)}
+.tag{border-radius:999px;padding:2px 8px;font-size:9px}
+.sys a{
+  grid-template-columns:minmax(170px,.42fr) 1fr auto;
+  gap:12px 28px;
+  padding:27px 18px;
+  border-radius:5px;
+}
+.sys b{font-size:clamp(1.65rem,3.2vw,2.5rem);letter-spacing:-.055em}
+.sys span{font-size:13px;line-height:1.65}
+.sys a:hover{padding-left:24px}
+.about{
+  border-radius:var(--human-radius);
+  padding:clamp(28px,5vw,62px);
+}
+.about p:not(.lead){
+  max-width:58ch;
+  font-size:15px;
+  line-height:1.9;
+}
+dl{gap:18px 30px}
+dl div{padding-top:14px}
+dt{font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+dd{padding-top:4px;font-size:13px;line-height:1.6}
+.people-directory{border-radius:var(--human-radius);overflow:hidden}
+.people-directory-head,.people-directory-foot{padding-left:18px;padding-right:18px}
+.employee-row{
+  min-height:78px;
+  padding:14px 18px;
+  transition:background .25s ease,padding .25s ease;
+}
+.employee-row:hover{background:rgba(255,255,255,.025);padding-left:23px}
+.employee-name b{font-family:"Manrope",Arial,sans-serif;font-size:15px;letter-spacing:-.025em}
+.employee-role{font-size:10px}
+.employee-status{font-size:9px}
+.conn{gap:14px}
+.conn a{
+  min-height:132px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  border-radius:var(--human-radius);
+  padding:23px;
+  transition:transform .35s var(--human-ease),border-color .25s ease,box-shadow .35s ease;
+}
+.conn small{font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.conn b{font-size:clamp(1.2rem,2vw,1.55rem);letter-spacing:-.045em}
+.conn a:hover{transform:translateY(-5px)}
+footer{font-size:10px;letter-spacing:.035em}
+.news-ticker{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.news-label{font-size:11px}
+.news-caption{font-size:9px}
+@media(max-width:900px){
+  .sec:not(.hero){padding-top:105px;padding-bottom:90px}
+  .card{min-height:230px}
+}
+@media(max-width:760px){
+  nav{min-height:82px;backdrop-filter:blur(14px)}
+  .sec:not(.hero){padding-top:86px;padding-bottom:76px}
+  h2{font-size:clamp(2.65rem,11vw,4rem);max-width:12ch}
+  .lead{font-size:14px;line-height:1.75}
+  .ht p{font-size:14px;line-height:1.7}
+  .ht li{font-size:9px;padding:7px 10px}
+  .stack{gap:12px}
+  .card{min-height:218px;padding:21px;border-radius:7px}
+  .card h3{font-size:2.25rem}
+  .card p{font-size:12px;line-height:1.7}
+  .sys a{gap:5px;padding:20px 10px}
+  .sys span{font-size:12px}
+  .about{padding:24px 18px}
+  .employee-row{min-height:70px;padding:12px}
+  .employee-row:hover{padding-left:12px}
+  .conn a{min-height:112px;padding:19px}
+}
+@media(prefers-reduced-motion:reduce){
+  .card,.conn a,.employee-row,.sys a{transition:none!important}
+}
