@@ -1451,3 +1451,84 @@ section[id]{scroll-margin-top:90px}
   line-height:inherit;
   font-weight:inherit;
 }
+
+
+/* Persistent broadcast bar: visible on every section and every scroll position. */
+:root{--na-news-clearance:82px}
+body{
+  padding-bottom:calc(var(--na-news-clearance) + env(safe-area-inset-bottom,0px));
+}
+html{scroll-padding-bottom:var(--na-news-clearance)}
+.news-ticker{
+  position:fixed;
+  top:auto;
+  right:0;
+  bottom:0;
+  left:0;
+  z-index:80;
+  width:100%;
+  max-width:none;
+  margin:0;
+  min-height:72px;
+  padding-bottom:calc(13px + env(safe-area-inset-bottom,0px));
+  border-top:1px solid rgba(240,43,54,.72);
+  background:linear-gradient(90deg,rgba(5,5,5,.985),rgba(16,6,7,.97) 48%,rgba(5,5,5,.985));
+  box-shadow:0 -14px 42px rgba(0,0,0,.62),0 -1px 18px rgba(240,43,54,.055);
+  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);
+  isolation:isolate;
+}
+.news-ticker:before{
+  content:"";
+  position:absolute;
+  top:-1px;
+  left:0;
+  width:clamp(64px,9vw,150px);
+  height:2px;
+  background:linear-gradient(90deg,var(--na-red-bright),rgba(240,43,54,0));
+  box-shadow:0 0 16px rgba(240,43,54,.3);
+  pointer-events:none;
+}
+.news-label{position:relative;z-index:1}
+.news-window{position:relative;z-index:1}
+.news-caption{position:relative;z-index:1}
+.hint{bottom:calc(4vh + var(--na-news-clearance))}
+@media(max-width:760px){
+  :root{--na-news-clearance:68px}
+  body{padding-bottom:calc(var(--na-news-clearance) + env(safe-area-inset-bottom,0px))}
+  .news-ticker{
+    min-height:calc(58px + env(safe-area-inset-bottom,0px));
+    padding:10px 5vw calc(10px + env(safe-area-inset-bottom,0px));
+    gap:12px;
+  }
+  .news-window{height:1.6em;min-height:1.6em}
+  .news-headline{font-size:clamp(17px,4.8vw,22px)}
+  .hint{bottom:calc(18px + var(--na-news-clearance))}
+  .hero-banner{bottom:calc(48px + var(--na-news-clearance))}
+}
+@media(max-width:420px){
+  :root{--na-news-clearance:66px}
+  .news-ticker{gap:9px}
+  .news-label{padding-left:10px;padding-right:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .news-ticker{backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+
+
+/* Mobile hero: let the brand banner follow the metadata instead of overlapping it. */
+@media(max-width:760px){
+  .ht{padding:95px 0 80px}
+  .hero-banner{
+    position:relative;
+    top:auto;
+    right:auto;
+    bottom:auto;
+    left:auto;
+    display:block;
+    width:min(100%,340px);
+    max-width:340px;
+    margin:27px 0 0;
+    transform:none;
+  }
+}
