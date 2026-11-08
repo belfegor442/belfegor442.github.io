@@ -934,92 +934,42 @@ footer a:hover{color:#ff636b}
   .ht p{max-width:40ch;font-size:14px}
   .hero-banner{right:0;width:min(34vw,350px)}
 }
+/* Font usage additions only â€” existing page typography and news styling stay intact. */
 
-
-/* NORTH ASSEMBLY — all five local typefaces have distinct visible roles. */
-
-/* 01 · Mr Tech: angular display face for actual product and system names. */
-.card h3,
-.sys b,
-.people b,
-.conn b{
-  font-family:"NA Mr Tech",Arial,sans-serif!important;
-  font-weight:400!important;
-  letter-spacing:-.015em;
-  line-height:1.12;
-}
-.card h3{font-size:clamp(1.65rem,2.35vw,2.25rem)}
-.sys b{font-size:clamp(1.55rem,2.75vw,2.35rem)}
-.people b{font-size:1.35rem}
-.conn b{font-size:1.35rem}
-
-/* 02 · Pro Display: editorial section headings, deliberately distinct from the hero. */
-h2{
-  font-family:"NA Pro Display","Space Grotesk",sans-serif!important;
-  font-weight:400!important;
-  letter-spacing:-.025em;
-  line-height:1.08;
-  text-shadow:0 0 26px rgba(255,255,255,.035);
-}
-.about h2{max-width:12ch}
-
-/* 03 · Techno: navigation and the readable technical information layer. */
-nav div,
-.nav-name,
-.ht small,
-.ht li,
-.card .k,
-.card .pl,
-.sys small,
-dt,
-.people span,
-.conn small,
-footer,
-#apps h2:before,
-#systems h2:before,
-#team h2:before,
-#connect h2:before{
-  font-family:"NA Techno",Consolas,monospace!important;
+/* Mr Tech: a small visual accent on the existing scroll indicator. */
+.hint span{
+  font-family:"NA Mr Tech",Arial,sans-serif;
+  font-size:11px;
   font-weight:400;
-  letter-spacing:.055em;
+  letter-spacing:.04em;
 }
 
-/* 04 · VHS Gothic: large broadcast headlines, not just a tiny caption. */
+/* Keep the original editorial font on application names and system names. */
+.card h3,.sys b,.people b,.conn b{
+  font-family:"NA Pro Display","Space Grotesk",sans-serif;
+}
+
+/* Preserve the original broadcast typography: Pro Display / Fake Receipt / VHS Gothic. */
 .news-headline{
-  font-family:"NA VHS Gothic",Consolas,monospace!important;
-  font-weight:400;
-  font-size:clamp(18px,2vw,25px);
-  letter-spacing:.015em;
-  line-height:1.2;
+  font-family:"NA Pro Display","NA Mr Tech",sans-serif;
+  font-weight:600;
+  font-size:clamp(20px,2.25vw,29px);
+  letter-spacing:-.018em;
+  line-height:1.15;
 }
-.news-label,.news-caption{
-  font-family:"NA VHS Gothic",Consolas,monospace!important;
-  font-weight:400;
-  letter-spacing:.09em;
-}
-
-/* 05 · Fake Receipt: status chips and live-state indicators. */
-.tag,
-.employee-status,
 .news-label{
-  font-family:"NA Fake Receipt",Consolas,monospace!important;
-  font-weight:400;
-  letter-spacing:.055em;
+  font-family:"NA Fake Receipt","NA Techno",var(--fm);
+}
+.news-caption{
+  font-family:"NA VHS Gothic",var(--fm);
 }
 .tag{
-  font-size:9px;
-  padding:3px 7px;
-  border-radius:2px;
-  text-transform:uppercase;
+  font-family:"NA Fake Receipt","NA Techno",var(--fm);
 }
-.employee-status{font-size:9px}
-.news-label{font-size:9px}
-
-/* Keep the face assignments consistent at smaller widths. */
+.employee-status{
+  font-family:"NA Techno",var(--fm);
+}
 @media(max-width:760px){
-  .card h3{font-size:1.85rem}
-  .sys b{font-size:1.7rem}
-  .people b,.conn b{font-size:1.25rem}
-  .news-headline{font-size:18px}
-  .tag,.employee-status{font-size:8px}
+  .news-headline{font-size:clamp(18px,5vw,23px)}
+  .hint span{font-size:10px}
 }
