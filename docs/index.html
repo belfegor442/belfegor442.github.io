@@ -319,26 +319,41 @@ footer a:hover{color:var(--ink)}
     if (nextText === activeText) return;
 
     activeText = nextText;
-    ticker.textContent = activeText;
+    const headlines = nextText.split("|").map(item => item.trim()).filter(Boolean).slice(0, 2);
+    const stories = headlines.length ? headlines : [DEFAULT_HEADLINE];
+    const escapeHTML = value => value.replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+    const separator = '<span class="news-separator" aria-hidden="true"> · </span>';
+    const storyMarkup = stories.map(escapeHTML).join(separator) + separator;
+    ticker.setAttribute("aria-label", stories.join(" · "));
 
     if (REDUCED_MOTION) {
       ticker.style.animation = "none";
       ticker.style.left = "0";
       ticker.style.transform = "none";
+      ticker.textContent = stories.join(" · ");
       return;
     }
 
     ticker.style.animation = "none";
     ticker.style.left = "100%";
     ticker.style.transform = "translateY(-50%)";
-    ticker.style.setProperty("--news-distance", newsWindow.clientWidth + "px");
-    const travelPixels = newsWindow.clientWidth + ticker.scrollWidth;
-    const duration = Math.max(14, Math.min(42, travelPixels / 92));
+    ticker.innerHTML = '<span class="news-cycle">' + storyMarkup + '</span>';
+    const cycle = ticker.querySelector(".news-cycle");
+    const cycleWidth = Math.ceil(cycle.getBoundingClientRect().width);
+    const loopCycles = Math.max(1, Math.ceil((newsWindow.clientWidth + cycleWidth) / Math.max(1, cycleWidth)));
+    const loopDistance = loopCycles * cycleWidth;
+    const copies = loopCycles + Math.ceil(newsWindow.clientWidth / Math.max(1, cycleWidth)) + 2;
+    ticker.innerHTML = Array.from({ length: copies }, () =>
+      '<span class="news-cycle">' + storyMarkup + '</span>'
+    ).join("");
+    ticker.style.setProperty("--news-loop-distance", loopDistance + "px");
+    const duration = Math.max(14, Math.min(42, (newsWindow.clientWidth + loopDistance) / 92));
     ticker.style.setProperty("--news-duration", duration.toFixed(2) + "s");
     void ticker.offsetWidth;
     ticker.style.animation = "";
   }
-
   window.addEventListener("resize", () => {
     window.clearTimeout(newsResizeTimer);
     newsResizeTimer = window.setTimeout(() => {
@@ -380,7 +395,7 @@ footer a:hover{color:var(--ink)}
   async function updateNews(headline) {
     const nextHeadline = String(headline || "").trim();
     if (!nextHeadline || Array.from(nextHeadline).length > 180) {
-      throw new Error("El titular debe contener entre 1 y 180 caracteres.");
+      throw new Error("Usa entre 1 y 180 caracteres. Para dos noticias, sepáralas con | (ejemplo: Noticia 1 | Noticia 2).");
     }
 
     const accessCode = window.prompt("North Assembly dice:");
@@ -416,7 +431,7 @@ footer a:hover{color:var(--ink)}
 
   loadHeadline();
   window.setInterval(loadHeadline, 15000);
-  console.info("[North Assembly] Administrador disponible. Usa NorthAssembly.updateNews(\"Tu titular\").");
+  console.info("[North Assembly] Publica una noticia o dos separadas por |. Ejemplo: NorthAssembly.updateNews(\"Noticia 1 | Noticia 2\").");
 })();
 </script>
 </body>

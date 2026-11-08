@@ -316,3 +316,23 @@ h2{
  .people-directory-head,.people-directory-foot{font-size:7px;letter-spacing:.07em}
 }
 @media(prefers-reduced-motion:reduce){.news-headline{position:static;left:auto;transform:none;animation:none;white-space:normal}.news-window{height:auto;min-height:1.6em}}
+
+/* Continuous two-story broadcast loop */
+.news-headline{
+  display:flex;
+  align-items:center;
+  gap:0;
+  animation:na-news-loop var(--news-duration,22s) linear infinite;
+}
+.news-cycle{display:inline-flex;align-items:center;flex:none;white-space:nowrap}
+.news-separator{
+  display:inline-block;
+  padding:0 .48em;
+  color:var(--ac-2);
+  font:500 .82em/1 var(--fm);
+  opacity:.9;
+}
+@keyframes na-news-loop{
+  from{transform:translateX(0) translateY(-50%)}
+  to{transform:translateX(calc(-1 * var(--news-loop-distance,100vw))) translateY(-50%)}
+}
