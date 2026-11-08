@@ -245,13 +245,6 @@ h2{
 
 
 /* North Assembly broadcast ticker — moving TV subtitle */
-@font-face{
- font-family:"NA Pro Display";
- src:url("/Pro%20Display%20tfb.ttf") format("truetype");
- font-style:normal;
- font-weight:400 800;
- font-display:swap;
-}
 .news-ticker{
  position:absolute;z-index:8;left:0;right:0;bottom:0;
  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:22px;
@@ -408,3 +401,153 @@ nav div{font-family:"NA Techno",var(--fm);letter-spacing:.035em}
   font-family:"NA Fake Receipt","NA Techno",var(--fm);
   letter-spacing:.075em;
 }
+
+
+
+/* 2026-11-08 audit fixes: keep the brand readable at every scroll position. */
+.nav-name{
+  color:var(--ink)!important;
+  font-family:"NA Techno",var(--fm);
+  font-size:10px;
+  letter-spacing:.055em;
+  font-weight:400;
+}
+.news-caption{
+  font-family:"NA VHS Gothic",var(--fm);
+  letter-spacing:.12em;
+}
+
+/* Preserve each individually animated word as a single line. */
+.ht h1{
+  width:max-content;
+  max-width:100%;
+  font-size:clamp(4.5rem,8vw,8.5rem);
+  line-height:.96;
+  text-wrap:initial;
+}
+.ht h1 .w{
+  white-space:nowrap;
+  max-width:none;
+}
+@media (min-width:761px) and (max-width:1000px){
+  .ht h1{
+    font-size:clamp(4rem,8.5vw,6.2rem);
+    max-width:100%;
+  }
+}
+@media (max-width:760px){
+  .ht h1{
+    width:max-content;
+    max-width:100%;
+    font-size:clamp(3rem,13.5vw,5.4rem);
+    letter-spacing:-.04em;
+    line-height:.98;
+  }
+  .brand-banner{
+    left:8px;
+    top:7px;
+    width:70px;
+    height:42px;
+  }
+  .nav-name{
+    display:block;
+    left:82px;
+    top:27px;
+    font-size:8px;
+    letter-spacing:.025em;
+    white-space:nowrap;
+  }
+  nav div{
+    gap:7px;
+    font-size:8px;
+  }
+  nav sup{
+    font-size:6px;
+    margin-right:2px;
+  }
+  nav .pill{
+    padding:4px 7px;
+  }
+}
+@media (max-width:420px){
+  .ht h1{
+    font-size:clamp(2.9rem,13.5vw,3.5rem);
+  }
+  .brand-banner{
+    left:7px;
+    width:64px;
+    height:40px;
+  }
+  .nav-name{
+    left:74px;
+    top:27px;
+    font-size:6.7px;
+    letter-spacing:.01em;
+  }
+  nav div{
+    gap:5px;
+    font-size:7px;
+  }
+  nav div a{
+    font-size:7px;
+  }
+  nav .pill{
+    padding:4px 6px;
+  }
+}
+
+
+
+/* Keep hero metadata consistent with the dark interface and readable. */
+.ht li{
+  background:rgba(13,17,26,.9);
+  border-color:var(--line-strong);
+  color:#c0c9dc;
+  backdrop-filter:blur(8px);
+}
+.ht li b{
+  color:var(--ink);
+}
+
+
+/* The JavaScript scroll controller owns desktop smoothing; avoid a second CSS animation. */
+html{scroll-behavior:auto}
+
+
+/* Accessibility and progressive enhancement: content remains available without JS. */
+.fi,.card{opacity:1;transform:none}
+html.na-motion .fi:not(.in){opacity:0;transform:translateY(14px)}
+html.na-motion .card:not(.in){opacity:0;transform:translateY(18px)}
+html:not(.na-ticker-ready) .news-headline{
+  position:static;left:auto;top:auto;display:block;width:auto;max-width:100%;
+  transform:none;animation:none;white-space:normal;
+}
+html:not(.na-ticker-ready) .news-window{height:auto;min-height:1.6em}
+.news-sr{
+  position:absolute!important;width:1px!important;height:1px!important;
+  padding:0!important;margin:-1px!important;overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
+}
+
+/* Keep every primary section reachable from the compact navigation when space allows. */
+@media (min-width:380px) and (max-width:760px){
+  nav div a:nth-child(2){display:inline-flex}
+}
+
+/* Full section navigation on phones; the compactest layout drops only the wordmark. */
+@media (max-width:760px){
+  nav div a:nth-child(2){display:inline-flex}
+}
+@media (max-width:339px){
+  .nav-name{display:none}
+}
+
+/* Keyboard users can bypass the decorative hero and reach the page content. */
+.skip-link{
+  position:fixed;z-index:1000;top:12px;left:12px;
+  padding:10px 14px;background:var(--ac-2);color:#071018;
+  border:1px solid var(--ac-2);font:600 11px/1.3 var(--fm);
+  transform:translateY(-160%);transition:transform .2s ease;
+}
+.skip-link:focus{transform:translateY(0)}
+#main-content:focus{outline:none}
