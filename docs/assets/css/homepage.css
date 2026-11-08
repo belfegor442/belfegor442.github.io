@@ -2197,3 +2197,111 @@ nav div a:not(.pill).on:before{opacity:1;transform:translateX(-50%) scale(1)}
   #apps .card:before,#apps .card:after,#connect .conn>a:before{display:none}
   .sec:not(.hero) h2:before{transition:none}
 }
+
+
+/* =========================================================
+   BLACKOUT / kinetic sequence 05 — scanner, section transitions,
+   and editorial kinetic type. Main page only.
+   ========================================================= */
+
+/* Section entry: a clean vertical scan passes once across each block. */
+.sec:not(.hero){
+  position:relative;
+  isolation:isolate;
+}
+.sec:not(.hero)::after{
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  pointer-events:none;
+  opacity:0;
+  background:linear-gradient(180deg,
+    transparent 0%,
+    rgba(240,43,54,0) 47.8%,
+    rgba(240,43,54,.035) 49.3%,
+    rgba(255,92,102,.22) 50%,
+    rgba(240,43,54,.035) 50.7%,
+    rgba(240,43,54,0) 52.2%,
+    transparent 100%);
+  transform:translate3d(0,-100%,0);
+  mix-blend-mode:screen;
+  will-change:transform,opacity;
+}
+html.na-motion .sec.in:not(.hero)::after{
+  animation:na-section-scanner 1.25s cubic-bezier(.22,.72,.22,1) .08s both;
+}
+@keyframes na-section-scanner{
+  0%{transform:translate3d(0,-100%,0);opacity:0}
+  12%{opacity:.9}
+  76%{opacity:.62}
+  100%{transform:translate3d(0,100%,0);opacity:0}
+}
+
+/* Section transitions: the content settles into place as its top rule draws. */
+html.na-motion .sec:not(.hero)>.c{
+  opacity:.84;
+  filter:blur(4px);
+  transform:translate3d(0,34px,0) scale(.992);
+  transition:
+    opacity .95s var(--na-motion),
+    filter 1.05s var(--na-motion),
+    transform 1.1s var(--na-motion);
+}
+html.na-motion .sec.in:not(.hero)>.c{
+  opacity:1;
+  filter:blur(0);
+  transform:translate3d(0,0,0) scale(1);
+}
+html.na-motion .sec:not(.hero)>.c:before{
+  transform:scaleX(.12);
+  transform-origin:left center;
+  transition:transform 1.05s var(--na-motion) .12s;
+}
+html.na-motion .sec.in:not(.hero)>.c:before{transform:scaleX(1)}
+
+/* Kinetic headlines: characters fold upward, sharpen and lock into position. */
+.rv .w{perspective:700px}
+.rv .ch{
+  opacity:0;
+  filter:blur(8px);
+  transform:translate3d(0,125%,0) rotateX(-78deg) skewY(7deg) scale(.94);
+  transform-origin:50% 100%;
+  backface-visibility:hidden;
+  transition:
+    transform .92s var(--na-motion) calc(var(--i)*31ms + 80ms),
+    opacity .62s ease calc(var(--i)*31ms + 80ms),
+    filter .82s ease calc(var(--i)*31ms + 80ms);
+  will-change:transform,opacity,filter;
+}
+.rv.in .ch{
+  opacity:1;
+  filter:blur(0);
+  transform:translate3d(0,0,0) rotateX(0) skewY(0) scale(1);
+}
+
+/* A short red registration flash underscores the headline entrance. */
+.rv{isolation:isolate}
+.rv.in{
+  animation:na-heading-lock .72s ease-out both;
+}
+@keyframes na-heading-lock{
+  0%{text-shadow:0 0 0 rgba(240,43,54,0)}
+  42%{text-shadow:0 0 22px rgba(240,43,54,.19)}
+  100%{text-shadow:0 0 0 rgba(240,43,54,0)}
+}
+
+/* Do not allow scanner overlays to intercept interaction or obscure focus. */
+.sec:not(.hero)::after{user-select:none}
+@media(max-width:760px){
+  .sec:not(.hero)::after{mix-blend-mode:normal}
+  html.na-motion .sec:not(.hero)>.c{transform:translate3d(0,22px,0) scale(.996)}
+  .rv .ch{transition-duration:.72s;filter:blur(5px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .sec:not(.hero)::after{display:none}
+  html.na-motion .sec:not(.hero)>.c{opacity:1;filter:none;transform:none;transition:none}
+  html.na-motion .sec:not(.hero)>.c:before{transform:none;transition:none}
+  .rv .ch,.rv.in .ch{opacity:1;filter:none;transform:none;transition:none;will-change:auto}
+  .rv.in{animation:none}
+}

@@ -94,7 +94,7 @@ footer a:hover{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-27">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-28">
 </head>
 <body>
 <div class="pg"></div>
@@ -202,7 +202,7 @@ footer a:hover{color:var(--ink)}
  /* letras que suben una a una */
  $('[data-split]').forEach(function(el){var n=0;el.innerHTML=el.dataset.split.split('|').map(function(l,k){return (k?'<br>':'')+l.split(' ').map(function(w){return '<span class="w" aria-hidden="true">'+w.split('').map(function(c){return '<span class="ch" style="--i:'+(n++)+'">'+c+'</span>'}).join('')+'</span>'}).join(' ')}).join('');if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',el.dataset.split.replace('|',' '))});/* ===== revelado por entrada en pantalla ===== */
  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.18,rootMargin:'0px 0px -6% 0px'});
- $('.rv,.fi,.card').forEach(function(el){if(el.closest('.hero'))setTimeout(function(){el.classList.add('in')},reduce?0:250);else if(reduce)el.classList.add('in');else io.observe(el)});
+ $('.sec,.rv,.fi,.card').forEach(function(el){if(el.closest('.hero'))setTimeout(function(){el.classList.add('in')},reduce?0:250);else if(reduce)el.classList.add('in');else io.observe(el)});
  document.documentElement.classList.add('na-motion');
  $('.card').forEach(function(c){
   c.addEventListener('pointermove',function(e){if(reduce||!c.classList.contains('in')||e.pointerType==='touch')return;var r=c.getBoundingClientRect(),px=(e.clientX-r.left)/r.width-.5,py=(e.clientY-r.top)/r.height-.5;c.style.transition='transform .2s ease,box-shadow .35s,border-color .35s';c.style.transform='rotateY('+(px*12).toFixed(1)+'deg) rotateX('+(-py*12).toFixed(1)+'deg) translateZ(14px)'});
