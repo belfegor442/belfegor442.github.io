@@ -1783,3 +1783,235 @@ html::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#d7333e,#7
   #apps .card.in:hover{transform:translateY(-2px)}
   #team .employee-row:hover{transform:none}
 }
+
+
+/* =========================================================
+   BLACKOUT / identity pass 03
+   More brand detail, clearer section signatures and
+   restrained surface texture. No content or ticker changes.
+   ========================================================= */
+
+/* Ambient surface: a fine grain layer beneath the existing grid. */
+body:after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  opacity:.13;
+  background-image:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0,rgba(255,255,255,.022) 1px,transparent 1px,transparent 3px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0,rgba(255,255,255,.012) 1px,transparent 1px,transparent 4px);
+  mix-blend-mode:soft-light;
+}
+@media(prefers-reduced-motion:reduce){
+  body:after{opacity:.075}
+}
+
+/* Section identifiers use information already present in the page. */
+.sec:not(.hero)>.c:after{
+  position:absolute;
+  top:-25px;
+  right:0;
+  z-index:2;
+  color:rgba(255,255,255,.30);
+  font:8px/1.4 "NA Techno",var(--fm);
+  letter-spacing:.14em;
+  text-align:right;
+  pointer-events:none;
+  white-space:nowrap;
+}
+#apps>.c:after{content:"DIRECTORY  /  11 APPLICATIONS"}
+#systems>.c:after{content:"INFRASTRUCTURE  /  04 SERVICES"}
+#about>.c:after{content:"ORGANIZATION  /  PROFILE"}
+#team>.c:after{content:"PERSONNEL  /  03 ACTIVE  ·  02 OPEN"}
+#connect>.c:after{content:"PUBLIC CHANNELS  /  03 ENDPOINTS"}
+
+/* Section top rule becomes a fine technical registration line. */
+.sec:not(.hero)>.c:before{
+  height:1px;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.055) 16%,rgba(255,255,255,.17) 100%);
+}
+#apps>.c:before,#systems>.c:before,#about>.c:before,#team>.c:before,#connect>.c:before{
+  opacity:.9;
+}
+
+/* The hero banner receives a subtle four-corner registration frame. */
+.hero-banner{
+  border-color:rgba(255,255,255,.18);
+  box-shadow:
+    0 28px 82px rgba(0,0,0,.52),
+    0 0 44px rgba(190,12,26,.105),
+    inset 0 0 0 1px rgba(255,255,255,.018);
+}
+.hero-banner:before{
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left 11px top 11px/25px 1px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left 11px top 11px/1px 25px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) right 11px top 11px/25px 1px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) right 11px top 11px/1px 25px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left 11px bottom 11px/25px 1px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left 11px bottom 11px/1px 25px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) right 11px bottom 11px/25px 1px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) right 11px bottom 11px/1px 25px no-repeat;
+  opacity:.7;
+  transition:opacity .35s ease;
+}
+.hero-banner:hover:before{opacity:1}
+
+/* Cards: small corner registration marks and sharper metadata separators. */
+#apps .card{
+  background-image:
+    linear-gradient(145deg,rgba(255,255,255,.028),transparent 36%),
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.075),transparent 57%),
+    linear-gradient(145deg,#111 0%,#090909 70%,#0c0506 100%);
+}
+#apps .card .k:first-child{
+  position:relative;
+}
+#apps .card .k:first-child:after{
+  content:"";
+  position:absolute;
+  left:0;
+  bottom:-1px;
+  width:24px;
+  height:1px;
+  background:rgba(240,43,54,.48);
+}
+#apps .card .k:last-child{
+  position:relative;
+}
+#apps .card .pl{
+  min-width:62px;
+  text-align:center;
+}
+
+/* Give the systems list a consistent index-like edge. */
+#systems .sys>a{
+  padding-right:26px;
+}
+#systems .sys>a:before{
+  width:2px;
+}
+#systems .sys>a:hover{
+  background:
+    linear-gradient(90deg,rgba(240,43,54,.065),rgba(240,43,54,.014) 40%,transparent 75%);
+}
+#systems .sys>a span:last-child{
+  min-width:24px;
+  text-align:right;
+}
+
+/* About panel: quiet corner markers echo the hero frame. */
+#about .about{
+  background:
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left top/34px 1px no-repeat,
+    linear-gradient(var(--na-red-light),var(--na-red-light)) left top/1px 34px no-repeat,
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.09),transparent 48%),
+    linear-gradient(145deg,rgba(255,255,255,.025),rgba(255,255,255,.004) 65%,rgba(240,43,54,.025));
+}
+#about dl div{
+  position:relative;
+  overflow:hidden;
+}
+#about dl div:after{
+  content:"";
+  position:absolute;
+  right:0;
+  top:0;
+  width:18px;
+  height:1px;
+  background:rgba(255,255,255,.23);
+  transition:width .28s var(--na-ease),background .28s ease;
+}
+#about dl div:hover:after{
+  width:100%;
+  background:rgba(240,43,54,.5);
+}
+
+/* People directory: make the open/active distinction legible at a glance. */
+#team .people-directory-head{
+  text-transform:uppercase;
+}
+#team .employee-status{
+  min-width:76px;
+  text-align:right;
+}
+#team .employee-status.is-open{
+  padding:4px 7px;
+  border:1px solid rgba(255,255,255,.14);
+  color:#c7c7c7;
+  background:rgba(255,255,255,.025);
+}
+#team .employee-status.is-open:before{display:none}
+#team .employee-status:not(.is-open){
+  color:#ff747b;
+}
+
+/* Contact cards get an understated serial-like top label rule. */
+#connect .conn>a{
+  background:
+    linear-gradient(90deg,rgba(240,43,54,.55),rgba(240,43,54,0) 38%) left top/100% 1px no-repeat,
+    linear-gradient(145deg,rgba(255,255,255,.026),transparent 46%),
+    radial-gradient(ellipse at 100% 0,rgba(240,43,54,.085),transparent 60%),
+    linear-gradient(145deg,#111 0%,#080808 78%);
+}
+#connect .conn small{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+#connect .conn small:before{
+  content:"";
+  display:inline-block;
+  width:5px;
+  height:5px;
+  background:var(--na-red-light);
+  box-shadow:0 0 10px rgba(240,43,54,.5);
+}
+
+/* Phone-sized layouts keep labels quiet and corners proportional. */
+@media(max-width:760px){
+  .sec:not(.hero)>.c:after{
+    top:-19px;
+    max-width:52%;
+    font-size:6px;
+    letter-spacing:.09em;
+  }
+  .hero-banner:before{
+    inset:0;
+    background:
+      linear-gradient(var(--na-red-light),var(--na-red-light)) left 7px top 7px/17px 1px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) left 7px top 7px/1px 17px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) right 7px top 7px/17px 1px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) right 7px top 7px/1px 17px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) left 7px bottom 7px/17px 1px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) left 7px bottom 7px/1px 17px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) right 7px bottom 7px/17px 1px no-repeat,
+      linear-gradient(var(--na-red-light),var(--na-red-light)) right 7px bottom 7px/1px 17px no-repeat;
+  }
+  #team .employee-status{min-width:65px}
+  #connect .conn small:before{width:4px;height:4px}
+}
+@media(prefers-reduced-motion:reduce){
+  #about dl div:after,#hero-banner:before{transition:none}
+}
+
+
+/* Final accessibility and small-screen calibration for identity details. */
+@media(max-width:760px){
+  .sec:not(.hero)>.c:after{
+    color:rgba(255,255,255,.43);
+    font-size:7px;
+    letter-spacing:.075em;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-banner:before{transition:none}
+  #team .employee-status:not(.is-open):before{animation:none}
+}
