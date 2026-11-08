@@ -31,8 +31,10 @@ jobs:
       - name: Check browser client syntax
         run: |
           node --check docs/Apps/NewWorld/map-renderer.js
+          node --check docs/Apps/NewWorld/build-menu.js
           node --check docs/Apps/NewWorld/game.js
           node --check docs/Apps/NewWorld/multiplayer.js
           node --check docs/Apps/NewWorld/simulation.js
+          node --check docs/Apps/NewWorld/strategy.js
       - name: Test browser simulation rules
         run: node --test docs/Apps/NewWorld/tests/*.test.cjs

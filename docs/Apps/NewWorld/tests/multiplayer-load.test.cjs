@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const simulation = require('../simulation.js');
+const strategy = require('../strategy.js');
 
 const source = fs.readFileSync(path.join(__dirname,'..','multiplayer.js'),'utf8');
 
@@ -96,7 +97,7 @@ class MemoryRelay {
 function createClient(relay) {
   const storage=new Map();
   const context={
-    window:{NewWorldSimulation:simulation},
+    window:{NewWorldSimulation:simulation,NewWorldStrategy:strategy},
     mqtt:{connect:()=>relay.connect()},
     crypto,
     structuredClone,

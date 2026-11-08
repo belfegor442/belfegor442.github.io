@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261108-theotown-builder-v2">
+  <link rel="stylesheet" href="./game.css?v=20261108-playable-systems-v1">
 </head>
 <body>
   <header class="topbar">
@@ -38,6 +38,7 @@
       <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
       <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
       <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><span class="nav-icon">⌘</span><span>RESEARCH</span></button>
+      <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><span class="nav-icon">◇</span><span>DIPLOMACY</span></button>
       <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
       <div class="nav-rail-foot">NA</div>
     </nav>
@@ -118,6 +119,8 @@
           <span><i class="legend owned"></i> <span id="legend-owned">YOUR GOVERNMENT</span></span>
           <span><i class="legend other"></i> <span id="legend-other">OTHER STATES</span></span>
           <span><i class="legend independent"></i> UNCLAIMED</span>
+          <span><i class="legend army"></i> ARMED FORCES</span>
+          <span><i class="legend occupation"></i> ACTIVE OCCUPATION</span>
           <span class="map-foot-hint">CLICK A STATE TO INSPECT · DRAG TO PAN · SCROLL TO ZOOM</span>
         </div>
       </section>
@@ -133,6 +136,9 @@
             <div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div>
             <div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div>
           </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">CAMPAIGN OBJECTIVES</p>
+          <div id="campaign-objectives" class="political-list"></div>
           <div class="panel-divider"></div>
           <div class="ownership-row"><span>ADMINISTRATION</span><strong id="state-owner">—</strong></div>
           <button id="claim-btn" class="action-btn" disabled>CLAIM THIS REGION <span>? 450</span></button>
@@ -211,6 +217,16 @@
           <div class="panel-divider"></div>
           <p class="panel-kicker">TRADE ROUTES / IMPORTS AND EXPORTS</p>
           <div id="trade-route-list" class="political-list"></div>
+          <div id="trade-route-controls" class="trade-route-controls" hidden>
+            <label class="field-label" for="trade-route-destination">DESTINATION STATE</label>
+            <select id="trade-route-destination" class="text-field"></select>
+            <label class="field-label" for="trade-route-good">EXPORTED GOOD</label>
+            <select id="trade-route-good" class="text-field"></select>
+            <label class="field-label" for="trade-route-capacity">DAILY ROUTE CAPACITY</label>
+            <input id="trade-route-capacity" class="text-field" type="number" min="1" max="500" step="1" value="50">
+            <button id="create-trade-route" class="action-btn" type="button" disabled>ESTABLISH TRADE ROUTE · ¤ 150</button>
+            <p id="trade-route-status" class="microcopy">Connect to a world to establish trade routes.</p>
+          </div>
           <details id="economy-setup-panel" hidden>
             <summary>Technical economic scenario setup · lobby only</summary>
             <p class="microcopy">The host can load or replace goods, recipes, NPC companies, markets, bilateral trade routes, and population groups with per-good daily needs before starting. Population needs add demand at a rate per 1,000 residents. This is technical scenario setup, not political authority. No official Beleland economic data is preloaded.</p>
@@ -248,12 +264,21 @@
           <p class="panel-kicker">LEGISLATION</p>
           <div id="law-list" class="political-list"></div>
           <div class="panel-divider"></div>
+          <p class="panel-kicker">ACTIVE PUBLIC POLICIES</p>
+          <div id="policy-list" class="political-list"></div>
+          <div class="panel-divider"></div>
           <p class="panel-kicker">LEGISLATIVE DECISIONS</p>
           <div id="decision-list" class="political-list"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">PROPOSE A LAW</p>
           <label class="field-label" for="law-title">TITLE</label>
-          <input id="law-title" class="text-field" maxlength="120" autocomplete="off">
+          <input id="law-title" class="text-field" maxlength="80" autocomplete="off">
+          <label class="field-label" for="law-policy">POLICY EFFECT</label>
+          <select id="law-policy" class="text-field">
+            <option value="public_works">Public works · 5% cheaper construction</option>
+            <option value="conscription">National service · 8% cheaper recruitment</option>
+            <option value="agricultural_program">Agricultural programme · 10% population growth bonus</option>
+          </select>
           <label class="field-label" for="law-text">PROPOSAL TEXT</label>
           <textarea id="law-text" class="text-field" rows="5" maxlength="4000"></textarea>
           <button id="propose-law" class="action-btn" type="button" disabled>SUBMIT FOR CONSTITUTIONAL REVIEW</button>
@@ -298,6 +323,17 @@
             <textarea id="technology-config" class="text-field" rows="12" spellcheck="false" aria-label="Technology scenario JSON"></textarea>
             <button id="save-technology-config" class="primary-button" type="button">Validate and save scenario</button>
           </details>
+        </section>
+
+        <section id="diplomacy-view" class="view">
+          <p class="panel-kicker">FOREIGN AFFAIRS / RELATIONS / CONFLICT</p>
+          <h2>Diplomatic relations</h2>
+          <p id="diplomacy-status" class="muted" role="status">Connect to a world to inspect foreign relations.</p>
+          <div id="diplomacy-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">DIPLOMATIC RECORD</p>
+          <div id="diplomacy-history" class="political-list"></div>
+          <p class="microcopy">Wars must be declared before attacking another administered State. Neutral, unclaimed territories can be claimed or attacked without a declaration.</p>
         </section>
 
         <section id="multiplayer-view" class="view">
@@ -350,10 +386,11 @@
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js?v=20261108-frontier-build-v1"></script>
-  <script src="./multiplayer.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./simulation.js?v=20261108-playable-systems-v1"></script>
+  <script src="./strategy.js?v=20261108-playable-systems-v1"></script>
+  <script src="./multiplayer.js?v=20261108-playable-systems-v1"></script>
   <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
   <script src="./build-menu.js?v=20261108-theotown-builder-v2"></script>
-  <script src="./game.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./game.js?v=20261108-playable-systems-v1"></script>
 </body>
 </html>

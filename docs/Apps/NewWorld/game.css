@@ -181,6 +181,13 @@ a{color:inherit}
 .political-row .appointment-select{margin-top:8px}
 .political-row button:disabled{cursor:not-allowed;opacity:.45}
 .political-empty{color:var(--muted);font-size:9px;line-height:1.5}
+.trade-route-controls{display:grid;gap:5px;margin-top:10px;padding:10px;border:1px solid var(--line-soft);background:#192528}
+.trade-route-controls[hidden]{display:none!important}
+.trade-route-controls .field-label{margin:5px 0 0}
+.trade-route-controls .action-btn{margin-top:6px}
+.trade-route-controls .microcopy{margin:3px 0 0}
+.map-foot .legend.army{background:#172d27;border:2px solid #d7e5c1;border-radius:50%;width:11px;height:11px}
+.map-foot .legend.occupation{background:#7c201e;border:2px solid #ffb4a7;border-radius:50%;width:11px;height:11px}
 .political-text{min-height:90px;resize:vertical;font-family:var(--sans);line-height:1.45}
 .field-row{display:flex;gap:5px}
 .field-row #server-endpoint{min-width:0;flex:1;padding:9px;border:1px solid var(--line);background:#172125;color:var(--muted);font:9px var(--mono);overflow-wrap:anywhere}

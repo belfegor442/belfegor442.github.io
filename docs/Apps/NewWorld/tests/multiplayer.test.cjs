@@ -2,10 +2,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-global.window = { NewWorldSimulation: require('../simulation.js') };
+const simulation = require('../simulation.js');
+const strategy = require('../strategy.js');
+global.window = {NewWorldSimulation:simulation,NewWorldStrategy:strategy};
 
 const multiplayer = require('../multiplayer.js');
-const simulation = require('../simulation.js');
 
 function guest(id, name) {
   return {

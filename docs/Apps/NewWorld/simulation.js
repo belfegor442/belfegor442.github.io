@@ -280,7 +280,7 @@
       .slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
     // Fixed-quantity company contracts settle before open market sales.
-    for (const route of routes.filter(item => item.exporterCompanyId)) {
+    for (const route of routes.filter(item => item.enabled !== false && item.exporterCompanyId)) {
       const exporter = companies.get(route.exporterCompanyId);
       const importer = companies.get(route.importerCompanyId);
       const exportState = territories.get(route.exportStateId);
@@ -357,7 +357,8 @@
         }
       }
 
-      const publicRoutes = routes.filter(route => route.importStateId === market.stateId &&
+      const publicRoutes = routes.filter(route => route.enabled !== false &&
+        route.importStateId === market.stateId &&
         route.goodId === market.goodId && !route.exporterCompanyId &&
         route.exportStateId !== market.stateId);
       const routeReservations = new Map();
@@ -495,9 +496,40 @@
       const capacity = Math.min(metrics.housingCapacity,metrics.foodCapacity,metrics.waterCapacity);
       const residents = Math.max(0,Number(territory.population) || 0);
       const room = Math.max(0,capacity-residents);
-      const growth = room > 0 ? Math.min(room,Math.max(1,Math.floor(residents*0.0015))) : 0;
+      const growthBonus = globalThis.NewWorldStrategy?.effectValue?.(game,territory.stateId,'population_growth_bonus') || 0;
+      const growth = room > 0
+        ? Math.min(room,Math.max(1,Math.floor(residents*0.0015*(1+growthBonus))))
+        : 0;
       territory.population = residents + growth;
       territory.populationGrowthLastDay = growth;
+
+      const coverage = (available,needed) => needed <= 0
+        ? 1
+        : Math.max(0,Math.min(1,available/needed));
+      const housingCoverage = coverage(metrics.housingCapacity,residents);
+      const foodCoverage = coverage(metrics.foodCapacity,residents);
+      const waterCoverage = coverage(metrics.waterCapacity,residents);
+      const healthCoverage = coverage(metrics.healthCapacity,residents*.25);
+      const educationCoverage = coverage(metrics.educationCapacity,metrics.workingAgePopulation*.45);
+      const employmentCoverage = coverage(metrics.availableJobs,metrics.workingAgePopulation);
+      const prosperityChange =
+        (housingCoverage-.90)*.25 +
+        (foodCoverage-.90)*.45 +
+        (waterCoverage-.90)*.45 +
+        (healthCoverage-.50)*.20 +
+        (educationCoverage-.50)*.10 +
+        (employmentCoverage-.70)*.30;
+      const roundedProsperityChange = Math.round(prosperityChange*100)/100;
+      territory.housingCoverage = Math.round(housingCoverage*100);
+      territory.foodCoverage = Math.round(foodCoverage*100);
+      territory.waterCoverage = Math.round(waterCoverage*100);
+      territory.healthCoverage = Math.round(healthCoverage*100);
+      territory.educationCoverage = Math.round(educationCoverage*100);
+      territory.employmentCoverage = Math.round(employmentCoverage*100);
+      territory.prosperityChangeLastDay = roundedProsperityChange;
+      territory.prosperity = Math.max(0,Math.min(100,
+        (Number(territory.prosperity)||0)+roundedProsperityChange));
+
       if (growth > 0) {
         for (const group of game.populationGroups || []) {
           if (group.stateId === territory.stateId)
@@ -543,6 +575,7 @@
         pushEvent(draft, 'economy.production_completed', company.stateId, description);
       }
       clearMarkets(draft);
+      globalThis.NewWorldStrategy?.advanceDay?.(draft);
 
       const dayDescription = draft.worldDate + ' began (day ' + draft.day + ').';
       pushActivity(draft, dayDescription);

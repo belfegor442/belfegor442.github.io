@@ -238,21 +238,26 @@
   function update() {
     if (state.selected !== null) selectState(state.selected, false, false);
     renderFinancialSummary();
+    renderObjectives();
     $('date-label').textContent = isOnline()
       ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
       : 'MULTIPLAYER REQUIRED';
     $('activity').innerHTML = state.activity.slice(0, 8)
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
-    $('world-mode').textContent = isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
+    $('world-mode').textContent = onlineGame?.status === 'completed'
+      ? 'CAMPAIGN COMPLETED · VICTORY'
+      : isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
     $('legend-owned').textContent = onlineGame ? 'YOUR GOVERNMENT' : 'GOVERNMENT MEMBERSHIP';
     $('legend-other').textContent = onlineGame ? 'OTHER STATES' : 'WORLD DATA UNAVAILABLE';
     $('save-btn').hidden = true;
     $('next-month').hidden = true;
     $('world-time').hidden = !isOnline();
     $('world-time').textContent = isOnline()
-      ? onlineGame?.started
-        ? onlineGame.paused ? 'PAUSED · HOST CLOCK' : '1 DAY / 5 MIN · HOST CLOCK'
-        : 'LOBBY · CLOCK PAUSED'
+      ? onlineGame?.status === 'completed'
+        ? 'VICTORY · ' + formatWorldDate(onlineGame.completedOn || onlineGame.worldDate)
+        : onlineGame?.started
+          ? onlineGame.paused ? 'PAUSED · HOST CLOCK' : '1 DAY / 5 MIN · HOST CLOCK'
+          : 'LOBBY · CLOCK PAUSED'
       : '';
     renderCity();
     renderOptions();
@@ -262,6 +267,23 @@
     renderTerritory();
     renderMilitary();
     renderTechnology();
+    renderDiplomacy();
+  }
+
+  function renderObjectives() {
+    const list = $('campaign-objectives');
+    if (!list) return;
+    list.replaceChildren();
+    if (!onlineGame || !onlineSession?.playerId) {
+      addPoliticalRow(list,'Campaign objectives','Create or join a multiplayer world to track your progress.');
+      return;
+    }
+    for (const objective of window.NewWorldStrategy?.objectivesFor?.(onlineGame,onlineSession.playerId) || []) {
+      const status = objective.completed ? 'COMPLETED' :
+        Number(objective.progress).toLocaleString('en-US') + ' / ' +
+        Number(objective.target).toLocaleString('en-US');
+      addPoliticalRow(list,objective.name + ' · ' + status,objective.description);
+    }
   }
 
   function renderEconomy() {
@@ -276,6 +298,7 @@
     $('economy-setup-panel').hidden = !onlineGame ||
       onlineGame.started ||
       onlineGame.hostPlayerId !== onlineSession?.playerId;
+    $('trade-route-controls').hidden = true;
     if (!onlineGame) {
       addPoliticalRow(list, 'No production data', 'Connect to a multiplayer world to load server-authoritative inventories.');
       addPoliticalRow(marketsList, 'No market data', 'Connect to a multiplayer world to load prices, supply, and demand.');
@@ -285,6 +308,25 @@
     }
 
     const territory = onlineGame.territories.find(item => item.index === state.selected);
+    if (territory) {
+      const metrics = window.NewWorldSimulation?.getSettlementMetrics?.(territory);
+      const residents = Number(territory.population || 0);
+      const ratio = (available,needed) => needed <= 0 ? 100 :
+        Math.round(Math.max(0,Math.min(1,available/needed))*100);
+      const workforce = Number(metrics?.workingAgePopulation || 0);
+      const coverage = [
+        'housing ' + ratio(metrics?.housingCapacity || 0,residents) + '%',
+        'food ' + ratio(metrics?.foodCapacity || 0,residents) + '%',
+        'water ' + ratio(metrics?.waterCapacity || 0,residents) + '%',
+        'health ' + ratio(metrics?.healthCapacity || 0,residents*.25) + '%',
+        'education ' + ratio(metrics?.educationCapacity || 0,workforce*.45) + '%',
+        'employment ' + ratio(metrics?.availableJobs || 0,workforce) + '%'
+      ];
+      addPoliticalRow(populationList,
+        'Settlement condition · prosperity ' + Number(territory.prosperity || 0).toFixed(1),
+        coverage.join(' · ') + ' · daily change ' +
+          Number(territory.prosperityChangeLastDay || 0).toFixed(2));
+    }
     const companies = onlineGame.companies?.filter(company => company.stateId === territory?.stateId) || [];
     if (!companies.length) {
       addPoliticalRow(list, 'No companies configured', 'This State has no configured production facilities.');
@@ -359,8 +401,11 @@
     const routes = (onlineGame.tradeRoutes || []).filter(route =>
       route.exportStateId === territory?.stateId || route.importStateId === territory?.stateId);
     if (!routes.length) {
-      addPoliticalRow(routesList, 'No trade routes configured', 'No inter-State goods routes are active.');
-    } else for (const route of routes) {
+      addPoliticalRow(routesList, 'No trade routes configured', 'Connect markets in other territories to import surplus goods and expand regional supply.');
+    }
+    const routeMembership = membershipsFor(currentPlayer()).find(item =>
+      item.stateId === territory?.stateId);
+    for (const route of routes) {
       const origin = onlineGame.territories.find(item => item.stateId === route.exportStateId);
       const destination = onlineGame.territories.find(item => item.stateId === route.importStateId);
       const good = onlineGame.goods?.find(item => item.id === route.goodId);
@@ -371,13 +416,96 @@
           ' · contracted daily quantity ' + route.dailyQuantity +
           ' at ' + money(route.unitPrice) + ' per ' + (good?.unit || 'unit')
         : ' · daily capacity ' + route.dailyCapacity + ' ' + (good?.unit || 'units') +
-          ' · exporter receives proceeds in the importing market currency';
-      addPoliticalRow(
+          ' · public market imports settle in the importing State';
+      const routeStatus = route.status ||
+        (route.enabled === false ? 'cancelled' : 'active');
+      const row = addPoliticalRow(
         routesList,
         (origin?.name || 'Unknown State') + ' → ' + (destination?.name || 'Unknown State') +
           ' · ' + (good?.name || route.goodId),
-        (route.enabled ? 'Active' : 'Suspended') + bilateralTerms);
+        routeStatus.toUpperCase().replaceAll('_',' ') + bilateralTerms);
+      const isImporter = route.importStateId === territory?.stateId;
+      const isExporter = route.exportStateId === territory?.stateId;
+      if (routeMembership && isImporter && routeStatus === 'pending' &&
+          route.createdByPlayerId !== currentPlayer()?.id &&
+          onlineGame.status === 'running') {
+        for (const [accept,label] of [[true,'ACCEPT ROUTE'],[false,'REJECT ROUTE']]) {
+          const response = document.createElement('button');
+          response.type = 'button';
+          response.className = 'secondary-button';
+          response.textContent = label;
+          response.addEventListener('click',() => sendAction({
+            type:'respondTradeRoute',stateId:territory.stateId,
+            tradeRouteId:route.id,accept
+          }));
+          row.appendChild(response);
+        }
+      }
+      if (routeMembership && (isExporter || isImporter) &&
+          ['active','pending'].includes(routeStatus) &&
+          onlineGame.status === 'running') {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'secondary-button';
+        cancel.textContent = routeStatus === 'pending' ? 'WITHDRAW PROPOSAL' : 'CANCEL ROUTE';
+        cancel.addEventListener('click',() => sendAction({
+          type:'cancelTradeRoute',stateId:territory.stateId,tradeRouteId:route.id
+        }));
+        row.appendChild(cancel);
+      }
     }
+
+    const routeControls = $('trade-route-controls');
+    const destinationSelect = $('trade-route-destination');
+    const goodSelect = $('trade-route-good');
+    const routeCapacity = $('trade-route-capacity');
+    const createRoute = $('create-trade-route');
+    const routeStatus = $('trade-route-status');
+    const previousDestination = destinationSelect.value;
+    const destinations = onlineGame.territories.filter(item =>
+      item.stateId !== territory?.stateId &&
+      (onlineGame.markets || []).some(market => market.stateId === item.stateId));
+    routeControls.hidden = !routeMembership || onlineGame.status !== 'running';
+    destinationSelect.replaceChildren();
+    for (const destination of destinations) {
+      const option = document.createElement('option');
+      option.value = destination.stateId;
+      option.textContent = destination.name;
+      destinationSelect.appendChild(option);
+    }
+    if (destinations.some(item => item.stateId === previousDestination))
+      destinationSelect.value = previousDestination;
+    const destinationStateId = destinationSelect.value;
+    const availableGoods = (onlineGame.goods || []).filter(good =>
+      (onlineGame.companies || []).some(company => company.stateId === territory?.stateId) &&
+      (onlineGame.markets || []).some(market =>
+        market.stateId === destinationStateId && market.goodId === good.id) &&
+      !(onlineGame.tradeRoutes || []).some(route =>
+        route.exportStateId === territory?.stateId &&
+        route.importStateId === destinationStateId && route.goodId === good.id &&
+        ['active','pending'].includes(route.status || (route.enabled===false?'cancelled':'active'))));
+    const previousGood = goodSelect.value;
+    goodSelect.replaceChildren();
+    for (const good of availableGoods) {
+      const option = document.createElement('option');
+      option.value = good.id;
+      option.textContent = good.name + ' · ' + good.unit;
+      goodSelect.appendChild(option);
+    }
+    if (availableGoods.some(item => item.id === previousGood))
+      goodSelect.value = previousGood;
+    const validCapacity = routeCapacity.value && routeCapacity.checkValidity() &&
+      Number.isSafeInteger(Number(routeCapacity.value));
+    createRoute.disabled = onlineGame.status !== 'running' ||
+      !routeMembership || !destinationStateId || !goodSelect.value ||
+      !validCapacity || Number(routeCapacity.value) < 1 ||
+      Number(routeCapacity.value) > 500 || Number(territory?.treasury || 0) < 150 ||
+      socket?.readyState !== WebSocket.OPEN;
+    routeStatus.textContent = !destinations.length
+      ? 'No other State markets are available in this world.'
+      : !availableGoods.length
+        ? 'No unconnected goods markets are available for this destination.'
+        : 'Establishment: ¤150 · Capacity: 1–500 units per world day. A route to another player requires their approval.';
   }
 
   function renderTerritory() {
@@ -397,7 +525,7 @@
     }
 
     const provinces = (onlineGame.provinces || []).filter(item =>
-      item.sovereignStateId === territory.stateId);
+      item.stateId === territory.stateId);
     const selectedProvince = provinces.find(item => item.id === selectedProvinceId);
     $('territory-status').textContent = provinces.length
       ? provinces.length + ' configured province(s) · sovereignty and effective control are distinct.' +
@@ -410,9 +538,12 @@
       addPoliticalRow(
         provinceList,
         province.name,
-        'SVG mapping: ' + province.svgElementId + ' · population: ' +
-          Number(province.population).toLocaleString('en-US') + ' · terrain: ' +
-          (province.terrainId || 'pending') + ' · control records: ' + currentControls.length);
+        'Sovereignty: ' +
+          (onlineGame.territories.find(item => item.stateId === province.sovereignStateId)?.name || 'unknown') +
+          ' · SVG mapping: ' + (province.svgElementId || 'not assigned') +
+          ' · population: ' + Number(province.population || 0).toLocaleString('en-US') +
+          ' · terrain: ' + (province.terrainId || 'pending') +
+          ' · control records: ' + currentControls.length);
     }
 
     const provinceIds = new Set(provinces.map(item => item.id));
@@ -471,11 +602,34 @@
       return;
     }
 
-    const units = (onlineGame.militaryUnits || []).filter(item => item.stateId === territory.stateId);
+    const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory.stateId);
+    if (membership && membership.permissionSetId !== 'government-observer') {
+      const recruitment = addPoliticalRow(unitsList,'Recruitment and mobilisation','Recruit units from the State treasury. Military orders are resolved by the host.');
+      for (const unitType of onlineGame.militaryUnitTypes || []) {
+        const discovered = !unitType.requiredTechnologyId ||
+          (onlineGame.technologyUnlocks || []).some(item =>
+            item.stateId === territory.stateId && item.technologyId === unitType.requiredTechnologyId);
+        const discount = Math.min(.5,window.NewWorldStrategy?.effectValue?.(onlineGame,territory.stateId,'recruitment_discount') || 0);
+        const cost = Math.ceil(Number(unitType.recruitmentCost || 0) * (1-discount));
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'RECRUIT ' + unitType.name.toUpperCase() + ' · ' + money(cost);
+        button.disabled = !discovered || onlineGame.status !== 'running' || socket?.readyState !== WebSocket.OPEN;
+        button.title = discovered ? 'Recruit a new unit' : 'Discover ' + unitType.requiredTechnologyId + ' first';
+        button.addEventListener('click',() => sendAction({
+          type:'recruitUnit',stateId:territory.stateId,unitTypeId:unitType.id
+        }));
+        recruitment.appendChild(button);
+      }
+    }
+    const accessibleStateIds = new Set(membershipsFor(currentPlayer()).map(item => item.stateId));
+    const units = (onlineGame.militaryUnits || []).filter(item =>
+      accessibleStateIds.has(item.stateId));
     $('military-status').textContent = units.length
-      ? units.length + ' configured unit(s) · movement and combat values come from the server.'
-      : 'Military scenario configuration is pending for this State.';
-    if (!units.length) addPoliticalRow(unitsList, 'No units configured', 'Unit composition and combat balance are not inferred.');
+      ? units.filter(unit => unit.personnel>0).length + ' active unit(s) · recruitment, movement and battles are processed by the host.'
+      : 'No field units are currently stationed in this State.';
+    if (!units.length) addPoliticalRow(unitsList, 'No units recruited', 'Recruit militia to begin expanding your military.');
+
     for (const unit of units) {
       const type = (onlineGame.militaryUnitTypes || []).find(item => item.id === unit.unitTypeId);
       const province = (onlineGame.provinces || []).find(item => item.id === unit.provinceId);
@@ -487,26 +641,44 @@
           String(unit.status) + ' · province ' + (province?.name || 'unknown'),
         'Training ' + unit.training + ' · morale ' + unit.morale + ' · experience ' +
           unit.experience + ' · commander ' + (commander?.name || 'unassigned'));
-      const membership = membershipsFor(currentPlayer()).find(item =>
-        item.stateId === territory.stateId);
-      const canCommand = Boolean(membership &&
-        (type?.commandPermissionSetIds || []).includes(membership.permissionSetId));
+      const unitMembership = membershipsFor(currentPlayer()).find(item =>
+        item.stateId === unit.stateId);
+      const canCommand = Boolean(unitMembership &&
+        (type?.commandPermissionSetIds || []).includes(unitMembership.permissionSetId));
       if (canCommand) {
         for (const route of (onlineGame.militaryRoutes || []).filter(item =>
           item.enabled && item.originProvinceId === unit.provinceId)) {
+          const destination = (onlineGame.provinces || []).find(item =>
+            item.id === route.destinationProvinceId);
+          if (!destination) continue;
+          const player = currentPlayer();
+          const friendly = membershipsFor(player).some(item =>
+            item.stateId === destination.stateId);
+          const destinationTerritory = onlineGame.territories.find(item =>
+            item.stateId === destination.stateId);
+          const foreignGovernment = Boolean(destinationTerritory?.ownerPlayerId &&
+            destinationTerritory.ownerPlayerId !== player?.id && !friendly);
+          const relation = (onlineGame.diplomaticRelations || []).find(item =>
+            item.stateAId === unit.stateId && item.stateBId === destination.stateId ||
+            item.stateBId === unit.stateId && item.stateAId === destination.stateId);
+          const warDeclared = relation?.status === 'war';
+          const samePlayerTerritory = destinationTerritory?.ownerPlayerId === player?.id;
           const button = document.createElement('button');
           button.className = 'secondary-button';
           button.type = 'button';
-          button.textContent = 'MOVE TO ' +
-            ((onlineGame.provinces || []).find(item =>
-              item.id === route.destinationProvinceId)?.name || 'DESTINATION');
+          button.textContent = friendly ? 'MOVE TO ' + destination.name
+            : foreignGovernment ? (warDeclared ? 'ATTACK ' : 'WAR REQUIRED · ') + destination.name
+              : samePlayerTerritory ? 'ADMINISTERED · ' + destination.name
+                : 'ATTACK ' + destination.name;
+          button.disabled = onlineGame.status !== 'running' || unit.personnel<=0 ||
+            (foreignGovernment && !warDeclared) || samePlayerTerritory;
           button.addEventListener('click', () => sendAction({
-            type: 'mobilizeUnit',
-            stateId: territory.stateId,
-            militaryOrderType: 'move',
-            militaryUnitId: unit.id,
-            destinationProvinceId: route.destinationProvinceId,
-            militaryRouteId: route.id
+            type:'mobilizeUnit',
+            stateId:unit.stateId,
+            militaryOrderType:friendly?'move':'attack',
+            militaryUnitId:unit.id,
+            destinationProvinceId:destination.id,
+            militaryRouteId:route.id
           }));
           row.appendChild(button);
         }
@@ -514,11 +686,14 @@
     }
 
     const stateProvinceIds = new Set((onlineGame.provinces || [])
-      .filter(item => item.sovereignStateId === territory.stateId)
+      .filter(item => item.stateId === territory.stateId)
       .map(item => item.id));
-    const orders = (onlineGame.militaryOrders || []).filter(item => item.stateId === territory.stateId);
+    const accessibleUnitIds = new Set(units.map(item => item.id));
+    const orders = (onlineGame.militaryOrders || []).filter(item =>
+      accessibleUnitIds.has(item.unitId));
     const battles = (onlineGame.militaryBattles || []).filter(item =>
-      stateProvinceIds.has(item.provinceId));
+      stateProvinceIds.has(item.provinceId) ||
+      (item.participantUnitIds || []).some(unitId => accessibleUnitIds.has(unitId)));
     if (!orders.length && !battles.length)
       addPoliticalRow(operationsList, 'No military operations', 'No orders or battles have been recorded.');
     for (const order of orders) {
@@ -560,6 +735,83 @@
           (occupation.controlEffective ? 'established' : 'not established') +
           ' · sovereignty unchanged');
     }
+  }
+
+  function renderDiplomacy() {
+    const list=$('diplomacy-list');
+    const history=$('diplomacy-history');
+    if(!list || !history) return;
+    list.replaceChildren();
+    history.replaceChildren();
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const player=currentPlayer();
+    if(!onlineGame || !territory || !player) {
+      $('diplomacy-status').textContent='Create or join a multiplayer world to inspect diplomatic relations.';
+      addPoliticalRow(list,'No diplomatic data','Foreign relations are stored by the host and shared with the world.');
+      addPoliticalRow(history,'No diplomatic record','Declarations and peace agreements will appear here.');
+      return;
+    }
+    const membership=membershipsFor(player).find(item=>item.stateId===territory.stateId);
+    $('diplomacy-status').textContent=membership
+      ? 'Foreign policy is issued by '+territory.name+'. War requires a public declaration; peace is blocked while an occupation remains active.'
+      : 'You need an active government membership in '+territory.name+' to conduct foreign policy.';
+    if(!membership) {
+      addPoliticalRow(list,'No diplomatic authority','Select a State in which you hold an active government membership.');
+      return;
+    }
+    for(const target of onlineGame.territories.filter(item=>item.stateId!==territory.stateId)) {
+      const targetMembers=onlineGame.players.filter(candidate =>
+        membershipsFor(candidate).some(item=>item.stateId===target.stateId));
+      const owner=onlineGame.players.find(candidate=>candidate.id===target.ownerPlayerId);
+      const sharedGovernment=membershipsFor(player).some(item=>item.stateId===target.stateId);
+      const relation=(onlineGame.diplomaticRelations || []).find(item =>
+        item.stateAId===territory.stateId && item.stateBId===target.stateId ||
+        item.stateAId===target.stateId && item.stateBId===territory.stateId);
+      const status=relation?.status==='war'
+        ? sharedGovernment?'AT WAR · CO-GOVERNED':'AT WAR'
+        : sharedGovernment?'CO-GOVERNED'
+          : target.ownerPlayerId===player.id?'YOUR ADMINISTRATION'
+            : target.ownerPlayerId?'PEACE':'UNCLAIMED';
+      const details=target.ownerPlayerId
+        ? 'Government: '+(owner?.name || 'Unknown player')+
+          ' · '+targetMembers.length+' member(s)'+
+          (relation?.status==='war'?' · war declared '+formatWorldDate(relation.declaredOn):'')
+        : 'No player administration · may be claimed peacefully or challenged by military campaign.';
+      const row=addPoliticalRow(list,target.name+' · '+status,details);
+      const foreignGovernment=Boolean(target.ownerPlayerId &&
+        target.ownerPlayerId!==player.id && !sharedGovernment);
+      const atWar=relation?.status==='war';
+      if(foreignGovernment || atWar) {
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='secondary-button';
+        button.textContent=atWar?'SIGN PEACE':'DECLARE WAR';
+        const pairProvinceIds=new Set((onlineGame.provinces || [])
+          .filter(item=>[territory.stateId,target.stateId].includes(item.stateId))
+          .map(item=>item.id));
+        const occupationActive=(onlineGame.occupations || []).some(item =>
+          item.status==='active' && pairProvinceIds.has(item.provinceId) &&
+          [territory.stateId,target.stateId].includes(item.occupyingStateId));
+        button.disabled=onlineGame.status!=='running' ||
+          socket?.readyState!==WebSocket.OPEN || (atWar && occupationActive);
+        button.title=atWar && occupationActive
+          ? 'Peace is unavailable while this State has an active military occupation.'
+          : atWar?'End the current war with a peace agreement.':'Declare a state of war before military attacks.';
+        button.addEventListener('click',()=>sendAction({
+          type:atWar?'makePeace':'declareWar',
+          stateId:territory.stateId,targetStateId:target.stateId
+        }));
+        row.appendChild(button);
+      }
+    }
+    const events=(onlineGame.events || []).filter(item =>
+      String(item.type || '').startsWith('diplomacy.')).slice().reverse().slice(0,20);
+    if(!events.length)
+      addPoliticalRow(history,'No diplomatic record','No wars or peace agreements have been recorded.');
+    for(const event of events)
+      addPoliticalRow(history,event.description || event.type,
+        formatWorldDate(event.worldDate)+' · '+(onlineGame.territories.find(item =>
+          item.stateId===event.stateId)?.name || 'Foreign affairs'));
   }
 
   function renderTechnology() {
@@ -622,8 +874,14 @@
             (String(institution.type).toLowerCase() === 'private'
               ? Number(institution.funding) >= Number(project.budget)
               : stateTreasury >= Number(project.budget)));
+      const allocatedStaff = stateProjects.filter(item =>
+        item.id !== project?.id &&
+        item.institutionId === project?.institutionId &&
+        String(item.status).toLowerCase() === 'active')
+        .reduce((sum,item) => sum + Math.max(0,Number(item.staff)||0),0);
       const enoughStaff = project && institution &&
-        Number(project.staff) > 0 && Number(project.staff) <= Number(institution.staff);
+        Number(project.staff) > 0 &&
+        allocatedStaff + Number(project.staff) <= Number(institution.staff);
       const status = adoptedIds.has(technology.id) ? 'adopted'
         : unlockedIds.has(technology.id) ? 'discovered'
           : project && String(project.status).toLowerCase() === 'active' ? 'in progress'
@@ -960,8 +1218,9 @@
     const institutions = $('institution-list');
     const parties = $('party-list');
     const laws = $('law-list');
+    const policies = $('policy-list');
     const decisions = $('decision-list');
-    for (const list of [summary, institutions, parties, laws, decisions]) list.replaceChildren();
+    for (const list of [summary, institutions, parties, laws, policies, decisions]) list.replaceChildren();
 
     $('government-title').textContent = territory?.name || 'Government';
     if (!onlineGame || !territory || !system) {
@@ -972,6 +1231,7 @@
       $('law-restriction').textContent = 'Law-making requires an explicitly configured Constitution and permitted government membership.';
       $('budget-restriction').textContent = 'Budget changes require an explicitly configured constitutional competence.';
       addPoliticalRow(summary, 'No political data', 'No authoritative State political system is available.');
+      addPoliticalRow(policies,'No active public policies','Connect to a world to inspect enacted policy effects.');
       return;
     }
 
@@ -1000,10 +1260,14 @@
       ?.find(rule => rule.competence === 'proposeLaw');
     const budgetRule = constitution?.competenceRules
       ?.find(rule => rule.competence === 'approveBudget');
+    const holdsBudgetOffice = (system.offices || []).some(office =>
+      ['treasurer','chief-executive'].includes(office.id) &&
+      office.holderPlayerId === player?.id);
     const canApproveBudget = onlineGame.status === 'running' &&
       system.government &&
       membership &&
-      budgetRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
+      budgetRule?.proposerPermissionSetIds?.includes(membership.permissionSetId) &&
+      holdsBudgetOffice;
     const budgetInput = $('budget-amount');
     if (system.government && document.activeElement !== budgetInput && !budgetInput.value)
       budgetInput.value = String(system.government.budget);
@@ -1012,13 +1276,16 @@
       ? 'Authority: ' + budgetRule.legalBasis + (budgetRule.approvalRequired
         ? '. The configured institution must approve this budget plan.'
         : '. This configured procedure applies the budget plan directly.')
-      : 'Budget changes are unavailable: the government, constitutional competence, or permission is not configured.';
+      : 'Only the appointed State Treasurer or Chief Executive can approve the public budget.';
 
     const appointmentRule = constitution?.competenceRules
       ?.find(rule => rule.competence === 'appointOffice');
+    const isChiefExecutive = (system.offices || []).some(office =>
+      office.id === 'chief-executive' && office.holderPlayerId === player?.id);
     const canAppointOffice = onlineGame.status === 'running' &&
       membership &&
-      appointmentRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
+      appointmentRule?.proposerPermissionSetIds?.includes(membership.permissionSetId) &&
+      isChiefExecutive;
     const eligibleAppointees = onlineGame.players.filter(candidate =>
       membershipsFor(candidate).some(item => item.stateId === system.stateId));
 
@@ -1096,6 +1363,23 @@
       addPoliticalRow(laws, 'No legislation recorded', 'Only proposals completing the configured constitutional procedure enter into force.');
     }
 
+    const activePolicies = system.policies || [];
+    if (activePolicies.length) {
+      for (const policy of activePolicies) {
+        const effect = policy.effectId === 'construction_discount'
+          ? Math.round(Number(policy.value)*100) + '% lower construction costs'
+          : policy.effectId === 'recruitment_discount'
+            ? Math.round(Number(policy.value)*100) + '% lower recruitment costs'
+            : policy.effectId === 'population_growth_bonus'
+              ? Math.round(Number(policy.value)*100) + '% faster population growth'
+              : 'No executable effect configured';
+        addPoliticalRow(policies,policy.name || policy.policyId,
+          effect + ' · enacted ' + formatWorldDate(policy.enactedOn));
+      }
+    } else {
+      addPoliticalRow(policies,'No active public policies',
+        'Approved bills appear here and apply their effects to the selected State.');
+    }
 
     if (system.decisions.length) {
       for (const decision of [...system.decisions].reverse()) {
@@ -1285,6 +1569,77 @@
     buildMenu?.open();
   }
 
+  function renderMapArmyMarkers(svgDocument) {
+    const svgNS='http://www.w3.org/2000/svg';
+    const root=svgDocument.documentElement;
+    if(!root || !onlineGame) return;
+    let layer=svgDocument.getElementById('new-world-army-markers');
+    if(!layer) {
+      layer=svgDocument.createElementNS(svgNS,'g');
+      layer.setAttribute('id','new-world-army-markers');
+      layer.setAttribute('pointer-events','none');
+      layer.setAttribute('aria-hidden','true');
+      root.appendChild(layer);
+    }
+    layer.replaceChildren();
+    const provinces=new Map((onlineGame.provinces || []).map(item=>[item.id,item]));
+    const forces=new Map();
+    for(const unit of onlineGame.militaryUnits || []) {
+      if(Number(unit.personnel)<=0) continue;
+      const province=provinces.get(unit.provinceId);
+      if(!province) continue;
+      const entry=forces.get(province.stateId) || {units:0,personnel:0};
+      entry.units++;
+      entry.personnel+=Number(unit.personnel)||0;
+      forces.set(province.stateId,entry);
+    }
+    const occupied=new Set((onlineGame.occupations || [])
+      .filter(item=>item.status==='active')
+      .map(item=>provinces.get(item.provinceId)?.stateId)
+      .filter(Boolean));
+    for(const [stateId,force] of forces) {
+      const index=onlineGame.territories.findIndex(item=>item.stateId===stateId);
+      if(index<0) continue;
+      const territoryPath=svgDocument.getElementById('state'+(index+1));
+      if(!territoryPath) continue;
+      let bounds;
+      try{bounds=territoryPath.getBBox()}catch{continue}
+      if(!bounds.width || !bounds.height) continue;
+      const x=bounds.x+bounds.width*.73;
+      const y=bounds.y+bounds.height*.30;
+      const activeOccupation=occupied.has(stateId);
+      const marker=svgDocument.createElementNS(svgNS,'g');
+      marker.setAttribute('class','new-world-army-marker');
+      marker.setAttribute('transform','translate('+x+' '+y+')');
+      const halo=svgDocument.createElementNS(svgNS,'circle');
+      halo.setAttribute('r','19');
+      halo.setAttribute('fill',activeOccupation?'#7c201e':'#172d27');
+      halo.setAttribute('stroke',activeOccupation?'#ffb4a7':'#d7e5c1');
+      halo.setAttribute('stroke-width','2.5');
+      const count=svgDocument.createElementNS(svgNS,'text');
+      count.setAttribute('text-anchor','middle');
+      count.setAttribute('dominant-baseline','central');
+      count.setAttribute('font-family','Arial,sans-serif');
+      count.setAttribute('font-size','13');
+      count.setAttribute('font-weight','800');
+      count.setAttribute('fill','#ffffff');
+      count.textContent=String(force.units);
+      const personnel=svgDocument.createElementNS(svgNS,'text');
+      personnel.setAttribute('text-anchor','middle');
+      personnel.setAttribute('y','31');
+      personnel.setAttribute('font-family','Arial,sans-serif');
+      personnel.setAttribute('font-size','10');
+      personnel.setAttribute('font-weight','700');
+      personnel.setAttribute('fill','#ffffff');
+      personnel.setAttribute('stroke','#17221d');
+      personnel.setAttribute('stroke-width','3');
+      personnel.setAttribute('paint-order','stroke');
+      personnel.textContent=force.personnel.toLocaleString('en-US');
+      marker.append(halo,count,personnel);
+      layer.appendChild(marker);
+    }
+  }
+
   function highlightMap(selectedIndex) {
     const object = $('world-map');
     try {
@@ -1346,6 +1701,7 @@
         element.style.stroke = selected ? '#f3d37a' : '';
         element.style.strokeWidth = selected ? '3' : '';
       }
+      renderMapArmyMarkers(document);
     } catch (error) {
       console.warn('[new-world] Could not update map territory styles:', error);
     }
@@ -1929,9 +2285,14 @@
   }
 
   function sendAction(action) {
-    const browserHostActions = new Set(['claim','build','pause','resume']);
-    if (!browserHostActions.has(action.type)) {
-      showMessage('This gameplay action has not yet been migrated to the browser-hosted rules engine.',true);
+    const supportedOrders = new Set([
+      'claim','build','pause','resume','recruitUnit','mobilizeUnit',
+      'startProject','cancelProject','adoptTechnology','approveBudget',
+      'proposeLaw','voteDecision','appointOffice',
+      'establishTradeRoute','respondTradeRoute','cancelTradeRoute','declareWar','makePeace'
+    ]);
+    if (!supportedOrders.has(action.type)) {
+      showMessage('This gameplay action is not part of the available world rules.',true);
       return false;
     }
     if (!socket || !window.NewWorldMultiplayer?.isConnected()) {
@@ -2002,7 +2363,44 @@
       UNIT_NOT_OPERATIONAL: 'This unit is not operational.',
       ROUTE_CAPACITY_EXCEEDED: 'The configured route does not have enough capacity.',
       TERRITORY_ACCESS_DENIED: 'This route crosses territory without configured access.',
-      MILITARY_CAPACITY_UNIT_UNSUPPORTED: 'This route uses a capacity unit that cannot yet be validated.'
+      MILITARY_CAPACITY_UNIT_UNSUPPORTED: 'This route uses a capacity unit that cannot yet be validated.',
+      TECHNOLOGY_REQUIRED: 'Discover the required military technology before recruiting this unit.',
+      UNIT_LIMIT: 'This State has reached its limit of active military units.',
+      UNIT_NOT_CONTROLLED: 'You do not have command authority over this unit.',
+      ROUTE_UNAVAILABLE: 'No valid military route connects the selected provinces.',
+      HOSTILE_TERRITORY: 'You cannot move into territory outside your government. Issue an attack order instead.',
+      ALREADY_CONTROLLED: 'Your government already administers this territory.',
+      ARMY_TOO_WEAK: 'This unit is not strong enough to launch the operation.',
+      PROJECT_UNAVAILABLE: 'This research project cannot be started or cancelled in its current state.',
+      INVALID_PROJECT: 'The research project references missing scenario data.',
+      PREREQUISITES_MISSING: 'The required technologies have not yet been discovered.',
+      PROJECT_RESOURCES_MISSING: 'The research institution lacks available staff, materials or funding.',
+      TECHNOLOGY_NOT_DISCOVERED: 'Complete the research project before adopting this technology.',
+      ALREADY_ADOPTED: 'This technology is already adopted by the State.',
+      INVALID_BUDGET: 'Enter a valid whole-number government budget.',
+      INVALID_LAW: 'A law needs a valid title and a sufficiently detailed proposal.',
+      INVALID_POLICY: 'Choose one of the available policy effects.',
+      POLICY_ALREADY_ACTIVE: 'This policy is already active in the selected State.',
+      VOTE_UNAVAILABLE: 'This decision is closed or your membership cannot vote.',
+      INVALID_VOTE: 'Choose approve or reject.',
+      DUPLICATE_VOTE: 'Your membership has already voted on this decision.',
+      INVALID_APPOINTMENT: 'The office or appointee is not eligible in this State.',
+      TRADE_DESTINATION_UNAVAILABLE: 'Trade routes require membership in both the exporting and importing governments.',
+      TRADE_GOOD_UNAVAILABLE: 'The selected good needs an exporter and a destination market.',
+      INVALID_ROUTE_CAPACITY: 'Choose a daily route capacity between 1 and 500.',
+      TRADE_ROUTE_EXISTS: 'A route for this good and destination already exists.',
+      TRADE_ROUTE_LIMIT: 'The world has reached its public trade route limit.',
+      TARGET_OCCUPIED: 'This territory is under military occupation.',
+      TRADE_ROUTE_UNAVAILABLE: 'This State does not participate in that active or pending route.',
+      TRADE_ROUTE_PENDING_NOT_FOUND: 'This State has no pending trade route to approve.',
+      TRADE_ROUTE_SELF_APPROVAL: 'The exporting player cannot approve their own trade proposal.',
+      INVALID_DIPLOMATIC_TARGET: 'Choose a valid foreign State.',
+      NOT_HOSTILE_STATE: 'War can only be declared against another administered government.',
+      WAR_ALREADY_ACTIVE: 'The two governments are already at war.',
+      WAR_NOT_DECLARED: 'Declare war before attacking another administered State.',
+      PEACE_UNAVAILABLE: 'There is no active war between these governments.',
+      OCCUPATION_ACTIVE: 'Finish or withdraw from active occupations before signing peace.',
+      INSUFFICIENT_PERMISSION: 'This action is reserved for the appointed government office holder.'
     };
     return messages[code] || 'The host rejected the order.';
   }
@@ -2204,10 +2602,26 @@
     const territory = onlineGame?.territories.find(item => item.index === state.selected);
     if (!territory || $('propose-law').disabled) return;
     sendAction({
-      type: 'proposeLaw',
-      stateId: territory.stateId,
-      decisionTitle: $('law-title').value,
-      decisionText: $('law-text').value
+      type:'proposeLaw',
+      stateId:territory.stateId,
+      decisionTitle:$('law-title').value,
+      decisionText:$('law-text').value,
+      policyId:$('law-policy').value
+    });
+  });
+  $('trade-route-destination').addEventListener('change',renderEconomy);
+  $('trade-route-capacity').addEventListener('change',renderEconomy);
+  $('create-trade-route').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item => item.index===state.selected);
+    const button=$('create-trade-route');
+    const capacity=Number($('trade-route-capacity').value);
+    if (!territory || button.disabled || !Number.isSafeInteger(capacity)) return;
+    sendAction({
+      type:'establishTradeRoute',
+      stateId:territory.stateId,
+      destinationStateId:$('trade-route-destination').value,
+      goodId:$('trade-route-good').value,
+      dailyCapacity:capacity
     });
   });
 

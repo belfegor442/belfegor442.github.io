@@ -250,8 +250,9 @@
 
   function emptyCollections() {
     return {
-      memberships:[], events:[], orders:[], currencies:[], financialTransactions:[],
-      companyFinancialTransactions:[], marketHistory:[], goods:[], productionRecipes:[],
+      memberships:[], events:[], orders:[], currencies:[], diplomaticRelations:[],
+      financialTransactions:[],companyFinancialTransactions:[],marketHistory:[],
+      goods:[],productionRecipes:[],
       populationGroups:[], companies:[], markets:[], tradeRoutes:[], politicalSystems:[],
       provinces:[], settlements:[], provinceConnections:[], territorialControls:[],
       sovereigntyHistory:[], militaryUnitTypes:[], militaryCommanders:[], militaryUnits:[],
@@ -299,9 +300,22 @@
     if (!window.NewWorldSimulation) throw new Error('The New World simulation engine failed to load.');
     Object.assign(game, window.NewWorldSimulation.createStarterEconomy(
       [game.territories[STARTING_TERRITORY_INDEX]],byId));
+    if (!window.NewWorldStrategy?.createStarterScenario)
+      throw new Error('The New World strategy engine failed to load.');
+    window.NewWorldStrategy.createStarterScenario(game,byId);
     const hostAssignment = assignLobbyPlayer(game, game.players[0], STARTING_TERRITORY_INDEX);
     if (!hostAssignment.ok)
       throw new Error('The host could not be assigned to the starting State: ' + hostAssignment.error);
+    const hostMembership = activeMemberships(game,playerId)[0];
+    if (hostMembership) hostMembership.permissionSetId = 'government-executive';
+    const foundingSystem = game.politicalSystems.find(item => item.stateId === game.territories[0].stateId);
+    if (foundingSystem) {
+      const chief = foundingSystem.offices.find(item => item.id === 'chief-executive');
+      const treasurer = foundingSystem.offices.find(item => item.id === 'treasurer');
+      if (chief) chief.holderPlayerId = playerId;
+      if (treasurer) treasurer.holderPlayerId = playerId;
+      foundingSystem.government.chiefExecutivePlayerId = playerId;
+    }
     pushEvent(game,'world.created',playerId,null,
       'A new frontier was founded. ' + name + ' leads the first settlement at ' +
       game.territories[0].name + '.');
@@ -557,6 +571,10 @@
       const territory = game.territories[Number(order.territoryIndex)];
       if (!territory || territory.ownerPlayerId)
         return reject('TARGET_UNAVAILABLE','This territory is already administered or invalid.',order.orderId);
+      const targetProvince = (game.provinces || []).find(item => item.stateId === territory.stateId);
+      if ((game.occupations || []).some(item =>
+          item.provinceId === targetProvince?.id && item.status === 'active'))
+        return reject('TARGET_OCCUPIED','This territory is under military occupation.',order.orderId);
       const government = game.territories.find(item => item.stateId === membership.stateId);
       if (!government || government.treasury < 450)
         return reject('INSUFFICIENT_FUNDS','Insufficient treasury (¤450 required).',order.orderId);
@@ -565,6 +583,7 @@
       territory.ownerPlayerId = player.id;
       territory.infrastructure++;
       territory.buildings ||= {};
+      window.NewWorldStrategy?.onClaim?.(game,territory,player.id,byId);
       if (window.NewWorldSimulation?.createStarterEconomy) {
         const localEconomy = window.NewWorldSimulation.createStarterEconomy([territory],byId);
         game.companies ||= [];
@@ -637,9 +656,12 @@
       if (!government) return reject('NOT_MEMBER','The selected territory has no active administration.',order.orderId);
       government.buildings ||= {};
       if (government.buildings[plot]) return reject('TARGET_UNAVAILABLE','This plot is already developed.',order.orderId);
-      if (government.treasury < building.cost)
+      const constructionDiscount = Math.min(.5,
+        window.NewWorldStrategy?.effectValue?.(game,membership.stateId,'construction_discount') || 0);
+      const constructionCost = Math.max(1,Math.ceil(building.cost * (1-constructionDiscount)));
+      if (government.treasury < constructionCost)
         return reject('INSUFFICIENT_FUNDS','Insufficient treasury.',order.orderId);
-      government.treasury -= building.cost;
+      government.treasury -= constructionCost;
       government.buildings[plot] = {
         ...clone(building),name:variantName,
         ...(spriteKey ? {spriteKey,rotation} : {}),
@@ -649,15 +671,20 @@
       };
       game.financialTransactions.push({
         id:byId(),stateId:government.stateId,currencyId:government.currencyId,
-        type:'constructionCost',amount:-building.cost,balanceBefore:government.treasury+building.cost,
+        type:'constructionCost',amount:-constructionCost,balanceBefore:government.treasury+constructionCost,
         balanceAfter:government.treasury,description:'Constructed ' + variantName + '.',
         worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),orderId:order.orderId,
         membershipId:membership.id
       });
       pushActivity(game,player.name + ' started construction of ' + variantName +
         ' in ' + government.name + '.');
+    } else if (window.NewWorldStrategy?.applyOrder) {
+      const result = window.NewWorldStrategy.applyOrder(game,player,membership,order,byId);
+      if (!result.ok)
+        return reject(result.code || 'STRATEGY_ORDER_REJECTED',
+          result.error || 'The strategy rules rejected this order.',order.orderId);
     } else {
-      return reject('UNSUPPORTED_ORDER','This order is not yet available in the host-authoritative ruleset.',order.orderId);
+      return reject('UNSUPPORTED_ORDER','The strategy rules engine is unavailable.',order.orderId);
     }
 
     game.worldVersion++;
@@ -666,6 +693,7 @@
     game.orders.push({id:order.orderId,playerId:player.id,type:orderType,stateId:order.stateId,
       payload:orderPayload,status:'executed',expectedWorldVersion:order.expectedWorldVersion,
       worldVersion:game.worldVersion,resultCode:null,result:null});
+    window.NewWorldStrategy?.checkVictory?.(game);
     pushEvent(game,'order.executed',player.id,order.stateId,
       game.activity[0] || ('Executed ' + orderType + '.'),order.orderId);
     return {id:order.orderId,accepted:true,code:null,error:null,replayed:false};
@@ -865,19 +893,49 @@
         const active = activeMemberships(game,player.id);
         if (!active.some(item => item.stateId === territory.stateId)) {
           const accumulated = (territory.dailyBalanceRemainder || 0) + (player.dailyBalanceRemainder || 0);
+          const isFoundingSettlement = Number(territory.population || 0) <= 0 &&
+            !territory.ownerPlayerId &&
+            !(game.memberships || []).some(item =>
+              item.stateId===territory.stateId && item.status==='active');
           const transfer = player.treasury + Math.trunc(accumulated / 30);
-          territory.treasury += transfer;
+          const foundingCapital = isFoundingSettlement ? 1200 : 0;
+          territory.treasury += transfer + foundingCapital;
           territory.dailyBalanceRemainder = accumulated % 30;
           player.treasury = 0;
           player.dailyBalanceRemainder = 0;
           territory.ownerPlayerId ||= player.id;
+          if (isFoundingSettlement) {
+            territory.population=850;
+            territory.prosperity=28;
+            territory.infrastructure=Math.max(1,Number(territory.infrastructure)||0);
+            territory.baseHousingCapacity=1200;
+            territory.baseFoodCapacity=1200;
+            territory.baseWaterCapacity=1200;
+            territory.baseJobCapacity=200;
+            territory.populationGrowthLastDay=0;
+          }
           game.memberships.push({
             id:byId(),gameId:game.id,playerId:player.id,stateId:territory.stateId,
             status:'active',permissionSetId:'government-member',joinedAtWorldDate:game.worldDate
           });
+          if (!game.companies?.some(item=>item.stateId===territory.stateId) &&
+              window.NewWorldSimulation?.createStarterEconomy) {
+            const localEconomy=window.NewWorldSimulation.createStarterEconomy([territory],byId);
+            game.companies ||= [];
+            game.markets ||= [];
+            game.populationGroups ||= [];
+            game.companies.push(...localEconomy.companies);
+            game.markets.push(...localEconomy.markets);
+            game.populationGroups.push(...localEconomy.populationGroups);
+          }
+          window.NewWorldStrategy?.onClaim?.(game,territory,player.id,byId);
           game.financialTransactions.push({
-            id:byId(),stateId:territory.stateId,type:'membershipTransfer',amount:transfer,
-            balanceAfter:territory.treasury,description:'Initial treasury transferred to ' + territory.name + '.',
+            id:byId(),stateId:territory.stateId,type:foundingCapital?'foundingCapital':'membershipTransfer',
+            amount:transfer+foundingCapital,balanceBefore:territory.treasury-transfer-foundingCapital,
+            balanceAfter:territory.treasury,
+            description:foundingCapital
+              ? 'Founding capital and initial treasury allocated to ' + territory.name + '.'
+              : 'Initial treasury transferred to ' + territory.name + '.',
             worldDate:game.worldDate
           });
         }
@@ -993,7 +1051,52 @@
     if (sent) runtime.lastHelloGeneration = generation;
   }
 
+  function migrateStrategyScenario(game) {
+    if (!game || Number(game.strategyVersion || 0) >= 1 ||
+        !window.NewWorldStrategy?.createStarterScenario) return false;
+    const hasExistingStrategy = (game.provinces || []).length ||
+      (game.militaryUnits || []).length ||
+      (game.technologies || []).length ||
+      (game.politicalSystems || []).some(system =>
+        system.constitution || system.institutions?.length ||
+        system.laws?.some(law => law.id !== 'founding-charter')) ||
+      (game.diplomaticRelations || []).length>0;
+    if (hasExistingStrategy) return false;
+
+    window.NewWorldStrategy.createStarterScenario(game,byId);
+    const hostPlayerId = game.hostPlayerId || game.players?.find(player => player.isHost)?.id;
+    const memberships = activeMemberships(game,hostPlayerId);
+    const homeMembership = memberships[0];
+    const homeTerritory = game.territories?.find(item =>
+      item.stateId === homeMembership?.stateId);
+    const homeProvince = game.provinces?.find(item =>
+      item.stateId === homeMembership?.stateId);
+    const foundingUnit = (game.militaryUnits || []).find(item =>
+      item.ownerPlayerId === hostPlayerId);
+    if (foundingUnit && homeTerritory && homeProvince) {
+      foundingUnit.stateId = homeTerritory.stateId;
+      foundingUnit.provinceId = homeProvince.id;
+      foundingUnit.maxPersonnel = Math.max(
+        Number(foundingUnit.maxPersonnel) || 0,
+        Number(foundingUnit.personnel) || 0);
+    }
+    for (const territory of game.territories || []) {
+      const member=(game.memberships || []).find(item =>
+        item.stateId===territory.stateId && item.status==='active');
+      const ownerPlayerId=territory.ownerPlayerId || member?.playerId;
+      if (ownerPlayerId)
+        window.NewWorldStrategy.onClaim?.(game,territory,ownerPlayerId,byId);
+    }
+    game.strategyVersion = 1;
+    game.worldVersion = (Number(game.worldVersion) || 0) + 1;
+    pushActivity(game,'The saved world was upgraded with military, research and government systems. Existing territory, buildings and economic data were preserved.');
+    pushEvent(game,'world.strategy_migrated',hostPlayerId,homeMembership?.stateId || null,
+      'The saved world was upgraded to strategy rules version 1.');
+    return true;
+  }
+
   function setHostRuntime(game,session,handlers) {
+    migrateStrategyScenario(game);
     runtime = {
       role:'host',game,session,room:session.inviteCode || session.roomCode,
       topics:topicSet(session.inviteCode || session.roomCode),pendingJoins:new Map(),
@@ -1254,6 +1357,7 @@
       canStartWorld,
       applyAdmin,
       applyOrder,
+      migrateStrategyScenario,
       snapshot,
       maxPlayers:MAX_PLAYERS
     });
