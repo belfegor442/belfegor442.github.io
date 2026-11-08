@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>North Assembly — Software / Systems / Infrastructure</title>
-<meta name="description" content="North Assembly — independent software, applications and systems architecture.">
+<meta name="description" content="North Assembly - independent software studio creating applications, games and digital tools.">
 <meta name="theme-color" content="#080a0e">
 <link rel="canonical" href="https://northassembly.work.gd/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,8 +20,6 @@ html{overflow-x:clip}
 body{margin:0;overflow-x:clip;color:var(--ink);font:400 1.05rem/1.55 var(--f);-webkit-font-smoothing:antialiased;background:radial-gradient(circle,var(--dot) 1px,transparent 1.4px) var(--gx) var(--gy)/40px 40px,var(--bg)}
 a{color:inherit;text-decoration:none}
 a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:3px}
-.gl{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.gl span{position:absolute;top:0;font:italic 400 1em/1 var(--fm);color:var(--ink);will-change:transform}
 nav{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:calc(env(safe-area-inset-top,0px) + 18px) 6vw 16px;background:linear-gradient(#fff 30%,#fff0)}
 nav b{font-weight:600;letter-spacing:-.02em}
 nav div{display:flex;gap:clamp(14px,2.6vw,34px);align-items:center;flex-wrap:wrap;justify-content:flex-end;font-size:.92rem}
@@ -52,20 +50,7 @@ h2{font-size:clamp(2.6rem,6.2vw,5.2rem);line-height:1;letter-spacing:-.04em;marg
 .ht li b{font-weight:600;color:var(--ink)}
 .hint{position:absolute;bottom:3.5vh;right:6vw;z-index:5;color:var(--mute);font-size:.85rem;display:flex;flex-direction:column;align-items:center;gap:8px}
 .hint i{width:1px;height:38px;background:linear-gradient(var(--ink),transparent);animation:sc 2.2s var(--ex) infinite;transform-origin:top}
-@keyframes sc{0%{transform:scaleY(0)}60%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
-/* matematicas que se escriben con el scroll */
-.mw{position:absolute;right:6vw;top:10vh;z-index:1;display:flex;gap:22px;align-items:flex-end;pointer-events:none;will-change:transform}
-.mw svg{display:block;width:min(19vw,210px);height:auto;overflow:visible;fill:none;stroke:var(--ink);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
-.mw .ac{stroke:var(--ac);stroke-width:2}
-.mw .dt{fill:var(--ac);stroke:none;opacity:0;transition:opacity .5s}.mw .dt.on{opacity:1}
-.ln{font:italic 400 clamp(1rem,1.5vw,1.35rem)/1.6 var(--fm);min-height:1.6em;white-space:nowrap;transition:color .6s var(--ex)}
-.ln.old{color:#b9bcc2}
-.ln sup{font-size:.62em;line-height:0;vertical-align:.55em}
-.cr{display:inline-block;width:2px;height:1.05em;background:var(--ac);vertical-align:-.15em;margin-left:2px;animation:bl 1s steps(2) infinite}
-@keyframes bl{50%{opacity:0}}
-.hero .mw,.stk .mw{flex-direction:column;align-items:flex-start;gap:14px}
-.hero .mw{top:16vh}.hero .mw svg{width:min(24vw,290px)}
-/* tarjetas */
+@keyframes sc{0%{transform:scaleY(0)}60%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}/* tarjetas */
 .stack{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;perspective:1200px}
 .cw{will-change:transform}
 .card{display:flex;flex-direction:column;gap:.5rem;height:100%;padding:22px;min-height:220px;background:#ffffffe0;backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:4px;transform-style:preserve-3d;opacity:0;transform:translateZ(-320px) rotateX(28deg);transition:transform .3s ease,opacity .9s ease,box-shadow .35s,border-color .35s}
@@ -84,13 +69,8 @@ h2{font-size:clamp(2.6rem,6.2vw,5.2rem);line-height:1;letter-spacing:-.04em;marg
 .sys b{font-weight:400;font-size:clamp(1.7rem,3.6vw,2.8rem);letter-spacing:-.03em;transition:font-weight .8s var(--ex)}
 .sys a:hover b{font-weight:600}
 .sys span{color:var(--mute)}
-/* escena fija (pin) */
-.pin{height:320vh;padding:0}
-.stk{position:sticky;top:0;height:100vh;height:100svh;display:flex;align-items:center;padding:0 6vw}
-.about{display:grid;grid-template-columns:1.15fr 1fr;gap:clamp(24px,6vw,90px);align-items:center;width:100%;position:relative}
-.stk .mw{position:relative;right:auto;top:auto;justify-self:end}
-.stk .mw svg{width:min(30vw,380px)}
-.stk .ln{font-size:clamp(1.05rem,1.8vw,1.55rem)}
+/* About */
+.about{display:block;width:100%;max-width:820px;margin:0 auto}
 dl{margin:2rem 0 0;display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
 dl div{border-top:1px solid var(--line);padding-top:10px}
 dt{color:var(--mute);font-size:.84rem}dd{margin:0;font-size:.95rem}
@@ -107,22 +87,18 @@ footer a:hover{color:var(--ink)}
 @media (max-width:900px){.stack{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:760px){
  .sec{padding:14vh 6vw 10vh}
- .stack,.about,dl{grid-template-columns:1fr}.sys a{grid-template-columns:1fr}
+ .stack,dl{grid-template-columns:1fr}.sys a{grid-template-columns:1fr}
  nav b{display:none}nav div{width:100%;justify-content:center;gap:14px}
- .sec>.mw{display:none}.hero .mw{top:auto;bottom:30vh;right:5vw;opacity:.5}.hero .mw .lines{display:none}.hero .mw svg{width:34vw}
- .pin{height:240vh}.stk .mw{justify-self:start;margin-top:8px}.stk .mw svg{width:44vw}.stk dl{display:none}
  footer{justify-content:flex-start}
 }
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
-.header-banner{position:absolute;left:36px;top:0;width:245px;height:82px;overflow:hidden;z-index:2}.header-banner a,.header-banner img{display:block;width:100%;height:100%}.header-banner img{object-fit:cover;object-position:left center;border-radius:0}@media(max-width:900px){.header-banner{left:20px;width:185px;height:70px}}@media(max-width:620px){.header-banner{left:14px;width:135px;height:58px}}.brand-banner{position:absolute;left:0;top:0;width:245px;height:82px;display:block;overflow:hidden;border-radius:0}.brand-banner img{display:block;width:100%;height:100%;object-fit:cover;object-position:left center}.brand-banner-label{display:flex;align-items:center;width:100%;height:100%;padding:12px 16px;background:#11110f;color:#f4f3ef;font:600 13px/1.05 monospace;letter-spacing:2px}.nav-name{position:absolute;left:calc(6vw + 265px);top:calc(env(safe-area-inset-top,0px) + 18px)}@media(max-width:900px){.brand-banner{width:185px;height:70px}.nav-name{left:calc(6vw + 205px)}}@media(max-width:620px){.brand-banner{left:0;width:135px;height:58px}.nav-name{display:none}nav{padding-left:0}}
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-6">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261108-10">
 </head>
 <body>
-<div class="gl" aria-hidden="true"></div>
 <div class="pg"></div>
-<nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><img src="/banner.svg?v=20261027-2" alt=""></a><b class="nav-name">North Assembly</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="/hub/">Hub</a></div></nav>
+<nav aria-label="Main"><a class="brand-banner" href="#top" aria-label="North Assembly home"><img src="/na-mark.svg?v=20261108-1" alt=""></a><b class="nav-name">NORTH ASSEMBLY</b><div><a href="#apps" data-t="apps"><sup>1</sup>Applications</a><a href="#systems" data-t="systems"><sup>2</sup>Systems</a><a href="#about" data-t="about"><sup>3</sup>About</a><a href="#team" data-t="team"><sup>4</sup>Team</a><a class="pill" href="/hub/">Hub</a></div></nav>
 
 <a class="skip-link" href="#main-content">Skip to content</a>
 <main id="main-content" tabindex="-1">
@@ -132,18 +108,18 @@ footer a:hover{color:var(--ink)}
   <div class="news-window" aria-live="polite"><span class="news-headline" id="news-headline" aria-hidden="true">North Assembly — independent software and systems.</span><span class="news-sr" id="news-announcement">North Assembly — independent software and systems.</span></div>
   <span class="news-caption">GLOBAL BROADCAST</span>
  </aside>
- <div class="mw" data-m="0" data-sp=".22" data-x="26"></div>
+
  <div class="ht" data-sp="-.38" data-x="12">
   <small class="fi">North Assembly / Independent software studio</small>
   <h1 class="rv" data-split="North|Assembly" aria-label="North Assembly">North Assembly</h1>
-  <p class="fi">A connected software organization building applications, infrastructure and operational tools with a common technical language.</p>
+  <p class="fi">Independent software studio creating applications, games and digital tools.</p>
   <ul class="fi"><li><b>Software</b> / Applications</li><li><b>Systems</b> / Infrastructure</li><li><b>2026</b> / Active</li></ul>
-  <div class="hero-banner"><img src="/banner.svg?v=20261027-2" alt="North Assembly abstract architectural banner"><span>NA / SYSTEMS ARCHITECTURE <b>001</b></span></div>
+  <div class="hero-banner"><img src="/banner.png?v=20261108-1" alt="North Assembly"></div>
  </div>
  <div class="hint"><span>Scroll</span><i></i></div>
 </section>
 
-<section class="sec" id="apps"><div class="mw" data-m="1" data-sp="-.2" data-x="22"></div><div class="c">
+<section class="sec" id="apps"><div class="c">
  <h2 class="rv" data-split="Applications">Applications</h2>
  <p class="lead fi">Direct entry points into the applications currently exposed under /Apps/. Beta applications are in active development and their interfaces may change.</p>
  <div class="stack">
@@ -161,7 +137,7 @@ footer a:hover{color:var(--ink)}
  </div>
 </div></section>
 
-<section class="sec" id="systems"><div class="mw" data-m="4" data-sp="-.2" data-x="22"></div><div class="c sys">
+<section class="sec" id="systems"><div class="c sys">
  <h2 class="rv" data-split="Systems">Systems</h2>
  <p class="lead fi">The supporting layer around the applications.</p>
  <a class="fi" href="/hub/"><b>Hub</b><span>Central access to projects, releases and operational resources.</span><span>↗</span></a>
@@ -170,7 +146,7 @@ footer a:hover{color:var(--ink)}
  <a class="fi" href="https://northassembly.work.gd/releases/"><b>Releases</b><span>Published software and release information.</span><span>↗</span></a>
 </div></section>
 
-<section class="sec pin" id="about"><div class="stk"><div class="about">
+<section class="sec" id="about"><div class="c"><div class="about">
  <div>
   <h2 class="rv" data-split="Built to|connect.">Built to connect.</h2>
   <p class="lead fi" style="margin-bottom:1rem">North Assembly treats applications, services, documentation and infrastructure as parts of one technical environment.</p>
@@ -183,10 +159,10 @@ footer a:hover{color:var(--ink)}
    <div><dt>Access</dt><dd>Public applications + internal tooling</dd></div>
   </dl>
  </div>
- <div class="mw" data-m="2"></div>
+
 </div></div></section>
 
-<section class="sec" id="team"><div class="mw" data-m="3" data-sp="-.2" data-x="22"></div><div class="c">
+<section class="sec" id="team"><div class="c">
  <h2 class="rv" data-split="People">People</h2>
  <p class="lead fi">The people currently forming the organization, with open roles listed separately.</p>
  <div class="people-directory">
@@ -205,7 +181,7 @@ footer a:hover{color:var(--ink)}
  </div>
 </div></section>
 
-<section class="sec" id="connect"><div class="mw" data-m="5" data-sp="-.2" data-x="22"></div><div class="c">
+<section class="sec" id="connect"><div class="c">
  <h2 class="rv" data-split="Connect">Connect</h2>
  <p class="lead fi">Public entry points for North Assembly.</p>
  <div class="conn">
@@ -223,44 +199,7 @@ footer a:hover{color:var(--ink)}
  var $=function(s,r){return [].slice.call((r||document).querySelectorAll(s))},clamp=function(v,a,b){return Math.max(a,Math.min(b,v))};
  var mob=matchMedia('(max-width:760px)'),fine=matchMedia('(hover:hover) and (pointer:fine)'),reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,smooth=fine.matches&&!reduce;
  /* letras que suben una a una */
- $('[data-split]').forEach(function(el){var n=0;el.innerHTML=el.dataset.split.split('|').map(function(l,k){return (k?'<br>':'')+l.split(' ').map(function(w){return '<span class="w" aria-hidden="true">'+w.split('').map(function(c){return '<span class="ch" style="--i:'+(n++)+'">'+c+'</span>'}).join('')+'</span>'}).join(' ')}).join('');if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',el.dataset.split.replace('|',' '))});
-
- /* ===== capa de simbolos con profundidad de campo ===== */
- var GL=['∑','∫','π','φ','∞','∇','≈','√','θ','λ','∂','ℵ','⊕','Δ','ζ','≡','∮','ψ'],gl=$('.gl')[0],G=[],i;
- for(i=0;i<30;i++){var z=.1+Math.pow(Math.random(),1.4)*.95,e=document.createElement('span');e.textContent=GL[i%GL.length];
-  e.style.cssText='left:'+(Math.random()*96)+'%;font-size:'+(12+z*z*130).toFixed(0)+'px;opacity:'+(.05+z*.11).toFixed(2)+';filter:blur('+(Math.abs(z-.5)*5).toFixed(1)+'px)'+(i%6===0?';color:var(--ac)':'');
-  gl.appendChild(e);G.push({e:e,z:z,b:Math.random()})}
-
- /* ===== figuras y ecuaciones que se escriben ===== */
- function C(cx,cy,r){return 'M'+(cx-r)+' '+cy+'a'+r+' '+r+' 0 1 0 '+2*r+' 0a'+r+' '+r+' 0 1 0 '+(-2*r)+' 0'}
- var t,spiral='',bb=Math.log((1+Math.sqrt(5))/2)/(Math.PI/2),bell='',stair='M60 340';
- for(t=0;t<=4*Math.PI;t+=.08){var r=3*Math.exp(bb*t);spiral+=(spiral?'L':'M')+(215+r*Math.cos(t)).toFixed(1)+' '+(230-r*Math.sin(t)).toFixed(1)}
- for(t=40;t<=360;t+=6)bell+=(bell?'L':'M')+t+' '+(320-230*Math.exp(-Math.pow((t-200)/62,2))).toFixed(1);
- for(t=0;t<6;t++)stair+='h40v-40';
- var MATH=[
-  {p:[['M40 200H360'],['M200 60V340'],[C(200,200,140)],['M340 200A140 140 0 0 0 60 200','ac']],dots:['60,200'],L:['e^{ix} = cos x + i sin x','x = π','e^{iπ} = −1','e^{iπ} + 1 = 0']},
-  {p:[['M60 340H300V100H60Z'],[stair,'ac'],['M60 340L300 100']],dots:[],L:['S = 1 + 2 + ⋯ + n','S = n + ⋯ + 2 + 1','2S = n(n + 1)','S = n(n + 1) / 2']},
-  {p:[['M200 70L70 320L330 320Z'],['M200 230L200 70M200 230L70 320M200 230L330 320'],[C(200,70,6)],[C(70,320,6)],[C(330,320,6)],[C(200,230,6)]],dots:['200,70','70,320','330,320','200,230'],L:['V − E + F = ?','V = 4,  E = 6,  F = 4','4 − 6 + 4 = 2','V − E + F = 2']},
-  {p:[['M60 120H340V340H60Z'],['M200 120V340'],[spiral,'ac']],dots:[],L:['φ = 1 + 1 / φ','φ² − φ − 1 = 0','φ = (1 + √5) / 2 ≈ 1.618']},
-  {p:[['M130 250H250V160H130Z'],['M40 160H130V250H40Z'],['M250 250L130 160L220 40L340 130Z'],['M130 250L250 250L130 160Z','ac']],dots:[],L:['a² + b² = c²','3² + 4² = 5²','9 + 16 = 25']},
-  {p:[['M30 320H370'],['M200 320V60','d'],[bell,'ac']],dots:[],L:['I = ∫ e^{−x²} dx','I² = ∬ e^{−(x²+y²)} dx dy','I² = ∫ dθ ∫ r e^{−r²} dr','I = √π']}
- ];
- function fmt(s,n){var out='',left=n;s.split(/(\^\{[^}]*\})/).forEach(function(p){if(!p||left<=0)return;var sup=p.charAt(0)==='^'&&p.charAt(1)==='{',x=sup?p.slice(2,-1):p,k=x.slice(0,left);left-=k.length;out+=sup?'<sup>'+k+'</sup>':k});return out}
- function tot(s){return s.replace(/\^\{|\}/g,'').length}
- function build(el){var d=MATH[+el.dataset.m],h='<svg viewBox="0 0 400 400" aria-hidden="true">',off=0;
-  d.p.forEach(function(p){h+='<path d="'+p[0]+'"'+(p[1]==='ac'?' class="ac"':'')+(p[1]==='d'?' stroke-dasharray="4 6"':' data-dr="1"')+'/>'});
-  d.dots.forEach(function(c){var q=c.split(',');h+='<circle class="dt" cx="'+q[0]+'" cy="'+q[1]+'" r="5"/>'});
-  el.innerHTML=h+'</svg><div class="lines" aria-hidden="true"></div>';var ln=el.querySelector('.lines');
-  el._s={pa:$('[data-dr]',el).map(function(p){return {p:p,l:0}}),dt:$('.dt',el),ln:d.L.map(function(s){var e=document.createElement('div'),T=tot(s),o=off;e.className='ln';ln.appendChild(e);off+=T;return {e:e,s:s,T:T,o:o,c:''}})};el._s.all=off}
- function measure(){$('.mw').forEach(function(el){el._s.pa.forEach(function(q){var L=q.p.getTotalLength()||0;q.l=L;q.p.style.strokeDasharray=L})})}
- function setProg(el,p){var s=el._s,n=s.pa.length,sp=.55,on=p>sp*.92,ty=clamp((p-sp*.7)/(1-sp*.7),0,1)*s.all,act=-1;
-  s.pa.forEach(function(q,j){var f=clamp(p/sp*n-j,0,1);f=f<.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2;q.p.style.strokeDashoffset=(q.l*(1-f)).toFixed(1)});
-  s.dt.forEach(function(c){c.classList.toggle('on',on)});
-  s.ln.forEach(function(x,k){if(clamp(ty-x.o,0,x.T)>=1)act=k});
-  s.ln.forEach(function(x,k){var m=Math.floor(clamp(ty-x.o,0,x.T)),h=m>0?fmt(x.s,m)+(k===act?'<span class="cr"></span>':''):'';if(h!==x.c){x.c=h;x.e.innerHTML=h}x.e.classList.toggle('old',k<act)})}
- var MW=$('.mw');MW.forEach(build);measure();MW.forEach(function(el){setProg(el,reduce?1:0)});
-
- /* ===== revelado por entrada en pantalla ===== */
+ $('[data-split]').forEach(function(el){var n=0;el.innerHTML=el.dataset.split.split('|').map(function(l,k){return (k?'<br>':'')+l.split(' ').map(function(w){return '<span class="w" aria-hidden="true">'+w.split('').map(function(c){return '<span class="ch" style="--i:'+(n++)+'">'+c+'</span>'}).join('')+'</span>'}).join(' ')}).join('');if(!el.getAttribute('aria-label'))el.setAttribute('aria-label',el.dataset.split.replace('|',' '))});/* ===== revelado por entrada en pantalla ===== */
  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.18,rootMargin:'0px 0px -6% 0px'});
  $('.rv,.fi,.card').forEach(function(el){if(el.closest('.hero'))setTimeout(function(){el.classList.add('in')},reduce?0:250);else if(reduce)el.classList.add('in');else io.observe(el)});
  document.documentElement.classList.add('na-motion');
@@ -272,8 +211,8 @@ footer a:hover{color:var(--ink)}
  var secs=$('.sec'),PL=secs.map(function(){return []}),navA=$('nav a[data-t]'),pg=$('.pg')[0],body=document.body;
  $('[data-sp]').forEach(function(el){var k=secs.indexOf(el.closest('.sec'));PL[k].push({el:el,sp:+el.dataset.sp,x:+el.dataset.x||0,card:false})});
  var cards=$('.cw').map(function(el){var o={el:el,sp:0,x:0,card:true};PL[secs.indexOf(el.closest('.sec'))].push(o);return o});
- var vh=innerHeight,max=0,cur=scrollY,tgt=cur,last=cur,vel=0,mx=0,my=0,tmx=0,tmy=0,t0=0,heroP=0,expectedScrollY=scrollY;
- function layout(){vh=innerHeight;max=document.documentElement.scrollHeight-vh;var cols=innerWidth<=760?1:innerWidth<=900?2:3;cards.forEach(function(c,i){c.sp=cols>1&&!reduce?[0,-.07,-.14][i%cols]:0});measure()}
+ var vh=innerHeight,max=0,cur=scrollY,tgt=cur,last=cur,vel=0,mx=0,my=0,tmx=0,tmy=0,expectedScrollY=scrollY;
+ function layout(){vh=innerHeight;max=document.documentElement.scrollHeight-vh;var cols=innerWidth<=760?1:innerWidth<=900?2:3;cards.forEach(function(c,i){c.sp=cols>1&&!reduce?[0,-.07,-.14][i%cols]:0})}
  addEventListener('resize',layout);addEventListener('load',layout);layout();
  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layout);
  addEventListener('scroll',function(){if(Math.abs(scrollY-cur)>2&&Math.abs(scrollY-expectedScrollY)>2){cur=tgt=scrollY}},{passive:true});
@@ -285,8 +224,7 @@ footer a:hover{color:var(--ink)}
   var sy=smooth?cur:scrollY;vel+=((sy-last)-vel)*.14;last=sy;mx+=(tmx-mx)*.06;my+=(tmy-my)*.06;
   body.style.setProperty('--gy',(-sy*.3-my*20).toFixed(1)+'px');body.style.setProperty('--gx',(mx*-26).toFixed(1)+'px');
   pg.style.transform='scaleX('+(max>0?clamp(sy/max,0,1):0).toFixed(4)+')';
-  var W=vh+260,act=0;
-  G.forEach(function(g){var y=(((g.b*W-sy*g.z*.9)%W)+W)%W-130;g.e.style.transform='translate3d('+(mx*g.z*90).toFixed(1)+'px,'+y.toFixed(1)+'px,0)'});
+  var act=0;
   var sk=clamp(vel*.05,-3.5,3.5);
   secs.forEach(function(s,i){var r=s.getBoundingClientRect();if(r.top<vh*.45)act=i;
    if(r.bottom<-vh*.6||r.top>vh*1.6)return;var dl=r.top+r.height/2-vh/2;
@@ -294,13 +232,7 @@ footer a:hover{color:var(--ink)}
     if(reduce)return;
     if(l.card)tf+=' skewY('+sk.toFixed(2)+'deg)';
     if(l.el.classList.contains('ht')){var hp=clamp(-r.top/vh,0,1);tf+=' scale('+(1-hp*.04).toFixed(3)+')';l.el.style.opacity=(1-hp*.08).toFixed(2)}
-    l.el.style.transform=tf});
-   var mw=s.querySelector('.mw');
-   if(mw&&!reduce){var p;
-    if(i===0){if(!t0&&now)t0=now;p=t0?clamp((now-t0-900)/6500,0,1):0;heroP=Math.max(heroP,p);p=heroP}
-    else if(s.classList.contains('pin'))p=clamp(-r.top/(r.height-vh)*1.15,0,1);
-    else p=clamp((vh*.92-r.top)/(vh*.62),0,1);
-    if(mw._p!==p){mw._p=p;setProg(mw,p)}}});
+    l.el.style.transform=tf});});
   navA.forEach(function(a){a.classList.toggle('on',a.dataset.t===secs[act].id)});
   requestAnimationFrame(frame)}
  requestAnimationFrame(frame);
