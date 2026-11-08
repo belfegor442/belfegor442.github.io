@@ -94,12 +94,68 @@
 
   function replayPendingOrders() {
     if (!window.NewWorldMultiplayer?.isConnected() || sentOrderIds.size > 0 ||
-        recoveryOrdersNeedCleanup) return;
-    const order = ordersForCurrentSession()[0];
-    if (!order || sentOrderIds.has(order.orderId)) return;
-    if (window.NewWorldMultiplayer.sendOrder(order) &&
-        ordersForCurrentSession().some(item => item.orderId === order.orderId))
-      sentOrderIds.add(order.orderId);
+        recoveryOrdersNeedCleanup || !onlineGame?.worldVersion) return;
+    const queue=getPendingOrders();
+    const order=queue.find(item =>
+      item.gameId===onlineSession?.gameId && item.playerId===onlineSession?.playerId);
+    if(!order || sentOrderIds.has(order.orderId)) return;
+
+    if(!order.sentOnce) {
+      order.expectedWorldVersion=Number(onlineGame.worldVersion);
+      order.sentOnce=true;
+      if(!savePendingOrders(queue)) return;
+    }
+
+    sentOrderIds.add(order.orderId);
+    const sent=window.NewWorldMultiplayer.sendOrder(order);
+    const stillPending=ordersForCurrentSession().some(item=>item.orderId===order.orderId);
+    if(sent && stillPending) {
+      showMessage('Sent to host: '+describeOrder(order)+'. Waiting for confirmation.');
+      renderMultiplayer();
+    } else if(!sent) {
+      sentOrderIds.delete(order.orderId);
+      if(stillPending) {
+        const latest=getPendingOrders();
+        const pending=latest.find(item=>item.orderId===order.orderId);
+        if(pending) pending.sentOnce=false;
+        savePendingOrders(latest);
+        renderMultiplayer();
+      }
+    }
+  }
+
+  function describeOrder(order) {
+    const territoryName=onlineGame?.territories.find(item=>
+      item.stateId===order.stateId)?.name || 'selected State';
+    if(order.type==='claim')
+      return 'Claim '+(onlineGame?.territories[Number(order.territoryIndex)]?.name || 'frontier');
+    if(order.type==='build')
+      return 'Build '+(order.variantName || order.buildingId)+' in '+territoryName;
+    if(order.type==='recruitUnit')
+      return 'Recruit '+(onlineGame?.militaryUnitTypes.find(item=>
+        item.id===order.unitTypeId)?.name || 'unit')+' in '+territoryName;
+    if(order.type==='mobilizeUnit')
+      return (order.militaryOrderType==='attack'?'Attack ':'Move to ')+
+        (onlineGame?.provinces.find(item=>item.id===order.destinationProvinceId)?.name || 'destination');
+    if(order.type==='startProject' || order.type==='cancelProject')
+      return (order.type==='startProject'?'Start ':'Cancel research ')+
+        (onlineGame?.researchProjects.find(item=>item.id===order.researchProjectId)?.technologyId || '');
+    if(order.type==='adoptTechnology')
+      return 'Adopt '+(onlineGame?.technologies.find(item=>item.id===order.technologyId)?.name || 'technology');
+    if(order.type==='declareWar' || order.type==='makePeace')
+      return (order.type==='declareWar'?'Declare war on ':'Make peace with ')+
+        (onlineGame?.territories.find(item=>item.stateId===order.targetStateId)?.name || 'State');
+    if(order.type==='establishTradeRoute')
+      return 'Propose trade route to '+
+        (onlineGame?.territories.find(item=>item.stateId===order.destinationStateId)?.name || 'State');
+    if(order.type==='respondTradeRoute') return order.accept?'Accept trade route':'Reject trade route';
+    if(order.type==='cancelTradeRoute') return 'Cancel trade route';
+    if(order.type==='approveBudget') return 'Set government budget to '+money(order.proposedBudget);
+    if(order.type==='proposeLaw') return 'Propose law: '+order.decisionTitle;
+    if(order.type==='voteDecision') return 'Vote '+order.voteChoice+' on a law';
+    if(order.type==='appointOffice') return 'Appoint a government office';
+    if(order.type==='pause' || order.type==='resume') return 'Vote to '+order.type+' the world';
+    return order.type;
   }
 
   let state = structuredClone(initial);
@@ -110,12 +166,13 @@
   let onlineGame = null;
   let offlineBackup = null;
   let socket = null;
-  let reconnectTimer = null;
-  let reconnectAttempts = 0;
-  let manuallyDisconnected = false;
   let sentOrderIds = new Set();
   let recoveryOrdersNeedCleanup = false;
   let startRequestPending = false;
+  let createWorldPending = false;
+  let joinWorldPending = false;
+  let relayTestPending = false;
+  let restorePending = false;
   let selectedPlot = INITIAL_MAP_PLOT;
   let zoom = 1;
   let mapDetailRenderer = null;
@@ -235,10 +292,26 @@
     renderFinancialLedger();
   }
 
+  function renderPanelSafely(label,renderer,statusId) {
+    try {
+      renderer();
+      return true;
+    } catch (error) {
+      console.error('[new-world] '+label+' panel failed to render:',error);
+      const status=$(statusId);
+      if(status) {
+        status.textContent=label+' could not be refreshed. Other game controls remain available; reconnect or refresh after checking the connection.';
+        status.classList.add('error');
+      }
+      return false;
+    }
+  }
+
   function update() {
     if (state.selected !== null) selectState(state.selected, false, false);
-    renderFinancialSummary();
-    renderObjectives();
+    $('first-steps').hidden=Boolean(onlineGame?.started);
+    renderPanelSafely('Financial overview',renderFinancialSummary,'state-currency');
+    renderPanelSafely('Campaign objectives',renderObjectives,'state-description');
     $('date-label').textContent = isOnline()
       ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
       : 'MULTIPLAYER REQUIRED';
@@ -259,15 +332,16 @@
           ? onlineGame.paused ? 'PAUSED · HOST CLOCK' : '1 DAY / 5 MIN · HOST CLOCK'
           : 'LOBBY · CLOCK PAUSED'
       : '';
-    renderCity();
-    renderOptions();
-    renderMultiplayer();
-    renderEconomy();
-    renderGovernment();
-    renderTerritory();
-    renderMilitary();
-    renderTechnology();
-    renderDiplomacy();
+    renderPanelSafely('Settlement',renderCity,'settlement-status');
+    renderPanelSafely('Build controls',renderOptions,'settlement-status');
+    renderPanelSafely('Multiplayer',renderMultiplayer,'multiplayer-message');
+    renderPanelSafely('Economy',renderEconomy,'trade-route-status');
+    renderPanelSafely('Government',renderGovernment,'government-status');
+    renderPanelSafely('Territories',renderTerritory,'territory-status');
+    renderPanelSafely('Military',renderMilitary,'military-status');
+    renderPanelSafely('Research',renderTechnology,'technology-status');
+    renderPanelSafely('Diplomacy',renderDiplomacy,'diplomacy-status');
+    renderPanelSafely('Map',()=>highlightMap(state.selected),'state-description');
   }
 
   function renderObjectives() {
@@ -568,6 +642,7 @@
       const province = provinces.find(candidate => candidate.id === item.provinceId);
       const stateName = onlineGame.territories.find(candidate => candidate.stateId === item.stateId)?.name;
       addPoliticalRow(
+        controlList,
         province?.name || 'Province',
         String(item.type) + ' control · ' + formatWorldDate(item.effectiveFrom),
         (stateName || 'Unknown State') + ' · ' + item.cause);
@@ -577,6 +652,7 @@
       const previous = onlineGame.territories.find(candidate => candidate.stateId === item.previousStateId)?.name;
       const next = onlineGame.territories.find(candidate => candidate.stateId === item.newStateId)?.name;
       addPoliticalRow(
+        controlList,
         province?.name || 'Province',
         'Sovereignty · ' + formatWorldDate(item.effectiveOn),
         (previous || 'No previous State') + ' → ' + (next || 'Unknown State') +
@@ -605,17 +681,34 @@
     const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory.stateId);
     if (membership && membership.permissionSetId !== 'government-observer') {
       const recruitment = addPoliticalRow(unitsList,'Recruitment and mobilisation','Recruit units from the State treasury. Military orders are resolved by the host.');
+      const activeUnitCount=(onlineGame.militaryUnits || []).filter(item =>
+        item.stateId===territory.stateId && item.personnel>0).length;
       for (const unitType of onlineGame.militaryUnitTypes || []) {
         const discovered = !unitType.requiredTechnologyId ||
           (onlineGame.technologyUnlocks || []).some(item =>
             item.stateId === territory.stateId && item.technologyId === unitType.requiredTechnologyId);
         const discount = Math.min(.5,window.NewWorldStrategy?.effectValue?.(onlineGame,territory.stateId,'recruitment_discount') || 0);
         const cost = Math.ceil(Number(unitType.recruitmentCost || 0) * (1-discount));
+        const permission=membership.permissionSetId!=='government-observer' &&
+          (unitType.commandPermissionSetIds || []).includes(membership.permissionSetId);
+        const reason=!discovered
+          ? 'Research '+unitType.requiredTechnologyId+' first.'
+          : onlineGame.status!=='running'
+            ? onlineGame.status==='lobby'?'Start the world before recruiting.':'The world must be running to recruit.'
+            : socket?.readyState!==WebSocket.OPEN
+              ? 'Reconnect to the host before recruiting.'
+              : !permission
+                ? 'Your government role cannot recruit this unit.'
+                : activeUnitCount>=12
+                  ? 'This State has reached the 12-unit limit.'
+                  : Number(territory.treasury)<cost
+                    ? 'The State needs '+money(cost)+' in its treasury.'
+                    : 'Recruit one unit from the State treasury.';
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = 'RECRUIT ' + unitType.name.toUpperCase() + ' · ' + money(cost);
-        button.disabled = !discovered || onlineGame.status !== 'running' || socket?.readyState !== WebSocket.OPEN;
-        button.title = discovered ? 'Recruit a new unit' : 'Discover ' + unitType.requiredTechnologyId + ' first';
+        button.disabled=reason!=='Recruit one unit from the State treasury.';
+        button.title=reason;
         button.addEventListener('click',() => sendAction({
           type:'recruitUnit',stateId:territory.stateId,unitTypeId:unitType.id
         }));
@@ -663,6 +756,17 @@
             item.stateBId === unit.stateId && item.stateAId === destination.stateId);
           const warDeclared = relation?.status === 'war';
           const samePlayerTerritory = destinationTerritory?.ownerPlayerId === player?.id;
+          const movementReason=onlineGame.status!=='running'
+            ? 'Start or resume the world before moving troops.'
+            : unit.personnel<=0
+              ? 'This unit has no remaining personnel.'
+              : (foreignGovernment && !warDeclared)
+                ? 'Declare war in the Diplomacy tab before attacking this government.'
+                : samePlayerTerritory
+                  ? 'This State is already administered by your player.'
+                  : socket?.readyState!==WebSocket.OPEN
+                    ? 'Reconnect to the host before issuing military orders.'
+                    : '';
           const button = document.createElement('button');
           button.className = 'secondary-button';
           button.type = 'button';
@@ -670,8 +774,10 @@
             : foreignGovernment ? (warDeclared ? 'ATTACK ' : 'WAR REQUIRED · ') + destination.name
               : samePlayerTerritory ? 'ADMINISTERED · ' + destination.name
                 : 'ATTACK ' + destination.name;
-          button.disabled = onlineGame.status !== 'running' || unit.personnel<=0 ||
-            (foreignGovernment && !warDeclared) || samePlayerTerritory;
+          button.disabled=Boolean(movementReason);
+          button.title=movementReason || (friendly
+            ? 'Move this unit to another province in your government.'
+            : 'Attack this neutral territory and begin an occupation.');
           button.addEventListener('click', () => sendAction({
             type:'mobilizeUnit',
             stateId:unit.stateId,
@@ -699,6 +805,7 @@
     for (const order of orders) {
       const unit = units.find(item => item.id === order.unitId);
       addPoliticalRow(
+        operationsList,
         String(order.type) + ' · ' + String(order.status),
         (unit?.unitTypeId || 'Unit') + ' · submitted ' +
           formatWorldDate(order.submittedOnWorldDate),
@@ -709,6 +816,7 @@
         .flatMap(item => Object.values(item || {}))
         .reduce((sum, value) => sum + Number(value || 0), 0);
       addPoliticalRow(
+        operationsList,
         'Battle · ' + formatWorldDate(battle.worldDate),
         ((onlineGame.provinces || []).find(item => item.id === battle.provinceId)?.name || 'Unknown location') +
           ' · ' + battle.participantUnitIds.length + ' units · ' +
@@ -725,6 +833,7 @@
       const occupyingState = onlineGame.territories.find(item =>
         item.stateId === occupation.occupyingStateId)?.name;
       addPoliticalRow(
+        occupationsList,
         province?.name || 'Province',
         'Occupied by ' + (occupyingState || 'Unknown State') +
           ' · since ' + formatWorldDate(occupation.startedOn),
@@ -890,21 +999,14 @@
                   !missingMaterials && enoughFunding && enoughStaff ? 'researchable'
                 : project ? 'blocked' : 'not configured';
       const row = addPoliticalRow(
+        technologyList,
         technology.name,
-        String(technology.domain) + ' · ' + status,
-        'Prerequisites: ' + (prerequisites.join(', ') || 'none') +
-          (missingKnowledge
-            ? ' · required knowledge unavailable'
-            : '') +
-          (missingMaterials
-            ? ' · required materials not reserved'
-            : '') +
-          (project && !enoughFunding
-            ? ' · configured funding unavailable'
-            : '') +
-          (project && !enoughStaff
-            ? ' · configured staff unavailable'
-            : '') +
+        String(technology.domain) + ' · ' + status +
+          ' · prerequisites: ' + (prerequisites.join(', ') || 'none') +
+          (missingKnowledge ? ' · required knowledge unavailable' : '') +
+          (missingMaterials ? ' · required materials not reserved' : '') +
+          (project && !enoughFunding ? ' · configured funding unavailable' : '') +
+          (project && !enoughStaff ? ' · configured staff unavailable' : '') +
           ' · effects: ' + ((technology.effects || []).map(item => item.effectId).join(', ') || 'not configured'));
       const adoptedAtState = (onlineGame.technologyAdoptions || []).some(item =>
         item.stateId === stateId &&
@@ -918,10 +1020,17 @@
         adoptButton.textContent = 'Adopt for State';
         const membership = membershipsFor(currentPlayer())
           .find(item => item.stateId === stateId);
-        adoptButton.disabled = !stateId ||
-          !membership ||
-          membership.permissionSetId === 'government-observer' ||
-          socket?.readyState !== WebSocket.OPEN;
+        const adoptionReason=!membership
+          ? 'Join this government before adopting technology.'
+          : membership.permissionSetId==='government-observer'
+            ? 'Observer memberships cannot adopt technology.'
+            : onlineGame.status!=='running'
+              ? 'Start the world before adopting technology.'
+              : socket?.readyState!==WebSocket.OPEN
+                ? 'Reconnect to the host before adopting technology.'
+                : '';
+        adoptButton.disabled=!stateId || Boolean(adoptionReason);
+        adoptButton.title=adoptionReason || 'Apply this discovered technology to the whole State.';
         adoptButton.addEventListener('click', () => sendAction({
           type: 'adoptTechnology',
           stateId,
@@ -937,13 +1046,15 @@
       addPoliticalRow(projectList, 'No research institutions or projects', 'Research rules and funding are not inferred.');
     for (const institution of institutions) {
       addPoliticalRow(
+        projectList,
         institution.name,
         String(institution.type) + ' · ' + institution.staff + ' staff · funding ' + institution.funding,
-        'Specializations: ' + (institution.specializations || []).join(', ') || 'No specialization recorded.');
+        'Specializations: ' + ((institution.specializations || []).join(', ') || 'No specialization recorded.'));
     }
     for (const project of projects) {
       const technology = technologies.find(item => item.id === project.technologyId);
       const row = addPoliticalRow(
+        projectList,
         technology?.name || project.technologyId,
         String(project.status) + ' · progress ' + project.progress + ' / ' + project.requiredProgress,
         'Started ' + formatWorldDate(project.startedOn) + ' · configured daily progress ' +
@@ -989,11 +1100,19 @@
           Object.entries(projectNeeds)
             .every(([id, quantity]) => Number(project.materialsReserved?.[id] || 0) >= Number(quantity)) &&
           (!isResuming || Number(project.fundingRemaining) >= Number(project.dailyFunding));
-        startButton.disabled = !stateId ||
-          !membership ||
-          ['government-observer'].includes(membership.permissionSetId) ||
-          !validProjectConfiguration ||
-          socket?.readyState !== WebSocket.OPEN;
+        const projectReason=!membership
+          ? 'Join this government before funding research.'
+          : membership.permissionSetId==='government-observer'
+            ? 'Observer memberships cannot manage research.'
+            : onlineGame.status!=='running'
+              ? 'Start the world before starting or resuming research.'
+              : socket?.readyState!==WebSocket.OPEN
+                ? 'Reconnect to the host before changing research.'
+                : !validProjectConfiguration
+                  ? 'Project blocked: check the institution, staff, prerequisites, materials and full budget.'
+                  : '';
+        startButton.disabled=!stateId || Boolean(projectReason);
+        startButton.title=projectReason || 'Fund this project and advance it each world day.';
         startButton.addEventListener('click', () => sendAction({
           type: 'startProject',
           stateId,
@@ -1014,10 +1133,17 @@
         cancelButton.textContent = 'Cancel project';
         const membership = membershipsFor(currentPlayer())
           .find(item => item.stateId === stateId);
-        cancelButton.disabled = !stateId ||
-          !membership ||
-          membership.permissionSetId === 'government-observer' ||
-          socket?.readyState !== WebSocket.OPEN;
+        const cancelReason=!membership
+          ? 'Join this government before cancelling research.'
+          : membership.permissionSetId==='government-observer'
+            ? 'Observer memberships cannot manage research.'
+            : onlineGame.status!=='running'
+              ? 'The world must be running to cancel research.'
+              : socket?.readyState!==WebSocket.OPEN
+                ? 'Reconnect to the host before changing research.'
+                : '';
+        cancelButton.disabled=Boolean(cancelReason);
+        cancelButton.title=cancelReason || 'Cancel this project and return unused funding.';
         cancelButton.addEventListener('click', () => sendAction({
           type: 'cancelProject',
           stateId,
@@ -1033,6 +1159,7 @@
     for (const adoption of adoptions) {
       const technology = technologies.find(item => item.id === adoption.technologyId);
       addPoliticalRow(
+        adoptionList,
         technology?.name || adoption.technologyId,
         (adoption.sector || 'State-wide') + ' · ' + formatWorldDate(adoption.adoptedOn),
         adoption.cause);
@@ -1264,6 +1391,7 @@
       ['treasurer','chief-executive'].includes(office.id) &&
       office.holderPlayerId === player?.id);
     const canApproveBudget = onlineGame.status === 'running' &&
+      socket?.readyState === WebSocket.OPEN &&
       system.government &&
       membership &&
       budgetRule?.proposerPermissionSetIds?.includes(membership.permissionSetId) &&
@@ -1272,17 +1400,29 @@
     if (system.government && document.activeElement !== budgetInput && !budgetInput.value)
       budgetInput.value = String(system.government.budget);
     $('approve-budget').disabled = !canApproveBudget;
+    const budgetRestrictionReason=!membership
+      ? 'Join this State government before changing its budget.'
+      : onlineGame.status!=='running'
+        ? 'Start the world before changing the budget.'
+        : socket?.readyState!==WebSocket.OPEN
+          ? 'Reconnect to the host before changing the budget.'
+          : !budgetRule?.proposerPermissionSetIds?.includes(membership.permissionSetId)
+            ? 'Your government role is not authorised to approve budgets.'
+            : !holdsBudgetOffice
+              ? 'The State Treasurer or Chief Executive must approve this budget.'
+              : '';
     $('budget-restriction').textContent = canApproveBudget
       ? 'Authority: ' + budgetRule.legalBasis + (budgetRule.approvalRequired
         ? '. The configured institution must approve this budget plan.'
         : '. This configured procedure applies the budget plan directly.')
-      : 'Only the appointed State Treasurer or Chief Executive can approve the public budget.';
+      : budgetRestrictionReason;
 
     const appointmentRule = constitution?.competenceRules
       ?.find(rule => rule.competence === 'appointOffice');
     const isChiefExecutive = (system.offices || []).some(office =>
       office.id === 'chief-executive' && office.holderPlayerId === player?.id);
     const canAppointOffice = onlineGame.status === 'running' &&
+      socket?.readyState === WebSocket.OPEN &&
       membership &&
       appointmentRule?.proposerPermissionSetIds?.includes(membership.permissionSetId) &&
       isChiefExecutive;
@@ -1390,6 +1530,7 @@
           decision.title + ' · ' + String(decision.status).replaceAll(/([A-Z])/g, ' $1').toUpperCase(),
           decision.text + ' · ' + decision.votes.length + ' vote(s) · ' + decision.legalBasis);
         const canVote = onlineGame.status === 'running' &&
+          socket?.readyState === WebSocket.OPEN &&
           decisionRule?.approvalRequired &&
           decision.status === 'pendingApproval' &&
           membership &&
@@ -1415,16 +1556,26 @@
     }
 
     const canProposeLaw = onlineGame.status === 'running' &&
+      socket?.readyState === WebSocket.OPEN &&
       membership &&
       lawRule?.proposerPermissionSetIds?.includes(membership.permissionSetId);
     $('propose-law').disabled = !canProposeLaw;
+    const lawRestrictionReason=!membership
+      ? 'Join this State government before proposing laws.'
+      : onlineGame.status!=='running'
+        ? 'Start the world before submitting a law.'
+        : socket?.readyState!==WebSocket.OPEN
+          ? 'Reconnect to the host before submitting a law.'
+          : !lawRule?.proposerPermissionSetIds?.includes(membership.permissionSetId)
+            ? 'Your government role is not authorised to propose laws.'
+            : 'The Constitution has not configured law-making authority.';
     $('law-restriction').textContent = canProposeLaw
       ? 'Authority: ' + lawRule.legalBasis + (lawRule.approvalRequired
         ? '. Approval requires ' + lawRule.minimumVotes + ' vote(s) and ' +
           lawRule.approvalThresholdPercent + '% of ' +
           String(lawRule.approvalThresholdBasis).replaceAll(/([A-Z])/g, ' $1').toLowerCase() + '.'
         : '. This configured procedure does not require approval.')
-      : 'Law proposals are unavailable: the Constitution, State membership, or configured permission does not authorize this action.';
+      : lawRestrictionReason;
   }
 
   function escapeHtml(value) {
@@ -1513,8 +1664,16 @@
       claimButton.disabled = true;
       claimButton.innerHTML = 'FOUNDING TREASURY BELOW <span>¤ 450</span>';
     } else {
-      claimButton.disabled = isOnline() && socket?.readyState !== WebSocket.OPEN;
-      claimButton.innerHTML = 'CLAIM THIS REGION <span>¤ 450</span>';
+      const claimReason=!onlineGame?.started
+        ? 'The host must start the world before claiming.'
+        : socket?.readyState!==WebSocket.OPEN
+          ? 'Reconnect to the host before claiming.'
+          : '';
+      claimButton.disabled=Boolean(claimReason);
+      claimButton.title=claimReason || 'Spend ¤450 from an administered State treasury to found this region.';
+      claimButton.innerHTML = claimReason
+        ? (onlineGame?.started?'RECONNECT TO CLAIM':'WORLD NOT STARTED')
+        : 'CLAIM THIS REGION <span>¤ 450</span>';
     }
     if (notify) toast(territory.name.toUpperCase() + ' SELECTED');
     highlightMap(index);
@@ -1522,6 +1681,13 @@
       renderFinancialSummary();
       renderCity();
       renderOptions();
+      renderObjectives();
+      renderEconomy();
+      renderGovernment();
+      renderTerritory();
+      renderMilitary();
+      renderTechnology();
+      renderDiplomacy();
     }
   }
 
@@ -1792,12 +1958,26 @@
       getContext:() => {
         const territory = onlineGame?.territories.find(item => item.index === state.selected);
         const membership = membershipsFor(currentPlayer()).find(item => item.stateId === territory?.stateId);
+        const buildReason=!onlineGame
+          ? 'CREATE OR JOIN A MULTIPLAYER WORLD FIRST.'
+          : !territory
+            ? 'SELECT A TERRITORY ON THE MAP.'
+            : !membership
+              ? 'THIS REGION IS NOT ADMINISTERED BY YOUR GOVERNMENT. CLAIM IT FIRST.'
+              : membership.permissionSetId==='government-observer'
+                ? 'YOUR GOVERNMENT ROLE DOES NOT ALLOW CONSTRUCTION.'
+                : !onlineGame.started
+                  ? 'THE HOST MUST START THE WORLD BEFORE CONSTRUCTION.'
+                  : onlineGame.status!=='running'
+                    ? 'THE WORLD IS PAUSED OR COMPLETED.'
+                    : !window.NewWorldMultiplayer?.isConnected()
+                      ? 'RECONNECT TO THE HOST BEFORE CONSTRUCTION.'
+                      : 'READY TO BUILD.';
         return {
           regionName:territory?.name || state.states[state.selected]?.name || 'No settlement',
           treasury:Number(state.treasury) || 0,
-          canBuild:Boolean(onlineGame?.started && onlineGame?.status === 'running' &&
-            territory && membership && membership.permissionSetId !== 'government-observer' &&
-            window.NewWorldMultiplayer?.isConnected())
+          canBuild:buildReason==='READY TO BUILD.',
+          buildReason
         };
       },
       canPlace:(item,index) => {
@@ -2032,18 +2212,6 @@
 
   function storeSession(session) {
     onlineSession = session;
-    manuallyDisconnected = false;
-    try {
-      localStorage.setItem(SESSION_KEY,JSON.stringify(session));
-    } catch (error) {
-      console.error('[new-world] Could not persist the multiplayer session:',error);
-      showMessage('This browser could not save the session token. Keep this tab open.',true);
-    }
-  }
-
-  function storeSession(session) {
-    onlineSession = session;
-    manuallyDisconnected = false;
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     } catch (error) {
@@ -2055,7 +2223,6 @@
   function showServerError(error) {
     console.error('[new-world] Multiplayer request failed:', error);
     const message = error instanceof Error ? error.message : 'The multiplayer request failed.';
-    $('recover-previous-save').hidden = error?.code !== 'SAVE_INVALID';
     $('server-status').textContent = 'Multiplayer connection error.';
     $('server-status').classList.add('error');
     showMessage(message, true);
@@ -2079,7 +2246,6 @@
       onSnapshot:game => {
         if (!game) return;
         socket = {readyState:WebSocket.OPEN};
-        reconnectAttempts = 0;
         applySnapshot(game);
         replayPendingOrders();
         $('server-status').textContent = window.NewWorldMultiplayer.isHost()
@@ -2094,19 +2260,34 @@
             ? 'Host active · this device owns the world.'
             : 'Relay connected · waiting for the host.';
           $('server-status').classList.remove('error');
+          renderMultiplayer();
           return;
         }
         socket = null;
+        sentOrderIds.clear();
         $('server-status').textContent = status || 'Disconnected from the relay.';
-        if (/offline|failed|error|could not/i.test(status || ''))
+        if (/offline|failed|error|could not|reconnecting|connecting/i.test(status || ''))
           $('server-status').classList.add('error');
+        renderMultiplayer();
       },
       onOrderResult:result => {
         if (!result) return;
+        const pending=getPendingOrders().find(item=>item.orderId===result.id);
+        const description=pending?describeOrder(pending):'Game action';
         if (result.id) removePendingOrder(result.id);
-        if (result.accepted) showMessage('Order accepted by the host.');
-        else showMessage(orderErrorMessage(result.code) || result.error ||
-          'The host rejected the order.',true);
+        if (result.accepted) {
+          showMessage(description+' — confirmed by the host.');
+          if(pending?.type==='build') {
+            buildMenu?.setStatus('BUILD CONFIRMED BY HOST · THE STRUCTURE IS NOW IN YOUR SETTLEMENT.');
+            toast('BUILDING CONFIRMED');
+          }
+        } else {
+          const reason=orderErrorMessage(result.code) || result.error || 'The host rejected the order.';
+          showMessage(description+' — '+reason,true);
+          if(pending?.type==='build')
+            buildMenu?.setStatus('BUILD REJECTED · '+reason.toUpperCase());
+        }
+        replayPendingOrders();
       },
       onPlayerJoined:player => {
         if (!onlineGame || !player?.id) return;
@@ -2142,40 +2323,74 @@
   }
 
   async function createWorld() {
+    if (createWorldPending || isOnline()) return;
+    const button=$('create-world');
+    createWorldPending=true;
+    button.disabled=true;
+    button.textContent='CONNECTING TO RELAY…';
+    showMessage('Creating the room and connecting this device as host. Keep this tab open.');
     try {
       const name = playerName();
       offlineBackup = structuredClone(state);
       const result = await window.NewWorldMultiplayer.createWorld(name,multiplayerHandlers());
       storeSession({...result.session,playerName:name});
       applySnapshot(result.game);
-      showMessage('World created on this device. Keep this browser open while the world is running.');
+      showMessage('World created. Invite friends with the 8-character code below.');
       toast('PRIVATE WORLD CREATED');
     } catch (error) {
       showServerError(error);
+    } finally {
+      createWorldPending=false;
+      button.disabled=false;
+      button.textContent='CREATE PRIVATE WORLD';
+      renderMultiplayer();
     }
   }
 
   async function joinWorld() {
+    if (joinWorldPending || isOnline()) return;
+    const button=$('join-world');
+    joinWorldPending=true;
+    button.disabled=true;
+    button.textContent='JOINING WORLD…';
+    showMessage('Checking the invitation and waiting for the host to answer.');
     try {
       const name = playerName();
+      const inviteCode=$('invite-code').value.trim();
+      if(!inviteCode) throw new Error('Enter the invitation code shared by the host.');
       offlineBackup = structuredClone(state);
       const session = await window.NewWorldMultiplayer.joinWorld(
-        $('invite-code').value.trim(),name,multiplayerHandlers());
+        inviteCode,name,multiplayerHandlers());
       storeSession({...session,playerName:name});
       const membership = membershipsFor(currentPlayer())[0];
       const assignedState = onlineGame?.territories.find(item => item.stateId === membership?.stateId);
       showMessage(assignedState
-        ? 'Connected to the founding settlement at ' + assignedState.name + '. Your group can expand together.'
-        : 'Connected to the host. Waiting for the founding settlement.');
+        ? 'Connected to ' + assignedState.name + '. Your founding group shares this government.'
+        : 'Connected to the host. Waiting for your State assignment.');
       toast('JOINED PRIVATE WORLD');
     } catch (error) {
       showServerError(error);
+    } finally {
+      joinWorldPending=false;
+      button.disabled=false;
+      button.textContent='JOIN WORLD';
+      renderMultiplayer();
     }
   }
 
   async function restoreSession() {
-    if (!onlineSession) return;
-    manuallyDisconnected = false;
+    if (!onlineSession || restorePending) return;
+    if(window.NewWorldMultiplayer?.isConnected()) {
+      showMessage('This device is already connected to the room relay.');
+      return;
+    }
+    restorePending=true;
+    const button=$('reconnect-world');
+    if(button) {
+      button.disabled=true;
+      button.textContent='RECONNECTING…';
+    }
+    $('server-status').textContent='Reconnecting to the host and restoring the shared world…';
     try {
       if (!offlineBackup) offlineBackup = structuredClone(state);
       const result = await window.NewWorldMultiplayer.restoreSession(
@@ -2183,24 +2398,15 @@
       if (result.session) storeSession({...result.session,
         playerName:$('player-name').value.trim() || result.session.playerName});
       if (result.game) applySnapshot(result.game);
+      showMessage('Reconnected. Your current world state has been restored.');
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
+    } finally {
+      restorePending=false;
+      renderMultiplayer();
     }
   }
-
-  function scheduleReconnect() {
-    if (!onlineSession || manuallyDisconnected || reconnectTimer !== null) return;
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      if (!window.NewWorldMultiplayer?.isConnected()) restoreSession();
-    },5000);
-  }
-
-  async function recoverPreviousSave() {
-    showMessage('Saves are stored on the host device. Reopen the original host browser to restore this world.',true);
-  }
-
 
   function applySnapshot(game) {
     const previousEventSequence = Number(onlineSession?.lastEventSequence) || 0;
@@ -2276,14 +2482,6 @@
     update();
   }
 
-  function openSocket() {
-    if (!onlineSession) return;
-    socket = window.NewWorldMultiplayer?.isConnected()
-      ? {readyState:WebSocket.OPEN}
-      : null;
-    if (!socket) restoreSession();
-  }
-
   function sendAction(action) {
     const supportedOrders = new Set([
       'claim','build','pause','resume','recruitUnit','mobilizeUnit',
@@ -2308,6 +2506,7 @@
     const isGameWideVote = action.type === 'pause' || action.type === 'resume';
     const order = {
       ...action,
+      sentOnce:false,
       orderId:crypto.randomUUID(),
       gameId:onlineSession.gameId,
       playerId:onlineSession.playerId,
@@ -2415,11 +2614,6 @@
     }
   }
 
-  async function requestSnapshotBroadcast() {
-    if (window.NewWorldMultiplayer?.isConnected()) return;
-    await restoreSession();
-  }
-
   async function startWorld() {
     const button = $('start-world');
     if (startRequestPending || button.disabled || !onlineSession?.isHost) return;
@@ -2446,10 +2640,42 @@
     sessionPanel.hidden = !isOnline();
     if (!onlineSession) return;
 
-    const pendingCount = ordersForCurrentSession().length;
+    const reconnectButton=$('reconnect-world');
+    const relayConnected=Boolean(window.NewWorldMultiplayer?.isConnected());
+    reconnectButton.hidden=relayConnected && !restorePending;
+    reconnectButton.disabled=restorePending;
+    reconnectButton.textContent=restorePending?'RECONNECTING…':'RECONNECT';
+    reconnectButton.title='Reconnect this browser to the host and restore the saved world.';
+    const pendingOrders=ordersForCurrentSession();
+    const pendingCount=pendingOrders.length;
     $('pending-orders-status').textContent = pendingCount
-      ? pendingCount + ' pending order' + (pendingCount === 1 ? '' : 's') + ' · saved on this device'
+      ? pendingCount + ' pending order' + (pendingCount === 1 ? '' : 's') + ' · waiting for host confirmation'
       : 'No pending orders.';
+    const pendingList=$('pending-order-list');
+    pendingList.replaceChildren();
+    for(const order of pendingOrders) {
+      const row=document.createElement('div');
+      row.className='pending-order-row';
+      const copy=document.createElement('div');
+      const title=document.createElement('strong');
+      title.textContent=describeOrder(order);
+      const status=document.createElement('small');
+      status.textContent=order.sentOnce
+        ? 'SENT · WAITING FOR HOST'
+        : 'QUEUED · NOT SENT YET';
+      copy.append(title,status);
+      row.appendChild(copy);
+      if(!order.sentOnce && !sentOrderIds.has(order.orderId)) {
+        const remove=document.createElement('button');
+        remove.type='button';
+        remove.textContent='REMOVE';
+        remove.title='Remove this order before it is sent to the host';
+        remove.addEventListener('click',()=>removePendingOrder(order.orderId));
+        row.appendChild(remove);
+      }
+      pendingList.appendChild(row);
+    }
+    $('advanced-scenario-settings').hidden=!canConfigureScenario();
     $('session-summary').textContent = onlineGame
       ? (onlineGame.status || (onlineGame.started ? 'running' : 'lobby')).toUpperCase() +
         ' · ' + formatWorldDate(onlineGame.worldDate) +
@@ -2508,15 +2734,18 @@
       const startButton = $('start-world');
       startButton.hidden = !isHost || onlineGame.started;
       const missingMembership = onlineGame.players.some(player => membershipsFor(player).length === 0);
-      startButton.disabled = startRequestPending || missingMembership;
-      startButton.textContent = startRequestPending ? 'STARTING WORLD...' : 'START WORLD';
-      startButton.title = missingMembership
+      const hostConnected=window.NewWorldMultiplayer?.isConnected() && socket?.readyState===WebSocket.OPEN;
+      startButton.disabled=startRequestPending || missingMembership || !hostConnected;
+      startButton.textContent=startRequestPending ? 'STARTING WORLD...' : 'START WORLD';
+      startButton.title=missingMembership
         ? 'Waiting for every player to join the founding party.'
-        : 'Start the shared frontier for all connected players.';
+        : !hostConnected
+          ? 'Reconnect the host to the relay before starting.'
+          : 'Start the shared frontier for everyone in the lobby.';
 
       const pauseControls = $('pause-controls');
-      pauseControls.hidden = !onlineGame.started;
-      if (onlineGame.started) {
+      pauseControls.hidden = !['running','paused'].includes(onlineGame.status);
+      if (!pauseControls.hidden) {
         const connectedCount = onlineGame.players.filter(player => player.connected).length;
         const voteIds = onlineGame.pauseVotePlayerIds || [];
         const voteCount = voteIds.filter(playerId =>
@@ -2528,7 +2757,12 @@
         const voteButton = $('pause-vote');
         voteButton.textContent = hasVoted ? 'WITHDRAW VOTE' :
           onlineGame.paused ? 'VOTE TO RESUME' : 'VOTE TO PAUSE';
-        voteButton.disabled = !currentPlayer()?.connected || socket?.readyState !== WebSocket.OPEN;
+        voteButton.disabled = !currentPlayer()?.connected ||
+          socket?.readyState !== WebSocket.OPEN ||
+          !['running','paused'].includes(onlineGame.status);
+        voteButton.title=voteButton.disabled
+          ? 'Reconnect to a running or paused world before voting.'
+          : 'Your vote counts with connected players. More than half must agree.';
       }
     } else {
       const status = document.createElement('p');
@@ -2541,8 +2775,6 @@
   }
 
   function disconnect() {
-    manuallyDisconnected = true;
-    clearTimeout(reconnectTimer);
     const hosted = Boolean(onlineSession?.isHost ||
       onlineGame?.hostPlayerId === onlineSession?.playerId);
     try {
@@ -2551,7 +2783,6 @@
       console.error('[new-world] Could not close the multiplayer connection:',error);
     }
     socket = null;
-    reconnectAttempts = 0;
     onlineSession = null;
     onlineGame = null;
     try {
@@ -2698,23 +2929,41 @@
     setZoom(zoom * Math.exp(-event.deltaY * 0.00115), event.clientX, event.clientY);
   }, {passive: false});
 
+  const advancedScenarioContent=$('advanced-scenario-content');
+  for(const panelId of [
+    'territory-setup-panel','economy-setup-panel',
+    'military-setup-panel','technology-setup-panel'
+  ]) {
+    const panel=$(panelId);
+    if(panel) advancedScenarioContent.appendChild(panel);
+  }
+
   const endpointLabel = $('server-endpoint');
   if (endpointLabel) endpointLabel.textContent = 'MQTT RELAY · HOST RUNS THE WORLD';
   $('player-name').value = localStorage.getItem(NAME_KEY) || '';
   $('test-server').addEventListener('click',async () => {
+    if(relayTestPending) return;
+    const button=$('test-server');
+    relayTestPending=true;
+    button.disabled=true;
+    button.textContent='TESTING…';
+    $('server-status').textContent='Testing the public relay connection…';
     try {
       await window.NewWorldMultiplayer.testRelay();
       $('server-status').textContent = 'Public relay reachable.';
       $('server-status').classList.remove('error');
-      showMessage('Relay reachable. The host device, not the relay, runs the world.');
+      showMessage('Relay reachable. Create a world to host a game, or join using an invitation code.');
     } catch (error) {
       showServerError(error);
+    } finally {
+      relayTestPending=false;
+      button.disabled=false;
+      button.textContent='TEST';
     }
   });
   $('create-world').addEventListener('click', createWorld);
   $('join-world').addEventListener('click', joinWorld);
   $('reconnect-world').addEventListener('click', restoreSession);
-  $('recover-previous-save').addEventListener('click', recoverPreviousSave);
   $('start-world').addEventListener('click', startWorld);
   $('leave-world').addEventListener('click', disconnect);
   $('load-economy-config').addEventListener('click', loadEconomyConfiguration);

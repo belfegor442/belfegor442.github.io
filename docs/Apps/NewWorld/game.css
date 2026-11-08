@@ -188,6 +188,23 @@ a{color:inherit}
 .trade-route-controls .microcopy{margin:3px 0 0}
 .map-foot .legend.army{background:#172d27;border:2px solid #d7e5c1;border-radius:50%;width:11px;height:11px}
 .map-foot .legend.occupation{background:#7c201e;border:2px solid #ffb4a7;border-radius:50%;width:11px;height:11px}
+.first-steps{margin:10px 0;padding:11px;border:1px solid var(--line-soft);background:#1b292c}
+.first-steps ol{display:grid;gap:10px;margin:8px 0 0;padding-left:21px}
+.first-steps li{padding-left:2px;color:var(--gold);font:700 9px/1.45 var(--mono)}
+.first-steps li strong{display:block;color:var(--ink)}
+.first-steps li span{display:block;margin-top:3px;color:var(--muted);font:9px/1.55 var(--sans)}
+.pending-order-list{display:grid;gap:5px;margin:6px 0 10px}
+.pending-order-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--line-soft);background:#1b282b}
+.pending-order-row strong{display:block;color:var(--ink);font:700 8px/1.4 var(--mono)}
+.pending-order-row small{display:block;margin-top:3px;color:var(--muted);font:7px/1.4 var(--mono)}
+.pending-order-row button{flex:0 0 auto;padding:6px 8px;border:1px solid var(--line);background:#303d40;color:var(--ink);font:700 7px var(--mono)}
+.advanced-scenario-settings{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.advanced-scenario-settings[hidden]{display:none}
+.advanced-scenario-settings>summary{cursor:pointer;color:var(--muted);font:700 8px var(--mono);letter-spacing:.6px}
+.advanced-scenario-content{display:grid;gap:10px;margin-top:10px}
+.advanced-scenario-content details{margin:0;padding:9px;border:1px solid var(--line-soft);background:#1c292c}
+.advanced-scenario-content details[hidden]{display:none}
+.advanced-scenario-content details>summary{cursor:pointer;color:var(--ink);font:700 8px var(--mono)}
 .political-text{min-height:90px;resize:vertical;font-family:var(--sans);line-height:1.45}
 .field-row{display:flex;gap:5px}
 .field-row #server-endpoint{min-width:0;flex:1;padding:9px;border:1px solid var(--line);background:#172125;color:var(--muted);font:9px var(--mono);overflow-wrap:anywhere}
