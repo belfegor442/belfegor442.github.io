@@ -94,7 +94,7 @@ footer a:hover{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261109-34">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261109-35">
 </head>
 <body>
 <div class="pg"></div>
@@ -307,35 +307,19 @@ footer a:hover{color:var(--ink)}
     }, 180);
   });
 
-  const LIVE_NEWS_URL = "https://raw.githubusercontent.com/belfegor442/belfegor442.github.io/main/docs/news.json";
-
   let newsLoadPending = false;
 
   async function loadHeadline() {
     if (newsLoadPending || document.hidden) return;
     newsLoadPending = true;
-    const sources = [
-      LIVE_NEWS_URL + "?v=" + Date.now(),
-      "/news.json?v=" + Date.now()
-    ];
-    let lastError = null;
     try {
-      for (const source of sources) {
-        try {
-          const response = await fetch(source, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          const data = await response.json();
-          if (typeof data.headline !== "string") throw new Error("Titular no válido");
-          displayHeadline(data.headline);
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-      if (lastError) throw lastError;
+      const response = await fetch("/news.json?v=" + Date.now(), { cache: "no-store" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      if (typeof data.headline !== "string") throw new Error("Titular no válido");
+      displayHeadline(data.headline);
     } catch (error) {
-      console.error("[North Assembly] No se pudo actualizar el broadcast:", error);
+      console.error("[North Assembly] No se pudo leer /news.json:", error);
     } finally {
       newsLoadPending = false;
     }
@@ -358,7 +342,7 @@ footer a:hover{color:var(--ink)}
         body: JSON.stringify({ headline: nextHeadline, code: accessCode })
       });
     } catch (error) {
-      throw new Error("No se pudo conectar con North Assembly Publisher en este PC. Inicia Start-North-Assembly-Publisher.bat y vuelve a ejecutar el comando.");
+      throw new Error("No se ha podido publicar la noticia: North Assembly Publisher no está activo en este PC (127.0.0.1:43127). El titular no se ha publicado globalmente.");
     }
 
     const result = await response.json().catch(() => ({}));
