@@ -419,65 +419,127 @@ footer a:hover{color:var(--ink)}
 <script>
 (() => {
   "use strict";
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const targets = document.querySelectorAll(".card, .sys a, .conn a, .about, .people-directory");
-  const draw = element => {
-    if (element.dataset.naFrame === "1") return;
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const symbols = ["&", "-", "$", "§", "@", "%", "+", "="];
+
+  function printHeading(heading) {
+    if (!heading || heading.dataset.naPrintDone === "1") return;
+
+    const chars = Array.from(heading.querySelectorAll(".ch"));
+    if (!chars.length) return;
+
+    heading.dataset.naPrintDone = "1";
+    const originals = chars.map(node => node.textContent);
+    heading.classList.add("na-k-printing");
+
+    if (reduced) {
+      chars.forEach((node, index) => {
+        node.textContent = originals[index];
+        node.classList.add("na-k-done");
+      });
+      return;
+    }
+
+    let index = 0;
+    function nextCharacter() {
+      if (index >= chars.length) {
+        heading.classList.add("na-k-printed");
+        return;
+      }
+
+      const node = chars[index];
+      const finalCharacter = originals[index];
+      node.classList.add("na-k-active");
+
+      if (!finalCharacter.trim()) {
+        node.textContent = finalCharacter;
+        node.classList.remove("na-k-active");
+        node.classList.add("na-k-done", "na-k-space");
+        index += 1;
+        window.setTimeout(nextCharacter, 28);
+        return;
+      }
+
+      let pass = 0;
+      function scramble() {
+        if (pass < 2) {
+          node.textContent = symbols[(index * 5 + pass * 3) % symbols.length];
+          pass += 1;
+          window.setTimeout(scramble, 42);
+          return;
+        }
+
+        node.textContent = finalCharacter;
+        node.classList.remove("na-k-active");
+        node.classList.add("na-k-done");
+        index += 1;
+        window.setTimeout(nextCharacter, 54);
+      }
+      scramble();
+    }
+
+    window.setTimeout(nextCharacter, 140);
+  }
+
+  function drawFrame(element) {
+    if (!element || element.dataset.naFrame === "1") return;
     element.dataset.naFrame = "1";
-    const frame = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    element.classList.add("na-frame-target");
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const frame = document.createElementNS(svgNS, "svg");
     frame.setAttribute("class", "na-draw-frame");
     frame.setAttribute("viewBox", "0 0 100 100");
     frame.setAttribute("preserveAspectRatio", "none");
     frame.setAttribute("aria-hidden", "true");
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", ".5"); rect.setAttribute("y", ".5");
-    rect.setAttribute("width", "99"); rect.setAttribute("height", "99");
-    rect.setAttribute("rx", "1.5");
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", "0.7");
+    rect.setAttribute("y", "0.7");
+    rect.setAttribute("width", "98.6");
+    rect.setAttribute("height", "98.6");
+    rect.setAttribute("rx", "1.2");
     frame.appendChild(rect);
     element.appendChild(frame);
-    if (reduced) element.classList.add("na-frame-drawn");
-    else requestAnimationFrame(() => requestAnimationFrame(() => element.classList.add("na-frame-drawn")));
-  };
-  if ("IntersectionObserver" in window && !reduced) {
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      draw(entry.target); observer.unobserve(entry.target);
-    }), { threshold: .16, rootMargin: "0px 0px -5% 0px" });
-    targets.forEach(element => observer.observe(element));
-  } else targets.forEach(draw);
 
-  const title = document.querySelector("#top h1");
-  if (!title) return;
-  const chars = Array.from(title.querySelectorAll(".ch"));
-  const symbols = ["&", "-", "$", "§", "@", "%", "+", "="];
-  const originals = chars.map(node => node.textContent);
-  title.classList.add("na-printing");
-  if (reduced) {
-    chars.forEach((node, index) => { node.textContent = originals[index]; node.classList.add("na-printed"); });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => element.classList.add("na-frame-drawn"));
+    });
+  }
+
+  const headings = Array.from(document.querySelectorAll(".rv"));
+  const frameTargets = Array.from(document.querySelectorAll(
+    ".card, .sys a, .conn a, .about, .people-directory"
+  ));
+
+  if (reduced || !("IntersectionObserver" in window)) {
+    headings.forEach(printHeading);
+    frameTargets.forEach(drawFrame);
     return;
   }
-  let index = 0;
-  const printNext = () => {
-    if (index >= chars.length) return;
-    const node = chars[index], finalChar = originals[index];
-    let noise = 0;
-    const scramble = () => {
-      if (noise < 3) {
-        node.textContent = symbols[(index * 3 + noise * 5) % symbols.length];
-        node.classList.add("na-print-noise");
-        noise++;
-        window.setTimeout(scramble, 48);
-      } else {
-        node.textContent = finalChar;
-        node.classList.remove("na-print-noise");
-        node.classList.add("na-printed");
-        index++;
-        window.setTimeout(printNext, finalChar === " " ? 65 : 105);
-      }
-    };
-    scramble();
-  };
-  window.setTimeout(printNext, 420);
+
+  const headingObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      printHeading(entry.target);
+      headingObserver.unobserve(entry.target);
+    });
+  }, { threshold: 0.16, rootMargin: "0px 0px -4% 0px" });
+
+  const frameObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      drawFrame(entry.target);
+      frameObserver.unobserve(entry.target);
+    });
+  }, { threshold: 0.12, rootMargin: "0px 0px -3% 0px" });
+
+  headings.forEach(heading => headingObserver.observe(heading));
+  frameTargets.forEach(element => frameObserver.observe(element));
+
+  const heroHeading = document.querySelector("#top h1.rv");
+  if (heroHeading) window.setTimeout(() => printHeading(heroHeading), 220);
 })();
 </script>
 </body>
