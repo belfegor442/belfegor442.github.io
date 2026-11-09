@@ -482,6 +482,36 @@ footer a:hover{color:var(--ink)}
     window.setTimeout(nextCharacter, 140);
   }
 
+  function printCardText(card) {
+    if (!card || card.dataset.naCardTextPrepared === "1") return;
+    card.dataset.naCardTextPrepared = "1";
+
+    const textTargets = card.querySelectorAll("h3, p, .k > span:first-child");
+    textTargets.forEach(target => {
+      if (target.dataset.naPrintDone === "1") return;
+      const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          if (node.parentElement && node.parentElement.closest(".tag")) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      textNodes.forEach(textNode => {
+        const fragment = document.createDocumentFragment();
+        Array.from(textNode.nodeValue).forEach(character => {
+          const span = document.createElement("span");
+          span.className = "ch";
+          span.textContent = character;
+          fragment.appendChild(span);
+        });
+        textNode.parentNode.replaceChild(fragment, textNode);
+      });
+      printHeading(target);
+    });
+  }
+
   function drawFrame(element) {
     if (!element || element.dataset.naFrame === "1") return;
     element.dataset.naFrame = "1";
@@ -544,6 +574,7 @@ footer a:hover{color:var(--ink)}
     entries.forEach(entry => {
       if (!entry.isIntersecting) return;
       drawFrame(entry.target);
+      if (entry.target.matches(".card")) printCardText(entry.target);
       frameObserver.unobserve(entry.target);
     });
   }, { threshold: 0.12, rootMargin: "0px 0px -3% 0px" });
