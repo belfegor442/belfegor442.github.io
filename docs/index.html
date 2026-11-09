@@ -495,14 +495,27 @@ footer a:hover{color:var(--ink)}
     frame.setAttribute("aria-hidden", "true");
 
     const rect = document.createElementNS(svgNS, "rect");
-    rect.setAttribute("x", "0.7");
-    rect.setAttribute("y", "0.7");
-    rect.setAttribute("width", "98.6");
-    rect.setAttribute("height", "98.6");
-    rect.setAttribute("rx", "1.2");
+    rect.setAttribute("class", "na-frame-perimeter");
+    rect.setAttribute("x", "0.8");
+    rect.setAttribute("y", "0.8");
+    rect.setAttribute("width", "98.4");
+    rect.setAttribute("height", "98.4");
+    rect.setAttribute("rx", "0.6");
     frame.appendChild(rect);
-    element.appendChild(frame);
 
+    [
+      "M 1 13 V 1 H 13",
+      "M 87 1 H 99 V 13",
+      "M 99 87 V 99 H 87",
+      "M 13 99 H 1 V 87"
+    ].forEach((d, index) => {
+      const corner = document.createElementNS(svgNS, "path");
+      corner.setAttribute("class", "na-frame-corner na-frame-corner-" + index);
+      corner.setAttribute("d", d);
+      frame.appendChild(corner);
+    });
+
+    element.appendChild(frame);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => element.classList.add("na-frame-drawn"));
     });
