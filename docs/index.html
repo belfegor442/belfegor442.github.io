@@ -331,7 +331,7 @@ footer a:hover{color:var(--ink)}
       throw new Error("Usa entre 1 y 180 caracteres. Para dos noticias, sepáralas con | (ejemplo: Noticia 1 | Noticia 2).");
     }
 
-    const accessCode = window.prompt("North Assembly dice:");
+    const accessCode = window.prompt("Introduce el codigo temporal mostrado en la ventana de North Assembly Publisher:");
     if (accessCode === null) return false;
 
     let response;
@@ -342,7 +342,7 @@ footer a:hover{color:var(--ink)}
         body: JSON.stringify({ headline: nextHeadline, code: accessCode })
       });
     } catch (error) {
-      throw new Error("No se ha podido publicar la noticia: North Assembly Publisher no está activo en este PC (127.0.0.1:43127). El titular no se ha publicado globalmente.");
+      throw new Error("No se puede conectar con North Assembly Publisher en este PC (127.0.0.1:43127). Ejecuta Start-North-Assembly-Publisher.bat desde la carpeta del repositorio y deja abierta su ventana.");
     }
 
     const result = await response.json().catch(() => ({}));
