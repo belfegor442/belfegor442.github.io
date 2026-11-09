@@ -246,7 +246,6 @@ footer a:hover{color:var(--ink)}
   const newsWindow = ticker?.closest(".news-window");
   const announcement = document.getElementById("news-announcement");
   const DEFAULT_HEADLINE = "North Assembly — independent software and systems.";
-  const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let activeText = "";
   let newsResizeTimer = 0;
 
@@ -264,15 +263,6 @@ footer a:hover{color:var(--ink)}
     const separator = '<span class="news-separator" aria-hidden="true"> · </span>';
     const storyMarkup = stories.map(escapeHTML).join(separator) + separator;
     if (announcement) announcement.textContent = stories.join(" · ");
-
-    if (REDUCED_MOTION) {
-      document.documentElement.classList.add("na-ticker-ready");
-      ticker.style.animation = "none";
-      ticker.style.left = "0";
-      ticker.style.transform = "none";
-      ticker.textContent = stories.join(" · ");
-      return;
-    }
 
     ticker.style.animation = "none";
     ticker.style.left = "100%";
@@ -311,21 +301,28 @@ footer a:hover{color:var(--ink)}
   async function loadHeadline() {
     if (newsLoadPending || document.hidden) return;
     newsLoadPending = true;
+    const sources = [
+      "/news.json?v=" + Date.now(),
+      LIVE_NEWS_URL + "?v=" + Date.now()
+    ];
+    let lastError = null;
     try {
-      const response = await fetch(LIVE_NEWS_URL + "?v=" + Date.now(), { cache: "no-store" });
-      if (!response.ok) throw new Error("GitHub raw HTTP " + response.status);
-      const data = await response.json();
-      if (typeof data.headline !== "string") throw new Error("Titular no válido");
-      displayHeadline(data.headline);
-    } catch (remoteError) {
-      try {
-        const fallback = await fetch("/news.json?v=" + Date.now(), { cache: "no-store" });
-        if (!fallback.ok) throw new Error("HTTP " + fallback.status);
-        const data = await fallback.json();
-        displayHeadline(typeof data.headline === "string" ? data.headline : DEFAULT_HEADLINE);
-      } catch (error) {
-        console.error("[North Assembly] No se pudo actualizar el titular:", remoteError, error);
+      for (const source of sources) {
+        try {
+          const response = await fetch(source, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          const data = await response.json();
+          if (typeof data.headline !== "string") throw new Error("Titular no válido");
+          displayHeadline(data.headline);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
       }
+      if (lastError) throw lastError;
+    } catch (error) {
+      console.error("[North Assembly] No se pudo actualizar el broadcast:", error);
     } finally {
       newsLoadPending = false;
     }
@@ -369,7 +366,8 @@ footer a:hover{color:var(--ink)}
   });
 
   loadHeadline();
-  window.setInterval(loadHeadline, 15000);
+  window.setInterval(loadHeadline, 8000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadHeadline(); });
   console.info("[North Assembly] Publica una noticia o dos separadas por |. Ejemplo: NorthAssembly.updateNews(\"Noticia 1 | Noticia 2\").");
 })();
 </script>
