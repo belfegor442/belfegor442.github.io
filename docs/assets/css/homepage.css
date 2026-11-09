@@ -2861,3 +2861,31 @@ html.na-route-transition .na-route-wipe:before {
     transition: none !important;
   }
 }
+
+
+/* Broadcast override: keep the live ticker moving on every motion preference. */
+.news-headline {
+  position: absolute !important;
+  left: 100% !important;
+  top: 50% !important;
+  display: flex !important;
+  width: max-content !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  transform: translateY(-50%);
+  animation: na-news-loop var(--news-duration, 22s) linear infinite !important;
+  animation-play-state: running !important;
+}
+.news-window {
+  height: 1.6em !important;
+  min-height: 1.6em !important;
+  overflow: hidden !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-headline {
+    position: absolute !important;
+    left: 100% !important;
+    white-space: nowrap !important;
+    animation: na-news-loop var(--news-duration, 22s) linear infinite !important;
+  }
+}
