@@ -2668,3 +2668,145 @@ footer{font-size:10px;letter-spacing:.035em}
  .na-draw-frame rect{stroke-dashoffset:0!important;transition:none!important}
  #top h1.na-printing .ch{opacity:1!important;color:inherit!important}
 }
+
+
+/* BLACKOUT / mechanical reveal system — replaces the blur-based entrance. */
+html.na-motion .sec:not(.hero)>.c,
+html.na-motion .sec.in:not(.hero)>.c {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+.fi, .fi.in, html.na-motion .fi:not(.in),
+.card:not(.in), html.na-motion .card:not(.in) {
+  filter: none !important;
+}
+html.na-motion .fi:not(.in),
+html.na-motion .card:not(.in) {
+  opacity: 1 !important;
+  transform: none !important;
+}
+.rv .ch, .rv.in .ch {
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+.rv .ch { opacity: 1 !important; }
+.rv.na-k-printing .ch {
+  display: inline-block;
+  opacity: 0 !important;
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+.rv.na-k-printing .ch.na-k-active {
+  opacity: 1 !important;
+  color: var(--na-red-bright, #ff3545) !important;
+  text-shadow: 0 0 12px rgba(240,43,54,.72);
+}
+.rv.na-k-printing .ch.na-k-done {
+  opacity: 1 !important;
+  color: inherit;
+  text-shadow: none;
+}
+.rv.na-k-printing .ch.na-k-space { min-width: .24em; }
+.rv.na-k-printed { animation: na-mech-lock .38s steps(5,end) both; }
+@keyframes na-mech-lock {
+  0% { text-shadow: 0 0 18px rgba(240,43,54,.7); }
+  100% { text-shadow: 0 0 0 rgba(240,43,54,0); }
+}
+
+/* Mechanical red scan: one crisp pass, never a blur/fade. */
+.sec:not(.hero)::after {
+  filter: none !important;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    transparent 47.8%,
+    rgba(240,43,54,.10) 49.1%,
+    rgba(255,88,98,.72) 50%,
+    rgba(240,43,54,.10) 50.9%,
+    transparent 52.2%,
+    transparent 100%);
+  mix-blend-mode: screen;
+}
+html.na-motion .sec.in:not(.hero)::after {
+  animation: na-mech-section-scan .82s steps(48,end) .04s both !important;
+}
+@keyframes na-mech-section-scan {
+  0% { transform: translate3d(0,-100%,0); opacity: 0; }
+  8% { opacity: .95; }
+  92% { opacity: .8; }
+  100% { transform: translate3d(0,100%,0); opacity: 0; }
+}
+html.na-motion .sec:not(.hero)>.c::before {
+  transform: scaleX(.04);
+  transform-origin: left center;
+  transition: transform .68s steps(36,end) .08s;
+}
+html.na-motion .sec.in:not(.hero)>.c::before { transform: scaleX(1); }
+
+/* Drawn perimeter replaces the soft card arrival. */
+.na-frame-target { position: relative; }
+.na-draw-frame {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.na-draw-frame rect {
+  fill: none;
+  stroke: rgba(255,54,68,.94);
+  stroke-width: 1.15;
+  vector-effect: non-scaling-stroke;
+  pathLength: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.na-frame-drawn>.na-draw-frame rect {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1.05s steps(64,end), stroke .2s linear;
+}
+.na-frame-target:hover>.na-draw-frame rect {
+  stroke: #ff8790;
+  stroke-width: 1.7;
+}
+.na-route-wipe {
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+.na-route-wipe:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 2px;
+  opacity: 0;
+  filter: none !important;
+  transform: none !important;
+  background: #ff4654;
+  box-shadow: 0 0 12px rgba(255,54,68,.9), 0 0 34px rgba(240,43,54,.48);
+}
+html.na-route-transition .na-route-wipe:before {
+  animation: na-route-laser .62s steps(72,end) both;
+}
+@keyframes na-route-laser {
+  0% { left: -3px; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .sec:not(.hero)::after { display: none !important; }
+  .rv.na-k-printing .ch { opacity: 1 !important; }
+  .na-draw-frame rect { stroke-dashoffset: 0 !important; transition: none !important; }
+  .na-route-wipe { display: none !important; }
+}
