@@ -2863,45 +2863,48 @@ html.na-route-transition .na-route-wipe:before {
 }
 
 
-/* BROADCAST — duplicated track with an exact half-width seamless loop. */
+/* BROADCAST — stable vertical centering and JS-controlled continuous motion. */
 .news-window {
-  position: relative;
-  min-width: 0;
-  height: clamp(2.5rem, 3vw, 2.9rem) !important;
-  min-height: clamp(2.5rem, 3vw, 2.9rem) !important;
-  overflow: hidden;
+  position: relative !important;
+  display: block !important;
+  min-width: 0 !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding-left: 0 !important;
+  overflow: hidden !important;
+  align-self: center !important;
 }
 .news-headline {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  display: flex;
-  align-items: center;
-  width: max-content;
-  max-width: none;
-  white-space: nowrap;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  width: max-content !important;
+  height: 100% !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  line-height: 1.18 !important;
+  transform: none;
+  animation: none !important;
   will-change: transform;
-  transform: translate3d(0, -50%, 0);
-  animation: na-broadcast-marquee var(--news-duration, 22s) linear infinite;
-  animation-play-state: running;
 }
 .news-cycle {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  white-space: nowrap;
-  padding-right: 3.5rem;
+  display: inline-flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  height: 100%;
+  padding-right: 3.5rem !important;
+  white-space: nowrap !important;
 }
-@keyframes na-broadcast-marquee {
-  from { transform: translate3d(0, -50%, 0); }
-  to   { transform: translate3d(-50%, -50%, 0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .news-window { height: clamp(2.5rem, 3vw, 2.9rem) !important; min-height: clamp(2.5rem, 3vw, 2.9rem) !important; }
+@media (max-width: 760px) {
+  .news-window {
+    height: 36px !important;
+    min-height: 36px !important;
+  }
   .news-headline {
-    position: absolute;
-    left: 0;
-    white-space: nowrap;
-    animation: na-broadcast-marquee var(--news-duration, 22s) linear infinite;
+    left: 12px !important;
+    font-size: clamp(18px, 5vw, 22px) !important;
   }
 }
