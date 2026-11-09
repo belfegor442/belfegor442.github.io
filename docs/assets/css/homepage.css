@@ -2111,12 +2111,12 @@ body:after{
   transition-timing-function:var(--na-motion);
   
 }
-.fi.in{filter:blur(0)}
+.fi.in{filter:none}
 #apps .card{backface-visibility:hidden}
 #apps .card.in{animation:na-card-arrive .9s var(--na-motion) both;animation-delay:calc(var(--i)*85ms)}
 @keyframes na-card-arrive{
-  0%{opacity:0;transform:translate3d(0,34px,0) rotateX(7deg) scale(.985);filter:blur(5px)}
-  100%{opacity:1;transform:translate3d(0,0,0) rotateX(0) scale(1);filter:blur(0)}
+  0%{opacity:0;transform:translate3d(0,34px,0) rotateX(7deg) scale(.985);filter:none}
+  100%{opacity:1;transform:translate3d(0,0,0) rotateX(0) scale(1);filter:none}
 }
 
 /* Cards have a moving edge highlight and a subtle internal light response. */
@@ -2289,7 +2289,7 @@ html.na-motion .sec.in:not(.hero)>.c:before{transform:scaleX(1)}
 @media(max-width:760px){
   .sec:not(.hero)::after{mix-blend-mode:normal}
   html.na-motion .sec:not(.hero)>.c{transform:translate3d(0,22px,0) scale(.996)}
-  .rv .ch{transition-duration:.72s;filter:blur(5px)}
+  .rv .ch{transition-duration:.72s;filter:none}
 }
 @media(prefers-reduced-motion:reduce){
   .sec:not(.hero)::after{display:none}
@@ -2330,7 +2330,7 @@ html.na-motion .sec.in:not(.hero)>.c:before{transform:scaleX(1)}
   opacity:1;
   
 }
-.na-cursor-glow.is-pressed{opacity:.72;filter:blur(7px)}
+.na-cursor-glow.is-pressed{opacity:.72;filter:none}
 
 /* A cinematic red/graphite light curtain signals an in-page navigation change. */
 .na-route-wipe{
@@ -2607,7 +2607,7 @@ dd{padding-top:4px;font-size:13px;line-height:1.6}
 .conn b{font-size:clamp(1.2rem,2vw,1.55rem);letter-spacing:-.045em}
 .conn a:hover{transform:translateY(-5px)}
 footer{font-size:10px;letter-spacing:.035em}
-.news-ticker{-webkit-backdrop-filter:blur(16px)}
+.news-ticker{-webkit-backdrop-filter:none}
 .news-label{font-size:11px}
 .news-caption{font-size:9px}
 @media(max-width:900px){
@@ -2615,7 +2615,7 @@ footer{font-size:10px;letter-spacing:.035em}
   .card{min-height:230px}
 }
 @media(max-width:760px){
-  nav{min-height:82px;backdrop-filter:blur(14px)}
+  nav{min-height:82px;backdrop-filter:none}
   .sec:not(.hero){padding-top:86px;padding-bottom:76px}
   h2{font-size:clamp(2.65rem,11vw,4rem);max-width:12ch}
   .lead{font-size:14px;line-height:1.75}
