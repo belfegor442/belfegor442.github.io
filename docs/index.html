@@ -53,7 +53,7 @@ h2{font-size:clamp(2.6rem,6.2vw,5.2rem);line-height:1;letter-spacing:-.04em;marg
 @keyframes sc{0%{transform:scaleY(0)}60%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}/* tarjetas */
 .stack{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;perspective:1200px}
 .cw{will-change:transform}
-.card{display:flex;flex-direction:column;gap:.5rem;height:100%;padding:22px;min-height:220px;background:#ffffffe0;backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:4px;transform-style:preserve-3d;opacity:0;transform:translateZ(-320px) rotateX(28deg);transition:transform .3s ease,opacity .9s ease,box-shadow .35s,border-color .35s}
+.card{display:flex;flex-direction:column;gap:.5rem;height:100%;padding:22px;min-height:220px;background:#ffffffe0;backdrop-filter:none;border:1px solid var(--line);border-radius:4px;transform-style:preserve-3d;opacity:0;transform:translateZ(-320px) rotateX(28deg);transition:transform .3s ease,opacity .9s ease,box-shadow .35s,border-color .35s}
 .card.in{opacity:1;transform:none;transition:transform .9s var(--ex) calc(var(--i)*90ms),opacity .9s ease calc(var(--i)*90ms),box-shadow .35s,border-color .35s}
 .card.in:hover{border-color:var(--ink);box-shadow:0 24px 44px -28px #1f202266}
 .card .k{display:flex;justify-content:space-between;align-items:center;font-size:.86rem;color:var(--mute)}
@@ -94,7 +94,7 @@ footer a:hover{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.card,.ch,.fi{opacity:1;transform:none;transition:none}.hint i{animation:none}}
 
 </style>
-<link rel="stylesheet" href="/assets/css/homepage.css?v=20261109-30">
+<link rel="stylesheet" href="/assets/css/homepage.css?v=20261109-31">
 </head>
 <body>
 <div class="pg"></div>
