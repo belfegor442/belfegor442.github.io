@@ -2863,29 +2863,45 @@ html.na-route-transition .na-route-wipe:before {
 }
 
 
-/* Broadcast override: keep the live ticker moving on every motion preference. */
-.news-headline {
-  position: absolute !important;
-  left: 100% !important;
-  top: 50% !important;
-  display: flex !important;
-  width: max-content !important;
-  max-width: none !important;
-  white-space: nowrap !important;
-  transform: translateY(-50%);
-  animation: na-news-loop var(--news-duration, 22s) linear infinite !important;
-  animation-play-state: running !important;
-}
+/* BROADCAST — duplicated track with an exact half-width seamless loop. */
 .news-window {
+  position: relative;
+  min-width: 0;
   height: 1.6em !important;
   min-height: 1.6em !important;
-  overflow: hidden !important;
+  overflow: hidden;
+}
+.news-headline {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
+  will-change: transform;
+  transform: translate3d(0, -50%, 0);
+  animation: na-broadcast-marquee var(--news-duration, 22s) linear infinite;
+  animation-play-state: running;
+}
+.news-cycle {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  white-space: nowrap;
+  padding-right: 3.5rem;
+}
+@keyframes na-broadcast-marquee {
+  from { transform: translate3d(0, -50%, 0); }
+  to   { transform: translate3d(-50%, -50%, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .news-window { height: 1.6em !important; min-height: 1.6em !important; }
   .news-headline {
-    position: absolute !important;
-    left: 100% !important;
-    white-space: nowrap !important;
-    animation: na-news-loop var(--news-duration, 22s) linear infinite !important;
+    position: absolute;
+    left: 0;
+    white-space: nowrap;
+    animation: na-broadcast-marquee var(--news-duration, 22s) linear infinite;
   }
 }
