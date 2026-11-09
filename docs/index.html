@@ -415,5 +415,70 @@ footer a:hover{color:var(--ink)}
   }
 })();
 </script>
+
+<script>
+(() => {
+  "use strict";
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const targets = document.querySelectorAll(".card, .sys a, .conn a, .about, .people-directory");
+  const draw = element => {
+    if (element.dataset.naFrame === "1") return;
+    element.dataset.naFrame = "1";
+    const frame = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    frame.setAttribute("class", "na-draw-frame");
+    frame.setAttribute("viewBox", "0 0 100 100");
+    frame.setAttribute("preserveAspectRatio", "none");
+    frame.setAttribute("aria-hidden", "true");
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", ".5"); rect.setAttribute("y", ".5");
+    rect.setAttribute("width", "99"); rect.setAttribute("height", "99");
+    rect.setAttribute("rx", "1.5");
+    frame.appendChild(rect);
+    element.appendChild(frame);
+    if (reduced) element.classList.add("na-frame-drawn");
+    else requestAnimationFrame(() => requestAnimationFrame(() => element.classList.add("na-frame-drawn")));
+  };
+  if ("IntersectionObserver" in window && !reduced) {
+    const observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      draw(entry.target); observer.unobserve(entry.target);
+    }), { threshold: .16, rootMargin: "0px 0px -5% 0px" });
+    targets.forEach(element => observer.observe(element));
+  } else targets.forEach(draw);
+
+  const title = document.querySelector("#top h1");
+  if (!title) return;
+  const chars = Array.from(title.querySelectorAll(".ch"));
+  const symbols = ["&", "-", "$", "§", "@", "%", "+", "="];
+  const originals = chars.map(node => node.textContent);
+  title.classList.add("na-printing");
+  if (reduced) {
+    chars.forEach((node, index) => { node.textContent = originals[index]; node.classList.add("na-printed"); });
+    return;
+  }
+  let index = 0;
+  const printNext = () => {
+    if (index >= chars.length) return;
+    const node = chars[index], finalChar = originals[index];
+    let noise = 0;
+    const scramble = () => {
+      if (noise < 3) {
+        node.textContent = symbols[(index * 3 + noise * 5) % symbols.length];
+        node.classList.add("na-print-noise");
+        noise++;
+        window.setTimeout(scramble, 48);
+      } else {
+        node.textContent = finalChar;
+        node.classList.remove("na-print-noise");
+        node.classList.add("na-printed");
+        index++;
+        window.setTimeout(printNext, finalChar === " " ? 65 : 105);
+      }
+    };
+    scramble();
+  };
+  window.setTimeout(printNext, 420);
+})();
+</script>
 </body>
 </html>

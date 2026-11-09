@@ -2642,3 +2642,29 @@ footer{font-size:10px;letter-spacing:.035em}
 @media(prefers-reduced-motion:reduce){
   .card,.conn a,.employee-row,.sys a{transition:none!important}
 }
+
+
+/* ROBOTIC INTERFACE PASS — mechanical drawing + character printing */
+.na-draw-frame{
+  position:absolute;inset:0;width:100%;height:100%;z-index:5;
+  overflow:visible;pointer-events:none;
+}
+.na-draw-frame rect{
+  fill:none;stroke:rgba(240,43,54,.9);stroke-width:1;
+  vector-effect:non-scaling-stroke;pathLength:1;
+  stroke-dasharray:1;stroke-dashoffset:1;
+  transition:stroke-dashoffset 1.25s steps(72,end),stroke .3s ease;
+}
+.na-frame-drawn>.na-draw-frame rect{stroke-dashoffset:0}
+.card.na-frame-drawn>.na-draw-frame rect{stroke:rgba(240,43,54,.72)}
+.card:hover>.na-draw-frame rect,.sys a:hover>.na-draw-frame rect,.conn a:hover>.na-draw-frame rect{stroke:#ff6670;stroke-width:1.5}
+.card,.sys a,.conn a,.about,.people-directory{isolation:isolate}
+.card>.na-draw-frame,.sys a>.na-draw-frame,.conn a>.na-draw-frame,.about>.na-draw-frame,.people-directory>.na-draw-frame{border-radius:inherit}
+#top h1.na-printing .ch{opacity:0;transform:none!important;transition:opacity .08s linear!important}
+#top h1.na-printing .ch.na-print-noise{opacity:.82;color:#ff4652;text-shadow:0 0 12px rgba(240,43,54,.65)}
+#top h1.na-printing .ch.na-printed{opacity:1;color:#fff;text-shadow:0 0 16px rgba(240,43,54,.12)}
+#top h1.na-printing .w{overflow:visible}
+@media(prefers-reduced-motion:reduce){
+ .na-draw-frame rect{stroke-dashoffset:0!important;transition:none!important}
+ #top h1.na-printing .ch{opacity:1!important;color:inherit!important}
+}
