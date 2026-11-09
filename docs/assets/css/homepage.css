@@ -2812,9 +2812,8 @@ html.na-route-transition .na-route-wipe:before {
 }
 
 
-/* BLACKOUT: zero blur policy across the homepage. */
+/* BLACKOUT: disable backdrop blur while preserving other visual filters. */
 *, *::before, *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  filter: none !important;
 }
