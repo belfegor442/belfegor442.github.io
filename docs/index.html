@@ -249,10 +249,12 @@ footer a:hover{color:var(--ink)}
   let activeText = "";
   let newsResizeTimer = 0;
 
+  let tickerAnimation = null;
+
   function displayHeadline(value) {
     if (!ticker || !newsWindow) return;
     const nextText = Array.from(String(value || DEFAULT_HEADLINE).trim()).slice(0, 180).join("") || DEFAULT_HEADLINE;
-    if (nextText === activeText) return;
+    if (nextText === activeText && tickerAnimation && tickerAnimation.playState !== "idle") return;
 
     activeText = nextText;
     const headlines = nextText.split("|").map(item => item.trim()).filter(Boolean).slice(0, 2);
@@ -264,18 +266,35 @@ footer a:hover{color:var(--ink)}
     const storyMarkup = stories.map(escapeHTML).join(separator);
     if (announcement) announcement.textContent = stories.join(" · ");
 
-    ticker.style.animation = "none";
+    if (tickerAnimation) {
+      tickerAnimation.cancel();
+      tickerAnimation = null;
+    }
+
     const cycleMarkup = '<span class="news-cycle">' + storyMarkup + '</span>';
     ticker.innerHTML = cycleMarkup + cycleMarkup;
+    document.documentElement.classList.add("na-ticker-ready");
 
     const cycle = ticker.querySelector(".news-cycle");
     const cycleWidth = Math.max(1, cycle.getBoundingClientRect().width);
     const duration = Math.max(14, Math.min(42, cycleWidth / 70));
     ticker.style.setProperty("--news-duration", duration.toFixed(2) + "s");
 
-    document.documentElement.classList.add("na-ticker-ready");
-    void ticker.offsetWidth;
-    ticker.style.animation = "";
+    if (typeof ticker.animate === "function") {
+      tickerAnimation = ticker.animate(
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(-50%)" }
+        ],
+        {
+          duration: duration * 1000,
+          iterations: Infinity,
+          easing: "linear"
+        }
+      );
+    } else {
+      console.error("[North Assembly] Este navegador no admite animación Web Animations.");
+    }
   }
   window.addEventListener("resize", () => {
     window.clearTimeout(newsResizeTimer);
@@ -359,6 +378,7 @@ footer a:hover{color:var(--ink)}
     getNews: () => activeText
   });
 
+  displayHeadline(DEFAULT_HEADLINE);
   loadHeadline();
   window.setInterval(loadHeadline, 8000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadHeadline(); });
