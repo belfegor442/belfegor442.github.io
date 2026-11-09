@@ -2867,8 +2867,8 @@ html.na-route-transition .na-route-wipe:before {
 .news-window {
   position: relative;
   min-width: 0;
-  height: 1.6em !important;
-  min-height: 1.6em !important;
+  height: clamp(2.5rem, 3vw, 2.9rem) !important;
+  min-height: clamp(2.5rem, 3vw, 2.9rem) !important;
   overflow: hidden;
 }
 .news-headline {
@@ -2897,7 +2897,7 @@ html.na-route-transition .na-route-wipe:before {
   to   { transform: translate3d(-50%, -50%, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .news-window { height: 1.6em !important; min-height: 1.6em !important; }
+  .news-window { height: clamp(2.5rem, 3vw, 2.9rem) !important; min-height: clamp(2.5rem, 3vw, 2.9rem) !important; }
   .news-headline {
     position: absolute;
     left: 0;
