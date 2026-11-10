@@ -173,6 +173,8 @@ a{color:inherit}
 .field-label{display:block;margin:13px 0 5px;color:var(--muted);font:700 8px var(--mono);letter-spacing:.7px}
 .text-field,.field-row input{min-width:0;width:100%;padding:9px 10px;border:1px solid var(--line);background:#172125;color:var(--ink);font:10px var(--mono)}
 .text-field:focus,.field-row input:focus,.player-assignment select:focus{outline:1px solid var(--gold);border-color:var(--gold)}
+.treaty-proposal-controls{display:grid;gap:7px;margin:10px 0 14px;padding:10px;border:1px solid var(--line-soft);background:#172125}
+.treaty-proposal-controls .field-label{margin:0}
 .political-list{display:grid;gap:7px}
 .political-row{padding:9px 10px;border:1px solid var(--line-soft);border-left:2px solid #62745e;background:linear-gradient(110deg,#263438,#202b2e);color:#aab3aa;font-size:9px;line-height:1.5}
 .political-row strong{display:block;margin-bottom:4px;color:#ece5d4;font:700 9px var(--mono)}
@@ -544,3 +546,63 @@ a{color:inherit}
  .build-selected-preview-wrap{min-height:130px}
  #build-selected-preview{height:122px}
 }
+
+/* Colored pixel-art interface sprites */
+.nav-icon{
+ display:block;width:30px;height:30px;flex:0 0 30px;
+ object-fit:contain;image-rendering:pixelated
+}
+.nav-icon-image{object-fit:contain;image-rendering:pixelated}
+.tab.active .nav-icon{filter:drop-shadow(0 1px 2px #e9c98566)}
+.map-heading-mark{
+ display:block;width:32px;height:32px;flex:0 0 32px;
+ object-fit:contain;image-rendering:pixelated
+}
+.build-menu-hammer{
+ display:block;width:34px;height:34px;flex:0 0 34px;
+ padding:2px;object-fit:contain;image-rendering:pixelated
+}
+.build-category-icon{
+ display:block;width:31px;height:31px;flex:0 0 31px;
+ object-fit:contain;image-rendering:pixelated;
+ filter:drop-shadow(0 1px 1px #07101166)
+}
+.build-category.active .build-category-icon{
+ filter:drop-shadow(0 0 4px #ead29a88)
+}
+.build-confirm-icon{
+ display:block;width:25px;height:25px;flex:0 0 25px;
+ object-fit:contain;image-rendering:pixelated
+}
+.political-row.has-status-icon{position:relative;padding-left:40px}
+.political-row-status-icon{
+ position:absolute;left:9px;top:50%;width:24px;height:24px;
+ object-fit:contain;image-rendering:pixelated;transform:translateY(-50%);
+ filter:drop-shadow(0 1px 1px #07101188)
+}
+@media(max-width:740px){
+ .nav-icon{width:26px;height:26px;flex-basis:26px}
+ .map-heading-mark{width:28px;height:28px;flex-basis:28px}
+ .build-category-icon{width:27px;height:27px;flex-basis:27px}
+}.political-row.is-error{border-left-color:#d96d6d}
+.political-row.is-warning{border-left-color:#e0b45f}
+.political-row.is-positive{border-left-color:#78b781}
+.political-row.is-research{border-left-color:#b6a2d9}
+.political-row.is-health{border-left-color:#d98491}
+.political-row.is-military{border-left-color:#c4a36f}
+.political-row.is-information{border-left-color:#83b8c5}
+.top-stats>div{
+ display:grid;grid-template-columns:28px minmax(0,1fr);
+ grid-template-rows:auto auto;column-gap:7px;align-content:center;align-items:center
+}
+.top-stats>div small,.top-stats>div strong{grid-column:2}
+.top-stat-icon{
+ display:block;grid-column:1;grid-row:1/3;
+ width:27px;height:27px;object-fit:contain;image-rendering:pixelated
+}
+.panel-kicker-icon{
+ display:inline-block;width:22px;height:22px;margin-right:7px;
+ object-fit:contain;image-rendering:pixelated;vertical-align:middle;
+ filter:drop-shadow(0 1px 1px #07101188)
+}.top-stats>div{min-width:126px}
+.top-stats>div:first-child{min-width:150px}

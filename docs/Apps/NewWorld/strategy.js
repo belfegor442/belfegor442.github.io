@@ -137,17 +137,33 @@
           {competence:'approveBudget',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
             legalBasis:'Public Finance Act',institutionId:'executive'},
           {competence:'appointOffice',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
-            legalBasis:'Government Organisation Act',institutionId:'executive'}
+            legalBasis:'Government Organisation Act',institutionId:'executive',
+            institutionIds:['executive','judiciary']},
+          {competence:'setCivicPolicy',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
+            legalBasis:'State Administration Act',institutionId:'executive'},
+          {competence:'managePublicBudget',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
+            legalBasis:'Public Finance Act',institutionId:'executive'},
+          {competence:'respondPublicPetitions',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
+            legalBasis:'Public Participation Act',institutionId:'executive'},
+          {competence:'establishDiplomaticMission',proposerPermissionSetIds:PERMISSIONS,approvalRequired:false,
+            legalBasis:'Diplomatic Service Act',institutionId:'executive'}
         ]
       },
       government:{program:'Frontier development',budget:400,legitimacy:60},
       institutions:[
         {id:'assembly',name:'State Assembly',branch:'legislative'},
-        {id:'executive',name:'Executive Council',branch:'executive'}
+        {id:'executive',name:'Executive Council',branch:'executive'},
+        {id:'judiciary',name:'State Courts',branch:'judicial'}
       ],
       offices:[
         {id:'chief-executive',institutionId:'executive',name:'Chief Executive',holderPlayerId:null},
-        {id:'treasurer',institutionId:'executive',name:'Treasurer',holderPlayerId:null}
+        {id:'treasurer',institutionId:'executive',name:'Treasurer',holderPlayerId:null},
+        {id:'justice-minister',institutionId:'executive',name:'Minister of Justice',holderPlayerId:null},
+        {id:'public-prosecutor',institutionId:'judiciary',name:'Public Prosecutor',holderPlayerId:null},
+        {id:'chief-justice',institutionId:'judiciary',name:'Chief Justice',holderPlayerId:null},
+        {id:'appeal-judge',institutionId:'judiciary',name:'Court of Appeal Judge',holderPlayerId:null},
+        {id:'press-secretary',institutionId:'executive',name:'Press Secretary',holderPlayerId:null},
+        {id:'intelligence-director',institutionId:'executive',name:'Intelligence Director',holderPlayerId:null}
       ],
       parties:[{id:'founders',name:'Founding Coalition',seats:1,program:'Settlement, trade and public works'}],
       laws:[{id:'founding-charter',title:'Founding Charter',text:'Establishes the first public institutions and the rule of law.',status:'enacted',legalBasis:'Founding Constitution',effectiveFrom:game.worldDate}],
@@ -165,7 +181,7 @@
     const system=politicalFor(game,territory.stateId);
     if (system) {
       for (const office of system.offices || [])
-        if (office.id==='chief-executive' || office.id==='treasurer')
+        if (['chief-executive','treasurer','justice-minister','public-prosecutor','chief-justice','appeal-judge','press-secretary','intelligence-director'].includes(office.id))
           office.holderPlayerId=ownerPlayerId;
       if (system.government) system.government.chiefExecutivePlayerId=ownerPlayerId;
     }
@@ -237,6 +253,584 @@
     if (membership.permissionSetId==='government-observer')
       return {ok:false,code:'INSUFFICIENT_PERMISSION',error:'Observer memberships cannot issue government, military or research orders.'};
 
+    if (order.type==='setCivicPolicy') {
+      const policyRule=system.constitution?.competenceRules?.find(item=>item.competence==='setCivicPolicy');
+      if(!permission(policyRule,'proposerPermissionSetIds',membership) ||
+        !holdsOffice(system,player.id,['chief-executive','treasurer']))
+        return {ok:false,code:'INSUFFICIENT_PERMISSION',error:'Only the Chief Executive or Treasurer may change executive State policy.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      if(!civic) return {ok:false,code:'CIVIC_SYSTEM_UNAVAILABLE',error:'The State civic systems have not been initialised.'};
+      const field=String(order.policyId||'');
+      const value=Number(order.value);
+      const ranges={
+        policePerThousand:{min:0,max:10,integer:false},
+        civilServants:{min:0,max:100000,integer:true},
+        pressFreedom:{min:0,max:100,integer:true},
+        counterintelligence:{min:0,max:100,integer:true},
+        healthInvestment:{min:0,max:100,integer:true},
+        educationInvestment:{min:0,max:100,integer:true},
+        environmentalRegulation:{min:0,max:100,integer:true},
+        welfareInvestment:{min:0,max:100,integer:true},
+        taxRatePermille:{min:0,max:300,integer:true}
+      };
+      const rule=ranges[field];
+      if(!rule || !Number.isFinite(value) || value<rule.min || value>rule.max ||
+        (rule.integer && !Number.isSafeInteger(value)) ||
+        (field==='policePerThousand' && Math.round(value*10)!==value*10))
+        return {ok:false,code:'INVALID_CIVIC_POLICY',error:'The selected State policy value is outside its permitted range.'};
+      civic.policy ||= {healthInvestment:50,educationInvestment:50,environmentalRegulation:40,welfareInvestment:20};
+      if(field==='policePerThousand') civic.justice.policePerThousand=value;
+      else if(field==='civilServants') civic.administration.civilServants=value;
+      else if(field==='pressFreedom') civic.media.pressFreedom=value;
+      else if(field==='counterintelligence') civic.intelligence.counterintelligence=value;
+      else if(field==='taxRatePermille') civic.administration.taxRatePermille=value;
+      else civic.policy[field]=value;
+      record(game,'government.civic_policy_changed',stateId,
+        player.name+' changed '+field+' to '+value+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='setPublicBudget') {
+      const rule=system.constitution?.competenceRules?.find(item=>item.competence==='managePublicBudget');
+      if(!permission(rule,'proposerPermissionSetIds',membership) ||
+        !holdsOffice(system,player.id,['treasurer','chief-executive']))
+        return {ok:false,code:'PUBLIC_BUDGET_AUTHORITY_REQUIRED',error:'Only the Treasurer or Chief Executive can allocate daily public expenditure.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      if(!civic?.publicBudget)
+        return {ok:false,code:'CIVIC_SYSTEM_UNAVAILABLE',error:'The public budget is not initialised.'};
+      const category=String(order.category||'');
+      const amount=Number(order.dailyAmount);
+      const categories=['health','education','justice','policing','welfare','environment','administration'];
+      if(!categories.includes(category) || !Number.isSafeInteger(amount) || amount<0 || amount>100000)
+        return {ok:false,code:'INVALID_PUBLIC_BUDGET',error:'Choose a supported department and a daily allocation from 0 to 100,000.'};
+      const allocations=civic.publicBudget.dailyAllocations||{};
+      const newTotal=categories.reduce((sum,key)=>sum+(key===category?amount:Number(allocations[key])||0),0);
+      if(newTotal>300000)
+        return {ok:false,code:'PUBLIC_BUDGET_LIMIT',error:'Combined daily public allocations cannot exceed 300,000.'};
+      civic.publicBudget.dailyAllocations[category]=amount;
+      record(game,'finance.public_budget_allocation_changed',stateId,
+        player.name+' set the daily '+category+' allocation to '+amount+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='respondCivicPetition') {
+      const rule=system.constitution?.competenceRules?.find(item=>item.competence==='respondPublicPetitions');
+      if(!permission(rule,'proposerPermissionSetIds',membership) ||
+        !holdsOffice(system,player.id,['chief-executive']))
+        return {ok:false,code:'PETITION_RESPONSE_AUTHORITY_REQUIRED',error:'Only the Chief Executive can issue an official response to a public petition.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      const petition=civic?.society?.petitions?.find(item=>item.id===order.petitionId);
+      const response=String(order.response||'');
+      if(!petition || petition.status!=='pending' || Number(petition.expiresDay)<game.day)
+        return {ok:false,code:'PETITION_UNAVAILABLE',error:'This petition is no longer awaiting an executive response.'};
+      if(!['approve','reject'].includes(response))
+        return {ok:false,code:'INVALID_PETITION_RESPONSE',error:'Choose approve or reject.'};
+      const supportedPolicies=['welfareInvestment','educationInvestment','environmentalRegulation','pressFreedom'];
+      if(response==='approve') {
+        if(!supportedPolicies.includes(petition.policyId) ||
+          !Number.isFinite(Number(petition.requestedValue)) ||
+          Number(petition.requestedValue)<0 || Number(petition.requestedValue)>100)
+          return {ok:false,code:'INVALID_PETITION_POLICY',error:'The petition contains an unsupported policy recommendation.'};
+        const current=petition.policyId==='pressFreedom'
+          ?Number(civic.media.pressFreedom)||0:Number(civic.policy?.[petition.policyId])||0;
+        if(Number(petition.requestedValue)<current || Number(petition.requestedValue)>current+30)
+          return {ok:false,code:'INVALID_PETITION_POLICY',error:'The requested policy change is outside the permitted executive response range.'};
+        if(petition.policyId==='pressFreedom') civic.media.pressFreedom=Number(petition.requestedValue);
+        else civic.policy[petition.policyId]=Number(petition.requestedValue);
+        petition.status='accepted';
+        petition.appliedValue=Number(petition.requestedValue);
+        petition.response='Accepted and implemented by the executive government.';
+        const support=Number(petition.supportBasisPoints)||0;
+        civic.media.publicConfidence=Math.min(100,(Number(civic.media.publicConfidence)||0)+
+          Math.min(3,support/2500));
+        civic.society.cohesion=Math.min(100,(Number(civic.society.cohesion)||0)+
+          Math.min(2,support/3500));
+      } else {
+        petition.status='rejected';
+        petition.response='Rejected by the executive government.';
+        const support=Number(petition.supportBasisPoints)||0;
+        civic.media.publicConfidence=Math.max(0,(Number(civic.media.publicConfidence)||0)-
+          Math.min(3,support/2500));
+        civic.society.cohesion=Math.max(0,(Number(civic.society.cohesion)||0)-
+          Math.min(2,support/3500));
+      }
+      petition.resolvedDay=game.day;
+      petition.respondedBy=player.id;
+      civic.society.resolvedPetitions=(Number(civic.society.resolvedPetitions)||0)+1;
+      record(game,'society.petition_'+(response==='approve'?'accepted':'rejected'),stateId,
+        player.name+' '+(response==='approve'?'accepted':'rejected')+' the public petition: '+petition.title+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='publishPublicStatement') {
+      if(!holdsOffice(system,player.id,['press-secretary']))
+        return {ok:false,code:'PRESS_AUTHORITY_REQUIRED',error:'Only the appointed Press Secretary can publish official State statements.'};
+      const headline=String(order.headline||'').trim().replace(/\\s+/g,' ').slice(0,90);
+      const body=String(order.body||'').trim().replace(/\\s+/g,' ').slice(0,600);
+      if(headline.length<5 || body.length<20 || /[<>]/.test(headline+body))
+        return {ok:false,code:'INVALID_PUBLIC_STATEMENT',error:'Provide a headline of at least 5 characters and a statement of at least 20 characters.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      if(!civic?.media) return {ok:false,code:'CIVIC_SYSTEM_UNAVAILABLE',error:'The State press office is not initialised.'};
+      civic.media.published ||= [];
+      const publication={
+        id:'official-statement-'+stateId+'-'+game.day+'-'+(civic.media.published.length+1),
+        day:game.day,worldDate:game.worldDate,headline,body,
+        source:'State Press Office',sourcePlayerId:player.id,
+        verified:true,official:true,approvedBy:player.id
+      };
+      civic.media.published.unshift(publication);
+      civic.media.publishedToday=(Number(civic.media.publishedToday)||0)+1;
+      if(civic.media.published.length>100) civic.media.published.length=100;
+      record(game,'media.official_statement_published',stateId,
+        'State Press Office published: '+headline+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='commissionIntelAssessment') {
+      if(!holdsOffice(system,player.id,['intelligence-director']))
+        return {ok:false,code:'INTELLIGENCE_AUTHORITY_REQUIRED',error:'Only the Intelligence Director can commission strategic assessments.'};
+      const targetStateId=String(order.targetStateId||'');
+      const target=territoryFor(game,targetStateId);
+      const sourceCivic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      const targetCivic=(game.civicSystems||[]).find(item=>item.stateId===targetStateId);
+      const type=String(order.assessmentType||'');
+      if(!target || targetStateId===stateId || !targetCivic?.intelligence ||
+        !targetCivic.military || !targetCivic.diplomacy || !targetCivic.finance ||
+        !targetCivic.labour || !targetCivic.agriculture || !targetCivic.justice)
+        return {ok:false,code:'INVALID_INTELLIGENCE_TARGET',error:'Choose an existing foreign State with complete civic data.'};
+      if(!sourceCivic?.intelligence)
+        return {ok:false,code:'CIVIC_SYSTEM_UNAVAILABLE',error:'The commissioning State intelligence service is not initialised.'};
+      if(!['military','economic','political'].includes(type))
+        return {ok:false,code:'INVALID_INTELLIGENCE_TYPE',error:'Choose a military, economic or political assessment.'};
+      game.intelligenceAssessments ||= [];
+      if(game.intelligenceAssessments.filter(item=>item.stateId===stateId && item.status==='pending').length>=8)
+        return {ok:false,code:'INTELLIGENCE_QUEUE_FULL',error:'The State has reached its limit of eight unresolved assessments.'};
+      const assessment={
+        id:idFor(createId),stateId,targetStateId,assessmentType:type,
+        commissionedBy:player.id,commissionedOn:game.worldDate,
+        commissionedDay:game.day,status:'pending',confidence:Math.max(5,Math.min(95,
+          Math.round(35+Number(sourceCivic.intelligence.capacity)*.35-
+            Number(targetCivic.intelligence.counterintelligence)*.18))),
+        evidenceSnapshot:type==='military'?{
+          personnel:Number(targetCivic.military.personnel)||0,
+          readiness:Number(targetCivic.military.readiness)||0,
+          wars:Number(targetCivic.diplomacy.activeWars)||0,
+          logisticsCoverage:Number(targetCivic.military.logisticsCoverage)||0
+        }:type==='economic'?{
+          treasury:Number(target.treasury)||0,
+          exports:Number(targetCivic.finance.exports)||0,
+          imports:Number(targetCivic.finance.imports)||0,
+          unemploymentRate:Number(targetCivic.labour.unemploymentRate)||0,
+          foodSecurity:Number(targetCivic.agriculture.foodSecurity)||0
+        }:{
+          legitimacy:Number(targetCivic.legitimacy)||0,
+          publicTrust:Number(targetCivic.publicTrust)||0,
+          stability:Number(targetCivic.stability)||0,
+          publicOrder:Number(targetCivic.justice.publicOrder)||0
+        },
+        summary:'Preliminary assessment based on the latest observable world-state snapshot; not a verified covert source.'
+      };
+      game.intelligenceAssessments.push(assessment);
+      sourceCivic.intelligence.reports ||= [];
+      sourceCivic.intelligence.reports.unshift({
+        id:assessment.id,threat:type+' assessment: '+target.name,
+        createdDay:game.day,confidence:assessment.confidence,
+        status:'pending',assessment:assessment.summary,targetStateId,
+        assessmentType:type
+      });
+      record(game,'intelligence.assessment_commissioned',stateId,
+        player.name+' commissioned a '+type+' assessment of '+target.name+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='reviewIntelAssessment') {
+      if(!holdsOffice(system,player.id,['intelligence-director']))
+        return {ok:false,code:'INTELLIGENCE_AUTHORITY_REQUIRED',error:'Only the Intelligence Director can review strategic assessments.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      const assessment=(game.intelligenceAssessments||[]).find(item=>
+        item.id===order.assessmentId && item.stateId===stateId && item.status==='pending');
+      if(!assessment)
+        return {ok:false,code:'INTELLIGENCE_REPORT_UNAVAILABLE',error:'This pending strategic assessment is unavailable.'};
+      if(game.day<=assessment.commissionedDay)
+        return {ok:false,code:'INTELLIGENCE_REPORT_NOT_READY',error:'The assessment requires at least one world day to complete.'};
+      assessment.status='reviewed';
+      assessment.reviewedOn=game.worldDate;
+      assessment.reviewedDay=game.day;
+      assessment.reviewedBy=player.id;
+      assessment.summary='Reviewed '+assessment.assessmentType+' assessment. Confidence '+assessment.confidence+
+        '%. Evidence was captured on day '+assessment.commissionedDay+'.';
+      const report=civic?.intelligence?.reports.find(item=>item.id===assessment.id);
+      if(report) {
+        report.status='reviewed';
+        report.assessment=assessment.summary;
+      }
+      record(game,'intelligence.assessment_reviewed',stateId,
+        player.name+' reviewed the '+assessment.assessmentType+' assessment of '+
+        territoryFor(game,assessment.targetStateId).name+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='investigateCourtCase') {
+      if(!holdsOffice(system,player.id,['justice-minister']))
+        return {ok:false,code:'JUSTICE_AUTHORITY_REQUIRED',error:'The Minister of Justice must authorise investigations.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      const justice=civic?.justice;
+      const caseFile=justice?.courtCases.find(item=>item.id===order.caseId);
+      if(!caseFile || caseFile.status!=='reported')
+        return {ok:false,code:'COURT_CASE_UNAVAILABLE',error:'Only a newly reported case can enter investigation.'};
+      caseFile.status='investigated';
+      caseFile.investigatedDay=game.day;
+      caseFile.investigatedBy=player.id;
+      caseFile.investigationAttempts=(Number(caseFile.investigationAttempts)||0)+1;
+      caseFile.evidenceScore=Math.max(0,Math.min(100,Math.round(
+        28+justice.policePerThousand*3.2+justice.publicOrder*.2+
+        (caseFile.severity==='serious'?8:0)-(caseFile.investigationAttempts-1)*10)));
+      record(game,'justice.case_investigated',stateId,
+        player.name+' completed an investigation in case '+caseFile.id+'. Evidence score: '+caseFile.evidenceScore+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='fileCourtCharges') {
+      if(!holdsOffice(system,player.id,['public-prosecutor']))
+        return {ok:false,code:'PROSECUTOR_AUTHORITY_REQUIRED',error:'Only the Public Prosecutor can file charges.'};
+      const justice=(game.civicSystems||[]).find(item=>item.stateId===stateId)?.justice;
+      const caseFile=justice?.courtCases.find(item=>item.id===order.caseId);
+      if(!caseFile || caseFile.status!=='investigated' || caseFile.evidenceScore<40)
+        return {ok:false,code:'INSUFFICIENT_EVIDENCE',error:'The case has not met the minimum evidence threshold for prosecution.'};
+      caseFile.status='awaitingTrial';
+      caseFile.chargedDay=game.day;
+      caseFile.chargedBy=player.id;
+      caseFile.chargeTitle=caseFile.offence;
+      justice.awaitingTrial=justice.courtCases.filter(item=>item.status==='awaitingTrial').length;
+      record(game,'justice.charges_filed',stateId,
+        player.name+' filed charges in case '+caseFile.id+'. A hearing is scheduled for a later world day.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='adjudicateCourtCase') {
+      if(!holdsOffice(system,player.id,['chief-justice']))
+        return {ok:false,code:'JUDICIAL_AUTHORITY_REQUIRED',error:'Only the Chief Justice can adjudicate a trial.'};
+      const civic=(game.civicSystems||[]).find(item=>item.stateId===stateId);
+      const justice=civic?.justice;
+      const caseFile=justice?.courtCases.find(item=>item.id===order.caseId);
+      if(!caseFile || caseFile.status!=='awaitingTrial' || game.day<=caseFile.chargedDay)
+        return {ok:false,code:'TRIAL_NOT_READY',error:'The case is not ready for a hearing on this world day.'};
+      if((Number(justice.casesAdjudicatedToday)||0)>=justice.courtCapacityPerDay)
+        return {ok:false,code:'COURT_CAPACITY_REACHED',error:'The court has reached its daily hearing capacity.'};
+      if(!['convict','acquit'].includes(order.verdict))
+        return {ok:false,code:'INVALID_VERDICT',error:'Choose a conviction or acquittal.'};
+      const sentenceDays=Number(order.sentenceDays ?? caseFile.defaultSentenceDays ?? 5);
+      if(order.verdict==='convict' && (!Number.isSafeInteger(sentenceDays)||sentenceDays<1||sentenceDays>3650))
+        return {ok:false,code:'INVALID_SENTENCE',error:'A custodial sentence must be 1–3,650 whole world days.'};
+      caseFile.status='resolved';
+      caseFile.verdict=order.verdict;
+      caseFile.outcome=order.verdict==='convict'?'conviction':'acquittal';
+      caseFile.sentenceDays=order.verdict==='convict'?sentenceDays:0;
+      caseFile.resolvedDay=game.day;
+      caseFile.adjudicatedBy=player.id;
+      justice.casesAdjudicatedToday=(Number(justice.casesAdjudicatedToday)||0)+1;
+      justice.resolvedLastDay=(Number(justice.resolvedLastDay)||0)+1;
+      if(order.verdict==='convict') {
+        justice.convictionsLastDay=(Number(justice.convictionsLastDay)||0)+1;
+        justice.prisoners ||= [];
+        caseFile.prisonerId='prisoner-'+caseFile.id;
+        justice.prisoners.push({
+          id:caseFile.prisonerId,caseId:caseFile.id,
+          admittedDay:game.day,releaseOnDay:game.day+sentenceDays,
+          sentenceDays,status:'incarcerated'
+        });
+        justice.prisonPopulation=justice.prisoners.length;
+        justice.prisonOvercrowding=Math.max(0,justice.prisonPopulation-justice.prisonCapacity);
+      }
+      justice.pendingCases=justice.courtCases.filter(item=>
+        ['reported','investigated','awaitingTrial','appealPending'].includes(item.status)).length;
+      justice.awaitingTrial=justice.courtCases.filter(item=>item.status==='awaitingTrial').length;
+      record(game,'justice.case_adjudicated',stateId,
+        'Case '+caseFile.id+' concluded with '+caseFile.outcome+
+        (order.verdict==='convict'?' and a '+sentenceDays+'-day sentence.':'.'),player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='appealCourtCase') {
+      const justice=(game.civicSystems||[]).find(item=>item.stateId===stateId)?.justice;
+      const caseFile=justice?.courtCases.find(item=>item.id===order.caseId);
+      const grounds=String(order.grounds||'').trim().replace(/\\s+/g,' ').slice(0,300);
+      if(!caseFile || caseFile.status!=='resolved' ||
+        !Number.isSafeInteger(caseFile.resolvedDay) || game.day>caseFile.resolvedDay+5)
+        return {ok:false,code:'APPEAL_WINDOW_CLOSED',error:'Appeals must be filed within five world days of the judgment.'};
+      if(grounds.length<12)
+        return {ok:false,code:'INVALID_APPEAL_GROUNDS',error:'Provide at least 12 characters explaining the grounds of appeal.'};
+      caseFile.status='appealPending';
+      caseFile.appealGrounds=grounds;
+      caseFile.appealFiledDay=game.day;
+      caseFile.appealedBy=player.id;
+      record(game,'justice.appeal_filed',stateId,
+        player.name+' filed an appeal in case '+caseFile.id+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='resolveCourtAppeal') {
+      if(!holdsOffice(system,player.id,['appeal-judge']))
+        return {ok:false,code:'APPEAL_AUTHORITY_REQUIRED',error:'Only the Court of Appeal Judge can resolve an appeal.'};
+      const justice=(game.civicSystems||[]).find(item=>item.stateId===stateId)?.justice;
+      const caseFile=justice?.courtCases.find(item=>item.id===order.caseId);
+      if(!caseFile || caseFile.status!=='appealPending' || game.day<=caseFile.appealFiledDay)
+        return {ok:false,code:'APPEAL_NOT_READY',error:'The appeal requires a later-world-day review.'};
+      if(!['uphold','overturn'].includes(order.appealVerdict))
+        return {ok:false,code:'INVALID_APPEAL_VERDICT',error:'Choose to uphold or overturn the original judgment.'};
+      const originalVerdict=caseFile.verdict;
+      if(order.appealVerdict==='overturn' && originalVerdict==='convict') {
+        justice.prisoners ||= [];
+        justice.prisoners=justice.prisoners.filter(item=>item.caseId!==caseFile.id);
+        justice.prisonPopulation=justice.prisoners.length;
+        caseFile.finalVerdict='acquittal';
+      } else if(order.appealVerdict==='overturn' && originalVerdict==='acquit') {
+        caseFile.finalVerdict='new-trial-required';
+        caseFile.status='awaitingTrial';
+        caseFile.chargedDay=game.day;
+        caseFile.defaultSentenceDays=5;
+        caseFile.retrialOrderedDay=game.day;
+        caseFile.appealStatus='overturn';
+        caseFile.appealResolvedDay=game.day;
+        caseFile.appealResolvedBy=player.id;
+        caseFile.resolvedDay=null;
+        justice.awaitingTrial=justice.courtCases.filter(item=>item.status==='awaitingTrial').length;
+        justice.pendingCases=justice.courtCases.filter(item=>
+          ['reported','investigated','awaitingTrial','appealPending'].includes(item.status)).length;
+        record(game,'justice.retrial_ordered',stateId,
+          'The Court of Appeal ordered a new trial in case '+caseFile.id+'.',player.id);
+        return {ok:true};
+      } else {
+        caseFile.finalVerdict=originalVerdict;
+      }
+      caseFile.status='resolved';
+      caseFile.appealStatus=order.appealVerdict;
+      caseFile.appealResolvedDay=game.day;
+      caseFile.appealResolvedBy=player.id;
+      caseFile.resolvedDay=game.day;
+      justice.prisonOvercrowding=Math.max(0,justice.prisonPopulation-justice.prisonCapacity);
+      justice.pendingCases=justice.courtCases.filter(item=>
+        ['reported','investigated','awaitingTrial','appealPending'].includes(item.status)).length;
+      record(game,'justice.appeal_resolved',stateId,
+        'Appeal in case '+caseFile.id+' was '+order.appealVerdict+'d by the Court of Appeal.',player.id);
+      return {ok:true};
+    }
+
+    if (order.type==='proposeTreaty') {
+
+      const targetStateId=String(order.targetStateId || '');
+      const target=territoryFor(game,targetStateId);
+      if(!target || targetStateId===stateId)
+        return {ok:false,code:'INVALID_DIPLOMATIC_TARGET',error:'Choose a valid foreign State.'};
+      if(order.treatyType!=='nonAggression')
+        return {ok:false,code:'UNSUPPORTED_TREATY_TYPE',error:'Only non-aggression treaties are currently enabled.'};
+      if(target.ownerPlayerId===player.id || membershipFor(game,player.id,targetStateId))
+        return {ok:false,code:'SAME_GOVERNMENT',error:'A treaty requires two separate governments.'};
+      const recipientMembers=(game.memberships || []).filter(item =>
+        item.stateId===targetStateId && item.status==='active');
+      if(!target.ownerPlayerId || recipientMembers.length===0)
+        return {ok:false,code:'NO_RECIPIENT_GOVERNMENT',error:'This State has no human government authorised to accept the proposal.'};
+      const durationDays=Number(order.durationDays);
+      const proposalExpiryDays=Number(order.proposalExpiryDays);
+      if(!Number.isSafeInteger(durationDays) || durationDays<1 || durationDays>3650)
+        return {ok:false,code:'INVALID_TREATY_TERM',error:'The treaty term must be 1–3,650 whole world days.'};
+      if(!Number.isSafeInteger(proposalExpiryDays) || proposalExpiryDays<1 || proposalExpiryDays>3650)
+        return {ok:false,code:'INVALID_PROPOSAL_EXPIRY',error:'The proposal expiry must be 1–3,650 whole world days.'};
+      const relation=relationFor(game,stateId,targetStateId);
+      if(relation?.status==='war')
+        return {ok:false,code:'WAR_ALREADY_ACTIVE',error:'A non-aggression treaty cannot be proposed during an active war.'};
+      game.diplomaticProposals ||= [];
+      game.treaties ||= [];
+      const activeTreaty=game.treaties.some(item =>
+        item.type==='nonAggression' && item.status==='active' &&
+        ((item.stateAId===stateId && item.stateBId===targetStateId) ||
+         (item.stateAId===targetStateId && item.stateBId===stateId)));
+      const pendingProposal=game.diplomaticProposals.some(item =>
+        item.type==='nonAggression' && item.status==='pending' &&
+        ((item.fromStateId===stateId && item.toStateId===targetStateId) ||
+         (item.fromStateId===targetStateId && item.toStateId===stateId)));
+      if(activeTreaty || pendingProposal)
+        return {ok:false,code:'TREATY_ALREADY_EXISTS',error:'An active treaty or pending proposal already exists for these governments.'};
+      const proposal={
+        id:idFor(createId),type:'nonAggression',fromStateId:stateId,toStateId:targetStateId,
+        proposedByPlayerId:player.id,proposedOnWorldDate:game.worldDate,
+        proposedOnDay:game.day,durationDays,proposalExpiryDays,
+        expiresOnDay:game.day+proposalExpiryDays,status:'pending',
+        terms:{type:'nonAggression',expiresAfterDays:durationDays}
+      };
+      game.diplomaticProposals.push(proposal);
+      record(game,'diplomacy.treaty_proposed',stateId,
+        player.name+' proposed a '+durationDays+'-day non-aggression treaty to '+target.name+'.',player.id);
+      return {ok:true};
+    }
+
+    if (order.type==='respondTreaty') {
+      game.diplomaticProposals ||= [];
+      game.treaties ||= [];
+      const proposal=(game.diplomaticProposals || []).find(item =>
+        item.id===order.proposalId && item.status==='pending');
+      if(!proposal || proposal.toStateId!==stateId)
+        return {ok:false,code:'TREATY_PROPOSAL_UNAVAILABLE',error:'This proposal is not pending for your government.'};
+      if(Number.isSafeInteger(proposal.expiresOnDay) && game.day>=proposal.expiresOnDay) {
+        proposal.status='expired';
+        proposal.respondedOnWorldDate=game.worldDate;
+        return {ok:false,code:'TREATY_PROPOSAL_EXPIRED',error:'This diplomatic proposal has expired.'};
+      }
+      if(!membershipFor(game,proposal.proposedByPlayerId,proposal.fromStateId))
+        return {ok:false,code:'PROPOSER_MEMBERSHIP_ENDED',error:'The proposing government no longer has an authorised signatory.'};
+      if(order.accept!==true) {
+        proposal.status='rejected';
+        proposal.respondedOnWorldDate=game.worldDate;
+        proposal.respondedByPlayerId=player.id;
+        record(game,'diplomacy.treaty_rejected',stateId,
+          player.name+' rejected a non-aggression treaty proposal.',player.id);
+        return {ok:true};
+      }
+      const relation=relationFor(game,proposal.fromStateId,proposal.toStateId);
+      const alreadyActive=game.treaties.some(item =>
+        item.type===proposal.type && item.status==='active' &&
+        ((item.stateAId===proposal.fromStateId && item.stateBId===proposal.toStateId) ||
+         (item.stateAId===proposal.toStateId && item.stateBId===proposal.fromStateId)));
+      if(relation?.status==='war' || alreadyActive)
+        return {ok:false,code:'TREATY_NO_LONGER_AVAILABLE',error:'The governments are at war or already have an active treaty.'};
+      const treaty={
+        id:idFor(createId),type:proposal.type,stateAId:proposal.fromStateId,
+        stateBId:proposal.toStateId,createdOnWorldDate:game.worldDate,
+        createdOnDay:game.day,expiresOnDay:game.day+proposal.durationDays,
+        status:'active',proposalId:proposal.id,
+        signatories:[proposal.proposedByPlayerId,player.id]
+      };
+      game.treaties.push(treaty);
+      proposal.status='accepted';
+      proposal.respondedOnWorldDate=game.worldDate;
+      proposal.respondedByPlayerId=player.id;
+      proposal.treatyId=treaty.id;
+      record(game,'diplomacy.treaty_signed',stateId,
+        player.name+' accepted a non-aggression treaty. It expires on world day '+treaty.expiresOnDay+'.',
+        player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='proposeEmbassy') {
+      const rule=system.constitution?.competenceRules?.find(item=>item.competence==='establishDiplomaticMission');
+      if(!permission(rule,'proposerPermissionSetIds',membership) ||
+        !holdsOffice(system,player.id,['chief-executive']))
+        return {ok:false,code:'EMBASSY_AUTHORITY_REQUIRED',error:'Only the Chief Executive can establish a diplomatic mission.'};
+      const targetStateId=String(order.targetStateId||'');
+      const target=territoryFor(game,targetStateId);
+      const relation=relationFor(game,stateId,targetStateId);
+      if(!target || targetStateId===stateId || !relation || !target.ownerPlayerId ||
+        target.ownerPlayerId===player.id || membershipFor(game,player.id,targetStateId))
+        return {ok:false,code:'INVALID_DIPLOMATIC_TARGET',error:'Choose a separately administered foreign State.'};
+      if(!((game.memberships||[]).some(item=>item.stateId===targetStateId&&item.status==='active')))
+        return {ok:false,code:'NO_RECIPIENT_GOVERNMENT',error:'The receiving State needs an active government membership to accept a mission.'};
+      if(relation.status==='war')
+        return {ok:false,code:'WAR_ALREADY_ACTIVE',error:'A diplomatic mission cannot be opened during an active war.'};
+      game.embassyMissions ||= [];
+      if(game.embassyMissions.some(item=>
+        [item.proposingStateId,item.targetStateId].includes(stateId) &&
+        [item.proposingStateId,item.targetStateId].includes(targetStateId) &&
+        ['pending','active','suspended'].includes(item.status)))
+        return {ok:false,code:'EMBASSY_ALREADY_EXISTS',error:'A pending or active diplomatic mission already exists between these States.'};
+      if(territory.treasury<100)
+        return {ok:false,code:'INSUFFICIENT_FUNDS',error:'The State treasury needs 100 currency units for the diplomatic mission proposal.'};
+      const before=territory.treasury;
+      territory.treasury-=100;
+      const mission={
+        id:idFor(createId),proposingStateId:stateId,targetStateId,
+        proposedByPlayerId:player.id,proposedOnDay:game.day,proposedOnWorldDate:game.worldDate,
+        expiresDay:game.day+14,status:'pending',deposit:100,dailyUpkeep:2,
+        acceptedByPlayerId:null,acceptedDay:null,lastMaintenanceDay:game.day
+      };
+      game.embassyMissions.push(mission);
+      game.financialTransactions ||= [];
+      game.financialTransactions.push({
+        id:'embassy-deposit-'+mission.id,stateId,currencyId:territory.currencyId,
+        type:'embassyProposalDeposit',amount:-100,balanceBefore:before,
+        balanceAfter:territory.treasury,description:'Deposit for a proposed diplomatic mission.',
+        worldDate:game.worldDate,recordedAtUtc:new Date().toISOString(),
+        orderId:order.orderId,membershipId:membership.id
+      });
+      record(game,'diplomacy.embassy_proposed',stateId,
+        player.name+' proposed a diplomatic mission to '+target.name+'.',player.id);
+      return {ok:true};
+    }
+
+    if(order.type==='respondEmbassyProposal') {
+      const rule=system.constitution?.competenceRules?.find(item=>item.competence==='establishDiplomaticMission');
+      if(!permission(rule,'proposerPermissionSetIds',membership) ||
+        !holdsOffice(system,player.id,['chief-executive']))
+        return {ok:false,code:'EMBASSY_AUTHORITY_REQUIRED',error:'Only the receiving Chief Executive can respond to a diplomatic mission proposal.'};
+      game.embassyMissions ||= [];
+      const mission=game.embassyMissions.find(item=>
+        item.id===order.missionId && item.targetStateId===stateId && item.status==='pending');
+      if(!mission)
+        return {ok:false,code:'EMBASSY_PROPOSAL_UNAVAILABLE',error:'No pending diplomatic mission proposal was found for this State.'};
+      if(game.day>=Number(mission.expiresDay)) {
+        mission.status='expired';
+        mission.resolvedDay=game.day;
+        const proposer=territoryFor(game,mission.proposingStateId);
+        if(proposer) {
+          const before=proposer.treasury;
+          proposer.treasury=Math.min(2147483647,before+mission.deposit);
+          game.financialTransactions.push({
+            id:'embassy-refund-'+mission.id,stateId:proposer.stateId,currencyId:proposer.currencyId,
+            type:'embassyProposalRefund',amount:proposer.treasury-before,
+            balanceBefore:before,balanceAfter:proposer.treasury,
+            description:'Refund for an expired diplomatic mission proposal.',worldDate:game.worldDate,
+            recordedAtUtc:new Date().toISOString(),orderId:order.orderId,membershipId:null
+          });
+        }
+        return {ok:false,code:'EMBASSY_PROPOSAL_EXPIRED',error:'The diplomatic proposal has expired and its deposit has been refunded.'};
+      }
+      const relation=relationFor(game,mission.proposingStateId,mission.targetStateId);
+      if(relation?.status==='war')
+        return {ok:false,code:'WAR_ALREADY_ACTIVE',error:'The proposal cannot be accepted while the governments are at war.'};
+      if(order.response==='accept') {
+        mission.status='active';
+        mission.acceptedByPlayerId=player.id;
+        mission.acceptedDay=game.day;
+        mission.lastMaintenanceDay=game.day;
+        record(game,'diplomacy.embassy_opened',stateId,
+          player.name+' accepted a diplomatic mission. The mission is now active.',player.id);
+        return {ok:true};
+      }
+      if(order.response!=='reject')
+        return {ok:false,code:'INVALID_EMBASSY_RESPONSE',error:'Choose accept or reject.'};
+      mission.status='rejected';
+      mission.resolvedDay=game.day;
+      const proposer=territoryFor(game,mission.proposingStateId);
+      if(proposer) {
+        const before=proposer.treasury;
+        proposer.treasury=Math.min(2147483647,before+mission.deposit);
+        game.financialTransactions.push({
+          id:'embassy-refund-'+mission.id,stateId:proposer.stateId,currencyId:proposer.currencyId,
+          type:'embassyProposalRefund',amount:proposer.treasury-before,
+          balanceBefore:before,balanceAfter:proposer.treasury,
+          description:'Refund for a rejected diplomatic mission proposal.',worldDate:game.worldDate,
+          recordedAtUtc:new Date().toISOString(),orderId:order.orderId,membershipId:null
+        });
+      }
+      record(game,'diplomacy.embassy_rejected',stateId,
+        player.name+' rejected a diplomatic mission proposal.',player.id);
+      return {ok:true};
+    }
+
+    if (order.type==='terminateTreaty') {
+      const treaty=(game.treaties || []).find(item =>
+        item.id===order.treatyId && item.status==='active' &&
+        (item.stateAId===stateId || item.stateBId===stateId));
+      if(!treaty)
+        return {ok:false,code:'TREATY_UNAVAILABLE',error:'No active treaty for this government was found.'};
+      treaty.status='terminated';
+      treaty.endedOnWorldDate=game.worldDate;
+      treaty.endedOnDay=game.day;
+      treaty.terminatedByPlayerId=player.id;
+      record(game,'diplomacy.treaty_terminated',stateId,
+        player.name+' terminated a non-aggression treaty.',player.id);
+      return {ok:true};
+    }
+
     if (order.type==='declareWar') {
       const targetStateId=String(order.targetStateId || '');
       const target=territoryFor(game,targetStateId);
@@ -246,6 +840,14 @@
       if (!target.ownerPlayerId || target.ownerPlayerId===player.id ||
           membershipFor(game,player.id,targetStateId))
         return {ok:false,code:'NOT_HOSTILE_STATE',error:'War can only be declared against another administered government.'};
+      const nonAggression=(game.treaties || []).find(item =>
+        item.type==='nonAggression' && item.status==='active' &&
+        Number(item.expiresOnDay)>game.day &&
+        ((item.stateAId===stateId && item.stateBId===targetStateId) ||
+         (item.stateAId===targetStateId && item.stateBId===stateId)));
+      if(nonAggression)
+        return {ok:false,code:'NON_AGGRESSION_ACTIVE',
+          error:'An active non-aggression treaty prevents a declaration of war until it expires or is terminated.'};
       if (relation.status==='war')
         return {ok:false,code:'WAR_ALREADY_ACTIVE',error:'The two States are already at war.'};
       relation.status='war';
@@ -703,8 +1305,10 @@
       if (!permission(rule,'proposerPermissionSetIds',membership) ||
           !holdsOffice(system,player.id,['chief-executive']))
         return {ok:false,code:'INSUFFICIENT_PERMISSION',error:'Only the Chief Executive may appoint or replace government office holders.'};
+      const allowedInstitutions=Array.isArray(rule.institutionIds)
+        ? rule.institutionIds : [rule.institutionId];
       const office=(system.offices || []).find(item =>
-        item.id===order.officeId && item.institutionId===rule.institutionId);
+        item.id===order.officeId && allowedInstitutions.includes(item.institutionId));
       const appointee=game.players.find(item => item.id===order.appointeePlayerId);
       if (!office || !appointee || !membershipFor(game,appointee.id,stateId))
         return {ok:false,code:'INVALID_APPOINTMENT',error:'The office or appointee is not eligible in this State.'};
@@ -719,6 +1323,25 @@
   }
 
   function advanceDay(game) {
+    for (const proposal of game.diplomaticProposals || []) {
+      if(proposal.status==='pending' && Number.isSafeInteger(proposal.expiresOnDay) &&
+          game.day>=proposal.expiresOnDay) {
+        proposal.status='expired';
+        proposal.respondedOnWorldDate=game.worldDate;
+        record(game,'diplomacy.treaty_proposal_expired',proposal.toStateId,
+          'A non-aggression treaty proposal expired without a response.');
+      }
+    }
+    for (const treaty of game.treaties || []) {
+      if(treaty.status==='active' && Number.isSafeInteger(treaty.expiresOnDay) &&
+          game.day>=treaty.expiresOnDay) {
+        treaty.status='expired';
+        treaty.endedOnWorldDate=game.worldDate;
+        treaty.endedOnDay=game.day;
+        record(game,'diplomacy.treaty_expired',treaty.stateAId,
+          'A non-aggression treaty reached its agreed end date.');
+      }
+    }
     for (const unit of game.militaryUnits || []) {
       if (unit.personnel<=0) continue;
       unit.morale=Math.min(100,(Number(unit.morale)||0)+2);
@@ -785,49 +1408,27 @@
       }
       if (occupation.durationDays>=occupation.requiredControlDays && occupation.resistance===0 &&
           occupation.occupyingForce>0) {
-        const previousOwner=territory.ownerPlayerId;
-        if (previousOwner && previousOwner!==occupation.occupyingPlayerId) {
-          for (const member of game.memberships || [])
-            if (member.stateId===territory.stateId && member.status==='active') member.status='displaced';
-        }
-        territory.ownerPlayerId=occupation.occupyingPlayerId;
-        const invadingMembers=(game.memberships || []).filter(item =>
-          item.stateId===occupation.occupyingStateId && item.status==='active');
-        for (const member of invadingMembers) {
-          if (!membershipFor(game,member.playerId,territory.stateId))
-            game.memberships.push({
-              id:'membership-'+territory.stateId+'-'+member.playerId,
-              gameId:game.id,playerId:member.playerId,stateId:territory.stateId,status:'active',
-              permissionSetId:member.permissionSetId,joinedAtWorldDate:game.worldDate
-            });
-        }
-        const previousSovereignStateId=province.sovereignStateId;
-        province.sovereignStateId=occupation.occupyingStateId;
-        onClaim(game,territory,occupation.occupyingPlayerId,idFor);
+        // Effective military control is not a transfer of sovereignty or civil administration.
+        province.controllerStateId=occupation.occupyingStateId;
+        province.occupationId=occupation.id;
         game.territorialControls ||= [];
-        game.sovereigntyHistory ||= [];
-        game.territorialControls.push({
-          id:'control-'+occupation.id,provinceId:province.id,stateId:occupation.occupyingStateId,
-          type:'militaryOccupation',effectiveFrom:game.worldDate,cause:'Successful military campaign'
-        });
-        game.sovereigntyHistory.push({
-          id:'sovereignty-'+occupation.id,provinceId:province.id,
-          previousStateId:previousSovereignStateId,newStateId:occupation.occupyingStateId,
-          effectiveOn:game.worldDate,legalMechanism:'Military conquest and completed occupation'
-        });
+        if (!game.territorialControls.some(item => item.id==='control-'+occupation.id)) {
+          game.territorialControls.push({
+            id:'control-'+occupation.id,provinceId:province.id,stateId:occupation.occupyingStateId,
+            type:'militaryOccupation',effectiveFrom:game.worldDate,
+            cause:'Military occupation established; sovereignty and civil administration unchanged'
+          });
+        }
         occupation.controlEffective=true;
         occupation.status='completed';
         for (const unit of game.militaryUnits || []) {
-          if (unit.provinceId!==province.id) continue;
-          if (membershipFor(game,unit.ownerPlayerId,occupation.occupyingStateId))
+          if (unit.provinceId===province.id &&
+              membershipFor(game,unit.ownerPlayerId,occupation.occupyingStateId))
             unit.status='garrison';
-          else {
-            unit.personnel=0;
-            unit.status='destroyed';
-          }
         }
-        record(game,'territory.conquered',territory.stateId,
-          'Territory conquered and transferred to the occupying government: '+territory.name+'.',
+        record(game,'territory.occupation_established',territory.stateId,
+          'Effective military control established in '+territory.name+
+          '. Sovereignty and civil administration remain unchanged.',
           occupation.occupyingPlayerId);
       }
     }

@@ -251,8 +251,9 @@
 
   function emptyCollections() {
     return {
-      memberships:[], events:[], orders:[], currencies:[], diplomaticRelations:[],
-      financialTransactions:[],companyFinancialTransactions:[],marketHistory:[],
+      memberships:[], events:[], eventDefinitions:[], eventOccurrences:[], diplomaticProposals:[], treaties:[], orders:[], currencies:[], diplomaticRelations:[],
+      financialTransactions:[],companyFinancialTransactions:[],populationFinancialTransactions:[],marketHistory:[],
+      civicSystems:[],
       goods:[],productionRecipes:[],
       populationGroups:[], companies:[], markets:[], tradeRoutes:[], politicalSystems:[],
       provinces:[], settlements:[], provinceConnections:[], territorialControls:[],
@@ -304,6 +305,7 @@
     if (!window.NewWorldStrategy?.createStarterScenario)
       throw new Error('The New World strategy engine failed to load.');
     window.NewWorldStrategy.createStarterScenario(game,byId);
+    window.NewWorldCivicSystems?.initialize?.(game);
     const hostAssignment = assignLobbyPlayer(game, game.players[0], STARTING_TERRITORY_INDEX);
     if (!hostAssignment.ok)
       throw new Error('The host could not be assigned to the starting State: ' + hostAssignment.error);
@@ -315,6 +317,10 @@
       const treasurer = foundingSystem.offices.find(item => item.id === 'treasurer');
       if (chief) chief.holderPlayerId = playerId;
       if (treasurer) treasurer.holderPlayerId = playerId;
+      for(const officeId of ['justice-minister','public-prosecutor','chief-justice','appeal-judge','press-secretary','intelligence-director']) {
+        const office=foundingSystem.offices.find(item=>item.id===officeId);
+        if(office) office.holderPlayerId=playerId;
+      }
       foundingSystem.government.chiefExecutivePlayerId = playerId;
     }
     pushEvent(game,'world.created',playerId,null,
@@ -447,11 +453,15 @@
       name:game.name,status:game.status,worldDate:game.worldDate,worldVersion:game.worldVersion,
       scenarioId:game.scenarioId,scenarioVersion:game.scenarioVersion,
       memberships, eventSequence:game.eventSequence,events:clone(game.events),
-      politicalSystems:clone(game.politicalSystems),goods:clone(game.goods),
+      eventDefinitions:clone(game.eventDefinitions || []),
+      eventOccurrences:clone(game.eventOccurrences || []),
+      diplomaticProposals:clone(game.diplomaticProposals || []),treaties:clone(game.treaties || []),
+      politicalSystems:clone(game.politicalSystems),civicSystems:clone(game.civicSystems || []),goods:clone(game.goods),
       productionRecipes:clone(game.productionRecipes),populationGroups:clone(game.populationGroups),
       markets:clone(game.markets),tradeRoutes:clone(game.tradeRoutes),currencies:clone(game.currencies),
       financialTransactions:clone(game.financialTransactions),
       companyFinancialTransactions:clone(game.companyFinancialTransactions),
+      populationFinancialTransactions:clone(game.populationFinancialTransactions || []),
       marketHistory:clone(game.marketHistory),
       companies:game.companies.map(company => ({
         ...clone(company),
@@ -968,7 +978,8 @@
           routes:'militaryRoutes',supplyRoutes:'supplyRoutes',occupations:'occupations'},
         technology:{technologies:'technologies',researchInstitutions:'researchInstitutions',
           researchProjects:'researchProjects',technologyUnlocks:'technologyUnlocks',
-          technologyAdoptions:'technologyAdoptions'}
+          technologyAdoptions:'technologyAdoptions'},
+        events:{definitions:'eventDefinitions'}
       };
       const fields = map[payload.kind];
       if (!fields) return {ok:false,error:'Unknown scenario configuration.'};
@@ -1097,8 +1108,77 @@
     return true;
   }
 
+  function migrateCivicAndJudicialSystems(game) {
+    if(!game || !Array.isArray(game.territories)) return false;
+    let changed=false;
+    const institution={id:'judiciary',name:'State Courts',branch:'judicial'};
+    const offices=[
+      {id:'justice-minister',institutionId:'executive',name:'Minister of Justice'},
+      {id:'public-prosecutor',institutionId:'judiciary',name:'Public Prosecutor'},
+      {id:'chief-justice',institutionId:'judiciary',name:'Chief Justice'},
+      {id:'appeal-judge',institutionId:'judiciary',name:'Court of Appeal Judge'},
+      {id:'press-secretary',institutionId:'executive',name:'Press Secretary'},
+      {id:'intelligence-director',institutionId:'executive',name:'Intelligence Director'}
+    ];
+    for(const system of game.politicalSystems||[]) {
+      system.institutions ||= [];
+      system.offices ||= [];
+      const rules=system.constitution?.competenceRules;
+      const appointmentRule=rules?.find(item=>item.competence==='appointOffice');
+      if(appointmentRule && !Array.isArray(appointmentRule.institutionIds)) {
+        appointmentRule.institutionIds=[appointmentRule.institutionId||'executive','judiciary'];
+        changed=true;
+      }
+      if(Array.isArray(rules) && !rules.some(item=>item.competence==='setCivicPolicy')) {
+        rules.push({competence:'setCivicPolicy',proposerPermissionSetIds:['government-member','government-council','government-executive'],
+          approvalRequired:false,legalBasis:'State Administration Act',institutionId:'executive'});
+        changed=true;
+      }
+      if(Array.isArray(rules) && !rules.some(item=>item.competence==='managePublicBudget')) {
+        rules.push({competence:'managePublicBudget',proposerPermissionSetIds:['government-member','government-council','government-executive'],
+          approvalRequired:false,legalBasis:'Public Finance Act',institutionId:'executive'});
+        changed=true;
+      }
+      if(Array.isArray(rules) && !rules.some(item=>item.competence==='respondPublicPetitions')) {
+        rules.push({competence:'respondPublicPetitions',proposerPermissionSetIds:['government-member','government-council','government-executive'],
+          approvalRequired:false,legalBasis:'Public Participation Act',institutionId:'executive'});
+        changed=true;
+      }
+      if(Array.isArray(rules) && !rules.some(item=>item.competence==='establishDiplomaticMission')) {
+        rules.push({competence:'establishDiplomaticMission',proposerPermissionSetIds:['government-member','government-council','government-executive'],
+          approvalRequired:false,legalBasis:'Diplomatic Service Act',institutionId:'executive'});
+        changed=true;
+      }
+      if(!system.institutions.some(item=>item.id==='judiciary')) {
+        system.institutions.push({...institution});
+        changed=true;
+      }
+      for(const definition of offices) {
+        if(system.offices.some(item=>item.id===definition.id)) continue;
+        const territory=game.territories.find(item=>item.stateId===system.stateId);
+        const member=(game.memberships||[]).find(item=>item.stateId===system.stateId && item.status==='active');
+        system.offices.push({
+          ...definition,holderPlayerId:territory?.ownerPlayerId||member?.playerId||null
+        });
+        changed=true;
+      }
+    }
+    const civicCount=(game.civicSystems||[]).length;
+    window.NewWorldCivicSystems?.initialize?.(game);
+    if((game.civicSystems||[]).length!==civicCount) changed=true;
+    game.judiciaryVersion=1;
+    if(changed) {
+      game.worldVersion=(Number(game.worldVersion)||0)+1;
+      pushActivity(game,'The saved world was upgraded with judicial institutions and State civic systems.');
+      pushEvent(game,'world.civic_migrated',game.hostPlayerId,null,
+        'State civic systems and judicial offices were added without replacing existing campaign data.');
+    }
+    return changed;
+  }
+
   function setHostRuntime(game,session,handlers) {
     migrateStrategyScenario(game);
+    migrateCivicAndJudicialSystems(game);
     runtime = {
       role:'host',game,session,room:session.inviteCode || session.roomCode,
       topics:topicSet(session.inviteCode || session.roomCode),pendingJoins:new Map(),

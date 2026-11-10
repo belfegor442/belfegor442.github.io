@@ -2,15 +2,15 @@
   'use strict';
 
   const CATEGORY_ORDER = [
-    {id:'recent',label:'Recent',icon:'◷'},
-    {id:'all',label:'All',icon:'▦'},
-    {id:'residential',label:'Residential',icon:'⌂'},
-    {id:'commercial',label:'Commercial',icon:'▤'},
-    {id:'industrial',label:'Industrial',icon:'⚒'},
-    {id:'agriculture',label:'Agriculture',icon:'♧'},
-    {id:'services',label:'Services',icon:'✚'},
-    {id:'utilities',label:'Water',icon:'◉'},
-    {id:'transport',label:'Transport',icon:'⇄'}
+    {id:'recent',label:'Recent',spriteKey:'village/1x1_market_stall'},
+    {id:'all',label:'All',spriteKey:'village/1x1_village_hall'},
+    {id:'residential',label:'Residential',spriteKey:'houses/1x1_house1'},
+    {id:'commercial',label:'Commercial',spriteKey:'restaurants/1x1_commercial_2_store'},
+    {id:'industrial',label:'Industrial',spriteKey:'village/1x1_lumber_shed'},
+    {id:'agriculture',label:'Agriculture',spriteKey:'village/1x1_farmhouse_barn'},
+    {id:'services',label:'Services',spriteKey:'stores/1x1_commercial_57_clinic'},
+    {id:'utilities',label:'Water',spriteKey:'watertower/1x1_classic_spheroid'},
+    {id:'transport',label:'Transport',spriteKey:'village/1x1_fisherman_hut'}
   ];
 
   const CATEGORY_BY_TYPE = {
@@ -231,9 +231,13 @@
         button.className = 'build-category' + (this.category === category.id ? ' active' : '');
         button.dataset.category = category.id;
         button.title = category.label + ' · ' + count + ' items';
-        const symbol = document.createElement('span');
-        symbol.className = 'build-category-symbol';
-        symbol.textContent = category.icon;
+        const symbol = document.createElement('canvas');
+        symbol.className = 'build-category-icon';
+        symbol.width = 72;
+        symbol.height = 72;
+        symbol.setAttribute('aria-hidden','true');
+        symbol.dataset.spriteKey=category.spriteKey;
+        this.mapRenderer?.drawSpriteThumbnail(symbol,category.spriteKey,0);
         const label = document.createElement('small');
         label.textContent = category.label;
         button.append(symbol,label);

@@ -1,0 +1,188 @@
+{
+  "name": "SpritePilot UI & Feedback Pack",
+  "license": "CC0-1.0",
+  "source": "https://spritepilot.com/free-game-assets",
+  "layout": "Each PNG is one row of square frames, left to right. The file name gives the frame size and count: explosion-32px_strip10.png is 10 frames of 32 × 32.",
+  "effects": [
+    {
+      "id": "alert-bubble",
+      "name": "Alert bubble",
+      "frames": 9,
+      "fps": 15,
+      "loop": false,
+      "sheets": [
+        {
+          "file": "16px/alert-bubble-16px_strip9.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/alert-bubble-32px_strip9.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/alert-bubble-preview.gif"
+    },
+    {
+      "id": "question-bubble",
+      "name": "Question bubble",
+      "frames": 9,
+      "fps": 12,
+      "loop": false,
+      "sheets": [
+        {
+          "file": "16px/question-bubble-16px_strip9.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/question-bubble-32px_strip9.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/question-bubble-preview.gif"
+    },
+    {
+      "id": "checkmark",
+      "name": "Checkmark",
+      "frames": 10,
+      "fps": 15,
+      "loop": false,
+      "sheets": [
+        {
+          "file": "16px/checkmark-16px_strip10.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/checkmark-32px_strip10.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/checkmark-preview.gif"
+    },
+    {
+      "id": "cross",
+      "name": "Cross",
+      "frames": 10,
+      "fps": 15,
+      "loop": false,
+      "sheets": [
+        {
+          "file": "16px/cross-16px_strip10.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/cross-32px_strip10.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/cross-preview.gif"
+    },
+    {
+      "id": "heartbeat",
+      "name": "Heartbeat",
+      "frames": 8,
+      "fps": 10,
+      "loop": true,
+      "sheets": [
+        {
+          "file": "16px/heartbeat-16px_strip8.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/heartbeat-32px_strip8.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/heartbeat-preview.gif"
+    },
+    {
+      "id": "loading-spinner",
+      "name": "Loading spinner",
+      "frames": 8,
+      "fps": 12,
+      "loop": true,
+      "sheets": [
+        {
+          "file": "16px/loading-spinner-16px_strip8.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/loading-spinner-32px_strip8.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/loading-spinner-preview.gif"
+    },
+    {
+      "id": "arrow-indicator",
+      "name": "Arrow indicator",
+      "frames": 7,
+      "fps": 12,
+      "loop": true,
+      "sheets": [
+        {
+          "file": "16px/arrow-indicator-16px_strip7.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/arrow-indicator-32px_strip7.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/arrow-indicator-preview.gif"
+    },
+    {
+      "id": "level-up",
+      "name": "Level up",
+      "frames": 12,
+      "fps": 15,
+      "loop": false,
+      "sheets": [
+        {
+          "file": "16px/level-up-16px_strip12.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/level-up-32px_strip12.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/level-up-preview.gif"
+    },
+    {
+      "id": "target-marker",
+      "name": "Target marker",
+      "frames": 8,
+      "fps": 10,
+      "loop": true,
+      "sheets": [
+        {
+          "file": "16px/target-marker-16px_strip8.png",
+          "frameWidth": 16,
+          "frameHeight": 16
+        },
+        {
+          "file": "32px/target-marker-32px_strip8.png",
+          "frameWidth": 32,
+          "frameHeight": 32
+        }
+      ],
+      "preview": "previews/target-marker-preview.gif"
+    }
+  ]
+}

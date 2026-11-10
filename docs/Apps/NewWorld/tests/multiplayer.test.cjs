@@ -38,13 +38,36 @@ test('a new world assigns its host to the first State and transfers the starting
   assert.equal(multiplayer.canStartWorld(game), true);
 });
 
+test('event definitions can be configured by the host before the world starts', () => {
+  const {game}=multiplayer.createInitialWorld('Host');
+  const definitions=[{
+    id:'low-reserves',title:'Low reserves',description:'The public treasury is below its reserve.',
+    category:'economy',severity:'warning',
+    trigger:{type:'treasuryBelow',stateId:game.territories[0].stateId,threshold:100}
+  }];
+
+  const configured=multiplayer.applyAdmin(game,'configure',{
+    kind:'events',configuration:{definitions}
+  });
+
+  assert.equal(configured.ok,true,configured.error);
+  assert.deepEqual(game.eventDefinitions,definitions);
+  assert.deepEqual(multiplayer.snapshot(game).eventDefinitions,definitions);
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+  const locked=multiplayer.applyAdmin(game,'configure',{
+    kind:'events',configuration:{definitions:[]}
+  });
+  assert.equal(locked.ok,false);
+  assert.deepEqual(game.eventDefinitions,definitions);
+});
+
 test('67 players can join one founding settlement and start the same world', () => {
   const { game } = multiplayer.createInitialWorld('Host');
   const home = game.territories[0];
   assert.equal(game.territories.filter(item => item.ownerPlayerId).length, 1);
   assert.equal(game.territories.filter(item => item.ownerPlayerId === game.hostPlayerId).length, 1);
-  assert.equal(game.companies.length, 4);
-  assert.equal(game.markets.length, 3);
+  assert.equal(game.companies.length, 6);
+  assert.equal(game.markets.length, 6);
   assert.equal(game.territories.slice(1).every(item => item.ownerPlayerId === null && item.population === 0), true);
 
   for (let index = 0; index < 66; index++) {
@@ -113,8 +136,8 @@ test('a cooperative founding member gains membership in a newly conquered region
   assert.equal(target.ownerPlayerId,host.id);
   assert.equal(target.treasury,600);
   assert.equal(target.population,0);
-  assert.equal(game.companies.filter(item => item.stateId === target.stateId).length,4);
-  assert.equal(game.markets.filter(item => item.stateId === target.stateId).length,3);
+  assert.equal(game.companies.filter(item => item.stateId === target.stateId).length,6);
+  assert.equal(game.markets.filter(item => item.stateId === target.stateId).length,6);
   assert.equal(game.populationGroups.filter(item => item.stateId === target.stateId).length,1);
   assert.equal(game.memberships.some(item => item.playerId === firstGuest.id &&
     item.stateId === target.stateId && item.status === 'active'),true);
@@ -218,4 +241,27 @@ test('construction rejects a catalogue sprite incompatible with its building typ
   assert.equal(result.accepted,false);
   assert.equal(result.code,'INVALID_PAYLOAD');
   assert.equal(territory.treasury,treasury);
+});
+
+
+test('multiplayer snapshots replicate civic labour data and household wage receipts',()=>{
+  const {game}=multiplayer.createInitialWorld('Host');
+  game.civicSystems=[{
+    stateId:game.territories[0].stateId,
+    labour:{privateEmployees:6,dailyPayrollPaid:12,wageArrears:4}
+  }];
+  game.populationFinancialTransactions=[{
+    id:'wage-receipt-1',stateId:game.territories[0].stateId,
+    populationGroupId:'households-a',currencyId:game.territories[0].currencyId,
+    type:'WageIncome',amount:12,worldDate:game.worldDate,day:game.day
+  }];
+
+  const replicated=multiplayer.snapshot(game);
+
+  assert.deepEqual(replicated.civicSystems,game.civicSystems);
+  assert.deepEqual(replicated.populationFinancialTransactions,
+    game.populationFinancialTransactions);
+  assert.notEqual(replicated.civicSystems[0],game.civicSystems[0]);
+  assert.notEqual(replicated.populationFinancialTransactions[0],
+    game.populationFinancialTransactions[0]);
 });

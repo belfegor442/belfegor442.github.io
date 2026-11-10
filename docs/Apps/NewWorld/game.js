@@ -150,6 +150,11 @@
         (onlineGame?.territories.find(item=>item.stateId===order.destinationStateId)?.name || 'State');
     if(order.type==='respondTradeRoute') return order.accept?'Accept trade route':'Reject trade route';
     if(order.type==='cancelTradeRoute') return 'Cancel trade route';
+    if(order.type==='proposeTreaty')
+      return 'Propose non-aggression treaty to '+
+        (onlineGame?.territories.find(item=>item.stateId===order.targetStateId)?.name || 'State');
+    if(order.type==='respondTreaty') return order.accept?'Accept non-aggression treaty':'Reject non-aggression treaty';
+    if(order.type==='terminateTreaty') return 'Terminate non-aggression treaty';
     if(order.type==='approveBudget') return 'Set government budget to '+money(order.proposedBudget);
     if(order.type==='proposeLaw') return 'Propose law: '+order.decisionTitle;
     if(order.type==='voteDecision') return 'Vote '+order.voteChoice+' on a law';
@@ -312,6 +317,7 @@
     $('first-steps').hidden=Boolean(onlineGame?.started);
     renderPanelSafely('Financial overview',renderFinancialSummary,'state-currency');
     renderPanelSafely('Campaign objectives',renderObjectives,'state-description');
+    renderPanelSafely('World chronicle',renderWorldEvents,'state-description');
     $('date-label').textContent = isOnline()
       ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
       : 'MULTIPLAYER REQUIRED';
@@ -341,7 +347,37 @@
     renderPanelSafely('Military',renderMilitary,'military-status');
     renderPanelSafely('Research',renderTechnology,'technology-status');
     renderPanelSafely('Diplomacy',renderDiplomacy,'diplomacy-status');
+    renderPanelSafely('State systems',renderCivicSystems,'civic-status');
     renderPanelSafely('Map',()=>highlightMap(state.selected),'state-description');
+  }
+
+  function renderWorldEvents() {
+    const list=$('world-event-list');
+    if(!list) return;
+    $('event-setup-panel').hidden=!canConfigureScenario();
+    list.replaceChildren();
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const occurrences=(onlineGame?.eventOccurrences || [])
+      .filter(item=>!territory || !item.stateId || item.stateId===territory.stateId)
+      .slice().sort((a,b)=>(Number(b.day)||0)-(Number(a.day)||0)).slice(0,12);
+    if(!onlineGame) {
+      addPoliticalRow(list,'World chronicle unavailable',
+        'Connect to a multiplayer world to load recorded events.');
+      return;
+    }
+    if(!occurrences.length) {
+      addPoliticalRow(list,'No emergent events recorded',
+        'The chronicle will record configured events when their world conditions are met.');
+      return;
+    }
+    for(const occurrence of occurrences) {
+      const category=String(occurrence.category || 'general').toUpperCase();
+      const severity=String(occurrence.severity || 'information').toUpperCase();
+      addPoliticalRow(list,
+        occurrence.title+' · '+severity,
+        formatWorldDate(occurrence.worldDate)+' · '+category+' · '+
+          occurrence.description+' Cause: '+occurrence.cause);
+    }
   }
 
   function renderObjectives() {
@@ -466,10 +502,16 @@
           need.dailyQuantityPerThousandPeople + ' ' + (good?.unit || 'units') +
           ' per 1,000 residents/day';
       });
+      const outcome=group.dailyNeedsOutcome;
+      const needsOutcome=outcome && outcome.requested>0
+        ? ' · Last daily fulfilment: '+outcome.fulfilled+'/'+outcome.requested+
+          ' ('+outcome.satisfactionPercent+'%) · unmet: '+outcome.unmet+
+          ' · '+formatWorldDate(outcome.worldDate)
+        : ' · Daily fulfilment: awaiting market data';
       addPoliticalRow(
         populationList,
         group.name + ' · ' + Number(group.population).toLocaleString('en-US') + ' residents',
-        'Configured needs: ' + (needs.join(', ') || 'none'));
+        'Configured needs: ' + (needs.join(', ') || 'none') + needsOutcome);
     }
 
     const routes = (onlineGame.tradeRoutes || []).filter(route =>
@@ -609,11 +651,23 @@
     for (const province of provinces) {
       const currentControls = (onlineGame.territorialControls || []).filter(item =>
         item.provinceId === province.id);
+      const sovereigntyName=onlineGame.territories.find(item =>
+        item.stateId===province.sovereignStateId)?.name || 'unknown';
+      const occupation=(onlineGame.occupations || []).find(item =>
+        item.provinceId===province.id && item.controlEffective &&
+        ['active','completed'].includes(item.status));
+      const controllerStateId=province.controllerStateId ||
+        occupation?.occupyingStateId || province.sovereignStateId;
+      const controllerName=onlineGame.territories.find(item =>
+        item.stateId===controllerStateId)?.name || 'unknown';
+      const occupationStatus=occupation
+        ? ' · occupation: effective ('+occupation.status+')'
+        : ' · occupation: none';
       addPoliticalRow(
         provinceList,
         province.name,
-        'Sovereignty: ' +
-          (onlineGame.territories.find(item => item.stateId === province.sovereignStateId)?.name || 'unknown') +
+        'Sovereignty: ' + sovereigntyName +
+          ' · effective control: ' + controllerName + occupationStatus +
           ' · SVG mapping: ' + (province.svgElementId || 'not assigned') +
           ' · population: ' + Number(province.population || 0).toLocaleString('en-US') +
           ' · terrain: ' + (province.terrainId || 'pending') +
@@ -849,9 +903,11 @@
   function renderDiplomacy() {
     const list=$('diplomacy-list');
     const history=$('diplomacy-history');
-    if(!list || !history) return;
+    const treatyList=$('treaty-list');
+    if(!list || !history || !treatyList) return;
     list.replaceChildren();
     history.replaceChildren();
+    treatyList.replaceChildren();
     const territory=onlineGame?.territories.find(item=>item.index===state.selected);
     const player=currentPlayer();
     if(!onlineGame || !territory || !player) {
@@ -866,6 +922,7 @@
       : 'You need an active government membership in '+territory.name+' to conduct foreign policy.';
     if(!membership) {
       addPoliticalRow(list,'No diplomatic authority','Select a State in which you hold an active government membership.');
+      addPoliticalRow(treatyList,'No treaty authority','An active membership is required to propose, accept or terminate an agreement.');
       return;
     }
     for(const target of onlineGame.territories.filter(item=>item.stateId!==territory.stateId)) {
@@ -890,6 +947,14 @@
       const foreignGovernment=Boolean(target.ownerPlayerId &&
         target.ownerPlayerId!==player.id && !sharedGovernment);
       const atWar=relation?.status==='war';
+      const activeTreaty=(onlineGame.treaties || []).find(item =>
+        item.type==='nonAggression' && item.status==='active' &&
+        ((item.stateAId===territory.stateId && item.stateBId===target.stateId) ||
+         (item.stateAId===target.stateId && item.stateBId===territory.stateId)));
+      const pendingProposal=(onlineGame.diplomaticProposals || []).find(item =>
+        item.type==='nonAggression' && item.status==='pending' &&
+        ((item.fromStateId===territory.stateId && item.toStateId===target.stateId) ||
+         (item.fromStateId===target.stateId && item.toStateId===territory.stateId)));
       if(foreignGovernment || atWar) {
         const button=document.createElement('button');
         button.type='button';
@@ -902,25 +967,95 @@
           item.status==='active' && pairProvinceIds.has(item.provinceId) &&
           [territory.stateId,target.stateId].includes(item.occupyingStateId));
         button.disabled=onlineGame.status!=='running' ||
-          socket?.readyState!==WebSocket.OPEN || (atWar && occupationActive);
+          socket?.readyState!==WebSocket.OPEN || (atWar && occupationActive) ||
+          (!atWar && Boolean(activeTreaty));
         button.title=atWar && occupationActive
           ? 'Peace is unavailable while this State has an active military occupation.'
-          : atWar?'End the current war with a peace agreement.':'Declare a state of war before military attacks.';
+          : !atWar && activeTreaty
+            ? 'War is blocked by the active non-aggression treaty.'
+            : atWar?'End the current war with a peace agreement.':'Declare a state of war before military attacks.';
         button.addEventListener('click',()=>sendAction({
           type:atWar?'makePeace':'declareWar',
           stateId:territory.stateId,targetStateId:target.stateId
         }));
         row.appendChild(button);
       }
+      if(foreignGovernment && !atWar && !activeTreaty && !pendingProposal) {
+        const treatyButton=document.createElement('button');
+        treatyButton.type='button';
+        treatyButton.className='secondary-button';
+        treatyButton.textContent='PROPOSE NON-AGGRESSION';
+        const term=Number($('treaty-duration').value);
+        const proposalExpiry=Number($('treaty-proposal-expiry').value);
+        treatyButton.disabled=onlineGame.status!=='running' ||
+          socket?.readyState!==WebSocket.OPEN ||
+          !Number.isSafeInteger(term) || term<1 || term>3650 ||
+          !Number.isSafeInteger(proposalExpiry) || proposalExpiry<1 || proposalExpiry>3650;
+        treatyButton.title=treatyButton.disabled
+          ? 'Enter a whole-number treaty term and proposal expiry, each from 1 to 3,650 world days.'
+          : 'Send a non-aggression proposal. The other government must accept it before it becomes binding.';
+        treatyButton.addEventListener('click',()=>sendAction({
+          type:'proposeTreaty',stateId:territory.stateId,targetStateId:target.stateId,
+          treatyType:'nonAggression',durationDays:term,proposalExpiryDays:proposalExpiry
+        }));
+        row.appendChild(treatyButton);
+      }
     }
     const events=(onlineGame.events || []).filter(item =>
       String(item.type || '').startsWith('diplomacy.')).slice().reverse().slice(0,20);
-    if(!events.length)
+    if(!events.length) {
       addPoliticalRow(history,'No diplomatic record','No wars or peace agreements have been recorded.');
+    }
     for(const event of events)
       addPoliticalRow(history,event.description || event.type,
         formatWorldDate(event.worldDate)+' · '+(onlineGame.territories.find(item =>
           item.stateId===event.stateId)?.name || 'Foreign affairs'));
+
+    const relevantTreaties=(onlineGame.treaties || []).filter(item =>
+      item.stateAId===territory.stateId || item.stateBId===territory.stateId);
+    const relevantProposals=(onlineGame.diplomaticProposals || []).filter(item =>
+      item.fromStateId===territory.stateId || item.toStateId===territory.stateId);
+    if(!relevantTreaties.length && !relevantProposals.length)
+      addPoliticalRow(treatyList,'No treaties or proposals',
+        'Non-aggression proposals require bilateral approval before they become binding.');
+    for(const treaty of relevantTreaties.slice().reverse()) {
+      const stateA=onlineGame.territories.find(item=>item.stateId===treaty.stateAId)?.name || treaty.stateAId;
+      const stateB=onlineGame.territories.find(item=>item.stateId===treaty.stateBId)?.name || treaty.stateBId;
+      const row=addPoliticalRow(treatyList,
+        'Non-aggression · '+treaty.status.toUpperCase(),
+        stateA+' ↔ '+stateB+' · expires world day '+treaty.expiresOnDay+
+          (treaty.createdOnWorldDate?' · signed '+formatWorldDate(treaty.createdOnWorldDate):''));
+      if(treaty.status==='active') {
+        const terminate=document.createElement('button');
+        terminate.type='button';
+        terminate.className='secondary-button';
+        terminate.textContent='TERMINATE TREATY';
+        terminate.addEventListener('click',()=>sendAction({
+          type:'terminateTreaty',stateId:territory.stateId,treatyId:treaty.id
+        }));
+        row.appendChild(terminate);
+      }
+    }
+    for(const proposal of relevantProposals.slice().reverse()) {
+      const from=onlineGame.territories.find(item=>item.stateId===proposal.fromStateId)?.name || proposal.fromStateId;
+      const to=onlineGame.territories.find(item=>item.stateId===proposal.toStateId)?.name || proposal.toStateId;
+      const row=addPoliticalRow(treatyList,
+        'Non-aggression proposal · '+proposal.status.toUpperCase(),
+        from+' → '+to+' · term '+proposal.durationDays+' days · expires world day '+proposal.expiresOnDay);
+      if(proposal.status==='pending' && proposal.toStateId===territory.stateId) {
+        for(const [accept,label] of [[true,'ACCEPT'],[false,'REJECT']]) {
+          const button=document.createElement('button');
+          button.type='button';
+          button.className='secondary-button';
+          button.textContent=label;
+          button.addEventListener('click',()=>sendAction({
+            type:'respondTreaty',stateId:territory.stateId,
+            proposalId:proposal.id,accept
+          }));
+          row.appendChild(button);
+        }
+      }
+    }
   }
 
   function renderTechnology() {
@@ -1182,7 +1317,7 @@
   async function saveScenarioConfiguration(endpoint,textareaId,keys,label) {
     if (!canConfigureScenario()) {
       showMessage('Only the host can configure this technical scenario before the world starts.',true);
-      return;
+      return false;
     }
     let configuration;
     try {
@@ -1190,11 +1325,11 @@
     } catch (error) {
       showMessage(label + ' scenario JSON is invalid: ' +
         (error instanceof Error ? error.message : 'parse error'),true);
-      return;
+      return false;
     }
     if (!configuration || keys.some(key => !Array.isArray(configuration[key]))) {
       showMessage(label + ' scenario requires: ' + keys.join(', ') + '.',true);
-      return;
+      return false;
     }
     try {
       const game = await window.NewWorldMultiplayer.admin('configure',{
@@ -1202,11 +1337,98 @@
       });
       if (game && typeof game === 'object') applySnapshot(game);
       showMessage(label + ' scenario saved to the host device and shared with the room.');
+      return true;
     } catch (error) {
       showServerError(error);
+      return false;
     }
   }
 
+
+  function loadEventConfiguration() {
+    if(!onlineGame) return;
+    let definitions=onlineGame.eventDefinitions || [];
+    if(!definitions.length) {
+      const territory=onlineGame.territories.find(item=>item.index===state.selected) ||
+        onlineGame.territories[0];
+      const good=onlineGame.goods?.[0];
+      definitions=[{
+        id:'example-market-shortage',enabled:false,category:'economy',severity:'warning',
+        title:'Market shortage',description:'A configured good has unmet demand.',
+        repeatIntervalDays:7,
+        trigger:good
+          ? {type:'marketShortage',stateId:territory.stateId,goodId:good.id,minimumUnmetDemand:10}
+          : {type:'treasuryBelow',stateId:territory.stateId,threshold:100}
+      }];
+    }
+    $('event-config').value=JSON.stringify({definitions},null,2);
+  }
+
+  function validateEventDefinitions(definitions) {
+    if(!Array.isArray(definitions)) throw new Error('Definitions must be an array.');
+    const ids=new Set();
+    const stateIds=new Set((onlineGame?.territories || []).map(item=>item.stateId));
+    const goodIds=new Set((onlineGame?.goods || []).map(item=>item.id));
+    for(const definition of definitions) {
+      if(!definition || typeof definition!=='object' || Array.isArray(definition))
+        throw new Error('Every event definition must be an object.');
+      const id=String(definition.id || '').trim();
+      if(!id || ids.has(id)) throw new Error('Every event requires a unique, non-empty ID.');
+      ids.add(id);
+      if(!String(definition.title || '').trim() || !String(definition.description || '').trim())
+        throw new Error('Every event requires a title and description.');
+      if(definition.repeatIntervalDays!=null &&
+          (!Number.isSafeInteger(definition.repeatIntervalDays) || definition.repeatIntervalDays<1))
+        throw new Error('Repeat intervals must be positive whole world days.');
+      if(definition.enabled!=null && typeof definition.enabled!=='boolean')
+        throw new Error('The enabled field must be true or false.');
+      const trigger=definition.trigger;
+      if(!trigger || typeof trigger!=='object') throw new Error('Each event requires a trigger.');
+      const stateId=definition.stateId || trigger.stateId;
+      if(['marketShortage','treasuryBelow','prosperityBelow'].includes(trigger.type) &&
+          !stateIds.has(stateId))
+        throw new Error('An event references a State that does not exist in this scenario.');
+      if(trigger.type==='marketShortage') {
+        if(!goodIds.has(trigger.goodId))
+          throw new Error('A market-shortage event references a good that does not exist.');
+        if(!Number.isSafeInteger(trigger.minimumUnmetDemand) || trigger.minimumUnmetDemand<1)
+          throw new Error('Minimum unmet demand must be a positive whole number.');
+      } else if(trigger.type==='treasuryBelow' || trigger.type==='prosperityBelow') {
+        if(!Number.isSafeInteger(trigger.threshold) || trigger.threshold<0)
+          throw new Error('Event thresholds must be non-negative whole numbers.');
+      } else if(trigger.type==='warActive') {
+        if(Boolean(trigger.stateAId)!==Boolean(trigger.stateBId))
+          throw new Error('A war trigger must include both State IDs or neither.');
+        if(trigger.stateAId && (!stateIds.has(trigger.stateAId) || !stateIds.has(trigger.stateBId)))
+          throw new Error('A war trigger references a State that does not exist.');
+      } else {
+        throw new Error('Unsupported trigger. Use marketShortage, treasuryBelow, prosperityBelow or warActive.');
+      }
+    }
+    return true;
+  }
+
+  async function saveEventConfiguration() {
+    if(!canConfigureScenario()) {
+      showMessage('Only the host can configure event rules before the world starts.',true);
+      return;
+    }
+    let configuration;
+    try {
+      configuration=JSON.parse($('event-config').value);
+      if(!configuration || !Array.isArray(configuration.definitions))
+        throw new Error('The configuration must contain a definitions array.');
+      validateEventDefinitions(configuration.definitions);
+    } catch(error) {
+      $('event-setup-status').textContent=error instanceof Error?error.message:'Invalid event configuration.';
+      showMessage('Event rule validation failed: '+$('event-setup-status').textContent,true);
+      return;
+    }
+    const saved=await saveScenarioConfiguration('events','event-config',['definitions'],'World event');
+    $('event-setup-status').textContent=saved
+      ? 'Event rules validated and saved to the host world.'
+      : 'The event rules were not saved. Check the host status message.';
+  }
 
   function loadEconomyConfiguration() {
     if (!onlineGame) return;
@@ -1218,6 +1440,10 @@
         stateId: company.stateId,
         currencyId: company.currencyId,
         cashBalances: company.cashBalances || {},
+        wageArrears: company.wageArrears || 0,
+        workforce: company.workforce || {},
+        workersPerFacility: company.workersPerFacility,
+        dailyWage: company.dailyWage,
         name: company.name,
         sector: company.sector,
         inventory: company.inventory || {},
@@ -1225,7 +1451,10 @@
           id: facility.id,
           recipeId: facility.recipeId,
           batchesPerCycle: facility.batchesPerCycle,
-          progressDays: facility.progressDays
+          progressDays: facility.progressDays,
+          workersRequired: facility.workersRequired,
+          dailyWage: facility.dailyWage,
+          employees: facility.employees || 0
         }))
       })),
       markets: onlineGame.markets || [],
@@ -1273,11 +1502,14 @@
     const list = $('transaction-list');
     list.replaceChildren();
     const companyList = $('company-transaction-list');
+    const householdList = household-transaction-list;
+    householdList.replaceChildren();
     companyList.replaceChildren();
     if (!onlineGame) {
       $('state-currency').textContent = 'Connect to a multiplayer world to load currency and transaction data.';
       addPoliticalRow(list, 'No financial records', 'Connect to a shared world to inspect public treasury activity.');
       addPoliticalRow(companyList, 'No company records', 'Company sales and market transactions appear after the world starts.');
+      addPoliticalRow(householdList,'No household records','Household balances and purchases appear after the first market settlement.');
       return;
     }
 
@@ -1314,20 +1546,82 @@
       for (const transaction of companyTransactions) {
         const company = onlineGame.companies?.find(item => item.id === transaction.companyId);
         const currency = onlineGame.currencies?.find(item => item.id === transaction.currencyId);
-        addPoliticalRow(
-          companyList,
-          company?.name || 'Company',
-          formatWorldDate(transaction.worldDate) + ' · ' + transaction.quantity + ' ' +
-            transaction.goodId + ' at ' + money(transaction.unitPrice) + ' · +' +
-            money(transaction.amount) + ' ' + (currency?.code || currency?.name || 'currency units') +
-            (transaction.tradeRouteId ? ' · trade route ' + transaction.tradeRouteId.slice(0, 8) : ' · domestic sale'));
+        const sign=transaction.amount>0?'+':transaction.amount<0?'−':'';
+        const isPayroll=transaction.type==='Payroll';
+        const entryType=isPayroll?'PAYROLL':String(transaction.type||'COMPANY MOVEMENT')
+          .replaceAll(/([A-Z])/g,' $1').toUpperCase();
+        const detail=isPayroll
+          ?formatWorldDate(transaction.worldDate)+' · '+transaction.quantity+' employee(s) · '+
+            sign+money(Math.abs(transaction.amount))+' paid · cash '+money(transaction.balanceAfter)
+          :formatWorldDate(transaction.worldDate)+' · '+entryType+' · '+
+            Number(transaction.quantity||0).toLocaleString('en-US')+' '+
+            (transaction.goodId||'units')+' at '+money(transaction.unitPrice||0)+' · '+
+            sign+money(Math.abs(transaction.amount||0))+' '+
+            (currency?.code||currency?.name||'currency units')+' · balance '+money(transaction.balanceAfter||0);
+        addPoliticalRow(companyList,company?.name||'Company',detail);
+      }
+    }
+    const householdTransactions=(onlineGame.populationFinancialTransactions||[])
+      .filter(item=>item.stateId===territory?.stateId)
+      .slice().reverse().slice(0,30);
+    if(!householdTransactions.length) {
+      addPoliticalRow(householdList,'No household transactions',
+        'Household opening balances, wage income and market purchases will appear here.');
+    } else {
+      for(const transaction of householdTransactions) {
+        const group=onlineGame.populationGroups?.find(item=>item.id===transaction.populationGroupId);
+        const good=onlineGame.goods?.find(item=>item.id===transaction.goodId);
+        const currency=onlineGame.currencies?.find(item=>item.id===transaction.currencyId);
+        const amount=Number(transaction.amount)||0;
+        const sign=amount>0?'+':amount<0?'−':'';
+        const title=({
+          OpeningBalance:'OPENING CASH',
+          WageIncome:'WAGE INCOME',
+          Consumption:'HOUSEHOLD PURCHASE'
+        })[transaction.type]||String(transaction.type||'HOUSEHOLD MOVEMENT').toUpperCase();
+        const itemDetail=formatWorldDate(transaction.worldDate)+' · '+title+
+          (good?' · '+Number(transaction.quantity||0).toLocaleString('en-US')+' '+good.name+
+            ' at '+money(transaction.unitPrice||0):'')+
+          ' · '+sign+money(Math.abs(amount))+' '+(currency?.code||currency?.name||'currency units')+
+          ' · balance '+money(transaction.balanceAfter||0);
+        addPoliticalRow(householdList,group?.name||'Households',itemDetail);
       }
     }
   }
 
+  function politicalStatusIcon(title,detail) {
+    const value=(String(title||'')+' '+String(detail||'')).toLowerCase();
+    const base='./assets/spritepilot-ui/spritepilot-ui-pack/previews/';
+    if(/\b(rejected|failed|invalid|denied|error|unpaid|arrears|overdue|breach|bankrupt|cancelled)\b/.test(value))
+      return {src:base+'cross-still.png',kind:'error'};
+    if(/\b(warning|crisis|shortage|pending|unfunded|suspended|risk|incident|dispute|blocked|low reserves)\b/.test(value))
+      return {src:base+'alert-bubble-still.png',kind:'warning'};
+    if(/\b(approved|accepted|completed|resolved|paid|cleared|funded|delivered|implemented|established|success)\b/.test(value))
+      return {src:base+'checkmark-still.png',kind:'positive'};
+    if(/\b(research|technology|innovation|education|discovery)\b/.test(value))
+      return {src:base+'level-up-still.png',kind:'research'};
+    if(/\b(health|medical|clinic|hospital|vaccination)\b/.test(value))
+      return {src:base+'heartbeat-still.png',kind:'health'};
+    if(/\b(military|army|battle|attack|defence|occupation|security|target)\b/.test(value))
+      return {src:base+'target-marker-still.png',kind:'military'};
+    if(/\b(petition|proposal|question|review|assessment|intelligence)\b/.test(value))
+      return {src:base+'question-bubble-still.png',kind:'information'};
+    return null;
+  }
   function addPoliticalRow(container, title, detail) {
     const row = document.createElement('div');
     row.className = 'political-row';
+    const iconSource=politicalStatusIcon(title,detail);
+    if(iconSource) {
+      row.classList.add('has-status-icon','is-'+iconSource.kind);
+      const icon=document.createElement('img');
+      icon.className='political-row-status-icon';
+      icon.src=iconSource.src;
+      icon.alt='';
+      icon.setAttribute('aria-hidden','true');
+      icon.decoding='async';
+      row.appendChild(icon);
+    }
     const heading = document.createElement('strong');
     heading.textContent = title;
     const description = document.createElement('span');
@@ -1688,6 +1982,7 @@
       renderMilitary();
       renderTechnology();
       renderDiplomacy();
+      renderCivicSystems();
     }
   }
 
@@ -2014,6 +2309,59 @@
     })
     : null;
 
+  function renderPanelKickerIcons() {
+    const rules=[
+      {pattern:/military|army|armed forces|defen[cs]e|war room/,image:'./assets/kenney-medieval-rts/medievalUnit_01.png'},
+      {pattern:/research|technology|science|innovation|discovery/,sprite:'restaurants/1x1_commercial_13_bookstore'},
+      {pattern:/diplomacy|international|foreign affairs|embassy|treaty/,sprite:'village/1x1_market_stall'},
+      {pattern:/economy|finance|currency|treasury|trade|market|payroll|company/,sprite:'restaurants/1x1_commercial_2_store'},
+      {pattern:/civic|society|government|justice|court|law|police|public service/,sprite:'stores/1x1_commercial_57_clinic'},
+      {pattern:/land|territory|terrain|agriculture|environment|resources|forest|water/,sprite:'village/1x1_farmhouse_barn'},
+      {pattern:/build|city|construction|infrastructure|production|industry/,sprite:'village/1x1_lumber_shed'},
+      {pattern:/population|household|demograph|people/,sprite:'houses/1x1_house1'},
+      {pattern:/world|map|chronicle|event|player|multiplayer|session/,sprite:'village/1x1_village_hall'}
+    ];
+    document.querySelectorAll('.panel-kicker').forEach(label=>{
+      if(label.dataset.spriteIcon) return;
+      const source=label.textContent||'';
+      const match=rules.find(rule=>rule.pattern.test(source));
+      if(!match) return;
+      let icon;
+      if(match.image) {
+        icon=document.createElement('img');
+        icon.src=match.image;
+        icon.alt='';
+      } else {
+        icon=document.createElement('canvas');
+        icon.width=48;
+        icon.height=48;
+        icon.dataset.spriteKey=match.sprite;
+      }
+      icon.className='panel-kicker-icon';
+      icon.setAttribute('aria-hidden','true');
+      label.prepend(icon);
+      label.dataset.spriteIcon=match.image||match.sprite;
+    });
+  }
+  function renderTheotownUiIcons() {
+    renderPanelKickerIcons();
+    if(!mapDetailRenderer?.ready) return;
+    document.querySelectorAll('canvas[data-sprite-key]').forEach(canvas=>{
+      const key=canvas.dataset.spriteKey;
+      if(!key || canvas.dataset.spriteRendered===key) return;
+      const size=Number(canvas.dataset.renderSize)||72;
+      canvas.width=size;
+      canvas.height=size;
+      if(mapDetailRenderer.drawSpriteThumbnail(canvas,key,0))
+        canvas.dataset.spriteRendered=key;
+    });
+  }
+
+  mapDetailRenderer?.getCatalogSprites?.().then(()=>{
+    renderPanelKickerIcons();
+    renderTheotownUiIcons();
+    buildMenu?.renderCategories?.();
+  }).catch(error=>console.warn('[new-world] UI sprite icons could not be rendered:',error));
   function hideMapTooltip() {
     mapTooltip.hidden = true;
     hoveredState = null;
@@ -2146,6 +2494,376 @@
     return details.join(' · ');
   }
 
+
+  function renderCivicSystems() {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const system=onlineGame?.civicSystems?.find(item=>item.stateId===territory?.stateId);
+    const ids=[
+      'civic-overview','civic-justice-list','civic-cases-list','civic-services-list','civic-land-list',
+      'civic-labour-list','civic-finance-list','civic-diplomacy-list',
+      'civic-administration-list','civic-media-list','civic-intelligence-list',
+      'civic-identity-list','civic-petition-list','civic-crisis-list'
+    ];
+    const lists=Object.fromEntries(ids.map(id=>[id,$(id)]));
+    for(const list of Object.values(lists)) list?.replaceChildren();
+    $('civic-title').textContent=territory?.name || 'State systems';
+    if(!onlineGame || !territory) {
+      $('civic-status').textContent='Connect to a multiplayer world to inspect state systems.';
+      return;
+    }
+    if(!system) {
+      $('civic-status').textContent='This saved world predates the civic systems layer. The host will initialise it during the next simulation day.';
+      return;
+    }
+    $('civic-status').textContent='WORLD DAY '+onlineGame.day+' · STATE SYSTEMS VERSION '+(system.version||1)+' · UPDATED DAY '+(system.lastAdvancedDay||0);
+    const policySelect=$('civic-policy-field');
+    const policyInput=$('civic-policy-value');
+    const policyField=policySelect.value;
+    if(policyInput.dataset.stateId!==territory.stateId) {
+      const currentValues={
+        policePerThousand:system.justice.policePerThousand,
+        civilServants:system.administration.civilServants,
+        pressFreedom:system.media.pressFreedom,
+        counterintelligence:system.intelligence.counterintelligence,
+        taxRatePermille:system.administration.taxRatePermille,
+        ...system.policy
+      };
+      policyInput.dataset.stateId=territory.stateId;
+      policyInput.value=String(currentValues[policyField]??0);
+      policyInput.min='0';
+      policyInput.max=policyField==='policePerThousand'?'10':policyField==='civilServants'?'100000':policyField==='taxRatePermille'?'300':'100';
+      policyInput.step=policyField==='policePerThousand'?'0.1':'1';
+    }
+    $('civic-policy-submit').disabled=!isOnline() || onlineGame.status!=='running' ||
+      !membershipsFor(currentPlayer()).some(item=>item.stateId===territory.stateId) ||
+      !system.offices?.some(item=>['chief-executive','treasurer'].includes(item.id) &&
+        item.holderPlayerId===currentPlayer()?.id);
+    const pct=value=>Math.round(Number(value)||0)+'%';
+    const metric=(value,label)=>{
+      const tile=document.createElement('div');
+      const strong=document.createElement('strong');
+      const small=document.createElement('small');
+      strong.textContent=String(value);
+      small.textContent=label;
+      tile.append(strong,small);
+      lists['civic-overview'].appendChild(tile);
+    };
+    metric(pct(system.legitimacy),'GOVERNMENT LEGITIMACY');
+    metric(pct(system.publicTrust),'PUBLIC TRUST');
+    metric(pct(system.stability),'STATE STABILITY');
+    metric(pct(system.justice.publicOrder),'PUBLIC ORDER');
+    metric(pct(system.administration.efficiency),'ADMINISTRATIVE CAPACITY');
+    metric(pct(system.society.cohesion),'SOCIAL COHESION');
+    const justice=system.justice;
+    addPoliticalRow(lists['civic-justice-list'],'Crime risk index',
+      Number(justice.crimeRatePerThousandYear).toFixed(1)+' annual incidents per 1,000 residents (modelled risk index).');
+    addPoliticalRow(lists['civic-justice-list'],'Court registry',
+      justice.pendingCases+' pending · '+justice.resolvedLastDay+' resolved today · '+justice.reportedCases+' cases recorded in total.');
+    addPoliticalRow(lists['civic-justice-list'],'Law enforcement and prisons',
+      Number(justice.policePerThousand).toFixed(1)+' police per 1,000 residents · '+justice.prisonPopulation+
+      ' detained / '+justice.prisonCapacity+' capacity · '+justice.releasesLastDay+' released today · '+
+      justice.prisonOvercrowding+' above capacity.');
+    addPoliticalRow(lists['civic-justice-list'],'Court workload',
+      justice.awaitingTrial+' awaiting trial · '+justice.courtCapacityPerDay+
+      ' hearings per day · '+justice.casesAdjudicatedToday+' adjudicated today.');
+    const player=currentPlayer();
+    const hasOffice=officeId=>Boolean(player && system.offices?.some(item=>
+      item.id===officeId && item.holderPlayerId===player.id));
+    const caseButton=(row,label,type,payload,enabled=true)=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.textContent=label;
+      button.disabled=!enabled || !isOnline();
+      button.addEventListener('click',()=>{
+        if(!territory) return;
+        const accepted=sendAction({type,stateId:territory.stateId,...payload});
+        if(accepted) $('civic-status').textContent='Court order queued for host validation.';
+      });
+      row.appendChild(button);
+      return button;
+    };
+    const cases=(justice.courtCases||[]).slice().sort((a,b)=>
+      (Number(b.reportedDay)||0)-(Number(a.reportedDay)||0)).slice(0,12);
+    if(!cases.length) addPoliticalRow(lists['civic-cases-list'],'No open court cases',
+      'Newly reported cases enter investigation before prosecution and judicial review.');
+    for(const caseFile of cases) {
+      const row=addPoliticalRow(lists['civic-cases-list'],
+        caseFile.id+' · '+String(caseFile.status).toUpperCase(),
+        caseFile.offence+' · '+caseFile.severity+' · reported day '+caseFile.reportedDay+
+        (caseFile.evidenceScore!=null?' · evidence '+caseFile.evidenceScore+'/100':'')+
+        (caseFile.verdict?' · verdict '+caseFile.verdict:'')+
+        (caseFile.appealStatus?' · appeal '+caseFile.appealStatus:''));
+      if(caseFile.status==='reported')
+        caseButton(row,'INVESTIGATE','investigateCourtCase',{caseId:caseFile.id},hasOffice('justice-minister'));
+      if(caseFile.status==='investigated')
+        caseButton(row,'FILE CHARGES','fileCourtCharges',{caseId:caseFile.id},
+          hasOffice('public-prosecutor') && Number(caseFile.evidenceScore)>=40);
+      if(caseFile.status==='awaitingTrial') {
+        caseButton(row,'ACQUIT','adjudicateCourtCase',{
+          caseId:caseFile.id,verdict:'acquit'
+        },hasOffice('chief-justice'));
+        caseButton(row,'CONVICT','adjudicateCourtCase',{
+          caseId:caseFile.id,verdict:'convict',
+          sentenceDays:caseFile.defaultSentenceDays||5
+        },hasOffice('chief-justice'));
+      }
+      if(caseFile.status==='resolved' && !caseFile.appealStatus &&
+        Number.isSafeInteger(caseFile.resolvedDay) && onlineGame.day<=caseFile.resolvedDay+5) {
+        const grounds=$('civic-appeal-grounds').value.trim();
+        caseButton(row,'FILE APPEAL','appealCourtCase',{
+          caseId:caseFile.id,grounds
+        },grounds.length>=12);
+      }
+      if(caseFile.status==='appealPending') {
+        caseButton(row,'UPHOLD','resolveCourtAppeal',{
+          caseId:caseFile.id,appealVerdict:'uphold'
+        },hasOffice('appeal-judge'));
+        caseButton(row,'OVERTURN','resolveCourtAppeal',{
+          caseId:caseFile.id,appealVerdict:'overturn'
+        },hasOffice('appeal-judge'));
+      }
+    }
+    const services=system.publicServices;
+    addPoliticalRow(lists['civic-services-list'],'Public health',
+      'Health index '+pct(services.healthIndex)+' · vaccination coverage '+pct(services.vaccinationCoverage)+
+      ' · healthcare capacity '+pct(territory.healthCoverage||0)+'.');
+    addPoliticalRow(lists['civic-services-list'],'Education',
+      'Education index '+pct(services.educationIndex)+' · literacy model '+pct(services.literacyRate)+
+      ' · education capacity '+pct(territory.educationCoverage||0)+'.');
+    addPoliticalRow(lists['civic-services-list'],'Social protection',
+      'Estimated unemployed population covered by the welfare model: '+pct(services.welfareCoverage)+
+      '. These are coverage indicators, not individual benefit payments.');
+    const land=system.agriculture;
+    addPoliticalRow(lists['civic-land-list'],'Agricultural conditions',
+      'Food security '+pct(land.foodSecurity)+' · soil fertility '+pct(land.soilFertility)+
+      ' · harvest index '+pct(land.harvestIndex)+'.');
+    addPoliticalRow(lists['civic-land-list'],'Natural resources',
+      'Forest stock '+Number(land.forestStock).toLocaleString('en-US')+
+      ' · timber '+Number(land.resourceReserves.timber).toLocaleString('en-US')+
+      ' · ore '+Number(land.resourceReserves.ore).toLocaleString('en-US')+
+      ' · stone '+Number(land.resourceReserves.stone).toLocaleString('en-US')+'.');
+    addPoliticalRow(lists['civic-land-list'],'Environment and water',
+      'Forest cover '+pct(land.forestCover)+' · water stress '+pct(land.waterStress)+
+      ' · pollution index '+pct(land.pollution)+'.');
+    const labour=system.labour;
+    addPoliticalRow(lists['civic-labour-list'],'Labour market',
+      labour.employed.toLocaleString('en-US')+' employed / '+labour.workforce.toLocaleString('en-US')+
+      ' working-age population · unemployment '+pct(labour.unemploymentRate)+'.');
+    addPoliticalRow(lists['civic-labour-list'],'Industry and productivity',
+      'Productivity index '+pct(labour.productivityIndex)+' · wage index '+pct(labour.averageWageIndex)+
+      ' · labour tension '+pct(labour.labourTension)+'.');
+    const companies=(onlineGame.companies||[]).filter(item=>item.stateId===territory.stateId);
+    addPoliticalRow(lists['civic-labour-list'],'Registered companies',
+      companies.length+' companies · '+companies.reduce((total,item)=>total+(item.facilities||[]).length,0)+' production facilities.');
+    const privateEmployees=companies.reduce((total,item)=>total+Number(item.workforce?.employees||0),0);
+    const privatePositions=companies.reduce((total,item)=>total+Number(item.workforce?.workersRequired||0),0);
+    addPoliticalRow(lists['civic-labour-list'],'Private-sector employment',
+      privateEmployees.toLocaleString('en-US')+' employees across registered firms · '+
+      Math.max(0,privatePositions-privateEmployees).toLocaleString('en-US')+' vacancies.');
+    addPoliticalRow(lists['civic-labour-list'],'Company payroll',
+      money(labour.dailyPayrollPaid||0)+' paid today of '+money(labour.dailyPayrollDue||0)+
+      ' due · '+money(labour.wageArrears||0)+' unpaid wages · household income '+
+      money(labour.householdWageIncome||0)+'.');
+    addPoliticalRow(lists['civic-labour-list'],'Household purchasing power',
+      money(labour.householdCashReserves||0)+' available in household accounts · '+
+      money(labour.householdSpendingToday||0)+' spent in the domestic market today.');    const finance=system.finance;
+    addPoliticalRow(lists['civic-finance-list'],'Public accounts',
+      'Observed treasury '+money(territory.treasury||0)+' · modelled public debt '+money(finance.publicDebt)+
+      ' · credit rating '+pct(finance.creditRating)+'.');
+    addPoliticalRow(lists['civic-finance-list'],'Trade balance',
+      'Recorded exports '+money(finance.exports)+' · recorded imports '+money(finance.imports)+
+      ' · balance '+(finance.tradeBalance>=0?'+':'−')+money(Math.abs(finance.tradeBalance))+'.');
+    addPoliticalRow(lists['civic-finance-list'],'Tax and public revenue',
+      'Sales tax collected today: '+money(finance.actualTaxCollectedToday||0)+
+      ' at '+(system.administration.taxRatePermille/10).toFixed(1)+'% of market sales.' );
+    const dailyBudget=system.publicBudget;
+    const dailyBudgetTotal=Object.values(dailyBudget.dailyAllocations||{})
+      .reduce((total,value)=>total+(Number(value)||0),0);
+    addPoliticalRow(lists['civic-finance-list'],'Public-service budget',
+      money(dailyBudget.spentLastDay||0)+' spent today · '+money(dailyBudgetTotal)+
+      ' allocated per day · '+money(dailyBudget.unfundedLastDay||0)+' unfunded · '+
+      Number(dailyBudget.fundedPercent??100).toFixed(1)+'% funded.');
+    const diplomacy=system.diplomacy;
+    addPoliticalRow(lists['civic-diplomacy-list'],'International standing',
+      'Reputation '+pct(diplomacy.reputation)+' · active wars '+diplomacy.activeWars+
+      ' · active treaties '+diplomacy.activeTreaties+' · diplomatic missions '+(diplomacy.embassies||0)+'.');
+    addPoliticalRow(lists['civic-diplomacy-list'],'Defence and intelligence assessment',
+      'Military readiness '+pct(system.military.readiness)+' · personnel '+
+      Number(system.military.personnel).toLocaleString('en-US')+' · threat level '+pct(system.intelligence.threatLevel)+'.');
+    const embassyTarget=$('civic-embassy-target');
+    const previousEmbassyTarget=embassyTarget.value;
+    const eligibleEmbassyTargets=(onlineGame.territories||[]).filter(item=>
+      item.stateId!==territory.stateId && item.ownerPlayerId &&
+      (onlineGame.memberships||[]).some(member=>member.stateId===item.stateId&&member.status==='active'));
+    if(embassyTarget.options.length!==eligibleEmbassyTargets.length ||
+      eligibleEmbassyTargets.some((item,index)=>embassyTarget.options[index]?.value!==item.stateId)) {
+      embassyTarget.replaceChildren();
+      for(const target of eligibleEmbassyTargets) {
+        const option=document.createElement('option');
+        option.value=target.stateId;
+        option.textContent=target.name;
+        embassyTarget.appendChild(option);
+      }
+      if(eligibleEmbassyTargets.some(item=>item.stateId===previousEmbassyTarget))
+        embassyTarget.value=previousEmbassyTarget;
+    }
+    const currentMissions=(onlineGame.embassyMissions||[]).filter(item=>
+      item.proposingStateId===territory.stateId || item.targetStateId===territory.stateId)
+      .slice().sort((a,b)=>(Number(b.proposedOnDay)||0)-(Number(a.proposedOnDay)||0));
+    if(!currentMissions.length) addPoliticalRow(lists['civic-diplomacy-list'],'No diplomatic missions',
+      'A mission requires an executive proposal and approval from the receiving government. Each active side pays 2 currency units per day.');
+    for(const mission of currentMissions.slice(0,8)) {
+      const outgoing=mission.proposingStateId===territory.stateId;
+      const counterpart=onlineGame.territories.find(item=>
+        item.stateId===(outgoing?mission.targetStateId:mission.proposingStateId));
+      const row=addPoliticalRow(lists['civic-diplomacy-list'],
+        (outgoing?'OUTGOING TO ':'INCOMING FROM ')+(counterpart?.name||'Unknown State')+
+          ' · '+String(mission.status).toUpperCase(),
+        'Proposed day '+mission.proposedOnDay+' · expires day '+(mission.expiresDay||'—')+
+        (mission.status==='active'?' · daily upkeep '+(mission.dailyUpkeep||2)+' per government':
+          mission.status==='suspended'?' · suspended: '+(mission.suspendedReason||'not specified'):
+          mission.status==='pending'?' · awaiting receiving-government approval':
+          mission.closedReason?' · closed: '+mission.closedReason:''));
+      if(!outgoing && mission.status==='pending') {
+        for(const [label,response] of [['ACCEPT MISSION','accept'],['REJECT AND REFUND','reject']]) {
+          const button=document.createElement('button');
+          button.type='button';
+          button.textContent=label;
+          button.disabled=!isOnline() || onlineGame.status!=='running' || !hasOffice('chief-executive');
+          button.addEventListener('click',()=>{
+            if(button.disabled || !territory) return;
+            const queued=sendAction({type:'respondEmbassyProposal',stateId:territory.stateId,
+              missionId:mission.id,response});
+            if(queued) $('civic-status').textContent='Diplomatic mission response queued for host validation.';
+          });
+          row.appendChild(button);
+        }
+      }
+    }
+    $('civic-embassy-propose').disabled=!isOnline() || onlineGame.status!=='running' ||
+      !hasOffice('chief-executive') || eligibleEmbassyTargets.length===0 ||
+      !embassyTarget.value || currentMissions.some(item=>
+        [item.proposingStateId,item.targetStateId].includes(embassyTarget.value) &&
+        ['pending','active','suspended'].includes(item.status));
+    const admin=system.administration;
+    addPoliticalRow(lists['civic-administration-list'],'Civil service',
+      admin.civilServants.toLocaleString('en-US')+' civil servants / '+admin.requiredStaff.toLocaleString('en-US')+
+      ' modelled requirement · efficiency '+pct(admin.efficiency)+'.');
+    addPoliticalRow(lists['civic-administration-list'],'Administrative oversight',
+      'Service backlog '+Math.round(admin.serviceBacklog).toLocaleString('en-US')+
+      ' · corruption risk '+pct(admin.corruptionRisk)+
+      ' · daily workload includes population and unresolved court cases.');
+    const media=system.media;
+    addPoliticalRow(lists['civic-media-list'],'Press environment',
+      'Freedom '+pct(media.pressFreedom)+' · public confidence '+pct(media.publicConfidence)+
+      ' · disinformation pressure '+pct(media.disinformationPressure)+'.');
+    for(const item of (media.published||[]).slice(0,5))
+      addPoliticalRow(lists['civic-media-list'],item.source||'Public bulletin',
+        formatWorldDate(item.worldDate)+' · '+item.headline+
+        (item.body?' · '+item.body:'')+(item.official?' · OFFICIAL STATEMENT':''));
+    const intel=system.intelligence;
+    addPoliticalRow(lists['civic-intelligence-list'],intel.agencyName,
+      'Capability '+pct(intel.capacity)+' · counterintelligence '+pct(intel.counterintelligence)+
+      ' · unresolved assessments '+intel.unresolvedReports+'.');
+    const officeHeld=officeId=>Boolean(player && system.offices?.some(item=>
+      item.id===officeId && item.holderPlayerId===player.id));
+    const budgetDepartment=$('civic-budget-department');
+    const budgetAmount=$('civic-budget-amount');
+    if(budgetAmount.dataset.stateId!==territory.stateId ||
+      budgetAmount.dataset.department!==budgetDepartment.value) {
+      budgetAmount.dataset.stateId=territory.stateId;
+      budgetAmount.dataset.department=budgetDepartment.value;
+      budgetAmount.value=String(dailyBudget.dailyAllocations?.[budgetDepartment.value]||0);
+    }
+    $('civic-budget-submit').disabled=!isOnline() || onlineGame.status!=='running' ||
+      !(officeHeld('treasurer')||officeHeld('chief-executive'));
+    for(const report of (intel.reports||[]).slice(0,6)) {
+      const row=addPoliticalRow(lists['civic-intelligence-list'],report.threat.toUpperCase(),
+        'Day '+report.createdDay+' · confidence '+pct(report.confidence)+' · '+report.assessment);
+      if(report.status==='pending' && report.id)
+        caseButton(row,'REVIEW ASSESSMENT','reviewIntelAssessment',{assessmentId:report.id},officeHeld('intelligence-director'));
+    }
+    const pressHeadline=$('civic-press-headline');
+    const pressBody=$('civic-press-body');
+    $('civic-publish-statement').disabled=!isOnline() || onlineGame.status!=='running' ||
+      !officeHeld('press-secretary') || pressHeadline.value.trim().length<5 ||
+      pressBody.value.trim().length<20;
+    const intelTarget=$('civic-intel-target');
+    const previousTarget=intelTarget.value;
+    const eligibleTargets=(onlineGame.territories||[]).filter(item=>item.stateId!==territory.stateId);
+    if(intelTarget.options.length!==eligibleTargets.length ||
+      eligibleTargets.some((item,index)=>intelTarget.options[index+1]?.value!==item.stateId)) {
+      intelTarget.replaceChildren();
+      for(const target of eligibleTargets) {
+        const option=document.createElement('option');
+        option.value=target.stateId;
+        option.textContent=target.name;
+        intelTarget.appendChild(option);
+      }
+      if(eligibleTargets.some(item=>item.stateId===previousTarget)) intelTarget.value=previousTarget;
+    }
+    $('civic-intel-commission').disabled=!isOnline() || onlineGame.status!=='running' ||
+      !officeHeld('intelligence-director') || eligibleTargets.length===0;
+    const describeGroups=groups=>(groups||[]).map(item=>
+      item.name+' '+(item.shareBasisPoints/100).toFixed(1)+'%').join(' · ');
+    addPoliticalRow(lists['civic-identity-list'],'Social groups',
+      describeGroups(system.society.groups)+' · inequality '+pct(system.society.inequalityIndex)+
+      ' · mobility '+pct(system.society.socialMobility)+'.');
+    addPoliticalRow(lists['civic-identity-list'],'Cultural communities',
+      describeGroups(system.identity.cultureGroups));
+    addPoliticalRow(lists['civic-identity-list'],'Religious and non-religious communities',
+      describeGroups(system.identity.religionGroups)+' · rights protection '+pct(system.identity.rightsProtection)+'.');
+    addPoliticalRow(lists['civic-identity-list'],'Political ideologies',
+      describeGroups(system.identity.ideologyGroups)+' · identity tension '+pct(system.identity.identityTension)+'.');
+    const petitions=(system.society.petitions||[]).slice().sort((a,b)=>
+      (a.status==='pending'?0:1)-(b.status==='pending'?0:1) ||
+      (Number(b.submittedDay)||0)-(Number(a.submittedDay)||0)).slice(0,8);
+    if(!petitions.length) addPoliticalRow(lists['civic-petition-list'],'No public petitions yet',
+      'Petitions are generated from measured unemployment, food shortages, education, rights, inequality and environmental conditions.');
+    for(const petition of petitions) {
+      const support=(Number(petition.supportBasisPoints)||0)/100;
+      const status=String(petition.status||'unknown').toUpperCase();
+      const recommendation=petition.policyId==='pressFreedom'?'press freedom':
+        String(petition.policyId||'policy').replace(/([A-Z])/g,' $1').toLowerCase();
+      const row=addPoliticalRow(lists['civic-petition-list'],
+        petition.title+' · '+status,
+        'Constituency: '+(petition.sourceGroupName||'Residents')+' · estimated support '+support.toFixed(1)+
+        '% ('+Number(petition.estimatedSupport||0).toLocaleString('en-US')+' residents) · submitted day '+
+        petition.submittedDay+' · '+petition.rationale+
+        (petition.status==='pending'?' · proposed '+recommendation+' '+petition.previousValue+' → '+petition.requestedValue+
+          ' · expires day '+petition.expiresDay:' · '+(petition.response||'No response recorded')));
+      if(petition.status==='pending') {
+        for(const [label,response] of [['APPROVE AND IMPLEMENT','approve'],['REJECT PETITION','reject']]) {
+          const button=document.createElement('button');
+          button.type='button';
+          button.textContent=label;
+          button.disabled=!isOnline() || onlineGame.status!=='running' || !hasOffice('chief-executive');
+          button.addEventListener('click',()=>{
+            if(!territory || button.disabled) return;
+            const queued=sendAction({type:'respondCivicPetition',stateId:territory.stateId,
+              petitionId:petition.id,response});
+            if(queued) $('civic-status').textContent='Executive petition response queued for host validation.';
+          });
+          row.appendChild(button);
+        }
+      }
+    }
+    addPoliticalRow(lists['civic-petition-list'],'Petition record',
+      (system.society.resolvedPetitions||0)+' petitions resolved by the executive; pending petitions expire after 30 world days. Support figures are population estimates, not individual player signatures.');
+    const activeCrises=(system.crises||[]).filter(item=>item.status==='active');
+    if(activeCrises.length) {
+      for(const crisis of activeCrises)
+        addPoliticalRow(lists['civic-crisis-list'],crisis.title+' · '+crisis.severity.toUpperCase(),
+          'ACTIVE SINCE DAY '+crisis.startedDay+' · '+crisis.description);
+    } else {
+      addPoliticalRow(lists['civic-crisis-list'],'No active civic crisis',
+        'No tracked food, public-order, administrative or environmental emergency is currently active.');
+    }
+    for(const crisis of (system.crises||[]).filter(item=>item.status==='resolved').slice(-4).reverse())
+      addPoliticalRow(lists['civic-crisis-list'],crisis.title+' · RESOLVED',
+        'Resolved on world day '+crisis.resolvedDay+'.');
+  }
+
   function renderSettlement() {
     const territory = onlineGame?.territories.find(item => item.index === state.selected);
     const population = Math.max(0, Number(territory?.population) || 0);
@@ -2166,6 +2884,18 @@
     $('settlement-employment').textContent = onlineGame
       ? Number(territory.availableJobs || 0).toLocaleString('en-US') + ' / ' +
         Number(territory.workingAgePopulation || 0).toLocaleString('en-US')
+      : '—';
+    const demographics = territory?.demographicIndicators;
+    $('settlement-age-structure').textContent = onlineGame && demographics
+      ? [demographics.children,demographics.workingAge,demographics.seniors]
+        .map(value => Number(value || 0).toLocaleString('en-US')).join(' / ')
+      : '—';
+    $('settlement-demographic-flow').textContent = onlineGame && demographics
+      ? [demographics.birthsLastDay,demographics.deathsLastDay,demographics.netMigrationLastDay]
+        .map(value => (Number(value) > 0 ? '+' : '') + Number(value || 0).toLocaleString('en-US')).join(' / ')
+      : '—';
+    $('settlement-dependency').textContent = onlineGame && demographics
+      ? (demographics.dependencyRatio == null ? '—' : demographics.dependencyRatio.toFixed(1) + ' / 100 active')
       : '—';
     const services = [
       ['HOUSING', territory?.housingCapacity, population],
@@ -2484,9 +3214,12 @@
 
   function sendAction(action) {
     const supportedOrders = new Set([
-      'claim','build','pause','resume','recruitUnit','mobilizeUnit',
+      'claim','build','pause','resume','recruitUnit','mobilizeUnit','setPublicBudget','respondCivicPetition',
       'startProject','cancelProject','adoptTechnology','approveBudget',
-      'proposeLaw','voteDecision','appointOffice',
+      'proposeLaw','voteDecision','appointOffice','setCivicPolicy',
+      'investigateCourtCase','fileCourtCharges','adjudicateCourtCase',
+      'appealCourtCase','resolveCourtAppeal','publishPublicStatement',
+      'commissionIntelAssessment','reviewIntelAssessment','proposeEmbassy','respondEmbassyProposal',
       'establishTradeRoute','respondTradeRoute','cancelTradeRoute','declareWar','makePeace'
     ]);
     if (!supportedOrders.has(action.type)) {
@@ -2599,7 +3332,34 @@
       WAR_NOT_DECLARED: 'Declare war before attacking another administered State.',
       PEACE_UNAVAILABLE: 'There is no active war between these governments.',
       OCCUPATION_ACTIVE: 'Finish or withdraw from active occupations before signing peace.',
-      INSUFFICIENT_PERMISSION: 'This action is reserved for the appointed government office holder.'
+      INSUFFICIENT_PERMISSION: 'This action is reserved for the appointed government office holder.',
+      CIVIC_SYSTEM_UNAVAILABLE: 'The State systems are not initialised yet. Advance the world once and retry.',
+      INVALID_CIVIC_POLICY: 'The selected policy value is outside its allowed range.',
+      JUSTICE_AUTHORITY_REQUIRED: 'The Minister of Justice must hold office in this State.',
+      PROSECUTOR_AUTHORITY_REQUIRED: 'The Public Prosecutor must hold office in this State.',
+      JUDICIAL_AUTHORITY_REQUIRED: 'The Chief Justice must hold office in this State.',
+      APPEAL_AUTHORITY_REQUIRED: 'The Court of Appeal Judge must hold office in this State.',
+      COURT_CASE_UNAVAILABLE: 'That case is no longer available for this procedure.',
+      INSUFFICIENT_EVIDENCE: 'The case has not met the evidence threshold for prosecution.',
+      TRIAL_NOT_READY: 'The hearing can only take place on a later world day after charges are filed.',
+      COURT_CAPACITY_REACHED: 'The court has reached its hearing capacity for this world day.',
+      INVALID_VERDICT: 'Choose either conviction or acquittal.',
+      INVALID_SENTENCE: 'The custodial sentence must be between 1 and 3,650 world days.',
+      APPEAL_WINDOW_CLOSED: 'The five-day appeal window has closed.',
+      INVALID_APPEAL_GROUNDS: 'Appeal grounds need at least 12 characters.',
+      APPEAL_NOT_READY: 'The appeal requires review on a later world day.',
+      INVALID_APPEAL_VERDICT: 'Choose whether to uphold or overturn the judgment.',
+      PRESS_AUTHORITY_REQUIRED: 'The appointed Press Secretary must publish official State statements.',
+      INVALID_PUBLIC_STATEMENT: 'The public statement needs a valid headline and body.',
+      INTELLIGENCE_AUTHORITY_REQUIRED: 'The appointed Intelligence Director must commission or review assessments.',
+      INVALID_INTELLIGENCE_TARGET: 'Choose another State with civic data.',
+      INVALID_INTELLIGENCE_TYPE: 'Choose a supported intelligence assessment type.',
+      INTELLIGENCE_QUEUE_FULL: 'Resolve existing assessments before commissioning more.',
+      INTELLIGENCE_REPORT_UNAVAILABLE: 'That intelligence assessment is no longer pending.',
+      INTELLIGENCE_REPORT_NOT_READY: 'The assessment needs one more world day before review.',
+      PUBLIC_BUDGET_AUTHORITY_REQUIRED: 'Only the Treasurer or Chief Executive can allocate public spending.',
+      INVALID_PUBLIC_BUDGET: 'Choose a valid department and a daily amount from 0 to 100,000.',
+      PUBLIC_BUDGET_LIMIT: 'Combined daily public allocations cannot exceed 300,000.'
     };
     return messages[code] || 'The host rejected the order.';
   }
@@ -2840,6 +3600,105 @@
       policyId:$('law-policy').value
     });
   });
+  $('civic-press-headline').addEventListener('input',renderCivicSystems);
+  $('civic-press-body').addEventListener('input',renderCivicSystems);
+  $('civic-publish-statement').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    if(!territory || $('civic-publish-statement').disabled) return;
+    const queued=sendAction({
+      type:'publishPublicStatement',stateId:territory.stateId,
+      headline:$('civic-press-headline').value,
+      body:$('civic-press-body').value
+    });
+    if(queued) $('civic-status').textContent='Official statement queued for the host press office.';
+  });
+  $('civic-embassy-target').addEventListener('change',renderCivicSystems);
+  $('civic-embassy-propose').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    if(!territory || $('civic-embassy-propose').disabled) return;
+    const queued=sendAction({type:'proposeEmbassy',stateId:territory.stateId,
+      targetStateId:$('civic-embassy-target').value});
+    if(queued) $('civic-status').textContent='Diplomatic mission proposal queued; 100 units will remain refundable until the recipient responds.';
+  });
+  $('civic-intel-commission').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    if(!territory || $('civic-intel-commission').disabled) return;
+    const queued=sendAction({
+      type:'commissionIntelAssessment',stateId:territory.stateId,
+      targetStateId:$('civic-intel-target').value,
+      assessmentType:$('civic-intel-type').value
+    });
+    if(queued) $('civic-status').textContent='Strategic assessment queued for the Intelligence Directorate.';
+  });
+  $('civic-budget-department').addEventListener('change',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const civic=onlineGame?.civicSystems?.find(item=>item.stateId===territory?.stateId);
+    if(!civic) return;
+    const input=$('civic-budget-amount');
+    input.dataset.department=$('civic-budget-department').value;
+    input.dataset.stateId=territory.stateId;
+    input.value=String(civic.publicBudget?.dailyAllocations?.[input.dataset.department]||0);
+  });
+  $('civic-budget-amount').addEventListener('input',renderCivicSystems);
+  $('civic-budget-submit').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const input=$('civic-budget-amount');
+    const amount=Number(input.value);
+    if(!territory || $('civic-budget-submit').disabled) return;
+    if(!input.value || !input.checkValidity() || !Number.isSafeInteger(amount)) {
+      $('civic-status').textContent='Daily allocation must be a whole number from 0 to 100,000.';
+      return;
+    }
+    const queued=sendAction({
+      type:'setPublicBudget',stateId:territory.stateId,
+      category:$('civic-budget-department').value,dailyAmount:amount
+    });
+    if(queued) $('civic-status').textContent='Daily public budget allocation queued for host approval.';
+  });
+  $('civic-policy-field').addEventListener('change',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const system=onlineGame?.civicSystems?.find(item=>item.stateId===territory?.stateId);
+    if(!system) return;
+    const field=$('civic-policy-field').value;
+    const values={
+      policePerThousand:system.justice.policePerThousand,
+      civilServants:system.administration.civilServants,
+      pressFreedom:system.media.pressFreedom,
+      counterintelligence:system.intelligence.counterintelligence,
+      taxRatePermille:system.administration.taxRatePermille,
+      ...system.policy
+    };
+    const input=$('civic-policy-value');
+    const ranges={
+      policePerThousand:[0,10,0.1],
+      civilServants:[0,100000,1],
+      taxRatePermille:[0,300,1]
+    };
+    const range=ranges[field]||[0,100,1];
+    input.min=String(range[0]);
+    input.max=String(range[1]);
+    input.step=String(range[2]);
+    input.value=String(values[field]??0);
+  });
+  $('civic-policy-value').addEventListener('input',() => {
+    $('civic-policy-value').dataset.edited='true';
+  });
+  $('civic-appeal-grounds').addEventListener('input',renderCivicSystems);
+  $('civic-policy-submit').addEventListener('click',() => {
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const input=$('civic-policy-value');
+    const field=$('civic-policy-field').value;
+    const value=Number(input.value);
+    if(!territory || $('civic-policy-submit').disabled) return;
+    if(!input.value || !input.checkValidity() || !Number.isFinite(value)) {
+      $('civic-policy-status').textContent='Enter a policy value within the selected instrument limits.';
+      return;
+    }
+    const queued=sendAction({
+      type:'setCivicPolicy',stateId:territory.stateId,policyId:field,value
+    });
+    if(queued) $('civic-policy-status').textContent='Policy request queued for host validation. The new setting takes effect in the shared world after acceptance.';
+  });
   $('trade-route-destination').addEventListener('change',renderEconomy);
   $('trade-route-capacity').addEventListener('change',renderEconomy);
   $('create-trade-route').addEventListener('click',() => {
@@ -3008,6 +3867,10 @@
     'technology', 'technology-config',
     ['technologies', 'researchInstitutions', 'researchProjects', 'technologyUnlocks', 'technologyAdoptions'],
     'Technology'));
+  $('load-event-config').addEventListener('click',loadEventConfiguration);
+  $('save-event-config').addEventListener('click',saveEventConfiguration);
+  $('treaty-duration').addEventListener('input',renderDiplomacy);
+  $('treaty-proposal-expiry').addEventListener('input',renderDiplomacy);
   $('copy-invite').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText($('invite-share').value);

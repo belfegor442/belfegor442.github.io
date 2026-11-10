@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261108-functional-controls-v3">
+  <link rel="stylesheet" href="./game.css?v=20261109-colored-sprite-ui-v1">
 </head>
 <body>
   <header class="topbar">
@@ -21,25 +21,26 @@
     <span class="campaign-subline">A world shaped by borders, cities and decisions</span>
   </div>
   <div class="top-stats">
-    <div class="stat-date"><small>WORLD DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
-    <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
-    <div><small>POPULATION</small><strong id="population">—</strong></div>
-    <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
+    <div class="stat-date"><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><small>WORLD DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
+    <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_2_store" aria-hidden="true"></canvas><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
+    <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="houses/1x1_house1" aria-hidden="true"></canvas><small>POPULATION</small><strong id="population">—</strong></div>
+    <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="village/1x1_farmhouse_barn" aria-hidden="true"></canvas><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
   </div>
   <button id="save-btn" class="quiet-btn" hidden>SAVE</button>
 </header>
 
   <main class="game-shell" aria-label="New World strategy interface">
     <nav class="nav-rail" aria-label="World navigation">
-      <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
-      <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
-      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>BUILD</span></button>
-      <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
-      <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
-      <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
-      <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><span class="nav-icon">⌘</span><span>RESEARCH</span></button>
-      <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><span class="nav-icon">◇</span><span>DIPLOMACY</span></button>
-      <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
+      <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>WORLD</span></button>
+      <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_farmhouse_barn" aria-hidden="true"></canvas><span>LAND</span></button>
+      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="houses/1x1_house1" aria-hidden="true"></canvas><span>BUILD</span></button>
+      <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_2_store" aria-hidden="true"></canvas><span>ECONOMY</span></button>
+      <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>GOVERNMENT</span></button>
+      <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><img class="nav-icon nav-icon-image" src="./assets/kenney-medieval-rts/medievalUnit_01.png" alt="" aria-hidden="true"><span>MILITARY</span></button>
+      <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_13_bookstore" aria-hidden="true"></canvas><span>RESEARCH</span></button>
+      <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_market_stall" aria-hidden="true"></canvas><span>DIPLOMACY</span></button>
+      <button class="tab" data-view="civic" aria-controls="civic-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="stores/1x1_commercial_57_clinic" aria-hidden="true"></canvas><span>SOCIETY / STATE</span></button>
+      <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_round_cottage" aria-hidden="true"></canvas><span>PLAYERS</span></button>
       <div class="nav-rail-foot">NA</div>
     </nav>
 
@@ -47,7 +48,7 @@
       <section class="map-frame" aria-label="Beleland strategic map">
         <div class="map-tools">
           <div class="map-heading">
-            <span class="map-heading-mark">◈</span>
+            <canvas class="map-heading-mark" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas>
             <span class="map-title"><b>BELELAND</b><small>STRATEGIC MAP</small></span>
             <span class="map-divider">/</span>
             <span id="map-layer-label">POLITICAL</span>
@@ -77,7 +78,7 @@
           <div id="map-coordinates" class="map-coordinates" aria-hidden="true">BELELAND · WORLD 001</div>
           <section id="theotown-build-menu" class="theotown-build-menu" role="dialog" aria-label="Build catalogue" hidden>
             <div class="build-menu-top">
-              <div class="build-menu-title"><span class="build-menu-hammer" aria-hidden="true">⚒</span><div><strong>BUILD</strong><small>OBJECT CATALOGUE</small></div></div>
+              <div class="build-menu-title"><canvas class="build-menu-hammer" width="72" height="72" data-sprite-key="village/1x1_lumber_shed" aria-hidden="true"></canvas><div><strong>BUILD</strong><small>OBJECT CATALOGUE</small></div></div>
               <div class="build-menu-context"><small id="build-region-name">NO SETTLEMENT</small><strong id="build-budget">¤ 0</strong><span>TREASURY</span></div>
               <button id="build-menu-close" class="build-menu-close" type="button" aria-label="Close build menu">×</button>
             </div>
@@ -102,7 +103,7 @@
                   <p id="build-selected-description">Select an item from the catalogue to inspect its description, cost and effects.</p>
                   <div id="build-selected-stats" class="build-selected-stats"></div>
                   <div class="build-selected-cost"><strong id="build-selected-cost">—</strong><span id="build-selected-time">— WORLD DAYS</span></div>
-                  <button id="build-confirm" class="build-confirm" type="button" disabled><span aria-hidden="true">⚒</span> BUILD</button>
+                  <button id="build-confirm" class="build-confirm" type="button" disabled><canvas class="build-confirm-icon" width="48" height="48" data-sprite-key="village/1x1_lumber_shed" aria-hidden="true"></canvas> BUILD</button>
                 </div>
               </section>
             </div>
@@ -136,6 +137,17 @@
             <div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div>
             <div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div>
           </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">WORLD CHRONICLE / EMERGENT EVENTS</p>
+          <div id="world-event-list" class="political-list"></div>
+          <details id="event-setup-panel" hidden>
+            <summary>Event rules · host scenario setup</summary>
+            <p class="microcopy">Configure deterministic triggers using measured world data. Supported triggers: marketShortage, treasuryBelow, prosperityBelow and warActive. There are no default random events.</p>
+            <textarea id="event-config" class="text-field" rows="10" spellcheck="false" aria-label="World event definitions JSON"></textarea>
+            <button id="load-event-config" class="secondary-button" type="button">LOAD EVENT RULES</button>
+            <button id="save-event-config" class="action-btn" type="button">VALIDATE AND SAVE EVENT RULES</button>
+            <p id="event-setup-status" class="microcopy" role="status">Event rules can only be changed by the host before the world starts.</p>
+          </details>
           <div class="panel-divider"></div>
           <p class="panel-kicker">CAMPAIGN OBJECTIVES</p>
           <div id="campaign-objectives" class="political-list"></div>
@@ -194,6 +206,9 @@
                 <div><small>OPEN CAPACITY</small><strong id="settlement-capacity">—</strong></div>
                 <div><small>DAILY GROWTH</small><strong id="settlement-growth">—</strong></div>
                 <div><small>AVAILABLE JOBS / WORKING AGE</small><strong id="settlement-employment">—</strong></div>
+                <div><small>CHILDREN / WORKING AGE / SENIORS</small><strong id="settlement-age-structure">—</strong></div>
+                <div><small>BIRTHS / DEATHS / NET MIGRATION</small><strong id="settlement-demographic-flow">—</strong></div>
+                <div><small>DEPENDENCY RATIO</small><strong id="settlement-dependency">—</strong></div>
                 <div><small>COMPLETED BUILDINGS</small><strong id="settlement-buildings">—</strong></div>
                 <div><small>UNDER CONSTRUCTION</small><strong id="settlement-construction">—</strong></div>
               </div>
@@ -246,8 +261,11 @@
             <button id="save-economy-config" class="primary-button" type="button">Validate and save scenario</button>
           </details>
           <div class="panel-divider"></div>
-          <p class="panel-kicker">COMPANY SALES / CASH LEDGER</p>
+          <p class="panel-kicker">COMPANY SALES / PAYROLL / CASH LEDGER</p>
           <div id="company-transaction-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">HOUSEHOLD INCOME / PURCHASES / CASH LEDGER</p>
+          <div id="household-transaction-list" class="political-list"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">SIMULATION RECORD</p>
           <h2>Recent activity</h2>
@@ -340,11 +358,115 @@
           <p class="panel-kicker">FOREIGN AFFAIRS / RELATIONS / CONFLICT</p>
           <h2>Diplomatic relations</h2>
           <p id="diplomacy-status" class="muted" role="status">Connect to a world to inspect foreign relations.</p>
+          <div class="treaty-proposal-controls">
+            <label class="field-label" for="treaty-duration">NON-AGGRESSION TERM / WORLD DAYS</label>
+            <input id="treaty-duration" class="text-field" type="number" min="1" max="3650" step="1" placeholder="1–3650">
+            <label class="field-label" for="treaty-proposal-expiry">PROPOSAL EXPIRY / WORLD DAYS</label>
+            <input id="treaty-proposal-expiry" class="text-field" type="number" min="1" max="3650" step="1" placeholder="1–3650">
+          </div>
           <div id="diplomacy-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">TREATIES / PROPOSALS</p>
+          <div id="treaty-list" class="political-list"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">DIPLOMATIC RECORD</p>
           <div id="diplomacy-history" class="political-list"></div>
           <p class="microcopy">Wars must be declared before attacking another administered State. Neutral, unclaimed territories can be claimed or attacked without a declaration.</p>
+        </section>
+
+        <section id="civic-view" class="view">
+          <p class="panel-kicker">PUBLIC ORDER / SOCIETY / STATE CAPACITY</p>
+          <h2 id="civic-title">State systems</h2>
+          <p id="civic-status" class="muted">Connect to a world to inspect justice, public services, environment, administration and society.</p>
+          <div id="civic-overview" class="metric-grid"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">DAILY PUBLIC BUDGET / EXPENDITURE</p>
+          <label class="field-label" for="civic-budget-department">DEPARTMENT</label>
+          <select id="civic-budget-department" class="text-field">
+            <option value="health">Public health</option>
+            <option value="education">Education</option>
+            <option value="justice">Courts and justice</option>
+            <option value="policing">Police and public order</option>
+            <option value="welfare">Welfare and social support</option>
+            <option value="environment">Environment and conservation</option>
+            <option value="administration">Civil administration</option>
+          </select>
+          <label class="field-label" for="civic-budget-amount">DAILY ALLOCATION / CURRENCY UNITS</label>
+          <input id="civic-budget-amount" class="text-field" type="number" min="0" max="100000" step="1" value="0">
+          <button id="civic-budget-submit" class="action-btn" type="button" disabled>SET DAILY ALLOCATION</button>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC PARTICIPATION / PETITIONS</p>
+          <div id="civic-petition-list" class="political-list"></div>
+          <p class="panel-kicker">STATE POLICY / EXECUTIVE INSTRUMENTS</p>
+          <label class="field-label" for="civic-policy-field">POLICY INSTRUMENT</label>
+          <select id="civic-policy-field" class="text-field">
+            <option value="policePerThousand">Police per 1,000 residents · 0–10</option>
+            <option value="civilServants">Civil servants · 0–100,000</option>
+            <option value="pressFreedom">Press freedom · 0–100</option>
+            <option value="counterintelligence">Counterintelligence · 0–100</option>
+            <option value="healthInvestment">Health investment · 0–100</option>
+            <option value="educationInvestment">Education investment · 0–100</option>
+            <option value="environmentalRegulation">Environmental regulation · 0–100</option>
+            <option value="welfareInvestment">Welfare investment · 0–100</option>
+            <option value="taxRatePermille">Trade tax rate · 0–300 per mille</option>
+          </select>
+          <label class="field-label" for="civic-policy-value">NEW SETTING</label>
+          <input id="civic-policy-value" class="text-field" type="number" step="1" value="50">
+          <button id="civic-policy-submit" class="action-btn" type="button" disabled>SUBMIT STATE POLICY</button>
+          <p id="civic-policy-status" class="microcopy">Requires an active government membership and host confirmation. Values are state policy settings, not direct financial transfers.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">15 / JUSTICE, COURTS AND PUBLIC ORDER</p>
+          <div id="civic-justice-list" class="political-list"></div>
+          <label class="field-label" for="civic-appeal-grounds">APPEAL GROUNDS</label>
+          <textarea id="civic-appeal-grounds" class="text-field" rows="3" maxlength="300" placeholder="Explain the alleged procedural or evidential error..."></textarea>
+          <div id="civic-cases-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">16 / HEALTH, EDUCATION AND WELFARE</p>
+          <div id="civic-services-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">17 / AGRICULTURE, RESOURCES AND ENVIRONMENT</p>
+          <div id="civic-land-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">18 / INDUSTRY, COMPANIES AND LABOUR</p>
+          <div id="civic-labour-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">19 / TRADE, CURRENCY AND PUBLIC FINANCE</p>
+          <div id="civic-finance-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">20 / DIPLOMACY AND INTERNATIONAL SECURITY</p>
+          <div id="civic-diplomacy-list" class="political-list"></div>
+          <label class="field-label" for="civic-embassy-target">DIPLOMATIC MISSION DESTINATION</label>
+          <select id="civic-embassy-target" class="text-field"></select>
+          <button id="civic-embassy-propose" class="action-btn" type="button" disabled>PROPOSE DIPLOMATIC MISSION</button>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">21 / ADMINISTRATION AND BUREAUCRACY</p>
+          <div id="civic-administration-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">22 / PRESS AND PUBLIC INFORMATION</p>
+          <div id="civic-media-list" class="political-list"></div>
+          <label class="field-label" for="civic-press-headline">OFFICIAL STATEMENT HEADLINE</label>
+          <input id="civic-press-headline" class="text-field" maxlength="90" placeholder="State Press Office headline">
+          <label class="field-label" for="civic-press-body">PUBLIC STATEMENT</label>
+          <textarea id="civic-press-body" class="text-field" rows="3" maxlength="600" placeholder="Publish a verified statement on behalf of the State..."></textarea>
+          <button id="civic-publish-statement" class="action-btn" type="button" disabled>PUBLISH OFFICIAL STATEMENT</button>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">23 / INTELLIGENCE AND COUNTERINTELLIGENCE</p>
+          <div id="civic-intelligence-list" class="political-list"></div>
+          <label class="field-label" for="civic-intel-target">ASSESSMENT TARGET</label>
+          <select id="civic-intel-target" class="text-field"></select>
+          <label class="field-label" for="civic-intel-type">ASSESSMENT TYPE</label>
+          <select id="civic-intel-type" class="text-field">
+            <option value="military">Military capability</option>
+            <option value="economic">Economic conditions</option>
+            <option value="political">Political stability</option>
+          </select>
+          <button id="civic-intel-commission" class="action-btn" type="button" disabled>COMMISSION ASSESSMENT</button>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">25 / CULTURE, RELIGION AND POLITICAL IDEOLOGIES</p>
+          <div id="civic-identity-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">24 / CRISES AND EMERGENT HISTORY</p>
+          <div id="civic-crisis-list" class="political-list"></div>
         </section>
 
         <section id="multiplayer-view" class="view">
@@ -402,11 +524,12 @@
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js?v=20261108-playable-systems-v1"></script>
-  <script src="./strategy.js?v=20261108-playable-systems-v1"></script>
-  <script src="./multiplayer.js?v=20261108-functional-controls-v3"></script>
+  <script src="./civic-systems.js?v=20261109-public-budget-phase5"></script>
+  <script src="./simulation.js?v=20261109-public-budget-phase5"></script>
+  <script src="./strategy.js?v=20261109-public-budget-phase5"></script>
+  <script src="./multiplayer.js?v=20261109-public-budget-phase5"></script>
   <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
-  <script src="./build-menu.js?v=20261108-functional-controls-v3"></script>
-  <script src="./game.js?v=20261108-functional-controls-v3"></script>
+  <script src="./build-menu.js?v=20261109-colored-sprite-ui-v1"></script>
+  <script src="./game.js?v=20261109-colored-sprite-ui-v1"></script>
 </body>
 </html>
