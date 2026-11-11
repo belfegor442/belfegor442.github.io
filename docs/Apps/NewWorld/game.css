@@ -801,3 +801,10 @@ a{color:inherit}
   .top-stats>div small{font-size:5.2px}
   .top-stats>div strong{font-size:6.7px}
 }
+
+/* Campaign entry modes */
+.mode-divider-label{display:flex;align-items:center;gap:9px;margin:15px 0 3px;color:var(--gold);font:700 7px/1.4 var(--mono);letter-spacing:1px}
+.mode-divider-label::after{content:"";height:1px;flex:1;background:var(--line-soft)}
+#play-solo{justify-content:center;min-height:42px;margin-top:7px}
+#network-service{margin-top:17px;padding-top:11px;border-top:1px solid var(--line-soft)}
+#network-service[hidden]{display:none!important}

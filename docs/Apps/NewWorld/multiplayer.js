@@ -1176,6 +1176,65 @@
     return changed;
   }
 
+  function startSoloCampaign(game) {
+    if (!game || game.started || game.status !== 'lobby') return false;
+    game.started = true;
+    game.paused = false;
+    game.status = 'running';
+    game.pauseVotePlayerIds = [];
+    game.worldVersion++;
+    pushActivity(game,'The solo campaign began on this device.');
+    pushEvent(game,'world.started',game.hostPlayerId,null,
+      'The solo campaign began on this device.');
+    return true;
+  }
+
+  function setSoloRuntime(game,session,handlers = {}) {
+    migrateStrategyScenario(game);
+    migrateCivicAndJudicialSystems(game);
+    const localLink = {
+      connected:true,
+      publish:() => true,
+      close:() => { localLink.connected = false; }
+    };
+    runtime = {
+      role:'host',mode:'solo',game,session,room:session.inviteCode,
+      topics:topicSet(session.inviteCode),pendingJoins:new Map(),
+      onSnapshot:handlers.onSnapshot || (()=>{}),
+      onStatus:handlers.onStatus || (()=>{}),
+      onOrderResult:handlers.onOrderResult || (()=>{}),
+      onSession:handlers.onSession || (()=>{}),
+      onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
+      onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
+      onPlayerCount:handlers.onPlayerCount || (()=>{}),
+      lastPulseAt:Date.now(),clockAccumulatorMs:0,hasConnected:true,link:localLink
+    };
+    runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
+    return runtime;
+  }
+
+  function createSoloWorld(name,handlers = {}) {
+    const normalized = String(name || '').trim().replace(/\s+/g,' ').slice(0,24);
+    if (normalized.length < 2 || /[\u0000-\u001f\u007f]/.test(normalized))
+      return Promise.reject(new Error('Player name must be 2–24 characters.'));
+    const previousRuntime = runtime;
+    previousRuntime?.link?.close(false);
+    const created = newWorld(normalized);
+    const soloId = 'SOLO-' + created.game.id.replace(/-/g,'').toUpperCase();
+    const session = {
+      ...created.session,mode:'solo',playerName:normalized,
+      inviteCode:soloId,roomCode:soloId
+    };
+    if (!startSoloCampaign(created.game))
+      return Promise.reject(new Error('The solo campaign could not be started.'));
+    const active = setSoloRuntime(created.game,session,handlers);
+    handlers.onSession?.(active.session);
+    persistHost();
+    active.onStatus('ready');
+    publishSnapshot();
+    return Promise.resolve({session:active.session,game:snapshot(active.game)});
+  }
+
   function setHostRuntime(game,session,handlers) {
     migrateStrategyScenario(game);
     migrateCivicAndJudicialSystems(game);
@@ -1301,6 +1360,23 @@
   }
 
   function restoreSession(session,handlers = {}) {
+    if (session?.mode === 'solo' && session?.isHost) {
+      let saved;
+      try { saved = JSON.parse(localStorage.getItem(HOST_SAVE + session.inviteCode)); } catch {}
+      if (!saved?.game || saved.game.id !== session.gameId ||
+          saved.game.hostPlayerId !== session.playerId) {
+        return Promise.reject(new Error('The solo campaign save is unavailable in this browser.'));
+      }
+      const previousRuntime=runtime;
+      previousRuntime?.link?.close(false);
+      const restoredSession = {...(saved.session || session),mode:'solo',isHost:true};
+      setSoloRuntime(saved.game,restoredSession,handlers);
+      handlers.onSession?.(runtime.session);
+      persistHost();
+      runtime.onStatus('ready');
+      publishSnapshot();
+      return Promise.resolve({session:runtime.session,game:snapshot(runtime.game)});
+    }
     if (session?.isHost) {
       let saved;
       try { saved = JSON.parse(localStorage.getItem(HOST_SAVE + session.inviteCode)); } catch {}
@@ -1450,7 +1526,7 @@
   hostPulseTimer.unref?.();
 
   window.NewWorldMultiplayer = {
-    createWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
+    createWorld,createSoloWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
     isHost:() => runtime?.role === 'host',
     isConnected:() => !!runtime?.link?.connected,
     currentSession:() => runtime?.session || null,
@@ -1460,6 +1536,7 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Object.freeze({
       createInitialWorld:newWorld,
+      startSoloCampaign,
       assignLobbyPlayer,
       canStartWorld,
       applyAdmin,

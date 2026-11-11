@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261111-live-sidebar-v16">
+  <link rel="stylesheet" href="./game.css?v=20261111-solo-campaign-v1">
 </head>
 <body>
   <header class="topbar">
@@ -21,7 +21,7 @@
     <span class="campaign-subline">A world shaped by borders, cities and decisions</span>
   </div>
   <div class="top-stats">
-    <div class="stat-date"><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><small>WORLD DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
+    <div class="stat-date"><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><small>WORLD DATE</small><strong id="date-label">NO ACTIVE CAMPAIGN</strong></div>
     <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_2_store" aria-hidden="true"></canvas><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
     <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="houses/1x1_house1" aria-hidden="true"></canvas><small>POPULATION</small><strong id="population">—</strong></div>
     <div><canvas class="top-stat-icon" width="72" height="72" data-sprite-key="village/1x1_farmhouse_barn" aria-hidden="true"></canvas><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
@@ -167,8 +167,8 @@
           <div id="first-steps" class="first-steps">
             <p class="panel-kicker">QUICK START / HOW TO PLAY</p>
             <ol>
-              <li><strong>Create or join a world</strong><span>Open MULTIPLAYER. The host creates a private room and shares its code.</span></li>
-              <li><strong>Start the frontier</strong><span>Once everyone is in the founding party, the host presses START WORLD.</span></li>
+              <li><strong>Choose a campaign mode</strong><span>Open PLAYERS and select PLAY SOLO for a local campaign, or create a private multiplayer world.</span></li>
+              <li><strong>Start the frontier</strong><span>Solo campaigns start immediately. In multiplayer, the host starts once everyone has joined the founding party.</span></li>
               <li><strong>Claim a region</strong><span>Select an UNCLAIMED State on the map, then claim it for ¤450. Your new settlement receives a development reserve.</span></li>
               <li><strong>Build your settlement</strong><span>Double-click your region, choose an object, press BUILD, then click an empty dry plot.</span></li>
               <li><strong>Expand and manage</strong><span>Use ECONOMY, GOVERNMENT, MILITARY and RESEARCH to grow, negotiate and compete.</span></li>
@@ -482,23 +482,28 @@
         </section>
 
         <section id="multiplayer-view" class="view">
-          <p class="panel-kicker">PRIVATE WORLD / NETWORK</p>
-          <h2>Multiplayer</h2>
-          <p class="muted">Create a private world or join one with an invitation. The host runs and validates the shared world; the public relay only carries messages.</p>
-          <label class="field-label">NETWORK SERVICE</label>
-          <div class="field-row"><span id="server-endpoint" class="microcopy">Loading multiplayer service…</span><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
-          <p id="server-status" class="connection-status" role="status">Server not connected.</p>
+          <p class="panel-kicker">CAMPAIGN MODE / NEW WORLD</p>
+          <h2>Start a campaign</h2>
+          <p class="muted">Build and manage Beleland on your own, or create a private world and invite other players. Solo progress is saved automatically in this browser; no network connection is required.</p>
           <label class="field-label" for="player-name">PLAYER NAME</label>
           <input id="player-name" class="text-field" maxlength="24" autocomplete="nickname" placeholder="2–24 characters">
           <div id="multiplayer-actions" class="multiplayer-actions">
+            <div class="mode-divider-label"><span>LOCAL CAMPAIGN</span></div>
+            <button id="play-solo" class="action-btn solo-action" type="button">PLAY SOLO</button>
+            <div class="mode-divider-label"><span>PLAY WITH OTHERS</span></div>
             <button id="create-world" class="action-btn" type="button">CREATE PRIVATE WORLD</button>
             <label class="field-label" for="invite-code">INVITATION CODE</label>
             <input id="invite-code" class="text-field" maxlength="64" autocomplete="off" placeholder="Paste an invitation code">
             <button id="join-world" class="action-btn secondary-action" type="button">JOIN WORLD</button>
           </div>
+          <div id="network-service" class="network-service">
+            <label class="field-label">MULTIPLAYER NETWORK SERVICE</label>
+            <div class="field-row"><span id="server-endpoint" class="microcopy">Loading multiplayer service…</span><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
+            <p id="server-status" class="connection-status" role="status">Network service not connected.</p>
+          </div>
           <div id="multiplayer-session" class="multiplayer-session" hidden>
             <div class="panel-divider"></div>
-            <p class="panel-kicker">CURRENT WORLD</p>
+            <p class="panel-kicker">CURRENT CAMPAIGN</p>
             <p id="session-summary" class="muted"></p>
             <p id="pending-orders-status" class="muted" role="status">No pending orders.</p>
             <div id="pending-order-list" class="pending-order-list" aria-live="polite"></div>
@@ -520,7 +525,7 @@
               <p id="pause-status" class="muted" role="status"></p>
               <button id="pause-vote" class="action-btn secondary-action" type="button">VOTE TO PAUSE</button>
             </div>
-            <button id="leave-world" class="quiet-btn leave-world" type="button">DISCONNECT ON THIS DEVICE</button>
+            <button id="leave-world" class="quiet-btn leave-world" type="button">END CAMPAIGN</button>
           </div>
           <p id="multiplayer-message" class="multiplayer-message" role="status" aria-live="polite"></p>
         </section>
@@ -528,7 +533,7 @@
     </div>
 
     <footer class="game-footer">
-      <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND FRONTIER STRATEGY</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
+      <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND FRONTIER STRATEGY</span><span id="world-mode">NO ACTIVE CAMPAIGN</span></div>
       <span id="world-time" class="world-time" hidden></span>
       <button id="next-month" class="advance" hidden>ADVANCE MONTH <b>→</b></button>
       <a href="/Apps/">NORTH ASSEMBLY ↗</a>
@@ -539,9 +544,9 @@
   <script src="./civic-systems.js?v=20261109-public-budget-phase5"></script>
   <script src="./simulation.js?v=20261109-public-budget-phase5"></script>
   <script src="./strategy.js?v=20261109-public-budget-phase5"></script>
-  <script src="./multiplayer.js?v=20261109-public-budget-phase5"></script>
+  <script src="./multiplayer.js?v=20261111-solo-campaign-v1"></script>
   <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
   <script src="./build-menu.js?v=20261109-colored-sprite-ui-v1"></script>
-  <script src="./game.js?v=20261109-colored-sprite-ui-v1"></script>
+  <script src="./game.js?v=20261111-solo-campaign-v1"></script>
 </body>
 </html>

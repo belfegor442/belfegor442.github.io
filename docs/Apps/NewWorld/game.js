@@ -320,12 +320,12 @@
     renderPanelSafely('World chronicle',renderWorldEvents,'state-description');
     $('date-label').textContent = isOnline()
       ? formatWorldDate(onlineGame?.worldDate) + ' / DAY ' + String(onlineGame?.day || 1).padStart(3, '0')
-      : 'MULTIPLAYER REQUIRED';
+      : 'NO ACTIVE CAMPAIGN';
     $('activity').innerHTML = state.activity.slice(0, 8)
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
     $('world-mode').textContent = onlineGame?.status === 'completed'
       ? 'CAMPAIGN COMPLETED · VICTORY'
-      : isOnline() ? 'PRIVATE MULTIPLAYER' : 'MULTIPLAYER REQUIRED';
+      : isOnline() ? (onlineSession?.mode === 'solo' ? 'SOLO CAMPAIGN' : 'PRIVATE MULTIPLAYER') : 'NO ACTIVE CAMPAIGN';
     $('legend-owned').textContent = onlineGame ? 'YOUR GOVERNMENT' : 'GOVERNMENT MEMBERSHIP';
     $('legend-other').textContent = onlineGame ? 'OTHER STATES' : 'WORLD DATA UNAVAILABLE';
     $('save-btn').hidden = true;
@@ -335,7 +335,9 @@
       ? onlineGame?.status === 'completed'
         ? 'VICTORY · ' + formatWorldDate(onlineGame.completedOn || onlineGame.worldDate)
         : onlineGame?.started
-          ? onlineGame.paused ? 'PAUSED · HOST CLOCK' : '1 DAY / 5 MIN · HOST CLOCK'
+          ? onlineGame.paused
+            ? (onlineSession?.mode === 'solo' ? 'PAUSED · LOCAL CLOCK' : 'PAUSED · HOST CLOCK')
+            : (onlineSession?.mode === 'solo' ? '1 DAY / 5 MIN · LOCAL CLOCK' : '1 DAY / 5 MIN · HOST CLOCK')
           : 'LOBBY · CLOCK PAUSED'
       : '';
     renderPanelSafely('Settlement',renderCity,'settlement-status');
@@ -2978,17 +2980,21 @@
         socket = {readyState:WebSocket.OPEN};
         applySnapshot(game);
         replayPendingOrders();
-        $('server-status').textContent = window.NewWorldMultiplayer.isHost()
-          ? 'This device is hosting the authoritative world.'
-          : 'Connected to the host device.';
+        $('server-status').textContent = onlineSession?.mode === 'solo'
+          ? 'SOLO MODE · SAVED IN THIS BROWSER'
+          : window.NewWorldMultiplayer.isHost()
+            ? 'This device is hosting the authoritative world.'
+            : 'Connected to the host device.';
         $('server-status').classList.remove('error');
       },
       onStatus:status => {
         if (status === 'ready' || status === 'connected') {
           socket = {readyState:WebSocket.OPEN};
-          $('server-status').textContent = status === 'ready'
-            ? 'Host active · this device owns the world.'
-            : 'Relay connected · waiting for the host.';
+          $('server-status').textContent = onlineSession?.mode === 'solo'
+            ? 'SOLO MODE · SAVED IN THIS BROWSER'
+            : status === 'ready'
+              ? 'Host active · this device owns the world.'
+              : 'Relay connected · waiting for the host.';
           $('server-status').classList.remove('error');
           renderMultiplayer();
           return;
@@ -3050,6 +3056,36 @@
           count.totalPlayers + ' OF ' + count.capacity;
       }
     };
+  }
+
+  async function createSoloWorld() {
+    if (createWorldPending || isOnline()) return;
+    const button=$('play-solo');
+    createWorldPending=true;
+    button.disabled=true;
+    button.textContent='STARTING SOLO CAMPAIGN…';
+    showMessage('Creating a local campaign. No network connection or invitation is needed.');
+    try {
+      const name=playerName();
+      offlineBackup=structuredClone(state);
+      const result=await window.NewWorldMultiplayer.createSoloWorld(name,multiplayerHandlers());
+      storeSession({...result.session,playerName:name,mode:'solo'});
+      applySnapshot(result.game);
+      $('server-status').textContent='SOLO MODE · SAVED IN THIS BROWSER';
+      $('server-status').classList.remove('error');
+      showMessage('Your solo campaign has started. Progress is saved automatically in this browser.');
+      toast('SOLO CAMPAIGN STARTED');
+    } catch (error) {
+      console.error('[new-world] Solo campaign failed to start:',error);
+      $('server-status').textContent='LOCAL CAMPAIGN COULD NOT START.';
+      showMessage(error instanceof Error ? error.message : 'The solo campaign could not be started.',true);
+      toast('CAMPAIGN ERROR');
+    } finally {
+      createWorldPending=false;
+      button.disabled=false;
+      button.textContent='PLAY SOLO';
+      renderMultiplayer();
+    }
   }
 
   async function createWorld() {
@@ -3120,7 +3156,9 @@
       button.disabled=true;
       button.textContent='RECONNECTING…';
     }
-    $('server-status').textContent='Reconnecting to the host and restoring the shared world…';
+    $('server-status').textContent=onlineSession.mode === 'solo'
+      ? 'Restoring local campaign…'
+      : 'Reconnecting to the host and restoring the shared world…';
     try {
       if (!offlineBackup) offlineBackup = structuredClone(state);
       const result = await window.NewWorldMultiplayer.restoreSession(
@@ -3128,7 +3166,9 @@
       if (result.session) storeSession({...result.session,
         playerName:$('player-name').value.trim() || result.session.playerName});
       if (result.game) applySnapshot(result.game);
-      showMessage('Reconnected. Your current world state has been restored.');
+      showMessage(onlineSession.mode === 'solo'
+        ? 'Your local campaign has been restored.'
+        : 'Reconnected. Your current world state has been restored.');
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
       showServerError(error);
@@ -3398,6 +3438,7 @@
     const sessionPanel = $('multiplayer-session');
     $('multiplayer-actions').hidden = isOnline();
     sessionPanel.hidden = !isOnline();
+    $('network-service').hidden = onlineSession?.mode === 'solo';
     if (!onlineSession) return;
 
     const reconnectButton=$('reconnect-world');
@@ -3409,7 +3450,9 @@
     const pendingOrders=ordersForCurrentSession();
     const pendingCount=pendingOrders.length;
     $('pending-orders-status').textContent = pendingCount
-      ? pendingCount + ' pending order' + (pendingCount === 1 ? '' : 's') + ' · waiting for host confirmation'
+      ? pendingCount + (onlineSession.mode === 'solo'
+        ? ' pending local action' + (pendingCount === 1 ? '' : 's') + ' · processed on this device'
+        : ' pending order' + (pendingCount === 1 ? '' : 's') + ' · waiting for host confirmation')
       : 'No pending orders.';
     const pendingList=$('pending-order-list');
     pendingList.replaceChildren();
@@ -3437,7 +3480,8 @@
     }
     $('advanced-scenario-settings').hidden=!canConfigureScenario();
     $('session-summary').textContent = onlineGame
-      ? (onlineGame.status || (onlineGame.started ? 'running' : 'lobby')).toUpperCase() +
+      ? (onlineSession.mode === 'solo' ? 'SOLO CAMPAIGN · ' : '') +
+        (onlineGame.status || (onlineGame.started ? 'running' : 'lobby')).toUpperCase() +
         ' · ' + formatWorldDate(onlineGame.worldDate) +
         ' · WORLD ' + onlineGame.id.slice(0, 8).toUpperCase() + ' · DAY ' + onlineGame.day +
         ' · VERSION ' + onlineGame.worldVersion
@@ -3453,8 +3497,9 @@
       const totalPlayers = Number(onlineGame.lobbyPlayerCount ?? onlineGame.players.length);
       const connectedPlayers = Number(onlineGame.lobbyConnectedCount ??
         onlineGame.players.filter(player => player.connected).length);
-      $('lobby-player-count').textContent = connectedPlayers + ' ONLINE / ' +
-        totalPlayers + ' OF ' + (onlineGame.maxHumanPlayers || 100);
+      $('lobby-player-count').textContent = onlineSession.mode === 'solo'
+        ? 'SOLO · 1 LOCAL PLAYER'
+        : connectedPlayers + ' ONLINE / ' + totalPlayers + ' OF ' + (onlineGame.maxHumanPlayers || 100);
       if (!isHost && !onlineGame.started) {
         const row = document.createElement('div');
         row.className = 'player-row';
@@ -3477,7 +3522,9 @@
           return territoryName + ' · ' + role;
         }).filter(Boolean);
         const stateLabel = document.createElement('span');
-        stateLabel.textContent = (player.connected ? '● ONLINE · ' : '○ OFFLINE · ') +
+        stateLabel.textContent = (onlineSession.mode === 'solo'
+          ? '● LOCAL · '
+          : player.connected ? '● ONLINE · ' : '○ OFFLINE · ') +
           (memberStates.join(', ') || 'STATE UNASSIGNED');
         summary.append(playerLabel, stateLabel);
         row.appendChild(summary);
@@ -3502,6 +3549,10 @@
         : !hostConnected
           ? 'Reconnect the host to the relay before starting.'
           : 'Start the shared frontier for everyone in the lobby.';
+
+      $('leave-world').textContent = onlineSession.mode === 'solo'
+        ? 'END SOLO CAMPAIGN'
+        : 'DISCONNECT ON THIS DEVICE';
 
       const pauseControls = $('pause-controls');
       pauseControls.hidden = !['running','paused'].includes(onlineGame.status);
@@ -3820,6 +3871,7 @@
       button.textContent='TEST';
     }
   });
+  $('play-solo').addEventListener('click', createSoloWorld);
   $('create-world').addEventListener('click', createWorld);
   $('join-world').addEventListener('click', joinWorld);
   $('reconnect-world').addEventListener('click', restoreSession);

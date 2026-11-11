@@ -38,6 +38,69 @@ test('a new world assigns its host to the first State and transfers the starting
   assert.equal(multiplayer.canStartWorld(game), true);
 });
 
+test('solo campaigns start immediately with one local executive player', () => {
+  const {game,session}=multiplayer.createInitialWorld('Solo Player');
+  const previousVersion=game.worldVersion;
+
+  assert.equal(multiplayer.startSoloCampaign(game),true);
+  assert.equal(game.started,true);
+  assert.equal(game.status,'running');
+  assert.equal(game.paused,false);
+  assert.equal(game.worldVersion,previousVersion+1);
+  assert.equal(game.players.length,1);
+  assert.equal(game.players[0].id,session.playerId);
+  assert.ok(game.events.some(event =>
+    event.type==='world.started' && /solo campaign/i.test(event.description)));
+  assert.equal(multiplayer.startSoloCampaign(game),false);
+});
+
+test('solo runtime saves and restores locally without MQTT or a relay', async () => {
+  const previousStorage=global.localStorage;
+  const storage=new Map();
+  global.localStorage={
+    getItem:key=>storage.has(key)?storage.get(key):null,
+    setItem:(key,value)=>storage.set(key,String(value)),
+    removeItem:key=>storage.delete(key)
+  };
+  const snapshots=[];
+  const statuses=[];
+  const sessions=[];
+  const handlers={
+    onSnapshot:game=>snapshots.push(game),
+    onStatus:status=>statuses.push(status),
+    onSession:session=>sessions.push(session)
+  };
+
+  try {
+    const created=await window.NewWorldMultiplayer.createSoloWorld('Solo Player',handlers);
+    assert.equal(created.session.mode,'solo');
+    assert.equal(created.session.isHost,true);
+    assert.match(created.session.inviteCode,/^SOLO-/);
+    assert.equal(created.game.status,'running');
+    assert.equal(window.NewWorldMultiplayer.isHost(),true);
+    assert.equal(window.NewWorldMultiplayer.isConnected(),true);
+    assert.ok(snapshots.some(game=>game.status==='running'));
+    assert.ok(statuses.includes('ready'));
+    assert.ok(sessions.some(session=>session.mode==='solo'));
+
+    const storageKey='new-world-host-state-v2:'+created.session.inviteCode;
+    const saved=JSON.parse(storage.get(storageKey));
+    assert.equal(saved.game.id,created.session.gameId);
+    assert.equal(saved.game.status,'running');
+
+    window.NewWorldMultiplayer.disconnect(false);
+    const restored=await window.NewWorldMultiplayer.restoreSession(created.session,handlers);
+    assert.equal(restored.session.mode,'solo');
+    assert.equal(restored.game.id,created.session.gameId);
+    assert.equal(restored.game.status,'running');
+    assert.equal(window.NewWorldMultiplayer.isConnected(),true);
+  } finally {
+    window.NewWorldMultiplayer.disconnect(false);
+    if(previousStorage===undefined) delete global.localStorage;
+    else global.localStorage=previousStorage;
+  }
+});
+
 test('event definitions can be configured by the host before the world starts', () => {
   const {game}=multiplayer.createInitialWorld('Host');
   const definitions=[{

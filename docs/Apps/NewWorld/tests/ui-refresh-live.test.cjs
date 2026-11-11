@@ -30,8 +30,21 @@ test('responsive navigation remains horizontal on smaller screens and respects r
   assert.ok(css.includes('@media(max-width:980px)'));
   assert.ok(css.includes('@media(max-width:740px)'));
   assert.ok(css.includes('prefers-reduced-motion:reduce'));
-  assert.ok(html.includes('game.css?v=20261111-live-sidebar-v16'));
+  assert.ok(html.includes('game.css?v=20261111-solo-campaign-v1'));
 });
+test('campaign screen offers a real local solo start alongside multiplayer',()=>{
+  const game=fs.readFileSync(path.join(root,'game.js'),'utf8');
+  const multiplayer=fs.readFileSync(path.join(root,'multiplayer.js'),'utf8');
+  assert.ok(html.includes('id="play-solo" class="action-btn solo-action" type="button">PLAY SOLO</button>'));
+  assert.ok(html.includes('id="network-service"'));
+  assert.ok(html.includes('saved automatically in this browser'));
+  assert.ok(game.includes("$('play-solo').addEventListener('click', createSoloWorld)"));
+  assert.ok(multiplayer.includes('function createSoloWorld('));
+  assert.ok(multiplayer.includes('function setSoloRuntime('));
+  assert.ok(css.includes('#network-service[hidden]'));
+  assert.ok(html.includes('solo-campaign-v1'));
+});
+
 test('mobile metrics fit two columns and military navigation uses an existing asset',()=>{
   assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))'));
   assert.ok(html.includes('military-unit.png'));
