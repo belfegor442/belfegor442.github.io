@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261108-functional-controls-v3">
+  <link rel="stylesheet" href="./game.css?v=20261111-north-assembly-ui-refresh-v15">
 </head>
 <body>
   <header class="topbar">
@@ -18,30 +18,91 @@
   <div class="campaign-identity">
     <span class="campaign-overline">BELELAND CAMPAIGN / 001</span>
     <strong>THE AGE OF STATES</strong>
-    <span class="campaign-subline">A world shaped by borders, cities and decisions</span>
+    <span class="campaign-subline">BELELAND / WORLD SIMULATION</span>
   </div>
   <div class="top-stats">
     <div class="stat-date"><small>WORLD DATE</small><strong id="date-label">MULTIPLAYER REQUIRED</strong></div>
     <div><small>TREASURY</small><strong id="treasury">¤ 1,200</strong></div>
     <div><small>POPULATION</small><strong id="population">—</strong></div>
     <div><small>MONTHLY BALANCE</small><strong id="balance">—</strong></div>
+    <div class="stat-state"><small>SELECTED STATE</small><strong id="current-state-label">—</strong></div>
+    <div class="stat-connection"><small>CONNECTION</small><strong id="connection-state-label">OFFLINE</strong></div>
   </div>
-  <button id="save-btn" class="quiet-btn" hidden>SAVE</button>
+  <div class="topbar-actions">
+    <button id="player-profile-toggle" class="player-profile-toggle" type="button"
+      title="Open player identity and session settings" aria-label="Open player identity and session settings">
+      <span aria-hidden="true">●</span><small>PLAYER</small><b id="player-profile-name">SET PLAYER</b>
+    </button>
+    <button id="command-inbox-toggle" class="command-inbox-toggle" type="button"
+      aria-controls="command-inbox" aria-expanded="false" aria-label="Open command inbox">
+      <span aria-hidden="true">▤</span><b>INBOX</b><small id="command-inbox-count">0</small>
+    </button>
+    <label id="order-date-control" class="order-date-control" hidden title="Schedule the next government order for a future world date">
+      <small>NEXT ORDER DATE</small>
+      <input id="order-target-date" type="date" aria-label="Target world date for the next order">
+      <button id="order-date-clear" type="button" aria-label="Clear target date" title="Send the next order immediately">×</button>
+    </label>
+    <button id="save-btn" class="quiet-btn" type="button" hidden title="Save the world locally and verify the previous backup">SAVE</button>
+    <button id="export-backup-btn" class="quiet-btn backup-action" type="button" hidden title="Export an encrypted, portable copy of the host world">EXPORT BACKUP</button>
+    <button id="import-backup-btn" class="quiet-btn backup-action" type="button" title="Import an encrypted host backup into this browser">IMPORT BACKUP</button>
+    <input id="import-backup-file" type="file" accept=".nwbackup,application/json" hidden>
+  </div>
 </header>
 
+<section id="command-inbox" class="command-inbox" hidden role="region" aria-labelledby="command-inbox-title">
+  <div class="command-inbox-heading">
+    <div><small>COMMAND CENTRE</small><strong id="command-inbox-title">ORDERS & WORLD ALERTS</strong><span id="command-inbox-summary" aria-live="polite">Connect to a world to receive updates.</span></div>
+    <div class="command-inbox-controls">
+      <button id="command-inbox-mark-read" type="button">MARK ALERTS READ</button>
+      <button id="command-inbox-close" type="button" aria-label="Close command inbox">×</button>
+    </div>
+  </div>
+  <div id="command-inbox-list" class="command-inbox-list" aria-live="polite"></div>
+  <section class="scheduled-order-section" aria-labelledby="scheduled-order-heading">
+    <div class="scheduled-order-heading">
+      <p id="scheduled-order-heading" class="panel-kicker">FUTURE ORDERS</p>
+      <small id="scheduled-order-count">0 pending</small>
+    </div>
+    <div id="scheduled-order-list" class="scheduled-order-list" aria-live="polite"></div>
+  </section>
+</section>
+
+  <a class="skip-link" href="#map-viewport">SKIP TO STRATEGIC MAP</a>
   <main class="game-shell" aria-label="New World strategy interface">
     <nav class="nav-rail" aria-label="World navigation">
-      <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
-      <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
-      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>BUILD</span></button>
-      <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
-      <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
-      <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
-      <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><span class="nav-icon">⌘</span><span>RESEARCH</span></button>
-      <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><span class="nav-icon">◇</span><span>DIPLOMACY</span></button>
-      <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
-      <div class="nav-rail-foot">NA</div>
-    </nav>
+  <div class="nav-group">
+    <span class="nav-section-label">OVERVIEW</span>
+    <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><span class="nav-icon">◎</span><span>WORLD</span></button>
+    <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><span class="nav-icon">⌖</span><span>LAND</span></button>
+    <button class="tab" data-view="society" aria-controls="society-view" aria-selected="false"><span class="nav-icon">◌</span><span>SOCIETY</span></button>
+    <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><span class="nav-icon">⌂</span><span>CITY</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">GOVERNMENT</span>
+    <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><span class="nav-icon">≡</span><span>ECONOMY</span></button>
+    <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><span class="nav-icon">§</span><span>GOVERNMENT</span></button>
+    <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><span class="nav-icon">⚑</span><span>MILITARY</span></button>
+    <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><span class="nav-icon">⌘</span><span>RESEARCH</span></button>
+    <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><span class="nav-icon">◇</span><span>DIPLOMACY</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">INSTITUTIONS</span>
+    <button class="tab" data-view="justice" aria-controls="justice-view" aria-selected="false"><span class="nav-icon">⚖</span><span>JUSTICE</span></button>
+    <button class="tab" data-view="resources" aria-controls="resources-view" aria-selected="false"><span class="nav-icon">◈</span><span>RESOURCES</span></button>
+    <button class="tab" data-view="services" aria-controls="services-view" aria-selected="false"><span class="nav-icon">✚</span><span>SERVICES</span></button>
+    <button class="tab" data-view="industry" aria-controls="industry-view" aria-selected="false"><span class="nav-icon">⚙</span><span>INDUSTRY</span></button>
+    <button class="tab" data-view="administration" aria-controls="administration-view" aria-selected="false"><span class="nav-icon">▤</span><span>ADMINISTRATION</span></button>
+    <button class="tab" data-view="media" aria-controls="media-view" aria-selected="false"><span class="nav-icon">◉</span><span>MEDIA</span></button>
+    <button class="tab" data-view="security" aria-controls="security-view" aria-selected="false"><span class="nav-icon">⌑</span><span>SECURITY</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">WORLD SYSTEMS</span>
+    <button class="tab" data-view="events" aria-controls="events-view" aria-selected="false"><span class="nav-icon">◇</span><span>EVENTS</span></button>
+    <button class="tab" data-view="identity" aria-controls="identity-view" aria-selected="false"><span class="nav-icon">◎</span><span>IDENTITY</span></button>
+    <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><span class="nav-icon">♧</span><span>PLAYERS</span></button>
+  </div>
+  <div class="nav-rail-foot">NORTH ASSEMBLY <span>NEW WORLD / 001</span></div>
+</nav>
 
     <div class="play-area">
       <section class="map-frame" aria-label="Beleland strategic map">
@@ -50,13 +111,15 @@
             <span class="map-heading-mark">◈</span>
             <span class="map-title"><b>BELELAND</b><small>STRATEGIC MAP</small></span>
             <span class="map-divider">/</span>
-            <span id="map-layer-label">POLITICAL</span>
+            <span id="map-layer-label">ADMINISTRATION</span>
           </div>
           <div class="map-modes" role="group" aria-label="Map mode">
             <button class="map-mode active" type="button" data-map-mode="political">POLITICAL</button>
             <button class="map-mode" type="button" data-map-mode="economy">ECONOMY</button>
             <button class="map-mode" type="button" data-map-mode="population">POPULATION</button>
             <button class="map-mode" type="button" data-map-mode="terrain">TERRAIN</button>
+            <button class="map-mode" type="button" data-map-mode="sovereignty">SOVEREIGNTY</button>
+            <button class="map-mode" type="button" data-map-mode="control">CONTROL</button>
           </div>
           <div class="map-controls">
             <button id="zoom-out" aria-label="Zoom out">−</button>
@@ -136,6 +199,13 @@
             <div><small>REVENUE / MO</small><strong id="state-revenue">—</strong></div>
             <div><small>INFRASTRUCTURE</small><strong id="state-infra">—</strong></div>
           </div>
+          <div class="scenario-readiness">
+            <div class="scenario-readiness-heading">
+              <div><p class="panel-kicker">WORLD SCENARIO / STRUCTURAL AUDIT</p><strong id="scenario-status">Connect to a world to inspect scenario integrity.</strong></div>
+              <span id="scenario-validation-count" class="scenario-validation-count">NOT CHECKED</span>
+            </div>
+            <div id="scenario-audit-list" class="political-list"></div>
+          </div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">CAMPAIGN OBJECTIVES</p>
           <div id="campaign-objectives" class="political-list"></div>
@@ -175,6 +245,45 @@
             <textarea id="territory-config" class="text-field" rows="12" spellcheck="false" aria-label="Territorial scenario JSON"></textarea>
             <button id="save-territory-config" class="primary-button" type="button">Validate and save scenario</button>
           </details>
+        </section>
+
+        <section id="society-view" class="view">
+          <p class="panel-kicker">POPULATION / AGE STRUCTURE / MOVEMENT</p>
+          <h2>Society and demography</h2>
+          <p id="demography-status" class="muted" role="status">Connect to a multiplayer world to inspect population cohorts.</p>
+          <div class="demography-metrics">
+            <div><small>POPULATION</small><strong id="society-population">—</strong></div>
+            <div><small>BIRTHS / LAST DAY</small><strong id="society-births">—</strong></div>
+            <div><small>DEATHS / LAST DAY</small><strong id="society-deaths">—</strong></div>
+            <div><small>INTERNAL MOVES / LAST 30</small><strong id="society-moves">—</strong></div>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">AGE DISTRIBUTION / AGGREGATED COHORTS</p>
+          <div id="demography-age-pyramid" class="demography-pyramid"></div>
+          <div id="demography-group-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INTERNAL MIGRATION / SAME-STATE TRANSFERS</p>
+          <p class="microcopy">Move an aggregated number of residents between two configured population groups. The operation preserves the State’s total population and age distribution.</p>
+          <div class="demography-controls">
+            <label class="field-label" for="migration-origin-group">ORIGIN GROUP</label>
+            <select id="migration-origin-group" class="text-field"></select>
+            <label class="field-label" for="migration-destination-group">DESTINATION GROUP</label>
+            <select id="migration-destination-group" class="text-field"></select>
+            <div class="range-widget">
+              <div class="range-heading"><label class="field-label" for="migration-quantity">RESIDENTS TO MOVE</label><strong id="migration-quantity-value" class="range-value">1</strong></div>
+              <input id="migration-quantity" class="range-input" type="range" min="1" max="1" step="1" value="1">
+              <div class="range-scale"><span>1</span><span id="migration-quantity-maximum">1</span></div>
+            </div>
+            <button id="migration-submit" class="action-btn" type="button" disabled>MOVE RESIDENTS</button>
+            <p id="migration-status" class="microcopy" role="status">Migration is unavailable until valid age cohorts, locations and permissions are configured.</p>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC HEALTH / EPIDEMIC SURVEILLANCE</p>
+          <p class="microcopy">Only scenario-configured disease profiles and dated outbreak starts are simulated. No pathogen, outbreak or mortality rate is invented by default. Transmission uses explicit population-group contact links.</p>
+          <div id="epidemic-status-list" class="political-list" aria-live="polite"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">DEMOGRAPHIC RECORD / AGGREGATED CAUSES</p>
+          <div id="demography-event-list" class="political-list"></div>
         </section>
 
         <section id="city-view" class="view">
@@ -246,6 +355,48 @@
             <button id="save-economy-config" class="primary-button" type="button">Validate and save scenario</button>
           </details>
           <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC FINANCE / CURRENCIES / BANKS</p>
+          <p id="finance-status" class="muted" role="status">Financial accounts and monetary rules are defined by the host scenario.</p>
+          <div class="political-list" id="finance-currency-summary"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">EXCHANGE RATES / EXPLICIT QUOTES</p>
+          <div id="finance-exchange-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">NPC BANKS / LIQUIDITY / LENDING LIMITS</p>
+          <div id="finance-bank-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC DEBT / MATURITY / INTEREST</p>
+          <div id="finance-debt-list" class="political-list"></div>
+          <div class="finance-controls">
+            <label class="field-label" for="finance-bank-select">CREDITOR BANK</label>
+            <select id="finance-bank-select" class="text-field"></select>
+            <label class="field-label" for="finance-debt-amount">BORROWING PRINCIPAL</label>
+            <input id="finance-debt-amount" class="text-field" type="number" min="1" step="1" value="100">
+            <label class="field-label" for="finance-interest-bps">ANNUAL INTEREST / BASIS POINTS</label>
+            <input id="finance-interest-bps" class="text-field" type="number" min="0" max="10000" step="1" value="500">
+            <label class="field-label" for="finance-term-days">MATURITY / DAYS</label>
+            <input id="finance-term-days" class="text-field" type="number" min="1" max="36500" step="1" value="365">
+            <button id="finance-issue-debt" class="action-btn" type="button" disabled>ISSUE PUBLIC DEBT</button>
+            <label class="field-label" for="finance-debt-select">OUTSTANDING PUBLIC ISSUE</label>
+            <select id="finance-debt-select" class="text-field"></select>
+            <label class="field-label" for="finance-repay-amount">REPAYMENT AMOUNT</label>
+            <input id="finance-repay-amount" class="text-field" type="number" min="1" step="1" value="100">
+            <button id="finance-repay-debt" class="secondary-button" type="button" disabled>REPAY SELECTED DEBT</button>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">TAX ASSESSMENTS / COMPANY TURNOVER</p>
+          <div id="finance-tax-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PRICE INDEX / CONFIGURED BASKET</p>
+          <div id="finance-index-list" class="political-list"></div>
+          <details id="finance-setup-panel" hidden>
+            <summary>Technical finance scenario setup · lobby only</summary>
+            <p class="microcopy">The host must define every currency's name, unique code and decimal scale, explicit foreign-exchange quotes, NPC bank capital and liquidity, tax rules and weighted price baskets. No currencies, banks, rates, taxes or inflation values are invented. Current operational tax coverage is limited to daily NPC-company turnover assessments; the price index uses the configured market basket.</p>
+            <button id="load-finance-config" class="secondary-button" type="button">LOAD CURRENT FINANCIAL DATA</button>
+            <textarea id="finance-config" class="text-field" rows="24" spellcheck="false" aria-label="Financial scenario JSON"></textarea>
+            <button id="save-finance-config" class="primary-button" type="button">VALIDATE AND SAVE FINANCIAL SCENARIO</button>
+          </details>
+          <div class="panel-divider"></div>
           <p class="panel-kicker">COMPANY SALES / CASH LEDGER</p>
           <div id="company-transaction-list" class="political-list"></div>
           <div class="panel-divider"></div>
@@ -261,13 +412,35 @@
           <div id="government-summary" class="political-list"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">GOVERNMENT BUDGET PLAN</p>
-          <label class="field-label" for="budget-amount">PROPOSED AMOUNT</label>
-          <input id="budget-amount" class="text-field" type="number" min="0" max="2147483647" step="1" inputmode="numeric">
+          <div class="range-widget budget-widget">
+            <div class="range-heading">
+              <label class="field-label" for="budget-amount">PROPOSED MONTHLY BUDGET</label>
+              <strong id="budget-amount-value" class="range-value">¤ 400</strong>
+            </div>
+            <input id="budget-amount" class="range-input" type="range" min="0" max="10000" step="25" value="400" aria-label="Proposed monthly government budget">
+            <div class="range-scale"><span>¤ 0</span><span id="budget-range-maximum">¤ 10,000</span></div>
+            <div class="range-actions" role="group" aria-label="Adjust the government budget">
+              <button type="button" data-budget-adjust="-500">−500</button>
+              <button type="button" data-budget-adjust="-100">−100</button>
+              <button type="button" data-budget-adjust="100">+100</button>
+              <button type="button" data-budget-adjust="500">+500</button>
+            </div>
+            <p class="range-current">CURRENT BUDGET <strong id="budget-current-value">¤ 400</strong></p>
+          </div>
           <button id="approve-budget" class="action-btn" type="button" disabled>SUBMIT BUDGET PROCEDURE</button>
           <p id="budget-restriction" class="microcopy">A budget is changed only through an explicitly configured constitutional competence.</p>
           <div class="panel-divider"></div>
           <p class="panel-kicker">INSTITUTIONS / OFFICES</p>
           <div id="institution-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">CONSTITUTIONAL COMPETENCIES</p>
+          <div id="competence-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PARLIAMENT / REPRESENTATION / ELECTIONS</p>
+          <div id="representation-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">OPPOSITION / OVERSIGHT</p>
+          <div id="oversight-list" class="political-list"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">POLITICAL PARTIES</p>
           <div id="party-list" class="political-list"></div>
@@ -281,18 +454,40 @@
           <p class="panel-kicker">LEGISLATIVE DECISIONS</p>
           <div id="decision-list" class="political-list"></div>
           <div class="panel-divider"></div>
-          <p class="panel-kicker">PROPOSE A LAW</p>
-          <label class="field-label" for="law-title">TITLE</label>
-          <input id="law-title" class="text-field" maxlength="80" autocomplete="off">
-          <label class="field-label" for="law-policy">POLICY EFFECT</label>
-          <select id="law-policy" class="text-field">
-            <option value="public_works">Public works · 5% cheaper construction</option>
-            <option value="conscription">National service · 8% cheaper recruitment</option>
-            <option value="agricultural_program">Agricultural programme · 10% population growth bonus</option>
-          </select>
-          <label class="field-label" for="law-text">PROPOSAL TEXT</label>
-          <textarea id="law-text" class="text-field" rows="5" maxlength="4000"></textarea>
-          <button id="propose-law" class="action-btn" type="button" disabled>SUBMIT FOR CONSTITUTIONAL REVIEW</button>
+          <p class="panel-kicker">LEGISLATION / POLICY STUDIO</p>
+          <div class="law-studio">
+            <p class="law-studio-intro">Choose what your government should improve. The bill title and legal text are generated automatically; no writing is required.</p>
+            <div id="law-policy-cards" class="law-policy-grid" role="group" aria-label="Choose a public policy">
+              <button class="law-policy-card selected" type="button" data-policy-id="public_works" aria-pressed="true">
+                <span class="law-card-icon" aria-hidden="true">⌂</span>
+                <span class="law-card-name">PUBLIC WORKS</span>
+                <strong class="law-card-value">5%</strong>
+                <small>Cheaper construction</small>
+              </button>
+              <button class="law-policy-card" type="button" data-policy-id="conscription" aria-pressed="false">
+                <span class="law-card-icon" aria-hidden="true">⚑</span>
+                <span class="law-card-name">NATIONAL SERVICE</span>
+                <strong class="law-card-value">8%</strong>
+                <small>Cheaper recruitment</small>
+              </button>
+              <button class="law-policy-card" type="button" data-policy-id="agricultural_program" aria-pressed="false">
+                <span class="law-card-icon" aria-hidden="true">♧</span>
+                <span class="law-card-name">AGRICULTURE</span>
+                <strong class="law-card-value">10%</strong>
+                <small>Faster population growth</small>
+              </button>
+            </div>
+            <div class="range-widget policy-widget">
+              <div class="range-heading">
+                <label class="field-label" for="law-strength">POLICY STRENGTH</label>
+                <strong id="law-strength-value" class="range-value">5%</strong>
+              </div>
+              <input id="law-strength" class="range-input" type="range" min="1" max="15" step="1" value="5" aria-label="Policy effect strength">
+              <div class="range-scale"><span id="law-strength-min">1%</span><span id="law-strength-max">15%</span></div>
+              <p id="law-effect-summary" class="law-effect-summary">Construction costs will be reduced by 5% in this State.</p>
+            </div>
+            <button id="propose-law" class="action-btn" type="button" disabled>PROPOSE THIS ACT <span>→</span></button>
+          </div>
           <p id="law-restriction" class="microcopy">Law-making requires an explicitly configured Constitution and permitted government membership.</p>
         </section>
 
@@ -307,9 +502,12 @@
           <div class="panel-divider"></div>
           <p class="panel-kicker">OCCUPATION / CONTROL</p>
           <div id="occupation-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SUPPLY STORES / CONVOYS / LOGISTICS</p>
+          <div id="military-supply-list" class="political-list"></div>
           <details id="military-setup-panel" hidden>
             <summary>Technical military scenario setup · lobby only</summary>
-            <p class="microcopy">Combat balance, morale scales, and logistics parameters remain scenario data; no default combat formula is assumed.</p>
+            <p class="microcopy">Supply rates are declared per unit type. Configure company stocks, provincial warehouses, convoy capacity and travel time, daily consumption, morale loss and combat penalties. No demand or shortage penalty is invented by default.</p>
             <button id="load-military-config" class="secondary-button" type="button">Load current configuration</button>
             <textarea id="military-config" class="text-field" rows="12" spellcheck="false" aria-label="Military scenario JSON"></textarea>
             <button id="save-military-config" class="primary-button" type="button">Validate and save scenario</button>
@@ -320,7 +518,13 @@
           <p class="panel-kicker">TECHNOLOGY / RESEARCH / ADOPTION</p>
           <h2>Knowledge and innovation</h2>
           <p id="technology-status" class="muted" role="status">Connect to a multiplayer world to load technology data.</p>
-          <div id="technology-list" class="political-list"></div>
+          <div id="technology-domain-filters" class="technology-domain-filters" role="group" aria-label="Filter technology by domain"></div>
+          <div class="technology-status-legend" aria-label="Technology status legend">
+            <span data-status="blocked">BLOCKED</span><span data-status="researchable">RESEARCHABLE</span>
+            <span data-status="in-progress">IN PROGRESS</span><span data-status="discovered">DISCOVERED</span>
+            <span data-status="adopted">ADOPTED</span>
+          </div>
+          <div id="technology-list" class="political-list technology-tree"></div>
           <div class="panel-divider"></div>
           <p class="panel-kicker">RESEARCH INSTITUTIONS AND PROJECTS</p>
           <div id="research-project-list" class="political-list"></div>
@@ -342,9 +546,383 @@
           <p id="diplomacy-status" class="muted" role="status">Connect to a world to inspect foreign relations.</p>
           <div id="diplomacy-list" class="political-list"></div>
           <div class="panel-divider"></div>
+          <p class="panel-kicker">TREATY NEGOTIATION / STRUCTURED TERMS</p>
+          <p class="microcopy">Negotiation text is non-binding. Only accepted structured clauses enter into force. Confidential diplomacy is disabled because the current shared snapshot cannot isolate private records by recipient.</p>
+          <div class="diplomacy-controls">
+            <label class="field-label" for="diplomacy-proposal-target">COUNTERPART STATE</label>
+            <select id="diplomacy-proposal-target" class="text-field"></select>
+            <label class="field-label" for="diplomacy-duration">TREATY TERM / DAYS</label>
+            <input id="diplomacy-duration" class="text-field" type="number" min="1" max="36500" value="365">
+            <label class="field-label" for="diplomacy-valid-days">PROPOSAL VALIDITY / DAYS</label>
+            <input id="diplomacy-valid-days" class="text-field" type="number" min="1" max="3650" value="30">
+            <label class="field-label" for="diplomacy-notice-days">TERMINATION NOTICE / DAYS</label>
+            <input id="diplomacy-notice-days" class="text-field" type="number" min="0" max="3650" value="30">
+            <div class="diplomacy-clause-grid" role="group" aria-label="Treaty clauses">
+              <label><input type="checkbox" class="diplomacy-clause" value="non_aggression"> NON-AGGRESSION</label>
+              <label><input type="checkbox" class="diplomacy-clause" value="peace"> PEACE</label>
+              <label><input type="checkbox" class="diplomacy-clause" value="mutual_defence"> MUTUAL DEFENCE</label>
+              <label><input type="checkbox" class="diplomacy-clause" value="trade_cooperation"> TRADE COOPERATION</label>
+              <label><input type="checkbox" class="diplomacy-clause" value="transit_access"> TRANSIT ACCESS</label>
+              <label><input type="checkbox" class="diplomacy-clause" value="recognition"> RECOGNITION</label>
+            </div>
+            <label class="field-label" for="diplomacy-negotiation-text">NON-BINDING NEGOTIATION NOTE</label>
+            <textarea id="diplomacy-negotiation-text" class="text-field" rows="3" maxlength="2000"></textarea>
+            <button id="diplomacy-propose-treaty" class="action-btn" type="button" disabled>PROPOSE STRUCTURED TREATY</button>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">TREATY PROPOSALS / RESPONSES</p>
+          <div id="diplomacy-proposal-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">TREATIES / INTERNATIONAL SANCTIONS</p>
+          <div id="diplomacy-treaty-list" class="political-list"></div>
+          <div id="diplomacy-organization-list" class="political-list"></div>
+          <div class="diplomacy-controls">
+            <label class="field-label" for="diplomacy-organization-select">INTERNATIONAL ORGANIZATION</label>
+            <select id="diplomacy-organization-select" class="text-field"></select>
+            <label class="field-label" for="diplomacy-sanction-target">EMBARGO TARGET STATE</label>
+            <select id="diplomacy-sanction-target" class="text-field"></select>
+            <label class="field-label" for="diplomacy-sanction-days">EMBARGO DURATION / DAYS</label>
+            <input id="diplomacy-sanction-days" class="text-field" type="number" min="1" max="3650" value="30">
+            <button id="diplomacy-propose-embargo" class="secondary-button" type="button" disabled>PROPOSE TRADE EMBARGO</button>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PEACE CONFERENCES</p>
+          <div id="diplomacy-conference-list" class="political-list"></div>
+          <div class="diplomacy-controls">
+            <label class="field-label" for="diplomacy-conference-participants">REPRESENTED STATES / PARTICIPANTS</label>
+            <select id="diplomacy-conference-participants" class="text-field" multiple size="5"></select>
+            <label class="field-label" for="diplomacy-conference-agenda">CONFERENCE AGENDA</label>
+            <textarea id="diplomacy-conference-agenda" class="text-field" rows="2" maxlength="500"></textarea>
+            <button id="diplomacy-open-conference" class="secondary-button" type="button" disabled>OPEN PEACE CONFERENCE</button>
+          </div>
+          <details id="diplomacy-setup-panel" hidden>
+            <summary>International organizations · host scenario setup</summary>
+            <p class="microcopy">Define real member States, charter, competencies, voting threshold and quorum before the world starts. Organization voting is one vote per member State. The only operational organization sanction in this phase is the structured, time-limited trade embargo.</p>
+            <button id="load-diplomacy-config" class="secondary-button" type="button">LOAD CURRENT ORGANIZATIONS</button>
+            <textarea id="diplomacy-config" class="text-field" rows="12" spellcheck="false" aria-label="Diplomacy scenario JSON"></textarea>
+            <button id="save-diplomacy-config" class="primary-button" type="button">VALIDATE AND SAVE ORGANIZATIONS</button>
+          </details>
+          <div class="panel-divider"></div>
           <p class="panel-kicker">DIPLOMATIC RECORD</p>
           <div id="diplomacy-history" class="political-list"></div>
-          <p class="microcopy">Wars must be declared before attacking another administered State. Neutral, unclaimed territories can be claimed or attacked without a declaration.</p>
+          <p class="microcopy">Wars must be declared before attacking another administered State. A live non-aggression treaty blocks a new declaration. Neutral, unclaimed territories remain outside treaty negotiation unless represented by a government.</p>
+        </section>
+
+        <section id="justice-view" class="view">
+          <p class="panel-kicker">LAW / COURTS / PUBLIC ORDER</p>
+          <h2>Justice and public order</h2>
+          <p id="justice-status" class="muted" role="status">Connect to a multiplayer world to inspect legal records.</p>
+          <div class="justice-report-form">
+            <div>
+              <label class="field-label" for="justice-report-province">REPORT LOCATION</label>
+              <select id="justice-report-province" class="text-field" aria-label="Incident report location"></select>
+            </div>
+            <div>
+              <label class="field-label" for="justice-report-description">INCIDENT DESCRIPTION</label>
+              <textarea id="justice-report-description" class="text-field" rows="3" maxlength="280"
+                placeholder="Describe what was reported. This is an allegation, not a finding of crime."
+                aria-label="Unclassified incident description"></textarea>
+            </div>
+            <button id="justice-report-submit" class="action-btn" type="button" disabled>SUBMIT UNCLASSIFIED REPORT</button>
+            <p class="microcopy">Reports remain allegations. An enacted law and authorized police office are required to investigate; a separate prosecutor must file charges, a non-conflicted judge decides the case, and a sentencing office may only apply a penalty defined by that law. Appeals require a configured deadline and authorized appeal office.</p>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC INCIDENT REGISTER</p>
+          <div id="justice-report-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INVESTIGATIONS / EVIDENCE</p>
+          <div id="justice-case-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PROCEDURAL HISTORY</p>
+          <div id="justice-history-list" class="political-list"></div>
+          <p class="microcopy">Defence submissions and an appellate review decision are not implemented yet. Evidence remains unverified; the game does not infer guilt, and a punishment can only use a penalty explicitly defined in the applicable law.</p>
+        </section>
+
+        <section id="resources-view" class="view">
+          <p class="panel-kicker">LAND / MINERALS / AGRICULTURE / CLIMATE</p>
+          <h2>Resources and environment</h2>
+          <p id="resources-status" class="muted" role="status">Connect to a world to inspect configured resources and environmental conditions.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">FINITE RESOURCE DEPOSITS</p>
+          <div id="resource-deposit-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">CURRENT RESOURCE STOCKS</p>
+          <div id="resource-stock-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">AGRICULTURE / HARVESTS</p>
+          <div id="resource-farm-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">LIVESTOCK / RANCHES / ANIMAL PRODUCTS</p>
+          <div id="resource-livestock-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">FISHERIES / SEASONAL CATCH / STOCKS</p>
+          <div id="resource-fishery-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">FORESTRY / STANDING TIMBER / CONSERVATION</p>
+          <div id="resource-forest-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ENVIRONMENT BY PROVINCE</p>
+          <div id="resource-environment-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ENERGY SYSTEM</p>
+          <div id="resource-energy-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">WATER SOURCES / ECOLOGICAL RESERVES</p>
+          <div id="resource-water-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">WATER ALLOCATION / SHORTAGES</p>
+          <div id="resource-water-history-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">RESOURCE / CLIMATE HISTORY</p>
+          <div id="resource-history-list" class="political-list"></div>
+          <p class="microcopy">No default mineral reserves, climate rates, crop yields, resource access or energy capacity are assumed. These systems remain inactive until the host configures the scenario data. Strategic reserves remain protected unless an explicit rule is implemented.</p>
+        </section>
+
+        <section id="services-view" class="view">
+          <p class="panel-kicker">EDUCATION / HEALTH / SOCIAL / CULTURE</p>
+          <h2>Public services and access</h2>
+          <p id="services-status" class="muted" role="status">Connect to a world to inspect services, staffing, location and access.</p>
+          <div class="service-metrics">
+            <div><small>FACILITIES</small><strong id="services-facility-count">—</strong></div>
+            <div><small>STAFFED POSTS</small><strong id="services-staff-count">—</strong></div>
+            <div><small>PUBLIC COST / DAY</small><strong id="services-public-cost">—</strong></div>
+            <div><small>OPERATOR COST / DAY</small><strong id="services-private-cost">—</strong></div>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">FACILITY COVERAGE / CAPACITY / QUALITY</p>
+          <div id="services-facility-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ACCESS BY POPULATION GROUP</p>
+          <div id="services-group-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SERVICE CONSTRAINTS / OPERATING HISTORY</p>
+          <div id="services-history-list" class="political-list"></div>
+          <p class="microcopy">Coverage is calculated from named population groups, local capacity, staffing, operating finance, quality and configured water. No national service percentage or health/education result is assumed when data is missing.</p>
+        </section>
+
+        <section id="industry-view" class="view">
+          <p class="panel-kicker">EMPLOYMENT / WAGES / WORKPLACE CONDITIONS</p>
+          <h2>Industry and labour market</h2>
+          <p id="industry-status" class="muted" role="status">Connect to a world to inspect companies, jobs, skills and wages.</p>
+          <div class="industry-metrics">
+            <div><small>LABOUR SUPPLY</small><strong id="industry-workforce">—</strong></div>
+            <div><small>EMPLOYED</small><strong id="industry-employed">—</strong></div>
+            <div><small>UNEMPLOYED</small><strong id="industry-unemployed">—</strong></div>
+            <div><small>EMPLOYMENT RATE</small><strong id="industry-employment-rate">—</strong></div>
+            <div><small>DAILY PAYROLL</small><strong id="industry-payroll">—</strong></div>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">WORKPLACES / CONTRACTS / SAFETY</p>
+          <div id="industry-workplace-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">LABOUR SUPPLY / OCCUPATION / QUALIFICATION</p>
+          <div id="industry-labour-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">UNIONS / COLLECTIVE BARGAINING</p>
+          <div id="industry-union-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">EMPLOYMENT HISTORY</p>
+          <div id="industry-history-list" class="political-list"></div>
+          <p class="microcopy">Companies are NPC businesses. Government members set laws and public policy; this interface does not let players directly hire, fire or operate individual companies. Real wages, accidents, strikes, patents and automation are not yet modelled.</p>
+        </section>
+
+        <section id="administration-view" class="view">
+          <p class="panel-kicker">CIVIL SERVICE / AGENCIES / PUBLIC ADMINISTRATION</p>
+          <h2>State administration</h2>
+          <p id="administration-status" class="muted" role="status">Connect to a multiplayer world to inspect agencies, public procedures and civil-service records.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">AGENCIES / JURISDICTIONS / CAPACITY</p>
+          <div id="administration-agency-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">CIVIL SERVICE / EMPLOYMENT / MERIT</p>
+          <div id="administration-staff-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ADMINISTRATIVE TASKS / LEGAL PROCEDURES</p>
+          <div id="administration-task-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC PROJECTS / MILESTONES</p>
+          <div id="administration-project-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PROCUREMENT / SUPPLIERS / PUBLIC CONTRACTS</p>
+          <div id="administration-procurement-list" class="political-list"></div>
+          <details id="procurement-tender-setup" class="procurement-controls" hidden>
+            <summary>PUBLISH A PUBLIC TENDER</summary>
+            <p class="microcopy">The agency reserves the full estimated amount before publication. Offers are recorded against registered suppliers; the award rule is the lowest valid price from an active supplier with the required competence. Delivery must pass inspection by a separate office before the supplier can be paid.</p>
+            <label class="field-label" for="procurement-agency">RESPONSIBLE AGENCY</label>
+            <select id="procurement-agency" class="text-field"></select>
+            <label class="field-label" for="procurement-province">DELIVERY PROVINCE</label>
+            <select id="procurement-province" class="text-field"></select>
+            <label class="field-label" for="procurement-competence">CONTRACT COMPETENCE</label>
+            <select id="procurement-competence" class="text-field"></select>
+            <label class="field-label" for="procurement-inspection-office">INDEPENDENT INSPECTION OFFICE</label>
+            <select id="procurement-inspection-office" class="text-field"></select>
+            <label class="field-label" for="procurement-title">TENDER TITLE</label>
+            <input id="procurement-title" class="text-field" maxlength="120" placeholder="Contract title">
+            <label class="field-label" for="procurement-scope">SCOPE / SPECIFICATION</label>
+            <textarea id="procurement-scope" class="text-field" rows="3" maxlength="2000" placeholder="Describe the deliverables and acceptance requirements"></textarea>
+            <div class="procurement-number-grid">
+              <label class="field-label" for="procurement-estimate">ESTIMATED CONTRACT VALUE</label>
+              <input id="procurement-estimate" class="text-field" type="number" min="0.01" max="90071992547409" step="0.01" value="100">
+              <label class="field-label" for="procurement-submission-days">SUBMISSION PERIOD / DAYS</label>
+              <input id="procurement-submission-days" class="text-field" type="number" min="1" max="365" step="1" value="7">
+            </div>
+            <button id="procurement-open-tender" class="primary-button" type="button" disabled>PUBLISH TENDER AND RESERVE BUDGET</button>
+            <p id="procurement-form-status" class="microcopy" role="status">Select an authorized agency and an independent inspection office.</p>
+          </details>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ADMINISTRATIVE RECORDS / AUDIT TRAIL</p>
+          <div id="administration-history-list" class="political-list"></div>
+          <p class="microcopy">Administrative capacity is constrained by staff, qualifications, experience, merit, loyalty, corruption risk, infrastructure, coordination, office capacity and available budget. Procedures with missing staff, funds or documents remain blocked or delayed. Public procurement reserves funds before publication, records received supplier offers and requires independent delivery inspection before payment. This phase does not provide automatic vendor discovery, external e-tender publication, tax treatment or a full public-procurement legal code.</p>
+        </section>
+
+        <section id="media-view" class="view">
+          <p class="panel-kicker">PRESS / BROADCAST / PUBLIC OPINION</p>
+          <h2>Media and public opinion</h2>
+          <p id="media-status" class="muted" role="status">Connect to a world and select a State to inspect news outlets and public opinion.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC OPINION / TRUST / TOPICS</p>
+          <div id="media-opinion-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">REGISTERED MEDIA OUTLETS</p>
+          <div id="media-outlet-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">NEWS / EDITORIALS / ANALYSIS</p>
+          <div id="media-article-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC OPINION POLLS</p>
+          <div id="media-poll-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PRESS RESTRICTIONS / LEGAL RECORD</p>
+          <div id="media-censorship-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <details id="media-publishing-panel">
+            <summary>EDITOR DESK / PUBLISH ARTICLE</summary>
+            <div class="media-compose-grid">
+              <label>Outlet<select id="media-editor-outlet" class="text-field"></select></label>
+              <label>Topic<select id="media-editor-topic" class="text-field"></select></label>
+              <label>Format<select id="media-editor-type" class="text-field">
+                <option value="news">News report</option><option value="editorial">Editorial / opinion</option>
+                <option value="analysis">Analysis</option><option value="notice">Public notice</option>
+              </select></label>
+              <label>Topic position<select id="media-editor-stance" class="text-field">
+                <option value="neutral">Neutral</option><option value="support">Support</option>
+                <option value="oppose">Oppose</option>
+              </select></label>
+              <label>Government position<select id="media-editor-government" class="text-field">
+                <option value="neutral">Neutral</option><option value="support">Supportive</option>
+                <option value="critical">Critical</option>
+              </select></label>
+            </div>
+            <label>Headline<input id="media-editor-title" class="text-field" maxlength="160" placeholder="A clear, verifiable headline"></label>
+            <label>Article text<textarea id="media-editor-body" class="text-field" rows="6" maxlength="1800" placeholder="40–1,800 characters. News reports must cite event IDs from the shared world record."></textarea></label>
+            <label>Sources<select id="media-editor-sources" class="text-field" multiple size="5" aria-label="Select events from the shared world record"></select></label>
+            <p class="microcopy">News is distinct from opinion and must cite existing events from this State. Editorials and analysis remain explicitly labelled; no article can create buildings, laws, events or statistics in the simulation.</p>
+            <button id="media-publish-article" class="primary-button" type="button">PUBLISH ARTICLE</button>
+          </details>
+          <details id="media-poll-panel">
+            <summary>POLLING DESK / SUBMIT SURVEY RESULTS</summary>
+            <div class="media-compose-grid">
+              <label>Outlet<select id="media-poll-outlet" class="text-field"></select></label>
+              <label>Topic<select id="media-poll-topic" class="text-field"></select></label>
+              <label>Sample size <output id="media-sample-readout">100 respondents</output>
+                <input id="media-poll-sample" type="range" min="30" max="1000" step="10" value="100"></label>
+              <label>Support responses <output id="media-support-readout">50%</output>
+                <input id="media-poll-support" type="range" min="0" max="100" step="1" value="50"></label>
+              <label>Undecided responses <output id="media-undecided-readout">15%</output>
+                <input id="media-poll-undecided" type="range" min="0" max="100" step="1" value="15"></label>
+            </div>
+            <p class="microcopy">The game stores aggregate response counts entered here, not fabricated individual respondents. The displayed margin of error is an approximation for a simple random sample.</p>
+            <button id="media-submit-poll" class="secondary-button" type="button">REGISTER POLL</button>
+          </details>
+          <p class="microcopy">The game distinguishes outlet ownership, editorial line, reach, credibility, independence and legal press freedom. Opinion only changes when topic profiles have been configured. Restricting a publication requires an active law that explicitly authorizes media restrictions and a configured public office.</p>
+        </section>
+
+        <section id="security-view" class="view">
+          <p class="panel-kicker">INTELLIGENCE / COUNTERINTELLIGENCE / INTERNAL SECURITY</p>
+          <h2>Security and intelligence</h2>
+          <p id="security-status" class="muted" role="status">Connect to a world and select a State to inspect security agencies and threat assessments.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SECURITY AGENCIES / LEGAL MANDATES</p>
+          <div id="security-agency-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INCIDENT REPORTING</p>
+          <div id="security-incident-form" class="security-compose">
+            <label>Province<select id="security-incident-province" class="text-field"></select></label>
+            <label>Category<select id="security-incident-type" class="text-field">
+              <option value="public_order">Public order</option>
+              <option value="sabotage">Sabotage</option>
+              <option value="espionage">Espionage allegation</option>
+              <option value="foreign_interference">Foreign interference</option>
+              <option value="cyber_incident">Cyber incident</option>
+              <option value="infrastructure_threat">Critical infrastructure</option>
+              <option value="terrorism_threat">Terrorism threat</option>
+              <option value="disinformation">Disinformation</option>
+              <option value="disaster_risk">Disaster risk</option>
+              <option value="other">Other</option>
+            </select></label>
+            <label>Description<textarea id="security-incident-description" class="text-field" rows="3" maxlength="500" placeholder="Describe the incident without assuming guilt or identifying private individuals."></textarea></label>
+            <button id="security-report-incident" class="secondary-button" type="button">REGISTER INCIDENT REPORT</button>
+          </div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">REPORTED INCIDENTS / TRIAGE</p>
+          <div id="security-incident-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INVESTIGATIONS / COUNTERINTELLIGENCE CASES</p>
+          <div id="security-case-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PUBLIC SECURITY ALERTS</p>
+          <div id="security-alert-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">INTELLIGENCE REPORTS / AUDIT TRAIL</p>
+          <div id="security-history-list" class="political-list"></div>
+          <p class="microcopy">Investigations require an active legal mandate, competence, provincial jurisdiction and an authorized investigative office. Closure is independent and requires a different oversight office. Reports reference the shared world record; assessments are not proof of guilt. This game does not include indiscriminate surveillance or private-person tracking.</p>
+        </section>
+
+        <section id="events-view" class="view">
+          <p class="panel-kicker">WORLD TIMELINE / CRISES / DECISIONS</p>
+          <h2>World events</h2>
+          <p id="world-events-status" class="muted" role="status">Connect to a world and select a State to inspect scheduled events and pending decisions.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">ACTIVE EVENTS / AWAITING A DECISION</p>
+          <div id="world-events-active-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">RECENTLY RESOLVED / EXPIRED</p>
+          <div id="world-events-history-list" class="political-list"></div>
+          <p class="microcopy">Events only trigger from definitions explicitly configured by the host. Their daily probability is deterministic for a given world/date, options are limited to declared effects, and only configured political offices can decide them. An expired event is not silently resolved on behalf of the player.</p>
+        </section>
+
+        <section id="identity-view" class="view">
+          <p class="panel-kicker">NATIONAL IDENTITY / RELIGION / IDEOLOGY / CULTURE</p>
+          <h2>Identity and communities</h2>
+          <p id="identity-status" class="muted" role="status">Connect to a world and select a State to inspect its aggregated community profiles.</p>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">SOCIAL COHESION / INTEGRATION / POLARIZATION</p>
+          <div id="identity-cohesion-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">RELIGIOUS / CULTURAL / IDEOLOGICAL GROUPS</p>
+          <div id="identity-group-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">PROVINCIAL RIGHTS / RECOGNITION / ACCESS</p>
+          <div id="identity-profile-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">COMMUNITY ORGANIZATIONS / PROGRAMS</p>
+          <div id="identity-program-list" class="political-list"></div>
+          <div class="panel-divider"></div>
+          <p class="panel-kicker">COMMUNITY PROGRAM HISTORY</p>
+          <div id="identity-history-list" class="political-list"></div>
+          <details id="identity-program-panel">
+            <summary>COMMUNITY PROGRAM DESK / FUND AN INITIATIVE</summary>
+            <div class="identity-program-grid">
+              <label>Organization<select id="identity-org-select" class="text-field"></select></label>
+              <label>Community profile<select id="identity-profile-select" class="text-field"></select></label>
+              <label>Programme<select id="identity-program-select" class="text-field"></select></label>
+              <label>Programme strength <output id="identity-strength-readout">2 / 5</output>
+                <input id="identity-strength" type="range" min="1" max="5" step="1" value="2"></label>
+            </div>
+            <p id="identity-program-preview" class="microcopy">Select a legally authorized community organization to preview the budget cost and social indicators affected.</p>
+            <button id="identity-fund-program" class="primary-button" type="button">FUND COMMUNITY PROGRAMME</button>
+          </details>
+          <p class="microcopy">All demographic and social indicators are aggregated by group and province. The game does not store individual religious belief, ethnicity, ideology or identity. Overlapping affiliations must be marked as non-exclusive; profile values do not identify specific people.</p>
         </section>
 
         <section id="multiplayer-view" class="view">
@@ -354,6 +932,7 @@
           <label class="field-label">NETWORK SERVICE</label>
           <div class="field-row"><span id="server-endpoint" class="microcopy">Loading multiplayer service…</span><button id="test-server" class="quiet-btn" type="button">TEST</button></div>
           <p id="server-status" class="connection-status" role="status">Server not connected.</p>
+          <p id="technical-maintenance-status" class="technical-maintenance-status" role="status" hidden></p>
           <label class="field-label" for="player-name">PLAYER NAME</label>
           <input id="player-name" class="text-field" maxlength="24" autocomplete="nickname" placeholder="2–24 characters">
           <div id="multiplayer-actions" class="multiplayer-actions">
@@ -368,18 +947,100 @@
             <p id="session-summary" class="muted"></p>
             <p id="pending-orders-status" class="muted" role="status">No pending orders.</p>
             <div id="pending-order-list" class="pending-order-list" aria-live="polite"></div>
+            <details id="technical-maintenance-panel" class="technical-maintenance-panel" hidden>
+              <summary>TECHNICAL MAINTENANCE / HOST OPERATIONS</summary>
+              <p class="microcopy">This operational state is independent of government decisions and pause votes. While active, the host stops daily simulation cycles and clock interpolation without changing the world status. The reason is visible to everyone in the room.</p>
+              <label class="field-label" for="technical-maintenance-reason">PUBLIC MAINTENANCE NOTICE</label>
+              <input id="technical-maintenance-reason" class="text-field" maxlength="240" placeholder="Explain the technical work (5–240 characters)">
+              <div class="field-row">
+                <button id="activate-technical-maintenance" class="secondary-button" type="button">START MAINTENANCE</button>
+                <button id="clear-technical-maintenance" class="quiet-btn" type="button">END MAINTENANCE</button>
+              </div>
+              <p id="technical-maintenance-control-status" class="microcopy">Maintenance is inactive.</p>
+            </details>
             <button id="reconnect-world" class="quiet-btn" type="button">RECONNECT</button>
             <div id="invite-panel" class="invite-panel" hidden>
               <label class="field-label" for="invite-share">PRIVATE INVITATION — SHARE ONLY WITH FRIENDS</label>
               <div class="field-row"><input id="invite-share" class="text-field" readonly><button id="copy-invite" class="quiet-btn" type="button">COPY</button></div>
             </div>
-            <p class="field-label">FOUNDING PARTY / ONLINE PLAYERS <span id="lobby-player-count" class="lobby-player-count">1 ONLINE / 1 OF 100</span></p>
+            <p class="field-label">FOUNDING PARTY / ONLINE PLAYERS <span id="lobby-player-count" class="lobby-player-count">1 ONLINE / 1 OF 20</span></p>
             <div id="player-list" class="player-list"></div>
             <button id="start-world" class="action-btn" type="button" hidden>START WORLD</button>
             <details id="advanced-scenario-settings" class="advanced-scenario-settings" hidden>
               <summary>ADVANCED · HOST SCENARIO SETTINGS</summary>
               <p class="microcopy">Optional technical configuration for the host before the world starts. Normal play does not require editing JSON.</p>
-              <div id="advanced-scenario-content" class="advanced-scenario-content"></div>
+<div id="advanced-scenario-content" class="advanced-scenario-content">
+              <details id="services-setup-panel">
+                <summary>PUBLIC SERVICES / PROVIDERS / COVERAGE CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Define service demand units, health or education outcomes, local facilities, population groups served, staffing, capacity, quality and operating costs. Public costs use the State treasury. Private, religious, community and mixed providers must reference a registered local NPC operator. No coverage is inferred from the State population.</p>
+                <button id="load-services-config" class="secondary-button" type="button">LOAD CURRENT SERVICE DATA</button>
+                <textarea id="services-config" class="text-field" rows="18" spellcheck="false" aria-label="Public services scenario JSON"></textarea>
+                <button id="save-services-config" class="primary-button" type="button">VALIDATE AND SAVE SERVICES</button>
+              </details>
+              <details id="industry-setup-panel">
+                <summary>INDUSTRY / LABOUR / WORKPLACE CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Register occupations, local labour pools, existing NPC company facilities, workplace positions, daily wages, qualification requirements, shift hours, safety and recognized unions. Labour supply cannot exceed the referenced population group. Companies pay their own payroll in the State currency.</p>
+                <button id="load-industry-config" class="secondary-button" type="button">LOAD CURRENT INDUSTRY DATA</button>
+                <textarea id="industry-config" class="text-field" rows="22" spellcheck="false" aria-label="Industry and labour scenario JSON"></textarea>
+                <button id="save-industry-config" class="primary-button" type="button">VALIDATE AND SAVE INDUSTRY</button>
+              </details>
+              <details id="demography-setup-panel">
+                <summary>DEMOGRAPHY / POPULATION COHORT CONFIGURATION</summary>
+                <p class="microcopy">Host-only technical setup before starting the world. Configure every represented age from 0 to 120, annual births per thousand, mortality by age band, group locations and migration permissions. Epidemic definitions require explicit incubation, infectious duration, transmission, mortality and group-to-group contact parameters plus dated outbreak seeds. No historical or disease rate is supplied by default.</p>
+                <button id="load-demography-config" class="secondary-button" type="button">LOAD CURRENT DEMOGRAPHY DATA</button>
+                <textarea id="demography-config" class="text-field" rows="18" spellcheck="false" aria-label="Demographic scenario JSON"></textarea>
+                <button id="save-demography-config" class="primary-button" type="button">VALIDATE AND SAVE DEMOGRAPHY</button>
+              </details>
+              <details id="justice-setup-panel">
+                <summary>JUSTICE / LEGAL SCENARIO CONFIGURATION</summary>
+                <p class="microcopy">Technical scenario data only. Configuration is locked after the world starts. Each State must include crimeTypes, courts, policeAgencies and prisons arrays. Crime categories must reference an enacted law in force. Courts and police agencies need explicit provincial jurisdiction; police actions also require an office holder authorized by the State.</p>
+                <button id="load-justice-config" class="secondary-button" type="button">LOAD CURRENT JUSTICE DATA</button>
+                <textarea id="justice-config" class="text-field" rows="18" spellcheck="false" aria-label="Justice scenario JSON"></textarea>
+                <button id="save-justice-config" class="primary-button" type="button">VALIDATE AND SAVE JUSTICE SCENARIO</button>
+              </details>
+              <details id="resources-setup-panel">
+                <summary>RESOURCES / CLIMATE / ENVIRONMENT CONFIGURATION</summary>
+                <p class="microcopy">Host-only technical setup before the world starts. Configure resource definitions, finite deposits, agricultural land, crops, farms, pasture and livestock sites, fisheries, managed forest areas, water, climate seasons, environmental measurements, disasters, energy and strategic reserves. Livestock, fisheries and forestry each need their own stocks, regeneration/harvest limits and a linked NPC company installation. Every reference must point to an existing State, province, land parcel, market good or company installation. No climate, deposit, herd, catch, timber or yield defaults are assumed.</p>
+                <button id="load-resources-config" class="secondary-button" type="button">LOAD CURRENT RESOURCE DATA</button>
+                <textarea id="resources-config" class="text-field" rows="22" spellcheck="false" aria-label="Resource and climate scenario JSON"></textarea>
+                <button id="save-resources-config" class="primary-button" type="button">VALIDATE AND SAVE RESOURCE SCENARIO</button>
+              </details>
+              <details id="bureaucracy-setup-panel">
+                <summary>ADMINISTRATION / AGENCIES / CIVIL SERVICE CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before starting the world. Configure agencies, competence and provincial jurisdiction, departments, permanent civil-service posts, legal procedures triggered by policy or law, budget accounts, public projects, milestones and suppliers. Political supervisory offices must already exist. Employees are not deleted when political office holders change.</p>
+                <button id="load-bureaucracy-config" class="secondary-button" type="button">LOAD CURRENT ADMINISTRATION DATA</button>
+                <textarea id="bureaucracy-config" class="text-field" rows="26" spellcheck="false" aria-label="Administrative scenario JSON"></textarea>
+                <button id="save-bureaucracy-config" class="primary-button" type="button">VALIDATE AND SAVE ADMINISTRATION</button>
+              </details>
+              <details id="media-setup-panel">
+                <summary>MEDIA / PUBLIC OPINION / PRESS RULES CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Configure every State's press-freedom rules, legal restriction powers, registered outlets, editorial profiles, reach, credibility, independence, licensed editors, topic coverage and public-opinion baselines. News reports later cite real world events. A censorship law must explicitly authorize media restrictions and an existing office must be assigned.</p>
+                <button id="load-media-config" class="secondary-button" type="button">LOAD CURRENT MEDIA DATA</button>
+                <textarea id="media-config" class="text-field" rows="24" spellcheck="false" aria-label="Media and public opinion scenario JSON"></textarea>
+                <button id="save-media-config" class="primary-button" type="button">VALIDATE AND SAVE MEDIA SCENARIO</button>
+              </details>
+              <details id="security-setup-panel">
+                <summary>SECURITY / INTELLIGENCE / OVERSIGHT CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Define each security agency's scope, competence, province, investigation offices and separate oversight offices. Every authorization must reference a law currently in force, a competence, a territory, a warrant requirement and a review interval. Do not configure powers that are not explicitly supported by the scenario's laws.</p>
+                <button id="load-security-config" class="secondary-button" type="button">LOAD CURRENT SECURITY DATA</button>
+                <textarea id="security-config" class="text-field" rows="24" spellcheck="false" aria-label="Security and intelligence scenario JSON"></textarea>
+                <button id="save-security-config" class="primary-button" type="button">VALIDATE AND SAVE SECURITY SCENARIO</button>
+              </details>
+              <details id="world-events-setup-panel">
+                <summary>WORLD EVENTS / TRIGGERS / OUTCOMES CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Define events by State, date window, deterministic daily probability (0–1,000 per thousand), occurrence limit, cooldown, expiry, required decision offices and explicit options. Supported effects are limited to State treasury, configured opinion topics, configured press-freedom rules and existing resource stock. Every effect is prevalidated before any part is applied.</p>
+                <button id="load-world-events-config" class="secondary-button" type="button">LOAD CURRENT EVENT DEFINITIONS</button>
+                <textarea id="world-events-config" class="text-field" rows="24" spellcheck="false" aria-label="World event definitions JSON"></textarea>
+                <button id="save-world-events-config" class="primary-button" type="button">VALIDATE AND SAVE EVENT SCENARIO</button>
+              </details>
+              <details id="identity-setup-panel">
+                <summary>IDENTITY / RELIGION / IDEOLOGY / COMMUNITY CONFIGURATION</summary>
+                <p class="microcopy">Host-only setup before the world starts. Configure aggregated groups and provincial profiles, rights, recognition, language/service access, grievance and trust. Communities may overlap; mark those groups non-exclusive. Organizations require an active law, valid province, registered office, bounded programme costs and capacities. Never enter names or private beliefs of individual residents.</p>
+                <button id="load-identity-config" class="secondary-button" type="button">LOAD CURRENT IDENTITY DATA</button>
+                <textarea id="identity-config" class="text-field" rows="26" spellcheck="false" aria-label="Identity and community scenario JSON"></textarea>
+                <button id="save-identity-config" class="primary-button" type="button">VALIDATE AND SAVE IDENTITY SCENARIO</button>
+              </details>
+            </div>
             </details>
             <div id="pause-controls" class="pause-controls" hidden>
               <p class="field-label">SIMULATION / PAUSE VOTE</p>
@@ -396,17 +1057,47 @@
     <footer class="game-footer">
       <div class="world-status"><span class="footer-mark">NW</span><span>BELELAND FRONTIER STRATEGY</span><span id="world-mode">MULTIPLAYER REQUIRED</span></div>
       <span id="world-time" class="world-time" hidden></span>
+      <div id="world-clock-progress" class="world-clock-progress" role="progressbar"
+        aria-label="Progress toward the next simulated day" aria-valuemin="0" aria-valuemax="100"
+        aria-valuenow="0" title="World clock interpolation" hidden>
+        <span id="world-clock-progress-fill"></span>
+      </div>
+      <div id="hud-quick-actions" class="hud-quick-actions" hidden role="toolbar" aria-label="Quick city management">
+        <button id="hud-build" type="button" title="Open the TheoTown-style building catalogue" aria-label="Open building catalogue"><span aria-hidden="true">⚒</span><b>BUILD</b></button>
+        <button id="hud-city" type="button" title="Open the selected settlement" aria-label="Open settlement"><span aria-hidden="true">⌂</span><b>CITY</b></button>
+        <button id="hud-economy" type="button" title="Open the economy and treasury" aria-label="Open economy"><span aria-hidden="true">¤</span><b>ECONOMY</b></button>
+        <button id="hud-government" type="button" title="Open government controls" aria-label="Open government"><span aria-hidden="true">§</span><b>GOV</b></button>
+        <button id="hud-pause" type="button" title="Open simulation pause controls" aria-label="Open pause controls"><span aria-hidden="true">Ⅱ</span><b>PAUSE</b></button>
+      </div>
       <button id="next-month" class="advance" hidden>ADVANCE MONTH <b>→</b></button>
       <a href="/Apps/">NORTH ASSEMBLY ↗</a>
     </footer>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
-  <script src="./simulation.js?v=20261108-playable-systems-v1"></script>
-  <script src="./strategy.js?v=20261108-playable-systems-v1"></script>
-  <script src="./multiplayer.js?v=20261108-functional-controls-v3"></script>
+  <script src="./scenario.js?v=20261109-epidemic-fingerprint-v1"></script>
+  <script src="./demography.js?v=20261108-demography-v1"></script>
+  <script src="./epidemiology.js?v=20261109-epidemics-v2"></script>
+  <script src="./resources.js?v=20261108-blocks16-18-v2"></script>
+  <script src="./services.js?v=20261108-blocks16-18-v2"></script>
+  <script src="./industry.js?v=20261108-blocks16-18-v2"></script>
+  <script src="./military-logistics.js?v=20261111-military-logistics-v1"></script>
+  <script src="./simulation.js?v=20261111-scheduled-order-cycle-v1"></script>
+  <script src="./strategy.js?v=20261111-military-logistics-v1"></script>
+  <script src="./finance.js?v=20261108-blocks19-21-v2"></script>
+  <script src="./diplomacy-advanced.js?v=20261108-blocks19-21-v2"></script>
+  <script src="./bureaucracy.js?v=20261111-procurement-v1"></script>
+  <script src="./media.js?v=20261108-media-v2"></script>
+  <script src="./security.js?v=20261108-security-v3"></script>
+  <script src="./world-events.js?v=20261109-epidemic-triggers-v1"></script>
+  <script src="./command-inbox.js?v=20261109-inbox-routing-v1"></script>
+  <script src="./identity.js?v=20261109-identity-v2"></script>
+  <script src="./justice.js?v=20261108-justice-v2"></script>
+  <script src="./portable-backup.js?v=20261111-encrypted-host-backup-v1"></script>
+  <script src="./multiplayer.js?v=20261111-scheduled-orders-v1"></script>
+  <script src="./territory-geometry.js?v=20261108-territory-v1"></script>
   <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
   <script src="./build-menu.js?v=20261108-functional-controls-v3"></script>
-  <script src="./game.js?v=20261108-functional-controls-v3"></script>
+  <script src="./game.js?v=20261111-ui-refresh-v4"></script>
 </body>
 </html>

@@ -4,7 +4,9 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const simulation=require('../simulation.js');
 const strategy=require('../strategy.js');
-global.window={NewWorldSimulation:simulation,NewWorldStrategy:strategy};
+const bureaucracy=require('../bureaucracy.js');
+globalThis.NewWorldBureaucracy=bureaucracy;
+global.window={NewWorldSimulation:simulation,NewWorldStrategy:strategy,NewWorldBureaucracy:bureaucracy};
 const multiplayer=require('../multiplayer.js');
 
 let sequence=0;
@@ -398,6 +400,34 @@ test('constitutional budget, law, vote and office appointment orders change gove
   assert.equal(duplicatePolicy.accepted,false);
   assert.equal(duplicatePolicy.code,'POLICY_ALREADY_ACTIVE');
 
+  const strongerPolicy=submit(game,host,'proposeLaw',{
+    stateId:territory.stateId,decisionTitle:'National Service Act',
+    decisionText:'Reduces the cost of recruiting additional defensive personnel.',
+    policyId:'conscription',policyValue:0.15
+  });
+  assert.equal(strongerPolicy.accepted,true,strongerPolicy.error);
+  const serviceDecision=system.decisions.at(-1);
+  assert.equal(serviceDecision.policyValue,0.15);
+  const serviceVote=submit(game,host,'voteDecision',{
+    stateId:territory.stateId,decisionId:serviceDecision.id,voteChoice:'approve'
+  });
+  assert.equal(serviceVote.accepted,true,serviceVote.error);
+  assert.equal(strategy.effectValue(game,territory.stateId,'recruitment_discount'),0.15);
+  const treasuryBeforeRecruitment = territory.treasury;
+  const discountedRecruitment = submit(game,host,'recruitUnit',{
+    stateId:territory.stateId,unitTypeId:'militia'
+  });
+  assert.equal(discountedRecruitment.accepted,true,discountedRecruitment.error);
+  assert.equal(treasuryBeforeRecruitment-territory.treasury,187);
+
+  const invalidStrength=submit(game,host,'proposeLaw',{
+    stateId:territory.stateId,decisionTitle:'Extreme Agricultural Act',
+    decisionText:'Requests an invalid policy magnitude outside the configured legal limits.',
+    policyId:'agricultural_program',policyValue:0.99
+  });
+  assert.equal(invalidStrength.accepted,false);
+  assert.equal(invalidStrength.code,'INVALID_POLICY');
+
   const budget=submit(game,host,'approveBudget',{
     stateId:territory.stateId,proposedBudget:850
   });
@@ -491,4 +521,111 @@ test('campaign objectives use the player government memberships rather than only
   const objectives=strategy.objectivesFor(game,member.id);
   assert.equal(objectives.find(item => item.id==='regional-power').progress,1);
   assert.equal(objectives.find(item => item.id==='unification').progress,1);
+});
+
+test('research enforces prerequisites and staffing, supports private funding, and applies adoption exactly once',()=>{
+  const game=freshWorld();
+  const host=game.players[0];
+  const territory=game.territories[0];
+  const masonry=game.researchProjects.find(item=>
+    item.stateId===territory.stateId && item.technologyId==='masonry');
+  const logistics=game.researchProjects.find(item=>
+    item.stateId===territory.stateId && item.technologyId==='logistics');
+  const institution=game.researchInstitutions.find(item=>item.id===masonry.institutionId);
+  const treasuryBefore=territory.treasury;
+
+  const missingPrerequisite=submit(game,host,'startProject',{
+    stateId:territory.stateId,researchProjectId:logistics.id
+  });
+  assert.equal(missingPrerequisite.accepted,false);
+  assert.equal(missingPrerequisite.code,'PREREQUISITES_MISSING');
+  assert.equal(logistics.status,'proposed');
+
+  institution.type='private';
+  institution.funding=119;
+  const insufficientPrivateFunding=submit(game,host,'startProject',{
+    stateId:territory.stateId,researchProjectId:masonry.id
+  });
+  assert.equal(insufficientPrivateFunding.accepted,false);
+  assert.equal(insufficientPrivateFunding.code,'INSUFFICIENT_FUNDS');
+  assert.equal(institution.funding,119);
+  assert.equal(territory.treasury,treasuryBefore);
+
+  institution.funding=120;
+  masonry.staff=institution.staff+1;
+  const insufficientStaff=submit(game,host,'startProject',{
+    stateId:territory.stateId,researchProjectId:masonry.id
+  });
+  assert.equal(insufficientStaff.accepted,false);
+  assert.equal(insufficientStaff.code,'PROJECT_RESOURCES_MISSING');
+  assert.equal(institution.funding,120);
+
+  masonry.staff=2;
+  const started=submit(game,host,'startProject',{
+    stateId:territory.stateId,researchProjectId:masonry.id
+  });
+  assert.equal(started.accepted,true,started.error);
+  assert.equal(masonry.fundedFrom,'institution');
+  assert.equal(institution.funding,0);
+  assert.equal(territory.treasury,treasuryBefore);
+
+  for(let day=0;day<5;day++) assert.equal(simulation.advanceDay(game).ok,true);
+  assert.equal(game.researchProjects.find(item=>item.id===masonry.id).status,'completed');
+  assert.equal(game.technologyUnlocks.some(item=>
+    item.stateId===territory.stateId && item.technologyId==='masonry'),true);
+
+  const adopted=submit(game,host,'adoptTechnology',{
+    stateId:territory.stateId,technologyId:'masonry'
+  });
+  assert.equal(adopted.accepted,true,adopted.error);
+  assert.equal(strategy.effectValue(game,territory.stateId,'construction_discount'),0.1);
+  const duplicate=submit(game,host,'adoptTechnology',{
+    stateId:territory.stateId,technologyId:'masonry'
+  });
+  assert.equal(duplicate.accepted,false);
+  assert.equal(duplicate.code,'ALREADY_ADOPTED');
+  assert.equal(game.technologyAdoptions.filter(item=>
+    item.stateId===territory.stateId && item.technologyId==='masonry').length,1);
+  assert.equal(game.technologyUnlocks.some(item=>
+    item.stateId===territory.stateId && item.technologyId==='masonry'),true);
+});
+
+
+test('appointing a new Chief Executive records institutional continuity without replacing or deleting civil servants',()=>{
+  const game=multiplayer.createInitialWorld('Administrative Continuity').game;
+  const host=game.players[0];
+  const stateId=game.territories[0].stateId;
+  const system=game.politicalSystems.find(item=>item.stateId===stateId);
+  const previousChief=system.offices.find(item=>item.id==='chief-executive');
+  assert.equal(previousChief.holderPlayerId,host.id);
+
+  const successor={id:'administrative-successor',name:'Government Successor',
+    connected:true,token:'administrative-successor-token'};
+  game.players.push(successor);
+  game.memberships.push({
+    id:'administrative-successor-membership',gameId:game.id,
+    playerId:successor.id,stateId,status:'active',
+    permissionSetId:'government-member'
+  });
+  bureaucracy.ensure(game);
+  game.civilServants.push({
+    id:'permanent-civil-clerk',stateId,agencyId:'existing-agency',
+    name:'Permanent Civil Clerk',appointmentBasis:'merit',status:'active',
+    headcount:1,dailyWorkUnitsPerPerson:1,qualificationPercent:100,
+    experiencePercent:100,meritScore:90,institutionalLoyaltyPercent:100,
+    corruptionRiskPercent:0,salaryPerDay:0
+  });
+  const staffBefore=structuredClone(game.civilServants);
+  assert.equal(multiplayer.applyAdmin(game,'start',{}).ok,true);
+
+  const appointed=submit(game,host,'appointOffice',{
+    stateId,officeId:'chief-executive',appointeePlayerId:successor.id
+  });
+  assert.equal(appointed.accepted,true,appointed.error);
+  assert.equal(system.offices.find(item=>item.id==='chief-executive').holderPlayerId,successor.id);
+  assert.deepEqual(game.civilServants,staffBefore);
+  assert.equal(game.administrativeHistory.filter(item=>
+    item.type==='government_transition').length,1);
+  assert.deepEqual(game.administrativeHistory.at(-1).details.retainedCivilServantIds,
+    ['permanent-civil-clerk']);
 });

@@ -15,8 +15,182 @@
   const DAY_LENGTH_MS = 5 * 60 * 1000;
   const DAYS_PER_FINANCIAL_PERIOD = 30;
   const MAX_TREASURY = 2147483647;
-  const MAX_PLAYERS = 100;
+  const MAX_PLAYERS = 20;
   const STARTING_TERRITORY_INDEX = 0;
+  const STATE_CATALOG = Object.freeze([
+    {key:'coimbrila',name:'Kingdom of Coimbrila'},
+    {key:'gania',name:'United Provinces of Gania'},
+    {key:'chungia',name:'Chungia'},
+    {key:'calcilacia',name:'Calcilacia'},
+    {key:'pician-empire',name:'Pician Empire'},
+    {key:'meityeun-theocracy',name:'Meityeun Theocracy'},
+    {key:'swabing',name:'Swabing'},
+    {key:'alba',name:'Alba'},
+    {key:'knosian-despotate',name:'Knosian Despotate'},
+    {key:'kalestos',name:'Kalestos'},
+    {key:'gorkirch',name:'Gorkirch'},
+    {key:'shonewesia',name:'Duchy of Shonewesia'},
+    {key:'shahtehaq',name:'Shahtehaq'},
+    {key:'kvinian-empire',name:'Kvinian Empire'},
+    {key:'shi',name:'Shi'},
+    {key:'kueopia',name:'Kueopia'}
+  ]);
+  const worldPlayerLimit = game => Math.max(1,Math.min(MAX_PLAYERS,
+    Math.floor(Number(game?.maxHumanPlayers) || MAX_PLAYERS)));
+
+  const HOST_SAVE_FORMAT = 'north-assembly-new-world-save';
+  const HOST_SAVE_SCHEMA = 3;
+  const HOST_SAVE_SLOTS = ['a','b'];
+  const MAX_CLOCK_DAYS_PER_PULSE = 24;
+
+  function hostSaveChecksum(value) {
+    const input=String(value);
+    let hash=2166136261;
+    for(let index=0;index<input.length;index++) {
+      hash^=input.charCodeAt(index);
+      hash=Math.imul(hash,16777619);
+    }
+    return (hash>>>0).toString(16).padStart(8,'0');
+  }
+
+  function validWorldDate(value) {
+    if(typeof value!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed=new Date(value+'T00:00:00.000Z');
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10)===value;
+  }
+
+  function validHostGame(game) {
+    if(!game || typeof game!=='object' || !game.id || !game.hostPlayerId ||
+       !Array.isArray(game.players) || game.players.length<1 ||
+       game.players.length>MAX_PLAYERS || !Array.isArray(game.territories) ||
+       game.territories.length<1 || !Number.isSafeInteger(game.day) || game.day<1 ||
+       !validWorldDate(game.worldDate) || !Number.isSafeInteger(game.worldVersion) ||
+       game.worldVersion<0) return false;
+    const playerIds=game.players.map(player=>player?.id);
+    const stateIds=game.territories.map(territory=>territory?.stateId);
+    if(playerIds.some(id=>typeof id!=='string' || !id) ||
+       new Set(playerIds).size!==playerIds.length ||
+       stateIds.some(id=>typeof id!=='string' || !id) ||
+       new Set(stateIds).size!==stateIds.length ||
+       !playerIds.includes(game.hostPlayerId)) return false;
+    if(game.memberships!==undefined && !Array.isArray(game.memberships)) return false;
+    if(game.memberships?.some(item=>item?.status==='active' &&
+       (!playerIds.includes(item.playerId) || !stateIds.includes(item.stateId)))) return false;
+    return true;
+  }
+
+  function createHostSaveEnvelope(game,session,room,generation,clockAccumulatorMs=0,savedAt=new Date().toISOString()) {
+    const payload={
+      room:String(room || ''),
+      gameId:String(game?.id || ''),
+      hostPlayerId:String(game?.hostPlayerId || ''),
+      clockAccumulatorMs:Number.isFinite(clockAccumulatorMs)
+        ? Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,clockAccumulatorMs)) : 0,
+      game,session
+    };
+    const serialized=JSON.stringify(payload);
+    return {
+      format:HOST_SAVE_FORMAT,
+      schemaVersion:HOST_SAVE_SCHEMA,
+      generation:Math.max(1,Math.floor(Number(generation) || 1)),
+      savedAt,
+      checksum:hostSaveChecksum(serialized),
+      payload
+    };
+  }
+
+  function validateHostSaveEnvelope(envelope,expected={}) {
+    if(!envelope || envelope.format!==HOST_SAVE_FORMAT ||
+       envelope.schemaVersion!==HOST_SAVE_SCHEMA ||
+       !Number.isSafeInteger(envelope.generation) || envelope.generation<1 ||
+       !envelope.payload || typeof envelope.payload!=='object') return {valid:false,reason:'SAVE_FORMAT_INVALID'};
+    let serialized;
+    try { serialized=JSON.stringify(envelope.payload); }
+    catch { return {valid:false,reason:'SAVE_PAYLOAD_UNREADABLE'}; }
+    if(hostSaveChecksum(serialized)!==envelope.checksum)
+      return {valid:false,reason:'SAVE_CHECKSUM_MISMATCH'};
+    const payload=envelope.payload;
+    if(!validHostGame(payload.game) ||
+       payload.gameId!==payload.game.id ||
+       payload.hostPlayerId!==payload.game.hostPlayerId ||
+       !Number.isFinite(payload.clockAccumulatorMs) ||
+       payload.clockAccumulatorMs<0 ||
+       payload.clockAccumulatorMs>Number.MAX_SAFE_INTEGER)
+      return {valid:false,reason:'SAVE_WORLD_INVALID'};
+    if(payload.session &&
+       (payload.session.gameId!==payload.game.id ||
+        payload.session.playerId!==payload.game.hostPlayerId))
+      return {valid:false,reason:'SAVE_SESSION_MISMATCH'};
+    if(expected.room && payload.room!==expected.room)
+      return {valid:false,reason:'SAVE_ROOM_MISMATCH'};
+    if(expected.gameId && payload.gameId!==expected.gameId)
+      return {valid:false,reason:'SAVE_GAME_MISMATCH'};
+    if(expected.hostPlayerId && payload.hostPlayerId!==expected.hostPlayerId)
+      return {valid:false,reason:'SAVE_HOST_MISMATCH'};
+    return {valid:true,payload,generation:envelope.generation,savedAt:envelope.savedAt || null};
+  }
+
+  const TECHNICAL_MAINTENANCE_MAX_REASON=240;
+
+  function createTechnicalMaintenanceMessage(gameId,active,reason='',revision=0,changedAt=new Date().toISOString()) {
+    if(typeof gameId!=='string'||gameId.length<2||gameId.length>120||
+       typeof active!=='boolean'||!Number.isSafeInteger(revision)||revision<1||
+       typeof changedAt!=='string'||!Number.isFinite(Date.parse(changedAt))||
+       new Date(changedAt).toISOString()!==changedAt) return null;
+    const cleanReason=String(reason||'').trim()
+      .replace(/[\u0000-\u001f\u007f<>]/g,' ')
+      .replace(/\s+/g,' ').slice(0,TECHNICAL_MAINTENANCE_MAX_REASON);
+    if(active && cleanReason.length<5) return null;
+    return {
+      t:'maintenance',protocolVersion:1,gameId,active,
+      reason:active?cleanReason:'',revision,changedAt
+    };
+  }
+
+  function validateTechnicalMaintenanceMessage(message,expectedGameId) {
+    if(!message||message.t!=='maintenance'||message.protocolVersion!==1||
+       message.gameId!==expectedGameId||typeof message.active!=='boolean'||
+       !Number.isSafeInteger(message.revision)||message.revision<1||
+       typeof message.changedAt!=='string'||!Number.isFinite(Date.parse(message.changedAt))||
+       new Date(message.changedAt).toISOString()!==message.changedAt||
+       typeof message.reason!=='string'||message.reason.length>TECHNICAL_MAINTENANCE_MAX_REASON||
+       /[\u0000-\u001f\u007f<>]/.test(message.reason)||
+       (message.active&&message.reason.trim().length<5)||
+       (!message.active&&message.reason!=='')) return null;
+    return {
+      active:message.active,reason:message.reason,
+      revision:message.revision,changedAt:message.changedAt
+    };
+  }
+
+  function clockElapsedMs(previousAt,nowAt) {
+    const previous=Number(previousAt);
+    const now=Number(nowAt);
+    if(!Number.isFinite(previous) || !Number.isFinite(now) || now<=previous) return 0;
+    return now-previous;
+  }
+
+  function accumulateClockMs(accumulatorMs,elapsedMs) {
+    const accumulator=Number(accumulatorMs);
+    const elapsed=Number(elapsedMs);
+    const base=Number.isFinite(accumulator) && accumulator>0 ? accumulator : 0;
+    const added=Number.isFinite(elapsed) && elapsed>0 ? elapsed : 0;
+    return Math.min(Number.MAX_SAFE_INTEGER,base+added);
+  }
+
+  function takeDueClockDays(accumulatorMs,dayLimit=MAX_CLOCK_DAYS_PER_PULSE) {
+    const accumulator=Number.isFinite(accumulatorMs) && accumulatorMs>0 ? accumulatorMs : 0;
+    const limit=Math.max(0,Math.min(MAX_CLOCK_DAYS_PER_PULSE,Math.floor(Number(dayLimit) || 0)));
+    const due=Math.floor(accumulator/DAY_LENGTH_MS);
+    const days=Math.min(due,limit);
+    return {days,remainingMs:accumulator-days*DAY_LENGTH_MS,pendingDays:due-days};
+  }
+  const LEGACY_STATE_NAMES = [
+    "Founders' Reach",'North Coast','Eastern Coast','Upper March',
+    'Western Vale','Highland Basin','Orren Foothills','Eastern Uplands',
+    'Western Lowlands','Central Forest','Southern Plain','Eastern Marches',
+    'South Coast','Great Riverland','Southern Reach','Far Coast'
+  ];
   const LEGACY_PLOT_OFFSET = 144;
   const WORLD_MAP_SIZE = 1024;
   const MAX_WORLD_PLOT_INDEX = LEGACY_PLOT_OFFSET + WORLD_MAP_SIZE * WORLD_MAP_SIZE;
@@ -49,12 +223,7 @@
       default: return false;
     }
   }
-  const NAMES = [
-    "Founders' Reach",'North Coast','Eastern Coast','Upper March',
-    'Western Vale','Highland Basin','Orren Foothills','Eastern Uplands',
-    'Western Lowlands','Central Forest','Southern Plain','Eastern Marches',
-    'South Coast','Great Riverland','Southern Reach','Far Coast'
-  ];
+  const NAMES = STATE_CATALOG.map(item => item.name);
   const byId = value => crypto.randomUUID ? crypto.randomUUID() :
     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
@@ -251,15 +420,46 @@
 
   function emptyCollections() {
     return {
-      memberships:[], events:[], orders:[], currencies:[], diplomaticRelations:[],
+      memberships:[], events:[], orders:[], scheduledOrders:[], currencies:[], diplomaticRelations:[],
       financialTransactions:[],companyFinancialTransactions:[],marketHistory:[],
       goods:[],productionRecipes:[],
       populationGroups:[], companies:[], markets:[], tradeRoutes:[], politicalSystems:[],
       provinces:[], settlements:[], provinceConnections:[], territorialControls:[],
       sovereigntyHistory:[], militaryUnitTypes:[], militaryCommanders:[], militaryUnits:[],
-      militaryOrders:[], militaryBattles:[], militaryRoutes:[], supplyRoutes:[], occupations:[],
+      militaryOrders:[], militaryBattles:[], militaryRoutes:[], supplyRoutes:[], supplyRules:[],
+      supplyStocks:[],supplyShipments:[],supplyHistory:[],occupations:[],
       technologies:[], researchInstitutions:[], researchProjects:[], technologyUnlocks:[],
-      technologyAdoptions:[]
+      technologyAdoptions:[],justiceSystems:[],justiceReports:[],justiceCases:[],justiceHistory:[],
+      importantNpcs:[],demographicProfiles:[],demographicEvents:[],migrationRecords:[],
+      epidemicDefinitions:[],epidemicStarts:[],epidemicOutbreaks:[],
+      epidemicGroupStates:[],epidemicHistory:[],
+      resourceDeposits:[],waterAllocationDate:null,waterAllocations:[],waterBalances:[],
+      waterHistory:[],resourceCycleDate:null,resourceCycleResult:null,
+      livestockSites:[],fishingGrounds:[],forestAreas:[],primaryProductionCycles:[],
+      administrativeAgencies:[],administrativeDepartments:[],
+      civilServants:[],administrativeProcedures:[],administrativeJurisdictions:[],
+      administrativeBudgets:[],publicProjects:[],procurementVendors:[],
+      administrativeTasks:[],administrativeRecords:[],administrativeHistory:[],
+      procurements:[],publicProjectAudits:[],publicRecords:[],
+      mediaOutlets:[],publicOpinionProfiles:[],mediaRules:[],mediaArticles:[],
+      opinionPolls:[],censorshipOrders:[],mediaHistory:[],mediaBroadcasts:[],
+      publicOpinionHistory:[],securityAgencies:[],securityAuthorizations:[],
+      securityIncidents:[],securityCases:[],securityReports:[],securityAlerts:[],securityHistory:[],
+      securityWarrantRequests:[],securityWarrants:[],
+      eventDefinitions:[],worldEvents:[],worldEventHistory:[],worldEventCounters:[],
+      identityGroups:[],identityProfiles:[],identityOrganizations:[],communityPrograms:[],
+      identityHistory:[],socialCohesionHistory:[],
+      serviceTypes:[],publicServiceFacilities:[],publicServiceCoverage:[],publicServiceHistory:[],
+      publicServiceCycleDate:null,publicServiceCycleResult:null,
+      industryOccupations:[],labourPools:[],industryWorkplaces:[],labourUnions:[],
+      industryEmploymentContracts:[],industryLabourBalances:[],industryHistory:[],
+      industryPayrollDate:null,
+      exchangeRates:[],financialBanks:[],taxRules:[],priceIndexConfigs:[],
+      publicDebtIssues:[],bankTransactions:[],taxAssessments:[],priceIndexHistory:[],
+      financeHistory:[],financeCycleDate:null,financeCycleResult:null,
+      internationalOrganizations:[],diplomaticProposals:[],treaties:[],
+      internationalSanctions:[],organizationResolutions:[],diplomaticConferences:[],
+      diplomacyHistory:[],diplomacyCycleDate:null,diplomacyCycleResult:null
     };
   }
 
@@ -270,14 +470,16 @@
     const game = {
       id:gameId,name:'New World',hostPlayerId:playerId,started:false,paused:false,status:'lobby',
       day:1,worldDate:'1500-01-01',worldVersion:1,eventSequence:0,
-      scenarioId:'beleland-frontier',scenarioVersion:'2.0',maxHumanPlayers:MAX_PLAYERS,
+      scenarioId:'beleland-frontier',scenarioVersion:'2.1',scenarioSeed:byId(),
+      maxHumanPlayers:MAX_PLAYERS,
       startingTerritoryIndex:STARTING_TERRITORY_INDEX,
       pauseVotePlayerIds:[],players:[{
         id:playerId,name,isHost:true,countryIndex:null,treasury:1200,dailyBalanceRemainder:0,
         buildings:{},connected:true,token:hostToken
       }],
-      territories:NAMES.map((territoryName,index) => ({
-        stateId:byId(),currencyId:byId(),index,name:territoryName,treasury:0,dailyBalanceRemainder:0,
+      territories:STATE_CATALOG.map((stateDefinition,index) => ({
+        stateId:byId(),scenarioStateKey:stateDefinition.key,currencyId:byId(),
+        index,name:stateDefinition.name,treasury:0,dailyBalanceRemainder:0,
         population:index === STARTING_TERRITORY_INDEX ? 850 : 0,
         prosperity:index === STARTING_TERRITORY_INDEX ? 28 : 0,
         infrastructure:index === STARTING_TERRITORY_INDEX ? 1 : 0,
@@ -301,6 +503,19 @@
     if (!window.NewWorldSimulation) throw new Error('The New World simulation engine failed to load.');
     Object.assign(game, window.NewWorldSimulation.createStarterEconomy(
       [game.territories[STARTING_TERRITORY_INDEX]],byId));
+    if (window.NewWorldJustice?.ensure) window.NewWorldJustice.ensure(game);
+    else {
+      game.justiceSystems=game.territories.map(territory=>({
+        stateId:territory.stateId,configurationVersion:1,configurationPending:true,
+        crimeTypes:[],courts:[],policeAgencies:[],prisons:[]
+      }));
+      game.justiceReports=[];game.justiceCases=[];game.justiceHistory=[];
+    }
+    window.NewWorldResources?.ensure?.(game);
+    window.NewWorldServices?.ensure?.(game);
+    window.NewWorldIndustry?.ensure?.(game);
+    window.NewWorldFinance?.ensure?.(game);
+    window.NewWorldDiplomacy?.ensure?.(game);
     if (!window.NewWorldStrategy?.createStarterScenario)
       throw new Error('The New World strategy engine failed to load.');
     window.NewWorldStrategy.createStarterScenario(game,byId);
@@ -317,6 +532,8 @@
       if (treasurer) treasurer.holderPlayerId = playerId;
       foundingSystem.government.chiefExecutivePlayerId = playerId;
     }
+    if(window.NewWorldScenario?.createRecord)
+      game.worldScenario=window.NewWorldScenario.createRecord(game,game.scenarioSeed);
     pushEvent(game,'world.created',playerId,null,
       'A new frontier was founded. ' + name + ' leads the first settlement at ' +
       game.territories[0].name + '.');
@@ -358,6 +575,44 @@
       worldVersion:game.worldVersion,description,sequence:game.eventSequence
     });
     if (game.events.length > 1000) game.events.splice(0,game.events.length - 1000);
+  }
+
+  function recordConnectedRosterChange(game,player,connected) {
+    game.worldVersion = (Number(game.worldVersion) || 0) + 1;
+    const stateId = activeMemberships(game,player.id)[0]?.stateId || null;
+    const presenceDescription = player.name + (connected ? ' reconnected.' : ' disconnected.');
+    pushActivity(game,presenceDescription);
+    pushEvent(game,'player.presence_changed',player.id,stateId,presenceDescription);
+    if ((game.pauseVotePlayerIds || []).length) {
+      game.pauseVotePlayerIds = [];
+      const resetDescription = 'The pause vote was reset because the connected player roster changed.';
+      pushActivity(game,resetDescription);
+      pushEvent(game,'world.pause_votes_reset',player.id,stateId,resetDescription);
+    }
+  }
+
+  function migrateScenarioIdentity(game) {
+    if (!game || game.scenarioId !== 'beleland-frontier' ||
+        !Array.isArray(game.territories) || game.territories.length !== STATE_CATALOG.length)
+      return false;
+    let changed = false;
+    for (let index=0;index<STATE_CATALOG.length;index++) {
+      const territory = game.territories.find(item => item.index === index);
+      if (!territory || territory.scenarioStateKey) continue;
+      const definition = STATE_CATALOG[index];
+      if (territory.name === LEGACY_STATE_NAMES[index] || territory.name === definition.name) {
+        territory.scenarioStateKey = definition.key;
+        if (territory.name === LEGACY_STATE_NAMES[index]) territory.name = definition.name;
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+    game.scenarioVersion = '2.1';
+    game.worldVersion = (Number(game.worldVersion) || 0) + 1;
+    const description = 'The Beleland State catalogue was upgraded to official State identities. Existing territory IDs, ownership, buildings and economy were preserved.';
+    pushActivity(game,description);
+    pushEvent(game,'world.state_catalog_migrated',game.hostPlayerId,null,description);
+    return true;
   }
 
   function finance(game, territory) {
@@ -410,7 +665,7 @@
       t:'lobbyCount',
       totalPlayers:runtime.game.players.length,
       connectedPlayers:runtime.game.players.filter(player => player.connected).length,
-      capacity:MAX_PLAYERS
+      capacity:worldPlayerLimit(runtime.game)
     },{qos:0});
   }
 
@@ -427,6 +682,15 @@
   }
 
   function snapshot(game) {
+    if (window.NewWorldJustice?.ensure) window.NewWorldJustice.ensure(game);
+    window.NewWorldResources?.ensure?.(game);
+    window.NewWorldServices?.ensure?.(game);
+    window.NewWorldIndustry?.ensure?.(game);
+    window.NewWorldBureaucracy?.ensure?.(game);
+    window.NewWorldMedia?.ensure?.(game);
+    window.NewWorldSecurity?.ensure?.(game);
+    window.NewWorldWorldEvents?.ensure?.(game);
+    window.NewWorldIdentity?.ensure?.(game);
     const memberships = game.memberships.map(item => ({...item}));
     const membershipByPlayer = new Map();
     for (const membership of memberships) {
@@ -436,7 +700,8 @@
     }
     const players = game.players.map(player => playerRecord(game,player));
     const territories = game.territories.map(territory => ({
-      stateId:territory.stateId,index:territory.index,name:territory.name,treasury:territory.treasury,
+      stateId:territory.stateId,scenarioStateKey:territory.scenarioStateKey || null,
+      index:territory.index,name:territory.name,treasury:territory.treasury,
       ...finance(game,territory),population:territory.population,prosperity:territory.prosperity,
       infrastructure:territory.infrastructure,ownerPlayerId:territory.ownerPlayerId,
       currencyId:territory.currencyId
@@ -444,8 +709,14 @@
     const out = {
       id:game.id,started:game.started,day:game.day,hostPlayerId:game.hostPlayerId,paused:game.paused,
       pauseVotePlayerIds:[...game.pauseVotePlayerIds],players,territories,activity:[...game.activity],
+      orders:clone((game.orders || []).slice(-150)),
+      orderHistoryTotal:(game.orders || []).length,
+      scheduledOrders:clone((game.scheduledOrders || []).slice(-200)),
       name:game.name,status:game.status,worldDate:game.worldDate,worldVersion:game.worldVersion,
       scenarioId:game.scenarioId,scenarioVersion:game.scenarioVersion,
+      scenarioSeed:game.scenarioSeed || null,worldScenario:clone(game.worldScenario || null),
+      scenarioAudit:window.NewWorldScenario?.validate?.(game) || null,
+      maxHumanPlayers:worldPlayerLimit(game),
       memberships, eventSequence:game.eventSequence,events:clone(game.events),
       politicalSystems:clone(game.politicalSystems),goods:clone(game.goods),
       productionRecipes:clone(game.productionRecipes),populationGroups:clone(game.populationGroups),
@@ -470,29 +741,427 @@
       militaryCommanders:clone(game.militaryCommanders),militaryUnits:clone(game.militaryUnits),
       militaryOrders:clone(game.militaryOrders),militaryBattles:clone(game.militaryBattles),
       militaryRoutes:clone(game.militaryRoutes),supplyRoutes:clone(game.supplyRoutes),
+      supplyRules:clone(game.supplyRules||[]),supplyStocks:clone(game.supplyStocks||[]),
+      supplyShipments:clone(game.supplyShipments||[]),supplyHistory:clone(game.supplyHistory||[]),
+      militarySupplyCycleDate:game.militarySupplyCycleDate||null,
+      militarySupplyCycleResult:clone(game.militarySupplyCycleResult||null),
       occupations:clone(game.occupations),technologies:clone(game.technologies),
       researchInstitutions:clone(game.researchInstitutions),researchProjects:clone(game.researchProjects),
-      technologyUnlocks:clone(game.technologyUnlocks),technologyAdoptions:clone(game.technologyAdoptions)
+      technologyUnlocks:clone(game.technologyUnlocks),technologyAdoptions:clone(game.technologyAdoptions),
+      justiceSystems:clone(game.justiceSystems || []),justiceReports:clone(game.justiceReports || []),
+      justiceCases:clone(game.justiceCases || []),justiceHistory:clone(game.justiceHistory || []),
+      importantNpcs:clone(game.importantNpcs || []),
+      demographicProfiles:clone(game.demographicProfiles || []),
+      demographicEvents:clone((game.demographicEvents || []).slice(-500)),
+      migrationRecords:clone((game.migrationRecords || []).slice(-500)),
+      epidemicDefinitions:clone(game.epidemicDefinitions || []),
+      epidemicStarts:clone(game.epidemicStarts || []),
+      epidemicOutbreaks:clone(game.epidemicOutbreaks || []),
+      epidemicGroupStates:clone(game.epidemicGroupStates || []),
+      epidemicHistory:clone((game.epidemicHistory || []).slice(-500)),
+      resourceCatalog:clone(game.resourceCatalog || []),
+      resourceDeposits:clone(game.resourceDeposits || []),
+      livestockSites:clone(game.livestockSites || []),
+      fishingGrounds:clone(game.fishingGrounds || []),
+      forestAreas:clone(game.forestAreas || []),
+      primaryProductionCycles:clone((game.primaryProductionCycles || []).slice(-500)),
+      resourceCycleDate:game.resourceCycleDate || null,
+      resourceCycleResult:clone(game.resourceCycleResult || null),
+      resourceStocks:clone(game.resourceStocks || []),
+      agriculturalLand:clone(game.agriculturalLand || []),
+      cropDefinitions:clone(game.cropDefinitions || []),
+      farms:clone(game.farms || []),
+      climateZones:clone(game.climateZones || []),
+      environmentalStates:clone(game.environmentalStates || []),
+      disasters:clone(game.disasters || []),
+      energySources:clone(game.energySources || []),
+      energyBalances:clone(game.energyBalances || []),
+      harvestCycles:clone((game.harvestCycles || []).slice(-500)),
+      resourceHistory:clone((game.resourceHistory || []).slice(-500)),
+      foodReserves:clone(game.foodReserves || []),
+      waterSources:clone(game.waterSources || []),
+      waterDemands:clone(game.waterDemands || []),
+      waterBalances:clone(game.waterBalances || []),
+      waterAllocationDate:game.waterAllocationDate || null,
+      waterAllocations:clone(game.waterAllocations || []),
+      waterHistory:clone((game.waterHistory || []).slice(-500)),
+      serviceTypes:clone(game.serviceTypes || []),
+      publicServiceFacilities:clone(game.publicServiceFacilities || []),
+      publicServiceCoverage:clone(game.publicServiceCoverage || []),
+      publicServiceHistory:clone((game.publicServiceHistory || []).slice(-500)),
+      publicServiceCycleDate:game.publicServiceCycleDate || null,
+      publicServiceCycleResult:clone(game.publicServiceCycleResult || null),
+      industryOccupations:clone(game.industryOccupations || []),
+      labourPools:clone(game.labourPools || []),
+      industryWorkplaces:clone(game.industryWorkplaces || []),
+      labourUnions:clone(game.labourUnions || []),
+      industryEmploymentContracts:clone(game.industryEmploymentContracts || []),
+      industryLabourBalances:clone(game.industryLabourBalances || []),
+      industryHistory:clone((game.industryHistory || []).slice(-500)),
+      industryPayrollDate:game.industryPayrollDate || null,
+      administrativeAgencies:clone(game.administrativeAgencies || []),
+      administrativeDepartments:clone(game.administrativeDepartments || []),
+      civilServants:clone(game.civilServants || []),
+      administrativeProcedures:clone(game.administrativeProcedures || []),
+      administrativeJurisdictions:clone(game.administrativeJurisdictions || []),
+      administrativeBudgets:clone(game.administrativeBudgets || []),
+      administrativeTasks:clone(game.administrativeTasks || []),
+      administrativeRecords:clone((game.administrativeRecords || []).slice(-500)),
+      administrativeHistory:clone((game.administrativeHistory || []).slice(-500)),
+      publicProjects:clone(game.publicProjects || []),
+      procurementVendors:clone(game.procurementVendors || []),
+      procurements:clone(game.procurements || []),
+      publicProjectAudits:clone(game.publicProjectAudits || []),
+      publicRecords:clone(game.publicRecords || []),
+      mediaOutlets:clone(game.mediaOutlets || []),
+      publicOpinionProfiles:clone(game.publicOpinionProfiles || []),
+      mediaRules:clone(game.mediaRules || []),
+      mediaArticles:clone((game.mediaArticles || []).slice(-300)),
+      opinionPolls:clone((game.opinionPolls || []).slice(-300)),
+      censorshipOrders:clone(game.censorshipOrders || []),
+      mediaHistory:clone((game.mediaHistory || []).slice(-500)),
+      mediaBroadcasts:clone(game.mediaBroadcasts || []),
+      publicOpinionHistory:clone((game.publicOpinionHistory || []).slice(-500)),
+      securityAgencies:clone(game.securityAgencies || []),
+      securityAuthorizations:clone(game.securityAuthorizations || []),
+      securityIncidents:clone(game.securityIncidents || []),
+      securityCases:clone(game.securityCases || []),
+      securityReports:clone(game.securityReports || []),
+      securityAlerts:clone(game.securityAlerts || []),
+      securityHistory:clone((game.securityHistory || []).slice(-500)),
+      securityWarrantRequests:clone(game.securityWarrantRequests || []),
+      securityWarrants:clone(game.securityWarrants || []),
+      eventDefinitions:clone(game.eventDefinitions || []),
+      worldEvents:clone(game.worldEvents || []),
+      worldEventHistory:clone((game.worldEventHistory || []).slice(-500)),
+      worldEventCounters:clone(game.worldEventCounters || []),
+      identityGroups:clone(game.identityGroups || []),
+      identityProfiles:clone(game.identityProfiles || []),
+      identityOrganizations:clone(game.identityOrganizations || []),
+      communityPrograms:clone((game.communityPrograms || []).slice(-300)),
+      identityHistory:clone((game.identityHistory || []).slice(-500)),
+      socialCohesionHistory:clone((game.socialCohesionHistory || []).slice(-500)),
+      exchangeRates:clone(game.exchangeRates || []),financialBanks:clone(game.financialBanks || []),
+      taxRules:clone(game.taxRules || []),priceIndexConfigs:clone(game.priceIndexConfigs || []),
+      publicDebtIssues:clone(game.publicDebtIssues || []),bankTransactions:clone((game.bankTransactions || []).slice(-1000)),
+      taxAssessments:clone((game.taxAssessments || []).slice(-1000)),
+      priceIndexHistory:clone((game.priceIndexHistory || []).slice(-1000)),
+      financeHistory:clone((game.financeHistory || []).slice(-1000)),
+      financeCycleDate:game.financeCycleDate || null,financeCycleResult:clone(game.financeCycleResult || null),
+      internationalOrganizations:clone(game.internationalOrganizations || []),
+      diplomaticProposals:clone(game.diplomaticProposals || []),treaties:clone(game.treaties || []),
+      internationalSanctions:clone(game.internationalSanctions || []),
+      organizationResolutions:clone(game.organizationResolutions || []),
+      diplomaticConferences:clone(game.diplomaticConferences || []),
+      diplomacyHistory:clone((game.diplomacyHistory || []).slice(-1000)),
+      diplomacyCycleDate:game.diplomacyCycleDate || null,
+      diplomacyCycleResult:clone(game.diplomacyCycleResult || null)
     };
     return out;
   }
 
-  function persistHost() {
-    if (!runtime || runtime.role !== 'host') return;
+  const PRIVATE_SECURITY_FIELDS=Object.freeze([
+    'securityAgencies','securityAuthorizations','securityIncidents','securityCases',
+    'securityReports','securityHistory','securityWarrantRequests','securityWarrants'
+  ]);
+
+  function activeMemberStateIds(game,playerId) {
+    return new Set((game.memberships||[]).filter(item=>
+      item.playerId===playerId && item.status==='active').map(item=>item.stateId));
+  }
+
+  function privateSecurityFor(game,playerId) {
+    const stateIds=activeMemberStateIds(game,playerId);
+    const result={};
+    for(const field of PRIVATE_SECURITY_FIELDS)
+      result[field]=clone((game[field]||[]).filter(item=>stateIds.has(item.stateId)));
+    return result;
+  }
+
+  function isPrivateSecurityOrder(order) {
+    return String(order?.type||'').startsWith('security.');
+  }
+
+  function isPrivateSecurityEvent(event) {
+    return String(event?.type||'').startsWith('security.');
+  }
+
+  function publicSnapshot(game) {
+    const out=snapshot(game);
+    for(const field of PRIVATE_SECURITY_FIELDS) out[field]=[];
+    out.securityReports=clone((game.securityReports||[]).filter(item=>item.classification==='public'));
+    out.securityAlerts=clone(game.securityAlerts||[]);
+    out.orders=clone((game.orders||[]).filter(item=>!isPrivateSecurityOrder(item)).slice(-100));
+    out.events=clone((game.events||[]).filter(item=>!isPrivateSecurityEvent(item)));
+    return out;
+  }
+
+  function snapshotForPlayer(game,playerId) {
+    const out=snapshot(game);
+    const stateIds=activeMemberStateIds(game,playerId);
+    Object.assign(out,privateSecurityFor(game,playerId));
+    out.orders=clone((game.orders||[]).filter(item=>
+      !isPrivateSecurityOrder(item) || stateIds.has(item.stateId)).slice(-100));
+    out.events=clone((game.events||[]).filter(item=>
+      !isPrivateSecurityEvent(item) || stateIds.has(item.stateId)));
+    return out;
+  }
+
+  function hostSaveSlotKey(room,slot) {
+    return HOST_SAVE + room + ':slot:' + slot;
+  }
+
+  function readValidHostSaveSlots(room,expected={}) {
+    const valid=[];
+    for(const slot of HOST_SAVE_SLOTS) {
+      try {
+        const raw=localStorage.getItem(hostSaveSlotKey(room,slot));
+        if(!raw) continue;
+        const envelope=JSON.parse(raw);
+        const checked=validateHostSaveEnvelope(envelope,{...expected,room});
+        if(checked.valid) valid.push({slot,envelope,checked});
+      } catch {}
+    }
+    return valid.sort((left,right)=>right.checked.generation-left.checked.generation);
+  }
+
+  function loadHostSave(session) {
+    const room=String(session?.inviteCode || session?.roomCode || '');
+    const expected={
+      room,
+      gameId:session?.gameId || '',
+      hostPlayerId:session?.playerId || ''
+    };
+    const slots=readValidHostSaveSlots(room,expected);
+    if(slots.length) {
+      const selected=slots[0];
+      return {
+        game:selected.checked.payload.game,
+        session:selected.checked.payload.session || session,
+        clockAccumulatorMs:selected.checked.payload.clockAccumulatorMs,
+        generation:selected.checked.generation,
+        source:'verified-slot',
+        backupAvailable:slots.length>1
+      };
+    }
     try {
-      localStorage.setItem(HOST_SAVE + runtime.room, JSON.stringify({
-        game:runtime.game,session:runtime.session,version:2,savedAt:new Date().toISOString()
-      }));
+      const legacy=JSON.parse(localStorage.getItem(HOST_SAVE + room) || 'null');
+      if(legacy?.version===2 && validHostGame(legacy.game) &&
+         legacy.game.id===expected.gameId &&
+         legacy.game.hostPlayerId===expected.hostPlayerId &&
+         (!legacy.session ||
+           (legacy.session.gameId===legacy.game.id &&
+            legacy.session.playerId===legacy.game.hostPlayerId))) {
+        return {
+          game:legacy.game,session:legacy.session || session,
+          clockAccumulatorMs:0,generation:0,source:'legacy-v2',
+          backupAvailable:false
+        };
+      }
+    } catch {}
+    return null;
+  }
+
+  function persistHost() {
+    if (!runtime || runtime.role !== 'host') return false;
+    try {
+      const validSlots=readValidHostSaveSlots(runtime.room,{
+        gameId:runtime.game.id,hostPlayerId:runtime.game.hostPlayerId
+      });
+      const latest=validSlots[0] || null;
+      const targetSlot=latest?.slot==='a'?'b':'a';
+      const generation=(latest?.checked.generation || 0)+1;
+      const envelope=createHostSaveEnvelope(
+        runtime.game,runtime.session,runtime.room,generation,
+        runtime.clockAccumulatorMs || 0
+      );
+      const key=hostSaveSlotKey(runtime.room,targetSlot);
+      localStorage.setItem(key,JSON.stringify(envelope));
+      const persisted=JSON.parse(localStorage.getItem(key) || 'null');
+      const verified=validateHostSaveEnvelope(persisted,{
+        room:runtime.room,gameId:runtime.game.id,
+        hostPlayerId:runtime.game.hostPlayerId
+      });
+      if(!verified.valid || verified.generation!==generation)
+        throw new Error('The new host save did not pass its read-back integrity check.');
+      try {
+        localStorage.setItem(HOST_SAVE + runtime.room + ':head',JSON.stringify({
+          slot:targetSlot,generation,checksum:envelope.checksum
+        }));
+      } catch {}
+      const afterSave=readValidHostSaveSlots(runtime.room,{
+        gameId:runtime.game.id,hostPlayerId:runtime.game.hostPlayerId
+      });
+      if(afterSave.length>=2) {
+        try { localStorage.removeItem(HOST_SAVE + runtime.room); } catch {}
+      }
+      runtime.lastSavedAt=envelope.savedAt;
+      runtime.lastSaveError=null;
+      return true;
     } catch (error) {
-      runtime.onStatus('Host save failed: browser storage is unavailable or full.');
+      runtime.lastSaveError=error?.message || 'Browser storage is unavailable or full.';
+      runtime.onSaveError?.(runtime.lastSaveError);
+      runtime.onStatus('Host save failed: '+runtime.lastSaveError);
+      return false;
     }
   }
 
+  function createVersionedSnapshotDelta(previous,current) {
+    if(!previous || !current || previous.id!==current.id ||
+       !Number.isSafeInteger(previous.worldVersion) ||
+       !Number.isSafeInteger(current.worldVersion) ||
+       current.worldVersion<=previous.worldVersion) return null;
+    const operations=[];
+    const maximumOperations=1800;
+    function same(left,right) {
+      try { return JSON.stringify(left)===JSON.stringify(right); }
+      catch { return false; }
+    }
+    function set(path,value) {
+      operations.push({op:'set',path:[...path],value:clone(value)});
+    }
+    function compare(before,after,path,depth=0) {
+      if(same(before,after)) return;
+      if(operations.length>=maximumOperations || depth>=24) {
+        set(path,after);
+        return;
+      }
+      if(Array.isArray(before) && Array.isArray(after)) {
+        if(after.length<before.length) {
+          set(path,after);
+          return;
+        }
+        const common=Math.min(before.length,after.length);
+        for(let index=0;index<common && operations.length<maximumOperations;index++)
+          compare(before[index],after[index],[...path,index],depth+1);
+        if(after.length>before.length)
+          operations.push({op:'append',path:[...path],values:clone(after.slice(before.length))});
+        return;
+      }
+      const beforeObject=before && typeof before==='object' && !Array.isArray(before);
+      const afterObject=after && typeof after==='object' && !Array.isArray(after);
+      if(beforeObject && afterObject) {
+        for(const key of Object.keys(before)) {
+          if(operations.length>=maximumOperations) break;
+          if(!Object.prototype.hasOwnProperty.call(after,key))
+            operations.push({op:'remove',path:[...path,key]});
+          else compare(before[key],after[key],[...path,key],depth+1);
+        }
+        for(const key of Object.keys(after)) {
+          if(operations.length>=maximumOperations) break;
+          if(!Object.prototype.hasOwnProperty.call(before,key))
+            set([...path,key],after[key]);
+        }
+        return;
+      }
+      set(path,after);
+    }
+    compare(previous,current,[]);
+    if(operations.length>=maximumOperations) return null;
+    return {
+      gameId:current.id,baseWorldVersion:previous.worldVersion,
+      worldVersion:current.worldVersion,operations
+    };
+  }
+
+  function applyVersionedSnapshotDelta(previous,delta) {
+    if(!previous || !delta || delta.gameId!==previous.id ||
+       delta.baseWorldVersion!==previous.worldVersion ||
+       !Number.isSafeInteger(delta.worldVersion) ||
+       delta.worldVersion<=delta.baseWorldVersion ||
+       !Array.isArray(delta.operations) || delta.operations.length>1800) return null;
+    let draft;
+    try { draft=clone(previous); } catch { return null; }
+    const blockedKeys=new Set(['__proto__','prototype','constructor']);
+    for(const operation of delta.operations) {
+      if(!operation || !Array.isArray(operation.path) ||
+         operation.path.length>24 ||
+         operation.path.some(part=>
+           !(typeof part==='string' || Number.isSafeInteger(part)) ||
+           (typeof part==='string' && blockedKeys.has(part)) ||
+           (typeof part==='number' && part<0))) return null;
+      const path=operation.path;
+      if(!path.length) return null;
+      let parent=draft;
+      for(let index=0;index<path.length-1;index++) {
+        const part=path[index];
+        if(parent===null || typeof parent!=='object' ||
+           !Object.prototype.hasOwnProperty.call(parent,part)) return null;
+        parent=parent[part];
+      }
+      const leaf=path[path.length-1];
+      if(parent===null || typeof parent!=='object') return null;
+      if(operation.op==='set') {
+        if(Array.isArray(parent) && (!Number.isSafeInteger(leaf) || leaf>parent.length-1)) return null;
+        if(!Array.isArray(parent) && typeof leaf!=='string') return null;
+        try { parent[leaf]=clone(operation.value); } catch { return null; }
+      } else if(operation.op==='remove') {
+        if(Array.isArray(parent) && (!Number.isSafeInteger(leaf) || leaf>parent.length-1)) return null;
+        if(!Array.isArray(parent) && typeof leaf!=='string') return null;
+        if(!Object.prototype.hasOwnProperty.call(parent,leaf)) return null;
+        if(Array.isArray(parent)) parent.splice(leaf,1);
+        else delete parent[leaf];
+      } else if(operation.op==='append') {
+        if(!Array.isArray(parent[leaf]) || !Array.isArray(operation.values)) return null;
+        try { parent[leaf].push(...clone(operation.values)); } catch { return null; }
+      } else return null;
+    }
+    draft.worldVersion=delta.worldVersion;
+    if(!validHostGame(draft)) return null;
+    return draft;
+  }
+
   function publishSnapshot() {
-    if (!runtime || runtime.role !== 'host') return;
-    const game = snapshot(runtime.game);
-    runtime.link.publish(runtime.topics.server,{t:'snapshot',game,hostTime:Date.now()},{qos:1});
-    runtime.onSnapshot(game);
+    if (!runtime || runtime.role !== 'host') return false;
+    const game=publicSnapshot(runtime.game);
+    const previous=runtime.lastPublishedSnapshot || null;
+    const connectedGuests=runtime.game.players.filter(player=>
+      player.connected && player.id!==runtime.session.playerId);
+    const supportsDeltas=connectedGuests.every(player=>
+      runtime.deltaCapablePlayerIds?.has(player.id));
+    const delta=previous && supportsDeltas
+      ? createVersionedSnapshotDelta(previous,game) : null;
+    let sent=false;
+    let payload=null;
+    if(delta) {
+      const deltaPayload={
+        t:'delta',delta,hostTime:Date.now(),
+        clockAccumulatorMs:runtime.clockAccumulatorMs || 0,
+        technicalMaintenance:createTechnicalMaintenanceMessage(
+          runtime.game.id,runtime.technicalMaintenance.active,
+          runtime.technicalMaintenance.reason,runtime.technicalMaintenance.revision,
+          runtime.technicalMaintenance.changedAt
+        ),protocolVersion:1
+      };
+      const deltaSize=JSON.stringify(deltaPayload).length;
+      const snapshotPayload={
+        t:'snapshot',game,hostTime:Date.now(),
+        clockAccumulatorMs:runtime.clockAccumulatorMs || 0,
+        technicalMaintenance:createTechnicalMaintenanceMessage(
+          runtime.game.id,runtime.technicalMaintenance.active,
+          runtime.technicalMaintenance.reason,runtime.technicalMaintenance.revision,
+          runtime.technicalMaintenance.changedAt
+        )
+      };
+      const snapshotSize=JSON.stringify(snapshotPayload).length;
+      payload=deltaSize<snapshotSize*.72 ? deltaPayload : snapshotPayload;
+    } else {
+      payload={
+        t:'snapshot',game,hostTime:Date.now(),
+        clockAccumulatorMs:runtime.clockAccumulatorMs || 0,
+        technicalMaintenance:createTechnicalMaintenanceMessage(
+          runtime.game.id,runtime.technicalMaintenance.active,
+          runtime.technicalMaintenance.reason,runtime.technicalMaintenance.revision,
+          runtime.technicalMaintenance.changedAt
+        )
+      };
+    }
+    sent=runtime.link.publish(runtime.topics.server,payload,{qos:1})!==false;
+    if(sent) {
+      runtime.lastPublishedSnapshot=clone(game);
+    }
+    runtime.onSnapshot(snapshotForPlayer(runtime.game,runtime.session.playerId));
+    return sent;
   }
 
   function emitOrderResult(playerId,result) {
@@ -516,26 +1185,108 @@
     return (permissions[permissionSetId] || []).includes(action);
   }
 
+  const MAX_SCHEDULED_ORDERS=200;
+  const MAX_SCHEDULE_DAYS=3650;
+
+  function orderPayload(order) {
+    return Object.fromEntries(Object.entries(order).filter(([key]) =>
+      !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
+  }
+
+  function scheduleFutureOrder(game,player,membership,order,targetDate) {
+    if(['pause','resume','cancelScheduledOrder'].includes(order.type)||
+       String(order.type||'').startsWith('security.')||
+       String(order.type||'').startsWith('justice.'))
+      return reject('ORDER_TYPE_NOT_SCHEDULABLE',
+        'This order must be executed immediately or contains information that cannot be placed in the public scheduled-order queue.',order.orderId);
+    if(membership.permissionSetId==='government-observer')
+      return reject('INSUFFICIENT_PERMISSION',
+        'Observer memberships cannot schedule government orders.',order.orderId);
+    const days=(Date.parse(targetDate+'T00:00:00.000Z')-
+      Date.parse(game.worldDate+'T00:00:00.000Z'))/86400000;
+    if(!Number.isSafeInteger(days)||days<1||days>MAX_SCHEDULE_DAYS)
+      return reject('SCHEDULE_HORIZON_EXCEEDED',
+        'Orders may be scheduled from tomorrow up to 3,650 world days ahead.',order.orderId);
+    game.scheduledOrders ||= [];
+    if(game.scheduledOrders.filter(item=>item.status==='scheduled').length>=MAX_SCHEDULED_ORDERS)
+      return reject('SCHEDULE_QUEUE_FULL',
+        'The world already has 200 pending scheduled orders.',order.orderId);
+    let payload;
+    try {
+      payload=orderPayload(order);
+      const serialized=JSON.stringify(payload);
+      if(serialized.length>20000)
+        return reject('SCHEDULE_PAYLOAD_TOO_LARGE',
+          'A scheduled order cannot exceed 20,000 characters.',order.orderId);
+    } catch {
+      return reject('INVALID_PAYLOAD','The scheduled order could not be serialized safely.',order.orderId);
+    }
+    const sequence=(Number(game.eventSequence)||0)+1;
+    game.eventSequence=sequence;
+    const scheduled={
+      id:order.orderId,gameId:game.id,playerId:player.id,stateId:membership.stateId,
+      type:order.type,payload,targetWorldDate:targetDate,
+      submittedOnWorldDate:game.worldDate,expectedWorldVersion:order.expectedWorldVersion,
+      sequence,status:'scheduled',executionOrderId:byId(),resultCode:null,result:null,
+      completedOnWorldDate:null
+    };
+    game.scheduledOrders.push(scheduled);
+    game.orders.push({
+      id:order.orderId,gameId:game.id,playerId:player.id,type:order.type,
+      stateId:membership.stateId,payload,status:'scheduled',
+      expectedWorldVersion:order.expectedWorldVersion,worldVersion:game.worldVersion+1,
+      resultCode:'ORDER_SCHEDULED',
+      result:'Scheduled for '+targetDate+'. The host will revalidate permissions and world conditions on that date.',
+      rejectionReason:null,recordedAtUtc:new Date().toISOString(),
+      worldDate:game.worldDate,targetWorldDate:targetDate
+    });
+    game.worldVersion++;
+    const description=player.name+' scheduled '+order.type+' for '+targetDate+'.';
+    game.activity.unshift(description);
+    if(game.activity.length>100) game.activity.length=100;
+    pushEvent(game,'order.scheduled',player.id,membership.stateId,description,order.orderId,'ORDER_SCHEDULED');
+    return {id:order.orderId,accepted:true,code:'ORDER_SCHEDULED',error:null,replayed:false};
+  }
+
   function reject(code,error,id = null) { return {id,accepted:false,code,error,replayed:false}; }
 
-  function applyOrder(game,player,order) {
+  function applyOrderCore(game,player,order) {
     if (!order || !order.orderId) return reject('INVALID_PAYLOAD','A valid order ID is required.',order?.orderId || null);
     const duplicate = game.orders.find(item => item.id === order.orderId);
     if (duplicate) {
       const payload = Object.fromEntries(Object.entries(order).filter(([key]) =>
         !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
       const samePayload = duplicate.playerId === player.id &&
+        order.playerId === player.id &&
+        (duplicate.gameId || game.id) === order.gameId &&
         duplicate.type === order.type &&
         duplicate.stateId === order.stateId &&
         duplicate.expectedWorldVersion === order.expectedWorldVersion &&
         JSON.stringify(duplicate.payload || {}) === JSON.stringify(payload);
       return samePayload
-        ? {id:order.orderId,accepted:duplicate.status === 'executed',
+        ? {id:order.orderId,accepted:['executed','scheduled'].includes(duplicate.status),
             code:duplicate.resultCode || null,error:duplicate.result || null,replayed:true}
         : reject('ORDER_ID_REUSED','This order ID was already used.',order.orderId);
     }
+    if (order.gameId !== game.id)
+      return reject('WRONG_GAME','This order belongs to a different world.',order.orderId);
+    if (order.playerId !== player.id)
+      return reject('WRONG_ACTOR','The order sender does not match the authenticated player.',order.orderId);
     if (Number(order.expectedWorldVersion) !== game.worldVersion)
       return reject('STALE_WORLD_VERSION','The world changed. Review the latest state before trying again.',order.orderId);
+    let futureTargetDate=null;
+    if(order.targetWorldDate!==undefined && order.targetWorldDate!==null && order.targetWorldDate!=='') {
+      const target=order.targetWorldDate;
+      const targetDate=typeof target==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(target)
+        ? new Date(target+'T00:00:00.000Z') : null;
+      const validTarget=targetDate && Number.isFinite(targetDate.getTime()) &&
+        targetDate.toISOString().slice(0,10)===target;
+      if(!validTarget)
+        return reject('INVALID_TARGET_DATE','The order target date must be a real Gregorian date in YYYY-MM-DD format.',order.orderId);
+      if(target<game.worldDate)
+        return reject('TARGET_DATE_IN_PAST','An order cannot target a date before the current world date.',order.orderId);
+      if(target>game.worldDate) futureTargetDate=target;
+    }
     const orderType = order.type;
     const isPause = orderType === 'pause' || orderType === 'resume';
     if (!game.started) return reject('WORLD_NOT_STARTED','The host must start the world before actions are allowed.',order.orderId);
@@ -549,8 +1300,31 @@
     const membership = isPause ? memberships[0] :
       memberships.find(item => item.stateId === order.stateId) || null;
     if (!isPause && !membership) return reject('NOT_MEMBER','You are not a member of the selected government.',order.orderId);
+    if(futureTargetDate)
+      return scheduleFutureOrder(game,player,membership,order,futureTargetDate);
     let message = null;
-    if (orderType === 'pause' || orderType === 'resume') {
+    if(orderType==='cancelScheduledOrder') {
+      const scheduled=game.scheduledOrders?.find(item=>
+        item.id===order.scheduledOrderId&&item.status==='scheduled');
+      if(!scheduled)
+        return reject('SCHEDULED_ORDER_NOT_FOUND',
+          'The scheduled order is no longer pending or does not exist.',order.orderId);
+      if(scheduled.playerId!==player.id||scheduled.stateId!==membership?.stateId)
+        return reject('SCHEDULED_ORDER_NOT_OWNED',
+          'Only the author can cancel a scheduled order from this government.',order.orderId);
+      scheduled.status='cancelled';
+      scheduled.completedOnWorldDate=game.worldDate;
+      scheduled.resultCode='ORDER_CANCELLED';
+      scheduled.result='Cancelled by its author before execution.';
+      const history=game.orders.find(item=>item.id===scheduled.id);
+      if(history) {
+        history.status='cancelled';
+        history.resultCode='ORDER_CANCELLED';
+        history.result=scheduled.result;
+        history.completedOnWorldDate=game.worldDate;
+      }
+      message='Scheduled order for '+scheduled.targetWorldDate+' was cancelled.';
+    } else if (orderType === 'pause' || orderType === 'resume') {
       if (!player.connected) return reject('NOT_CONNECTED','Only connected players can vote.',order.orderId);
       const votes = new Set(game.pauseVotePlayerIds);
       if (votes.has(player.id)) votes.delete(player.id); else votes.add(player.id);
@@ -679,6 +1453,49 @@
       });
       pushActivity(game,player.name + ' started construction of ' + variantName +
         ' in ' + government.name + '.');
+    } else if (String(orderType).startsWith('identity.') && window.NewWorldIdentity?.applyOrder) {
+      const result=window.NewWorldIdentity.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'IDENTITY_ORDER_REJECTED',
+          result?.error || 'The identity and community rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('worldEvents.') && window.NewWorldWorldEvents?.applyOrder) {
+      const result=window.NewWorldWorldEvents.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'WORLD_EVENT_ORDER_REJECTED',
+          result?.error || 'The world event rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('security.') && window.NewWorldSecurity?.applyOrder) {
+      const result=window.NewWorldSecurity.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'SECURITY_ORDER_REJECTED',
+          result?.error || 'The security rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('media.') && window.NewWorldMedia?.applyOrder) {
+      const result=window.NewWorldMedia.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'MEDIA_ORDER_REJECTED',
+          result?.error || 'The media rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('finance.') && window.NewWorldFinance?.applyOrder) {
+      const result=window.NewWorldFinance.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok) return reject(result?.code || 'FINANCE_ORDER_REJECTED',
+        result?.error || 'The financial rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('diplomacy.') && window.NewWorldDiplomacy?.applyOrder) {
+      const result=window.NewWorldDiplomacy.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok) return reject(result?.code || 'DIPLOMACY_ORDER_REJECTED',
+        result?.error || 'The advanced diplomatic rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('administration.') && window.NewWorldBureaucracy?.applyOrder) {
+      const result=window.NewWorldBureaucracy.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'ADMIN_ORDER_REJECTED',
+          result?.error || 'The administrative rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('resource.') && window.NewWorldResources?.applyOrder) {
+      const result=window.NewWorldResources.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'RESOURCE_ORDER_REJECTED',
+          result?.error || 'The environmental rules rejected this order.',order.orderId);
+    } else if (String(orderType).startsWith('justice.') && window.NewWorldJustice?.applyOrder) {
+      const result=window.NewWorldJustice.applyOrder(game,player,membership,order,byId);
+      if (!result?.ok)
+        return reject(result?.code || 'JUSTICE_ORDER_REJECTED',
+          result?.error || 'The justice rules rejected this order.',order.orderId);
     } else if (window.NewWorldStrategy?.applyOrder) {
       const result = window.NewWorldStrategy.applyOrder(game,player,membership,order,byId);
       if (!result.ok)
@@ -691,9 +1508,13 @@
     game.worldVersion++;
     const orderPayload = Object.fromEntries(Object.entries(order).filter(([key]) =>
       !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
-    game.orders.push({id:order.orderId,playerId:player.id,type:orderType,stateId:order.stateId,
+    game.orders.push({
+      id:order.orderId,gameId:game.id,playerId:player.id,type:orderType,stateId:order.stateId,
       payload:orderPayload,status:'executed',expectedWorldVersion:order.expectedWorldVersion,
-      worldVersion:game.worldVersion,resultCode:null,result:null});
+      worldVersion:game.worldVersion,resultCode:null,result:null,rejectionReason:null,
+      recordedAtUtc:new Date().toISOString(),worldDate:game.worldDate,
+      targetWorldDate:order.targetWorldDate || null
+    });
     window.NewWorldStrategy?.checkVictory?.(game);
     pushEvent(game,'order.executed',player.id,order.stateId,
       game.activity[0] || ('Executed ' + orderType + '.'),order.orderId);
@@ -701,10 +1522,176 @@
   }
 
 
-  function advanceHostDay() {
+  function applyOrder(game,player,order) {
+    const existingOrder = order?.orderId
+      ? (game.orders || []).find(item => item.id === order.orderId)
+      : null;
+    const result = applyOrderCore(game,player,order);
+    if (!game || !player || !order?.orderId || existingOrder || result.replayed || result.accepted)
+      return result;
+
+    const submittedAtUtc = new Date().toISOString();
+    const payload = Object.fromEntries(Object.entries(order).filter(([key]) =>
+      !['orderId','gameId','playerId','expectedWorldVersion'].includes(key)));
+    game.orders.push({
+      id:order.orderId,gameId:game.id,playerId:player.id,type:order.type || 'unknown',
+      stateId:order.stateId || null,payload,status:'rejected',
+      expectedWorldVersion:Number(order.expectedWorldVersion),
+      worldVersion:game.worldVersion,
+      resultCode:result.code || 'ORDER_REJECTED',
+      result:result.error || 'The order was rejected.',
+      rejectionReason:{
+        code:result.code || 'ORDER_REJECTED',
+        message:result.error || 'The order was rejected.',
+        recordedOnWorldDate:game.worldDate
+      },
+      recordedAtUtc:submittedAtUtc,worldDate:game.worldDate,
+      targetWorldDate:order.targetWorldDate || null
+    });
+    pushEvent(game,'order.rejected',player.id,order.stateId || null,
+      result.error || 'The order was rejected.',order.orderId,
+      result.code || 'ORDER_REJECTED');
+    return result;
+  }
+
+  function executeScheduledOrders(game) {
+    if(!game||!Array.isArray(game.players))
+      return {ok:false,executed:0,rejected:0,error:'The world is unavailable.'};
+    game.scheduledOrders ||= [];
+    const due=game.scheduledOrders.filter(item=>
+      item.status==='scheduled'&&item.targetWorldDate<=game.worldDate)
+      .slice().sort((left,right)=>
+        left.targetWorldDate.localeCompare(right.targetWorldDate)||
+        Number(left.sequence)-Number(right.sequence)||
+        String(left.id).localeCompare(String(right.id)));
+    let executed=0,rejected=0;
+    for(const scheduled of due) {
+      const player=game.players.find(item=>item.id===scheduled.playerId);
+      let result;
+      if(!player) {
+        result=reject('SCHEDULED_ACTOR_UNAVAILABLE',
+          'The player who submitted this order no longer exists.',scheduled.executionOrderId);
+      } else {
+        const executionOrder={
+          ...(scheduled.payload||{}),
+          orderId:scheduled.executionOrderId,
+          gameId:game.id,playerId:scheduled.playerId,
+          expectedWorldVersion:game.worldVersion,
+          targetWorldDate:game.worldDate
+        };
+        result=applyOrder(game,player,executionOrder);
+      }
+      scheduled.status=result.accepted?'executed':'rejected';
+      scheduled.completedOnWorldDate=game.worldDate;
+      scheduled.resultCode=result.code||null;
+      scheduled.result=result.error||null;
+      const original=game.orders.find(item=>item.id===scheduled.id);
+      if(original) {
+        original.status=scheduled.status;
+        original.resultCode=result.accepted?null:(result.code||'SCHEDULED_ORDER_REJECTED');
+        original.result=result.accepted?'Executed on '+game.worldDate+'.':
+          (result.error||'The scheduled order was rejected.');
+        original.rejectionReason=result.accepted?null:{
+          code:original.resultCode,message:original.result,
+          recordedOnWorldDate:game.worldDate
+        };
+        original.completedOnWorldDate=game.worldDate;
+      }
+      game.worldVersion++;
+      const description=result.accepted
+        ? 'Scheduled order '+scheduled.type+' executed on '+game.worldDate+'.'
+        : 'Scheduled order '+scheduled.type+' was rejected on '+game.worldDate+': '+
+          (result.error||result.code||'unknown reason')+'.';
+      pushEvent(game,'order.schedule_resolved',scheduled.playerId,scheduled.stateId,
+        description,scheduled.id,result.accepted?'ORDER_EXECUTED':(result.code||'ORDER_REJECTED'));
+      if(result.accepted) executed++; else rejected++;
+    }
+    return {ok:true,executed,rejected,
+      pending:game.scheduledOrders.filter(item=>item.status==='scheduled').length};
+  }
+
+  function resetClockReferenceOnRunTransition(previousStatus) {
+    if(runtime?.role==='host'&&previousStatus!=='running'&&runtime.game.status==='running')
+      runtime.lastPulseAt=Date.now();
+  }
+
+  function maintenanceMessageFor(runtimeState,active,reason,revision) {
+    return createTechnicalMaintenanceMessage(
+      runtimeState.game.id,active,reason,revision,new Date().toISOString()
+    );
+  }
+
+  function publishTechnicalMaintenance() {
+    if(!runtime || runtime.role!=='host') return false;
+    const current=runtime.technicalMaintenance;
+    const message=createTechnicalMaintenanceMessage(
+      runtime.game.id,current.active,current.reason,current.revision,current.changedAt
+    );
+    if(!message) return false;
+    const sent=runtime.link.publish(runtime.topics.server,message,{qos:1})!==false;
+    runtime.lastMaintenancePublishedAt=Date.now();
+    runtime.onMaintenance?.({
+      active:current.active,reason:current.reason,
+      revision:current.revision,changedAt:current.changedAt
+    });
+    return sent;
+  }
+
+  function setTechnicalMaintenance(active,reason='') {
+    if(!runtime || runtime.role!=='host')
+      return {ok:false,error:'Only the active host can change technical maintenance status.'};
+    if(typeof active!=='boolean')
+      return {ok:false,error:'Technical maintenance must be enabled or disabled explicitly.'};
+    const revision=(runtime.technicalMaintenance?.revision||0)+1;
+    const message=maintenanceMessageFor(runtime,active,reason,revision);
+    if(!message)
+      return {ok:false,error:'Active maintenance requires a valid public reason of 5–240 characters.'};
+    runtime.technicalMaintenance={
+      active:message.active,reason:message.reason,
+      revision:message.revision,changedAt:message.changedAt
+    };
+    runtime.lastPulseAt=Date.now();
+    const published=publishTechnicalMaintenance();
+    return {ok:true,status:{...runtime.technicalMaintenance},published};
+  }
+
+  function receiveTechnicalMaintenance(message,game) {
+    if(!runtime || runtime.role!=='guest') return false;
+    const validated=validateTechnicalMaintenanceMessage(message,runtime.session?.gameId);
+    if(!validated || validated.revision<=(runtime.technicalMaintenance?.revision||0)) return false;
+    runtime.technicalMaintenance=validated;
+    runtime.hostClockReceivedAt=Date.now();
+    const currentGame=game||runtime.lastSnapshot;
+    runtime.hostClockRunning=Boolean(runtime.hostOnline&&currentGame?.started&&
+      currentGame.status==='running'&&!validated.active);
+    runtime.onMaintenance?.({...validated});
+    return true;
+  }
+
+  function pauseForNoConnectedPlayers() {
+    if(!runtime || runtime.role!=='host') return false;
+    const game=runtime.game;
+    if(!game.started || game.status!=='running' ||
+       game.players.some(player=>player.connected)) return false;
+    game.status='paused';
+    game.paused=true;
+    game.pauseVotePlayerIds=[];
+    game.worldVersion=(Number(game.worldVersion) || 0)+1;
+    const description='The world paused automatically because no players are connected.';
+    pushActivity(game,description);
+    pushEvent(game,'world.paused.no_connected_players',null,null,
+      description,null,'NoConnectedPlayers');
+    persistHost();
+    publishSnapshot();
+    return true;
+  }
+
+  function advanceHostDay(options={}) {
     if (!runtime || runtime.role !== 'host') return false;
     const game = runtime.game;
-    if (!game.started || game.status !== 'running' || !runtime.link.connected) return false;
+    if(runtime.technicalMaintenance?.active) return false;
+    if (!game.started || game.status !== 'running' || !runtime.link.connected ||
+        !game.players.some(player=>player.connected)) return false;
 
     const result = window.NewWorldSimulation?.advanceDay(game);
     if (!result?.ok) {
@@ -716,41 +1703,65 @@
       pushActivity(game,'The world was paused because its simulation cycle failed: ' + reason);
       pushEvent(game,'world.paused.simulation_error',null,null,
         'Simulation cycle rejected atomically: ' + reason);
-      persistHost();
-      publishSnapshot();
+      if(options.persist!==false) persistHost();
+      if(options.publish!==false) publishSnapshot();
       runtime.onStatus('World paused: simulation error — ' + reason);
-      return true;
+      return false;
     }
 
-    persistHost();
-    publishSnapshot();
+    if(options.persist!==false) persistHost();
+    if(options.publish!==false) publishSnapshot();
     return true;
   }
 
   function hostPulse() {
     if (!runtime || runtime.role !== 'host') return;
+    const now=Date.now();
     if (!runtime.link.connected) {
-      runtime.lastPulseAt = Date.now();
+      runtime.lastPulseAt=now;
       return;
     }
-    const game = runtime.game;
+    const game=runtime.game;
+    if(runtime.technicalMaintenance?.active) {
+      if(now-(runtime.lastMaintenancePublishedAt||0)>=10000)
+        publishTechnicalMaintenance();
+      runtime.lastPulseAt=now;
+      return;
+    }
     if (!game.started || game.status !== 'running') {
-      runtime.lastPulseAt = Date.now();
+      runtime.lastPulseAt=now;
       return;
     }
-    const now = Date.now();
-    const previous = Number(runtime.lastPulseAt) || now;
-    runtime.clockAccumulatorMs = (runtime.clockAccumulatorMs || 0) +
-      Math.max(0,Math.min(now-previous,DAY_LENGTH_MS));
-    runtime.lastPulseAt = now;
-    let advanced = 0;
-    while (runtime.clockAccumulatorMs >= DAY_LENGTH_MS && advanced < 24 &&
-           runtime.game.status === 'running') {
-      runtime.clockAccumulatorMs -= DAY_LENGTH_MS;
-      if (!advanceHostDay()) break;
-      advanced++;
+    if(!game.players.some(player=>player.connected)) {
+      pauseForNoConnectedPlayers();
+      runtime.lastPulseAt=now;
+      return;
     }
-    if (advanced) persistHost();
+
+    const previous=Number.isFinite(Number(runtime.lastPulseAt))
+      ? Number(runtime.lastPulseAt) : now;
+    runtime.clockAccumulatorMs=accumulateClockMs(
+      runtime.clockAccumulatorMs,clockElapsedMs(previous,now)
+    );
+    runtime.lastPulseAt=now;
+
+    let advanced=0;
+    let worldChanged=false;
+    const due=takeDueClockDays(runtime.clockAccumulatorMs,MAX_CLOCK_DAYS_PER_PULSE);
+    while(advanced<due.days && runtime.game.status==='running') {
+      runtime.clockAccumulatorMs-=DAY_LENGTH_MS;
+      if(!advanceHostDay({persist:false,publish:false})) {
+        runtime.clockAccumulatorMs=accumulateClockMs(runtime.clockAccumulatorMs,DAY_LENGTH_MS);
+        worldChanged=true;
+        break;
+      }
+      advanced++;
+      worldChanged=true;
+    }
+    if(worldChanged || now-(Number(runtime.lastClockPersistAt) || 0)>=30000) {
+      if(persistHost()) runtime.lastClockPersistAt=now;
+      if(worldChanged) publishSnapshot();
+    }
   }
 
   function hostReceive(topic,message) {
@@ -760,24 +1771,46 @@
       const playerId = match && match[1];
       if (!playerId || playerId === runtime.session.playerId) return;
       const player = runtime.game.players.find(item => item.id === playerId);
-      if (player && player.connected !== (message.online === true)) {
-        player.connected = message.online === true;
-        if (!player.connected)
-          runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== playerId);
+      const connected = message.online === true;
+      if (player && player.connected !== connected) {
+        player.connected = connected;
+        recordConnectedRosterChange(runtime.game,player,connected);
         notifyPlayerPresence(player);
+        persistHost();
+        publishSnapshot();
       }
       return;
     }
     if (topic !== runtime.topics.clients) return;
+    if(message.t==='resync') {
+      const player=runtime.game.players.find(item=>
+        item.id===message.playerId && item.token===message.playerToken);
+      if(!player || !player.connected || message.gameId!==runtime.game.id) return;
+      runtime.link.publish(runtime.topics.private(player.id),{
+        t:'welcome',game:publicSnapshot(runtime.game),hostTime:Date.now(),
+        clockAccumulatorMs:runtime.clockAccumulatorMs || 0,
+        technicalMaintenance:createTechnicalMaintenanceMessage(
+          runtime.game.id,runtime.technicalMaintenance.active,
+          runtime.technicalMaintenance.reason,runtime.technicalMaintenance.revision,
+          runtime.technicalMaintenance.changedAt
+        ),resync:true
+      },{qos:1});
+      return;
+    }
     if (message.t === 'hello') {
       const clientNonce = String(message.clientNonce || '');
       const pendingTopic = runtime.topics.pending(clientNonce);
       let player = null;
       let isNewPlayer = false;
+      let isReconnectedPlayer = false;
       if (message.playerId && message.playerToken) {
         player = runtime.game.players.find(item =>
           item.id === message.playerId && item.token === message.playerToken);
-        if (player) player.connected = true;
+        if (player && !player.connected) {
+          player.connected = true;
+          isReconnectedPlayer = true;
+          recordConnectedRosterChange(runtime.game,player,true);
+        }
       }
       if (!player && clientNonce) {
         const pendingPlayerId = runtime.pendingJoins.get(clientNonce);
@@ -793,7 +1826,7 @@
           runtime.link.publish(pendingTopic,{t:'error',error:'Player name must be 2–24 characters.'});
           return;
         }
-        if (runtime.game.players.length >= MAX_PLAYERS) {
+        if (runtime.game.players.length >= worldPlayerLimit(runtime.game)) {
           runtime.link.publish(pendingTopic,{t:'error',error:'This world has reached its player limit.'});
           return;
         }
@@ -818,13 +1851,28 @@
         }
         if (clientNonce) runtime.pendingJoins.set(clientNonce,player.id);
       }
+      if(message.deltaSyncVersion===1) runtime.deltaCapablePlayerIds.add(player.id);
+      else runtime.deltaCapablePlayerIds.delete(player.id);
       const session = {
         gameId:runtime.game.id,playerId:player.id,playerToken:player.token,
         inviteCode:runtime.room,isHost:false,playerName:player.name
       };
-      runtime.link.publish(pendingTopic,{t:'welcome',session,game:snapshot(runtime.game)},{qos:1});
+      runtime.link.publish(pendingTopic,{
+        t:'welcome',session,game:publicSnapshot(runtime.game),hostTime:Date.now(),
+        clockAccumulatorMs:runtime.clockAccumulatorMs || 0,
+        technicalMaintenance:createTechnicalMaintenanceMessage(
+          runtime.game.id,runtime.technicalMaintenance.active,
+          runtime.technicalMaintenance.reason,runtime.technicalMaintenance.revision,
+          runtime.technicalMaintenance.changedAt
+        )
+      },{qos:1});
+      runtime.lastPublishedSnapshot=null;
       persistHost();
       if (isNewPlayer) notifyPlayerJoined(player);
+      else if (isReconnectedPlayer) {
+        notifyPlayerPresence(player);
+        publishSnapshot();
+      }
       return;
     }
     if (message.t === 'order') {
@@ -836,7 +1884,9 @@
           code:'UNAUTHORIZED',error:'Player authentication failed.',replayed:false});
         return;
       }
+      const previousStatus=runtime.game.status;
       const result = applyOrder(runtime.game,player,message.order);
+      if(result.accepted) resetClockReferenceOnRunTransition(previousStatus);
       persistHost();
       publishSnapshot();
       emitOrderResult(player.id,result);
@@ -847,9 +1897,10 @@
       if (leaving) {
         if (leaving.connected) {
           leaving.connected = false;
-          runtime.game.pauseVotePlayerIds = runtime.game.pauseVotePlayerIds.filter(id => id !== leaving.id);
+          recordConnectedRosterChange(runtime.game,leaving,false);
           notifyPlayerPresence(leaving);
           persistHost();
+          publishSnapshot();
         }
       }
       return;
@@ -948,6 +1999,11 @@
       if (game.started) return {ok:false,error:'The world has already started.'};
       if (!canStartWorld(game))
         return {ok:false,error:'Every player must have a State assignment before starting.'};
+      const scenarioAudit=window.NewWorldScenario?.validate?.(game);
+      if(scenarioAudit && !scenarioAudit.valid)
+        return {ok:false,error:'The scenario contains structural errors: '+scenarioAudit.errors.join(', ')};
+      if(window.NewWorldScenario?.createRecord)
+        game.worldScenario=window.NewWorldScenario.createRecord(game,game.scenarioSeed);
       game.started = true;
       game.status = 'running';
       game.paused = false;
@@ -962,22 +2018,176 @@
       const map = {
         economy:{goods:'goods',productionRecipes:'productionRecipes',companies:'companies',
           markets:'markets',tradeRoutes:'tradeRoutes',populationGroups:'populationGroups'},
+        finance:{currencies:'currencies',exchangeRates:'exchangeRates',financialBanks:'financialBanks',
+          taxRules:'taxRules',priceIndexConfigs:'priceIndexConfigs'},
+        diplomacy:{internationalOrganizations:'internationalOrganizations'},
         territory:{provinces:'provinces',settlements:'settlements',connections:'provinceConnections',
-          controls:'territorialControls',sovereigntyHistory:'sovereigntyHistory'},
+          controls:'territorialControls',sovereigntyHistory:'sovereigntyHistory',resourceDeposits:'resourceDeposits'},
         military:{unitTypes:'militaryUnitTypes',commanders:'militaryCommanders',units:'militaryUnits',
-          routes:'militaryRoutes',supplyRoutes:'supplyRoutes',occupations:'occupations'},
+          routes:'militaryRoutes',supplyRoutes:'supplyRoutes',supplyRules:'supplyRules',
+          supplyStocks:'supplyStocks',occupations:'occupations'},
         technology:{technologies:'technologies',researchInstitutions:'researchInstitutions',
           researchProjects:'researchProjects',technologyUnlocks:'technologyUnlocks',
-          technologyAdoptions:'technologyAdoptions'}
+          technologyAdoptions:'technologyAdoptions'},
+        demography:{demographicProfiles:'demographicProfiles',populationGroups:'populationGroups',
+          epidemicDefinitions:'epidemicDefinitions',epidemicStarts:'epidemicStarts'},
+        justice:{justiceSystems:'justiceSystems'},
+        identity:{identityGroups:'identityGroups',identityProfiles:'identityProfiles',
+          identityOrganizations:'identityOrganizations'},
+        worldEvents:{eventDefinitions:'eventDefinitions'},
+        security:{securityAgencies:'securityAgencies',securityAuthorizations:'securityAuthorizations'},
+        media:{mediaOutlets:'mediaOutlets',publicOpinionProfiles:'publicOpinionProfiles',mediaRules:'mediaRules'},
+        bureaucracy:{
+          administrativeAgencies:'administrativeAgencies',
+          administrativeDepartments:'administrativeDepartments',civilServants:'civilServants',
+          administrativeProcedures:'administrativeProcedures',
+          administrativeJurisdictions:'administrativeJurisdictions',
+          administrativeBudgets:'administrativeBudgets',publicProjects:'publicProjects',
+          procurementVendors:'procurementVendors'
+        },
+        resources:{
+          resourceCatalog:'resourceCatalog',resourceDeposits:'resourceDeposits',
+          agriculturalLand:'agriculturalLand',cropDefinitions:'cropDefinitions',
+          farms:'farms',climateZones:'climateZones',environmentalStates:'environmentalStates',
+          disasters:'disasters',energySources:'energySources',foodReserves:'foodReserves',
+          waterSources:'waterSources',waterDemands:'waterDemands',
+          livestockSites:'livestockSites',fishingGrounds:'fishingGrounds',forestAreas:'forestAreas'
+        },
+        services:{serviceTypes:'serviceTypes',publicServiceFacilities:'publicServiceFacilities'},
+        industry:{
+          industryOccupations:'industryOccupations',labourPools:'labourPools',
+          industryWorkplaces:'industryWorkplaces',labourUnions:'labourUnions'
+        }
       };
       const fields = map[payload.kind];
       if (!fields) return {ok:false,error:'Unknown scenario configuration.'};
+      if(payload.kind==='military') {
+        const configuration={
+          ...(payload.configuration||{}),
+          supplyRoutes:payload.configuration?.supplyRoutes||[],
+          supplyRules:payload.configuration?.supplyRules||[],
+          supplyStocks:payload.configuration?.supplyStocks||[]
+        };
+        const validated=window.NewWorldMilitaryLogistics?.validateConfiguration?.(game,configuration);
+        if(!validated?.ok)
+          return {ok:false,error:validated?.error||'Military logistics scenario validation failed.'};
+        payload.configuration=configuration;
+      }
+      if(payload.kind==='demography') {
+        const configuration={
+          ...(payload.configuration||{}),
+          epidemicDefinitions:payload.configuration?.epidemicDefinitions||[],
+          epidemicStarts:payload.configuration?.epidemicStarts||[]
+        };
+        const validated=window.NewWorldDemography?.validateConfiguration?.(
+          game,configuration.demographicProfiles,configuration.populationGroups);
+        if(!validated?.valid)
+          return {ok:false,error:'Demographic scenario validation failed: '+(validated?.errors || []).join(', ')};
+        const epidemicValidation=window.NewWorldEpidemiology?.validateConfiguration?.(
+          game,configuration);
+        if(!epidemicValidation?.ok)
+          return {ok:false,error:'Epidemic scenario validation failed: '+epidemicValidation.error};
+        payload.configuration=configuration;
+      }
+      if (payload.kind==='justice') {
+        const validated=window.NewWorldJustice?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Justice scenario validation failed.'};
+      }
+      if (payload.kind==='identity') {
+        const validated=window.NewWorldIdentity?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Identity and community scenario validation failed.'};
+      }
+      if (payload.kind==='worldEvents') {
+        const validated=window.NewWorldWorldEvents?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'World event scenario validation failed.'};
+      }
+      if (payload.kind==='security') {
+        const validated=window.NewWorldSecurity?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Security scenario validation failed.'};
+      }
+      if (payload.kind==='media') {
+        const validated=window.NewWorldMedia?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Media and opinion scenario validation failed.'};
+      }
+      if (payload.kind==='finance') {
+        const validated=window.NewWorldFinance?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Financial scenario validation failed.'};
+      }
+      if (payload.kind==='diplomacy') {
+        const validated=window.NewWorldDiplomacy?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Diplomatic scenario validation failed.'};
+      }
+      if (payload.kind==='bureaucracy') {
+        const validated=window.NewWorldBureaucracy?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Administrative scenario validation failed.'};
+      }
+      if (payload.kind==='resources') {
+        const validated=window.NewWorldResources?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Resource and climate scenario validation failed.'};
+      }
+      if (payload.kind==='services') {
+        const validated=window.NewWorldServices?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Public service scenario validation failed.'};
+      }
+      if (payload.kind==='industry') {
+        const validated=window.NewWorldIndustry?.validateConfiguration?.(game,payload.configuration);
+        if (!validated?.ok) return {ok:false,error:validated?.error || 'Industry and labour scenario validation failed.'};
+      }
+      const replacements={};
       for (const [key,target] of Object.entries(fields)) {
-        if (!Array.isArray(payload.configuration[key]))
+        if (!Array.isArray(payload.configuration?.[key]))
           return {ok:false,error:'Scenario configuration requires an array for ' + key + '.'};
-        game[target] = clone(payload.configuration[key]);
+        replacements[target]=clone(payload.configuration[key]);
+      }
+      Object.assign(game,replacements);
+      if(payload.kind==='military') {
+        window.NewWorldMilitaryLogistics?.ensure?.(game);
+        for(const stock of game.supplyStocks) {
+          if(!Number.isFinite(stock.initialQuantity)) stock.initialQuantity=stock.quantity;
+        }
+        game.militarySupplyCycleDate=null;
+        game.militarySupplyCycleResult=null;
       }
       if (payload.kind === 'economy') game.companies = game.companies || [];
+      if(payload.kind==='demography') {
+        game.demographicEvents ||= [];
+        game.migrationRecords ||= [];
+        window.NewWorldEpidemiology?.ensure?.(game);
+      }
+      if (payload.kind === 'justice') window.NewWorldJustice?.ensure?.(game);
+      if (payload.kind === 'finance') {
+        window.NewWorldFinance?.ensure?.(game);
+        game.financeCycleDate=null;game.financeCycleResult=null;
+      }
+      if (payload.kind === 'diplomacy') {
+        window.NewWorldDiplomacy?.ensure?.(game);
+        game.diplomacyCycleDate=null;game.diplomacyCycleResult=null;
+      }
+      if (payload.kind === 'bureaucracy') {
+        window.NewWorldBureaucracy?.ensure?.(game);
+        for(const budget of game.administrativeBudgets)
+          if(!Number.isFinite(budget.balance)) budget.balance=budget.openingBalance;
+        for(const project of game.publicProjects) {
+          project.status ||= 'planned';
+          if(!Number.isFinite(project.spent)) project.spent=0;
+          for(const milestone of project.milestones || []) {
+            if(!Number.isFinite(milestone.completedWorkUnits)) milestone.completedWorkUnits=0;
+            milestone.status ||= 'pending';
+          }
+        }
+      }
+      if (payload.kind === 'resources') {
+        window.NewWorldResources?.ensure?.(game);
+        game.resourceCycleDate=null;
+        game.resourceCycleResult=null;
+        game.waterAllocationDate=null;
+        for (const territory of game.territories)
+          window.NewWorldResources?.refreshEnergy?.(game,territory.stateId);
+      }
+      if (payload.kind === 'services') window.NewWorldServices?.ensure?.(game);
+      if (payload.kind === 'industry') window.NewWorldIndustry?.ensure?.(game);
+      if(window.NewWorldScenario?.createRecord)
+        game.worldScenario=window.NewWorldScenario.createRecord(game,game.scenarioSeed);
       pushActivity(game,'The host updated the ' + payload.kind + ' scenario.');
     } else if (action === 'close') {
       game.status = 'closed';
@@ -988,6 +2198,29 @@
     game.worldVersion++;
     pushEvent(game,'world.' + action,game.hostPlayerId,null,game.activity[0]);
     return {ok:true};
+  }
+
+  function receiveHostClock(message,game) {
+    if(!runtime || runtime.role!=='guest') return;
+    const accumulator=Number(message?.clockAccumulatorMs);
+    runtime.hostClockAccumulatorMs=Number.isFinite(accumulator) && accumulator>=0
+      ? Math.min(accumulator,Number.MAX_SAFE_INTEGER) : 0;
+    runtime.hostClockReceivedAt=Date.now();
+    runtime.hostClockRunning=Boolean(game?.started && game.status==='running' &&
+      !runtime.technicalMaintenance?.active);
+  }
+
+  function requestSnapshotResync() {
+    if(!runtime || runtime.role!=='guest' || !runtime.session ||
+       !runtime.link.connected ||
+       (runtime.resyncRequested && Date.now()-(runtime.resyncRequestedAt || 0)<5000)) return false;
+    runtime.resyncRequested=true;
+    runtime.resyncRequestedAt=Date.now();
+    return runtime.link.publish(runtime.topics.clients,{
+      t:'resync',gameId:runtime.session.gameId,
+      playerId:runtime.session.playerId,playerToken:runtime.session.playerToken,
+      knownWorldVersion:runtime.lastSnapshot?.worldVersion ?? null
+    },{qos:1})!==false;
   }
 
   function receiveGuest(topic,message) {
@@ -1012,6 +2245,10 @@
           t:'presence',playerId:runtime.playerId,online:true
         },{retain:true,qos:1});
         runtime.onSession(runtime.session);
+        runtime.lastSnapshot=clone(message.game);
+        runtime.resyncRequested=false;
+        receiveTechnicalMaintenance(message.technicalMaintenance,message.game);
+        receiveHostClock(message,message.game);
         runtime.onSnapshot(message.game);
         runtime.resolveJoin(runtime.session);
       }
@@ -1019,7 +2256,28 @@
     }
     if (topic === runtime.topics.server) {
       if (message.to && message.to !== runtime.playerId) return;
-      if (message.t === 'snapshot' && message.game) runtime.onSnapshot(message.game);
+      if (message.t === 'maintenance') {
+        receiveTechnicalMaintenance(message,runtime.lastSnapshot);
+      }
+      if (message.t === 'snapshot' && message.game) {
+        runtime.lastSnapshot=clone(message.game);
+        runtime.resyncRequested=false;
+        receiveTechnicalMaintenance(message.technicalMaintenance,message.game);
+        receiveHostClock(message,message.game);
+        runtime.onSnapshot(message.game);
+      }
+      if(message.t==='delta' && message.delta) {
+        const updated=message.protocolVersion===1
+          ? applyVersionedSnapshotDelta(runtime.lastSnapshot,message.delta)
+          : null;
+        if(updated) {
+          runtime.lastSnapshot=updated;
+          runtime.resyncRequested=false;
+          receiveTechnicalMaintenance(message.technicalMaintenance,updated);
+          receiveHostClock(message,updated);
+          runtime.onSnapshot(updated);
+        } else requestSnapshotResync();
+      }
       if (message.t === 'playerJoined' && message.player) runtime.onPlayerJoined?.(message.player);
       if (message.t === 'playerPresence')
         runtime.onPlayerPresence?.(message.playerId,message.online === true);
@@ -1037,6 +2295,11 @@
       return;
     }
     if (topic === runtime.topics.private(runtime.playerId) && message.t === 'welcome') {
+      if(message.game?.id!==runtime.session?.gameId) return;
+      runtime.lastSnapshot=clone(message.game);
+      runtime.resyncRequested=false;
+      receiveTechnicalMaintenance(message.technicalMaintenance,message.game);
+      receiveHostClock(message,message.game);
       runtime.onSnapshot(message.game);
     }
   }
@@ -1048,7 +2311,8 @@
     const sent = runtime.link.publish(runtime.topics.clients,{
       t:'hello',clientNonce:runtime.link.clientNonce,name:runtime.name,
       playerId:runtime.session?.playerId || null,
-      playerToken:runtime.session?.playerToken || null
+      playerToken:runtime.session?.playerToken || null,
+      deltaSyncVersion:window.NewWorldCapabilities?.snapshotDeltas===false ? 0 : 1
     },{qos:1});
     if (sent) runtime.lastHelloGeneration = generation;
   }
@@ -1098,49 +2362,86 @@
   }
 
   function setHostRuntime(game,session,handlers) {
+    migrateScenarioIdentity(game);
+    const configuredLimit = Number(game.maxHumanPlayers) || MAX_PLAYERS;
+    game.maxHumanPlayers = worldPlayerLimit(game);
+    if (configuredLimit !== game.maxHumanPlayers) {
+      game.worldVersion = (Number(game.worldVersion) || 0) + 1;
+      pushActivity(game,'The legacy lobby capacity was reduced to the current 20-player maximum.');
+      pushEvent(game,'world.player_limit_migrated',game.hostPlayerId,null,
+        'The legacy lobby capacity was reduced to the current 20-player maximum.');
+    }
     migrateStrategyScenario(game);
+    if (window.NewWorldJustice?.ensure) window.NewWorldJustice.ensure(game);
     runtime = {
       role:'host',game,session,room:session.inviteCode || session.roomCode,
       topics:topicSet(session.inviteCode || session.roomCode),pendingJoins:new Map(),
       onSnapshot:handlers.onSnapshot || (()=>{}),
       onStatus:handlers.onStatus || (()=>{}),
+      onMaintenance:handlers.onMaintenance || (()=>{}),
       onOrderResult:handlers.onOrderResult || (()=>{}),
       onSession:handlers.onSession || (()=>{}),
       onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
       onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
-      onPlayerCount:handlers.onPlayerCount || (()=>{})
+      onPlayerCount:handlers.onPlayerCount || (()=>{}),
+      deltaCapablePlayerIds:new Set(),
+      lastPublishedSnapshot:null,
+      technicalMaintenance:{
+        active:false,reason:'',revision:1,changedAt:new Date().toISOString()
+      },lastMaintenancePublishedAt:0
     };
     runtime.session.inviteCode = runtime.room;
     runtime.session.roomCode = runtime.room;
     runtime.lastPulseAt = Date.now();
+    runtime.lastClockPersistAt = runtime.lastPulseAt;
     runtime.clockAccumulatorMs = 0;
-    runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
+    for (const player of runtime.game.players) {
+      const shouldBeConnected = player.id === runtime.session.playerId;
+      if (player.connected !== shouldBeConnected) {
+        player.connected = shouldBeConnected;
+        recordConnectedRosterChange(runtime.game,player,shouldBeConnected);
+      }
+    }
     runtime.hasConnected = false;
     runtime.link = new BrokerLink('host',runtime.room,session.playerId,
       hostReceive,(status) => {
         if (status === 'ready') {
           runtime.hasConnected = true;
           const host = runtime.game.players.find(player => player.id === runtime.session.playerId);
-          if (host) host.connected = true;
+          if (host && !host.connected) {
+            host.connected = true;
+            recordConnectedRosterChange(runtime.game,host,true);
+          }
           runtime.lastPulseAt = Date.now();
           runtime.onStatus('ready');
+          publishTechnicalMaintenance();
           persistHost();
           publishSnapshot();
         } else {
           if (runtime.hasConnected && !runtime.link.connected) {
             const host = runtime.game.players.find(player => player.id === runtime.session.playerId);
-            if (host) host.connected = false;
+            if (host && host.connected) {
+              host.connected = false;
+              recordConnectedRosterChange(runtime.game,host,false);
+            }
             runtime.lastPulseAt = Date.now();
             if (runtime.game.started && runtime.game.status === 'running') {
               runtime.game.status = 'paused';
               runtime.game.paused = true;
               runtime.game.pauseVotePlayerIds = [];
               runtime.game.worldVersion++;
-              pushActivity(runtime.game,'The world paused because the host lost its relay connection.');
-              pushEvent(runtime.game,'world.paused.no_players',null,null,
-                'The world paused because the host lost its relay connection.');
+              const noPlayersConnected=!runtime.game.players.some(player=>player.connected);
+              const pauseReason=noPlayersConnected?'NoConnectedPlayers':'HostRelayLost';
+              const description=noPlayersConnected
+                ? 'The world paused automatically because the last connected player lost the relay connection.'
+                : 'The world paused because the host lost its relay connection while other players remained connected.';
+              pushActivity(runtime.game,description);
+              pushEvent(runtime.game,noPlayersConnected
+                ? 'world.paused.no_connected_players' : 'world.paused.host_relay_lost',
+                null,null,description,null,pauseReason);
             }
             persistHost();
+            publishSnapshot();
           }
           runtime.onStatus(status);
         }
@@ -1191,12 +2492,15 @@
       playerId:existingSession?.playerId || null,hostOnline:false,lastHelloGeneration:-1,
       onSnapshot:handlers.onSnapshot || (()=>{}),
       onStatus:handlers.onStatus || (()=>{}),
+      onMaintenance:handlers.onMaintenance || (()=>{}),
       onOrderResult:handlers.onOrderResult || (()=>{}),
       onSession:handlers.onSession || (()=>{}),
       onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
       onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
       onPlayerCount:handlers.onPlayerCount || (()=>{}),
-      resolveJoin:null,rejectJoin:null,adminRequests:new Map()
+      resolveJoin:null,rejectJoin:null,adminRequests:new Map(),
+      technicalMaintenance:{active:false,reason:'',revision:0,changedAt:null},
+      lastSnapshot:null
     };
     runtime = active;
     active.link = new BrokerLink('guest',room,active.playerId,receiveGuest,
@@ -1206,11 +2510,19 @@
       });
     return new Promise((resolve,reject) => {
       active.resolveJoin = resolve;
-      active.rejectJoin = error => reject(error);
       const timeout = setTimeout(() => {
-        if (runtime === active) active.link.close(false);
+        if (runtime === active) {
+          active.link.close(false);
+          runtime = null;
+        }
         reject(new Error('World not found or its host is offline. Check the code and try again.'));
       },30000);
+      active.rejectJoin = error => {
+        clearTimeout(timeout);
+        active.link.close(false);
+        if (runtime === active) runtime = null;
+        reject(error);
+      };
       const resolveOnce = active.resolveJoin;
       active.resolveJoin = session => {
         clearTimeout(timeout);
@@ -1222,15 +2534,17 @@
 
   function restoreSession(session,handlers = {}) {
     if (session?.isHost) {
-      let saved;
-      try { saved = JSON.parse(localStorage.getItem(HOST_SAVE + session.inviteCode)); } catch {}
-      if (!saved?.game || saved.game.id !== session.gameId ||
-          saved.game.hostPlayerId !== session.playerId) {
-        return Promise.reject(new Error('The host save is not available in this browser. Reopen the original host browser profile.'));
+      let saved=null;
+      try { saved=loadHostSave(session); } catch {}
+      if (!saved?.game) {
+        return Promise.reject(new Error('No valid host save was found. Both local save slots may be damaged or the original browser profile may be unavailable.'));
       }
       const previousRuntime=runtime;
       previousRuntime?.link?.close(false);
       setHostRuntime(saved.game,saved.session || session,handlers);
+      runtime.clockAccumulatorMs=saved.clockAccumulatorMs || 0;
+      runtime.lastPulseAt=Date.now();
+      runtime.recoverySource=saved.source;
       const active=runtime;
       return new Promise((resolve,reject) => {
         const timeout=setTimeout(() => {
@@ -1270,7 +2584,9 @@
       const player = runtime.game.players.find(item =>
         item.id === runtime.session.playerId && item.token === runtime.session.playerToken);
       if (!player) return false;
+      const previousStatus=runtime.game.status;
       const result = applyOrder(runtime.game,player,order);
+      if(result.accepted) resetClockReferenceOnRunTransition(previousStatus);
       persistHost();
       publishSnapshot();
       const onOrderResult=runtime.onOrderResult;
@@ -1286,8 +2602,10 @@
   function admin(action,payload = {}) {
     if (!runtime || !runtime.session) return Promise.reject(new Error('No active multiplayer session.'));
     if (runtime.role === 'host') {
+      const previousStatus=runtime.game.status;
       const result = applyAdmin(runtime.game,action,payload);
       if (!result.ok) return Promise.reject(new Error(result.error));
+      resetClockReferenceOnRunTransition(previousStatus);
       persistHost();
       publishSnapshot();
       return Promise.resolve(snapshot(runtime.game));
@@ -1370,7 +2688,111 @@
   hostPulseTimer.unref?.();
 
   window.NewWorldMultiplayer = {
-    createWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
+    createWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,executeScheduledOrders,
+    saveNow:() => persistHost(),
+    exportHostBackup:() => {
+      if(!runtime||runtime.role!=='host')
+        throw new Error('Only the active host can export a portable world backup.');
+      if(!persistHost())
+        throw new Error('The latest world state could not be saved and verified locally.');
+      const slots=readValidHostSaveSlots(runtime.room,{
+        gameId:runtime.game.id,hostPlayerId:runtime.game.hostPlayerId
+      });
+      if(!slots.length)
+        throw new Error('No verified host save is available for export.');
+      return clone(slots[0].envelope);
+    },
+    importHostBackup:envelope => {
+      if(runtime)
+        throw new Error('Disconnect the current multiplayer session before importing a host backup.');
+      const checked=validateHostSaveEnvelope(envelope);
+      if(!checked.valid)
+        throw new Error('The file does not contain a valid supported host save ('+checked.reason+').');
+      const payload=checked.payload;
+      const room=String(payload.room||'');
+      const session=payload.session;
+      const host=payload.game.players.find(player=>player.id===payload.game.hostPlayerId);
+      if(!/^[A-HJ-NP-Z2-9]{8}$/.test(room)||!host||!session||
+         session.isHost!==true||session.gameId!==payload.game.id||
+         session.playerId!==payload.game.hostPlayerId||
+         session.playerToken!==host.token||
+         session.inviteCode!==room||session.roomCode!==room)
+        throw new Error('The backup has no matching host identity, room code and recovery token.');
+      const existing=readValidHostSaveSlots(room,{
+        gameId:payload.game.id,hostPlayerId:payload.game.hostPlayerId
+      });
+      const latest=existing[0]||null;
+      const generation=Math.max(checked.generation,(latest?.checked.generation||0)+1);
+      const targetSlot=latest?.slot==='a'?'b':'a';
+      const imported=createHostSaveEnvelope(
+        payload.game,session,room,generation,payload.clockAccumulatorMs
+      );
+      const key=hostSaveSlotKey(room,targetSlot);
+      let previousRaw=null;
+      try {
+        previousRaw=localStorage.getItem(key);
+        localStorage.setItem(key,JSON.stringify(imported));
+        const persisted=JSON.parse(localStorage.getItem(key)||'null');
+        const verified=validateHostSaveEnvelope(persisted,{
+          room,gameId:payload.game.id,hostPlayerId:payload.game.hostPlayerId
+        });
+        if(!verified.valid||verified.generation!==generation)
+          throw new Error('The imported backup failed its local read-back verification.');
+      } catch(error) {
+        try {
+          if(previousRaw===null) localStorage.removeItem(key);
+          else localStorage.setItem(key,previousRaw);
+        } catch {}
+        throw new Error('The host backup could not be installed in this browser: '+
+          (error?.message||'browser storage unavailable or full.'));
+      }
+      return clone({...session,playerName:session.playerName||host.name});
+    },
+    saveStatus:() => ({
+      savedAt:runtime?.lastSavedAt || null,
+      error:runtime?.lastSaveError || null,
+      clockAccumulatorMs:runtime?.clockAccumulatorMs || 0,
+      recoverySource:runtime?.recoverySource || null,
+      backupAvailable:runtime?.role==='host'
+        ? readValidHostSaveSlots(runtime.room).length>1 : false
+    }),
+    setTechnicalMaintenance,
+    technicalMaintenanceStatus:() => runtime?.technicalMaintenance
+      ? {...runtime.technicalMaintenance} : {active:false,reason:'',revision:0,changedAt:null},
+    clockStatus:() => ({
+      status:runtime?.role==='host' ? runtime.game.status : null,
+      day:runtime?.role==='host' ? runtime.game.day : null,
+      connectedPlayers:runtime?.role==='host'
+        ? runtime.game.players.filter(player=>player.connected).length : null,
+      technicalMaintenance:runtime?.technicalMaintenance?{...runtime.technicalMaintenance}:null,
+      accumulatorMs:runtime?.role==='host' ? runtime.clockAccumulatorMs || 0 : null,
+      pendingDays:runtime?.role==='host'
+        ? Math.floor((runtime.clockAccumulatorMs || 0)/DAY_LENGTH_MS) : null,
+      dayLengthMs:DAY_LENGTH_MS
+    }),
+    clockPresentation:() => {
+      if(!runtime) return {progress:0,elapsedMs:0,dayLengthMs:DAY_LENGTH_MS,running:false};
+      let accumulator=0;
+      let running=false;
+      if(runtime.role==='host') {
+        accumulator=runtime.clockAccumulatorMs || 0;
+        running=Boolean(runtime.game.started && runtime.game.status==='running' &&
+          !runtime.technicalMaintenance?.active && runtime.link.connected &&
+          runtime.game.players.some(player=>player.connected));
+        if(running) accumulator+=clockElapsedMs(runtime.lastPulseAt,Date.now());
+      } else {
+        accumulator=runtime.hostClockAccumulatorMs || 0;
+        running=Boolean(runtime.hostOnline && runtime.hostClockRunning &&
+          !runtime.technicalMaintenance?.active);
+        if(running)
+          accumulator+=clockElapsedMs(runtime.hostClockReceivedAt,Date.now());
+      }
+      const elapsedMs=Math.min(DAY_LENGTH_MS-1,Math.max(0,accumulator%DAY_LENGTH_MS));
+      return {
+        progress:elapsedMs/DAY_LENGTH_MS,
+        elapsedMs,dayLengthMs:DAY_LENGTH_MS,running
+      };
+    },
     isHost:() => runtime?.role === 'host',
     isConnected:() => !!runtime?.link?.connected,
     currentSession:() => runtime?.session || null,
@@ -1380,12 +2802,29 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = Object.freeze({
       createInitialWorld:newWorld,
+      migrateScenarioIdentity,
       assignLobbyPlayer,
       canStartWorld,
       applyAdmin,
       applyOrder,
+      executeScheduledOrders,
       migrateStrategyScenario,
       snapshot,
+      publicSnapshot,
+      snapshotForPlayer,
+      createHostSaveEnvelope,
+      validateHostSaveEnvelope,
+      validHostGame,
+      hostSaveChecksum,
+      clockElapsedMs,
+      accumulateClockMs,
+      takeDueClockDays,
+      createVersionedSnapshotDelta,
+      applyVersionedSnapshotDelta,
+      createTechnicalMaintenanceMessage,
+      validateTechnicalMaintenanceMessage,
+      dayLengthMs:DAY_LENGTH_MS,
+      maxClockDaysPerPulse:MAX_CLOCK_DAYS_PER_PULSE,
       maxPlayers:MAX_PLAYERS
     });
   }

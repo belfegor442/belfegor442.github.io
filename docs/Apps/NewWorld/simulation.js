@@ -276,7 +276,9 @@
       }
     }
 
-    const routes = (game.tradeRoutes || []).filter(route => route.enabled !== false)
+    const routes = (game.tradeRoutes || []).filter(route => route.enabled !== false &&
+      (globalThis.NewWorldDiplomacy?.tradeAllowed?.(game,route.exportStateId,
+        route.importStateId,route.goodId) ?? true))
       .slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
     // Fixed-quantity company contracts settle before open market sales.
@@ -497,7 +499,9 @@
       const residents = Math.max(0,Number(territory.population) || 0);
       const room = Math.max(0,capacity-residents);
       const growthBonus = globalThis.NewWorldStrategy?.effectValue?.(game,territory.stateId,'population_growth_bonus') || 0;
-      const growth = room > 0
+      const configuredDemography=(game.demographicProfiles || []).some(profile=>
+        profile.stateId===territory.stateId);
+      const growth = configuredDemography ? 0 : room > 0
         ? Math.min(room,Math.max(1,Math.floor(residents*0.0015*(1+growthBonus))))
         : 0;
       territory.population = residents + growth;
@@ -544,6 +548,16 @@
     }
   }
 
+  function nextGregorianDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const date = new Date(value + 'T00:00:00.000Z');
+    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return null;
+    date.setUTCDate(date.getUTCDate() + 1);
+    if (!Number.isFinite(date.getTime())) return null;
+    const next = date.toISOString().slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(next) ? next : null;
+  }
+
   function advanceDay(game) {
     if (!game || !Array.isArray(game.territories) || !Array.isArray(game.players))
       return {ok:false, error:'The host world snapshot is invalid.'};
@@ -551,17 +565,18 @@
       const draft = clone(game);
       if (!Number.isSafeInteger(draft.day) || draft.day < 1 || draft.day >= 2147483647)
         throw new Error('The world reached the supported calendar limit.');
-      const date = new Date(String(draft.worldDate) + 'T00:00:00Z');
-      if (!Number.isFinite(date.getTime())) throw new Error('The world calendar date is invalid.');
-      date.setUTCDate(date.getUTCDate() + 1);
-      if (!Number.isFinite(date.getTime())) throw new Error('The world calendar cannot advance further.');
+      const nextDate = nextGregorianDate(draft.worldDate);
+      if (!nextDate) throw new Error('The world calendar date is invalid or outside the supported Gregorian range.');
       draft.day++;
-      draft.worldDate = date.toISOString().slice(0, 10);
+      draft.worldDate = nextDate;
 
-      // Finish work orders first, then update residents and public finance.
+      // Finish work orders first, then update residents, employment and public finance.
       advanceConstruction(draft);
       updateSettlementPopulation(draft);
       accrueGovernmentBalances(draft);
+      const environmentCycle=globalThis.NewWorldResources?.advanceDay?.(draft);
+      if(environmentCycle && !environmentCycle.ok)
+        throw new Error(environmentCycle.error || 'The resource and climate cycle failed.');
       const production = advanceProduction(draft);
       for (const result of production) {
         const company = draft.companies.find(item => item.id === result.companyId);
@@ -574,8 +589,44 @@
         pushActivity(draft, description);
         pushEvent(draft, 'economy.production_completed', company.stateId, description);
       }
+      const diplomacyCycle=globalThis.NewWorldDiplomacy?.advanceDay?.(draft,id);
+      if(diplomacyCycle && !diplomacyCycle.ok)
+        throw new Error(diplomacyCycle.error || 'The advanced diplomatic cycle failed.');
       clearMarkets(draft);
+      const financeCycle=globalThis.NewWorldFinance?.advanceDay?.(draft,id);
+      if(financeCycle && !financeCycle.ok)
+        throw new Error(financeCycle.error || 'The financial cycle failed.');
+      const industryCycle=globalThis.NewWorldIndustry?.advanceDay?.(draft);
+      if(industryCycle && !industryCycle.ok)
+        throw new Error(industryCycle.error || 'The industrial employment cycle failed.');
+      const serviceCycle=globalThis.NewWorldServices?.advanceDay?.(draft);
+      if(serviceCycle && !serviceCycle.ok)
+        throw new Error(serviceCycle.error || 'The public service cycle failed.');
+      globalThis.NewWorldDemography?.advanceDay?.(draft);
+      const epidemicCycle=globalThis.NewWorldEpidemiology?.advanceDay?.(draft,id);
+      if(epidemicCycle && !epidemicCycle.ok)
+        throw new Error(epidemicCycle.error || 'The epidemic simulation failed.');
       globalThis.NewWorldStrategy?.advanceDay?.(draft);
+      const administrationCycle=globalThis.NewWorldBureaucracy?.advanceDay?.(draft,id);
+      if(administrationCycle && !administrationCycle.ok)
+        throw new Error(administrationCycle.error || 'The administrative cycle failed.');
+      const mediaCycle=globalThis.NewWorldMedia?.advanceDay?.(draft);
+      if(mediaCycle && !mediaCycle.ok)
+        throw new Error(mediaCycle.error || 'The media cycle failed.');
+      const securityCycle=globalThis.NewWorldSecurity?.advanceDay?.(draft);
+      if(securityCycle && !securityCycle.ok)
+        throw new Error(securityCycle.error || 'The security cycle failed.');
+      const worldEventCycle=globalThis.NewWorldWorldEvents?.advanceDay?.(draft,id);
+      if(worldEventCycle && !worldEventCycle.ok)
+        throw new Error(worldEventCycle.error || 'The world event cycle failed.');
+      const identityCycle=globalThis.NewWorldIdentity?.advanceDay?.(draft,id);
+      if(identityCycle && !identityCycle.ok)
+        throw new Error(identityCycle.error || 'The identity and social cohesion cycle failed.');
+      const schedulingEngine=globalThis.NewWorldMultiplayer ||
+        globalThis.window?.NewWorldMultiplayer || null;
+      const scheduledOrderCycle=schedulingEngine?.executeScheduledOrders?.(draft);
+      if(scheduledOrderCycle && !scheduledOrderCycle.ok)
+        throw new Error(scheduledOrderCycle.error || 'Scheduled orders could not be processed.');
 
       const dayDescription = draft.worldDate + ' began (day ' + draft.day + ').';
       pushActivity(draft, dayDescription);
@@ -655,7 +706,7 @@
     };
   }
 
-  const api = Object.freeze({advanceDay, createStarterEconomy, getSettlementMetrics});
+  const api = Object.freeze({advanceDay, nextGregorianDate, createStarterEconomy, getSettlementMetrics});
   globalThis.NewWorldSimulation = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

@@ -8,9 +8,9 @@
     {id:'cavalry',name:'Cavalry',recruitmentCost:650,personnelPerRecruit:80,strength:2.1,requiredTechnologyId:'logistics',commandPermissionSetIds:PERMISSIONS}
   ];
   const POLICY_EFFECTS = Object.freeze({
-    public_works:{name:'Public works programme',effectId:'construction_discount',value:0.05},
-    conscription:{name:'National service act',effectId:'recruitment_discount',value:0.08},
-    agricultural_program:{name:'Agricultural development act',effectId:'population_growth_bonus',value:0.10}
+    public_works:{name:'Public works programme',effectId:'construction_discount',value:0.05,minValue:0.01,maxValue:0.15},
+    conscription:{name:'National service act',effectId:'recruitment_discount',value:0.08,minValue:0.01,maxValue:0.15},
+    agricultural_program:{name:'Agricultural development act',effectId:'population_growth_bonus',value:0.10,minValue:0.01,maxValue:0.25}
   });
   const TECHNOLOGIES = [
     {id:'masonry',name:'Masonry and public works',domain:'Infrastructure',requiredProgress:5,dailyProgress:1,dailyFunding:24,budget:120,prerequisiteTechnologyIds:[],requiredKnowledge:{},requiredMaterials:{},effects:[{effectId:'construction_discount',value:0.10}]},
@@ -86,6 +86,7 @@
     game.militaryBattles=[];
     game.occupations=[];
     game.supplyRoutes=[];
+    globalThis.NewWorldMilitaryLogistics?.ensure?.(game);
 
     const home=game.territories[0];
     const commanderId=idFor(createId);
@@ -203,7 +204,7 @@
       .filter(item => item.stateId===stateId).map(item => item.technologyId));
   }
 
-  function completeDecision(game,system,decision,approved) {
+  function completeDecision(game,system,decision,approved,createId) {
     decision.status=approved?'approved':'rejected';
     decision.resolvedOn=game.worldDate;
     if (approved && decision.competence==='proposeLaw') {
@@ -213,12 +214,14 @@
         proposedBy:decision.proposedBy,decisionId:decision.id
       };
       system.laws.push(law);
+      globalThis.NewWorldBureaucracy?.onLawEnacted?.(game,system,law,decision,createId);
       const policy=POLICY_EFFECTS[decision.policyId];
       if (policy) {
         system.policies ||= [];
         system.policies.push({
           id:'policy-'+decision.id,policyId:decision.policyId,
-          name:policy.name,effectId:policy.effectId,value:policy.value,
+          name:policy.name,effectId:policy.effectId,
+          value:Number.isFinite(decision.policyValue) ? decision.policyValue : policy.value,
           enactedOn:game.worldDate,lawId:law.id
         });
       }
@@ -231,6 +234,15 @@
 
   function applyOrder(game,player,membership,order,createId) {
     const stateId=membership.stateId;
+    if(order.type==='movePopulation') {
+      if (membership.permissionSetId==='government-observer')
+        return {ok:false,code:'INSUFFICIENT_PERMISSION',
+          error:'Observer memberships cannot move population groups.'};
+      const result=globalThis.NewWorldDemography?.movePopulation?.(
+        game,order,player,membership,createId);
+      return result || {ok:false,code:'DEMOGRAPHY_NOT_LOADED',
+        error:'The demographic simulation module is unavailable.'};
+    }
     const territory=territoryFor(game,stateId);
     const system=politicalFor(game,stateId);
     if (!territory) return {ok:false,code:'INVALID_STATE',error:'The selected government no longer exists.'};
@@ -248,6 +260,8 @@
         return {ok:false,code:'NOT_HOSTILE_STATE',error:'War can only be declared against another administered government.'};
       if (relation.status==='war')
         return {ok:false,code:'WAR_ALREADY_ACTIVE',error:'The two States are already at war.'};
+      if (globalThis.NewWorldDiplomacy?.isWarProhibited?.(game,stateId,targetStateId))
+        return {ok:false,code:'NON_AGGRESSION_TREATY_ACTIVE',error:'An active non-aggression treaty prevents a declaration of war.'};
       relation.status='war';
       relation.declaredOn=game.worldDate;
       relation.declaredBy=player.id;
@@ -350,12 +364,15 @@
       const defenders=(game.militaryUnits || []).filter(item =>
         item.provinceId===destination.id && item.personnel>0 &&
         item.stateId!==unit.stateId && item.ownerPlayerId!==player.id);
+      const logistics=globalThis.NewWorldMilitaryLogistics||
+        globalThis.window?.NewWorldMilitaryLogistics;
       const strength=(candidate) => {
         const type=(game.militaryUnitTypes || []).find(item => item.id===candidate.unitTypeId);
         const doctrine=effectValue(game,candidate.stateId,'military_strength');
         const commander=(game.militaryCommanders || []).find(item => item.id===candidate.commanderId);
+        const supplyMultiplier=logistics?.combatMultiplier?.(game,candidate)??1;
         return Math.max(0,Number(candidate.personnel)||0) *
-          Number(type?.strength||1) *
+          Number(type?.strength||1) * supplyMultiplier *
           (0.70+Math.max(0,Number(candidate.morale)||0)/250) *
           (1+Math.max(0,Number(candidate.training)||0)/250) *
           (1+doctrine+(Number(commander?.experience)||0)/1000);
@@ -652,18 +669,22 @@
       if (title.length<4 || text.length<12 || /[<>]/.test(title+text))
         return {ok:false,code:'INVALID_LAW',error:'A law requires a title of at least 4 characters and a text of at least 12 characters.'};
       const policyId=String(order.policyId || '');
-      if (!POLICY_EFFECTS[policyId])
+      const policy=POLICY_EFFECTS[policyId];
+      if (!policy)
         return {ok:false,code:'INVALID_POLICY',error:'Choose a valid public policy for this bill.'};
       if ((system.policies || []).some(item => item.policyId===policyId))
         return {ok:false,code:'POLICY_ALREADY_ACTIVE',error:'This public policy is already active in the State.'};
+      const policyValue=order.policyValue===undefined ? policy.value : Number(order.policyValue);
+      if (!Number.isFinite(policyValue) || policyValue<policy.minValue || policyValue>policy.maxValue)
+        return {ok:false,code:'INVALID_POLICY',error:'Policy strength must stay within its configured range.'};
       const decision={
-        id:idFor(createId),competence:'proposeLaw',title,text,policyId,
+        id:idFor(createId),competence:'proposeLaw',title,text,policyId,policyValue,
         status:rule.approvalRequired?'pendingApproval':'approved',
         votes:[],legalBasis:rule.legalBasis,proposedBy:player.id,
         proposedOn:game.worldDate,institutionId:rule.institutionId
       };
       system.decisions.push(decision);
-      if (!rule.approvalRequired) completeDecision(game,system,decision,true);
+      if (!rule.approvalRequired) completeDecision(game,system,decision,true,createId);
       record(game,'government.law_proposed',stateId,
         player.name+' proposed: '+title+'.',player.id);
       return {ok:true};
@@ -688,10 +709,10 @@
       const no=decision.votes.filter(vote => vote.choice==='reject').length;
       const threshold=Math.max(1,Number(rule.approvalThresholdPercent)||50)/100;
       if (decision.votes.length>=(Number(rule.minimumVotes)||1) && yes/Math.max(1,eligible.length)>=threshold)
-        completeDecision(game,system,decision,true);
+        completeDecision(game,system,decision,true,createId);
       else if (no/Math.max(1,eligible.length)>1-threshold ||
           decision.votes.length>=eligible.length && yes/Math.max(1,eligible.length)<threshold)
-        completeDecision(game,system,decision,false);
+        completeDecision(game,system,decision,false,createId);
       else
         record(game,'government.vote_cast',stateId,
           player.name+' voted '+order.voteChoice+' on '+decision.title+'.',player.id);
@@ -708,8 +729,16 @@
       const appointee=game.players.find(item => item.id===order.appointeePlayerId);
       if (!office || !appointee || !membershipFor(game,appointee.id,stateId))
         return {ok:false,code:'INVALID_APPOINTMENT',error:'The office or appointee is not eligible in this State.'};
+      const previousOfficeHolderIds=(system.offices || [])
+        .map(item=>item.holderPlayerId).filter(Boolean);
+      const previousHolderId=office.holderPlayerId;
       office.holderPlayerId=appointee.id;
-      if (office.id==='chief-executive') system.government.chiefExecutivePlayerId=appointee.id;
+      if (office.id==='chief-executive') {
+        system.government.chiefExecutivePlayerId=appointee.id;
+        if(previousHolderId && previousHolderId!==appointee.id)
+          globalThis.NewWorldBureaucracy?.onGovernmentChange?.(
+            game,stateId,previousOfficeHolderIds,createId);
+      }
       record(game,'government.office_appointed',stateId,
         player.name+' appointed '+appointee.name+' as '+office.name+'.',player.id);
       return {ok:true};
@@ -719,12 +748,26 @@
   }
 
   function advanceDay(game) {
+    const logistics=globalThis.NewWorldMilitaryLogistics||
+      globalThis.window?.NewWorldMilitaryLogistics;
+    const logisticsResult=logistics?.advanceDay?.(game,()=>
+      'military-supply-'+game.id+'-'+(++game.eventSequence));
+    if(logisticsResult&&!logisticsResult.ok)
+      throw new Error(logisticsResult.error||'Military logistics could not advance.');
     for (const unit of game.militaryUnits || []) {
       if (unit.personnel<=0) continue;
-      unit.morale=Math.min(100,(Number(unit.morale)||0)+2);
+      const supplyConfigured=(game.supplyRules||[]).some(rule=>
+        rule.stateId===unit.stateId&&rule.unitTypeId===unit.unitTypeId);
+      const supplied=unit.supplyStatus!=='undersupplied';
+      if(!supplyConfigured||supplied)
+        unit.morale=Math.min(100,(Number(unit.morale)||0)+2);
       if (['recovering','occupying','garrison'].includes(unit.status)) {
         const maximum=Number(unit.maxPersonnel)||Number(unit.personnel);
-        unit.personnel=Math.min(maximum,unit.personnel+Math.max(1,Math.ceil(maximum*.025)));
+        const baseRecovery=Math.max(1,Math.ceil(maximum*.025));
+        const recovery=supplyConfigured&&!supplied
+          ? Math.floor(baseRecovery*Math.max(0,Math.min(100,Number(unit.supplyCoveragePercent)||0))/100)
+          : baseRecovery;
+        unit.personnel=Math.min(maximum,unit.personnel+recovery);
         if (unit.personnel>=maximum && unit.status==='recovering') unit.status='ready';
       }
     }

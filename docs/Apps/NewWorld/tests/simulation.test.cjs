@@ -23,16 +23,41 @@ function baseWorld(overrides = {}) {
   return game;
 }
 
-test('starter scenario seeds an economic network for every State', () => {
-  const territories = [
-    {stateId:'state-a',currencyId:'currency-a',index:0,name:'Test State',population:50000}
-  ];
+test('starter economy creates an independent economic network for every requested State', () => {
+  const territories = Array.from({length:16},(_,index)=>({
+    stateId:'state-'+index,currencyId:'currency-'+index,index,
+    name:'Test State '+index,population:index===0?50000:0
+  }));
   const economy = simulation.createStarterEconomy(territories);
-  assert.equal(economy.companies.length,4);
-  assert.equal(economy.markets.length,3);
+  assert.equal(economy.companies.length,64);
+  assert.equal(economy.markets.length,48);
   assert.equal(economy.productionRecipes.length,4);
-  assert.equal(economy.populationGroups.length,1);
+  assert.equal(economy.populationGroups.length,16);
+  assert.deepEqual(new Set(economy.companies.map(item=>item.stateId)),
+    new Set(territories.map(item=>item.stateId)));
   assert.ok(economy.companies.every(company => company.facilities.length === 1));
+});
+
+test('the world calendar follows Gregorian month and leap-year boundaries and rejects invalid dates atomically', () => {
+  const {nextGregorianDate,advanceDay}=simulation;
+  assert.equal(nextGregorianDate('1500-02-28'),'1500-03-01');
+  assert.equal(nextGregorianDate('1500-12-31'),'1501-01-01');
+  assert.equal(nextGregorianDate('1600-02-28'),'1600-02-29');
+  assert.equal(nextGregorianDate('1600-02-29'),'1600-03-01');
+  assert.equal(nextGregorianDate('1900-02-28'),'1900-03-01');
+  assert.equal(nextGregorianDate('2000-02-28'),'2000-02-29');
+  assert.equal(nextGregorianDate('2100-02-28'),'2100-03-01');
+  assert.equal(nextGregorianDate('1500-02-30'),null);
+  assert.equal(nextGregorianDate('1500-13-01'),null);
+  assert.equal(nextGregorianDate('1500-2-01'),null);
+  assert.equal(nextGregorianDate('9999-12-31'),null);
+
+  const game=baseWorld({worldDate:'1500-02-30'});
+  const before=structuredClone(game);
+  const result=advanceDay(game);
+  assert.equal(result.ok,false);
+  assert.match(result.error,/Gregorian range/);
+  assert.deepEqual(game,before,'invalid dates must not partially advance or mutate the world');
 });
 
 test('a host day runs production, population demand and market settlement', () => {
@@ -254,4 +279,60 @@ test('bilateral trade contracts respect buyer funds and destination storage', ()
   assert.equal(game.companies[1].cashBalances['currency-b'],0);
   assert.equal(game.companies[0].cashBalances['currency-b'],8);
   assert.ok(game.companyFinancialTransactions.some(item => item.type === 'TradePurchase'));
+});
+
+
+test('the authoritative daily cycle starts and advances only the configured epidemic timeline',()=>{
+  const epidemiology=require('../epidemiology.js');
+  const previous=globalThis.NewWorldEpidemiology;
+  globalThis.NewWorldEpidemiology=epidemiology;
+  try {
+    const game=baseWorld({
+      territories:[{
+        stateId:'state-a',currencyId:'currency-a',index:0,name:'Test State',
+        treasury:1200,dailyBalanceRemainder:0,population:1000,prosperity:60,
+        infrastructure:1,ownerPlayerId:'player-a'
+      }],
+      populationGroups:[
+        {id:'origin',stateId:'state-a',name:'Origin',locationId:'province-a',
+          population:500,ageCohorts:[{ageYears:20,population:500}]},
+        {id:'destination',stateId:'state-a',name:'Destination',locationId:'province-b',
+          population:500,ageCohorts:[{ageYears:30,population:500}]}
+      ],
+      epidemicDefinitions:[{
+        id:'configured-disease',stateId:'state-a',name:'Configured disease',
+        description:'Scenario-specified transmission profile.',
+        incubationDays:1,infectiousDays:2,transmissionBasisPoints:1000,
+        dailyMortalityPerThousand:0,
+        contactLinks:[{
+          originGroupId:'origin',destinationGroupId:'destination',
+          dailyContactsPerThousand:10000
+        }]
+      }],
+      epidemicStarts:[{
+        id:'scenario-outbreak',definitionId:'configured-disease',
+        sourceGroupId:'origin',startsOn:'1500-01-02',initialInfectious:10
+      }],
+      epidemicOutbreaks:[],epidemicGroupStates:[],epidemicHistory:[]
+    });
+
+    const first=simulation.advanceDay(game);
+    assert.equal(first.ok,true,first.error);
+    assert.equal(game.worldDate,'1500-01-02');
+    assert.equal(game.epidemicOutbreaks.length,1);
+    assert.equal(game.epidemicOutbreaks[0].status,'active');
+    assert.equal(game.epidemicOutbreaks[0].totalInfections,10,
+      'the configured outbreak begins on the authoritative world date but does not consume a simulation day immediately');
+
+    const second=simulation.advanceDay(game);
+    assert.equal(second.ok,true,second.error);
+    assert.equal(game.worldDate,'1500-01-03');
+    assert.equal(game.epidemicOutbreaks[0].totalExposures,10);
+    assert.equal(game.epidemicGroupStates.find(item=>item.groupId==='destination')
+      .exposedCohorts.reduce((sum,item)=>sum+item.count,0),10);
+    assert.equal(game.worldVersion,3);
+  } finally {
+    if(previous===undefined) delete globalThis.NewWorldEpidemiology;
+    else globalThis.NewWorldEpidemiology=previous;
+  }
 });
