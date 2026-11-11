@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261109-colored-sprite-ui-v1">
+  <link rel="stylesheet" href="./game.css?v=20261111-live-sidebar-v16">
 </head>
 <body>
   <header class="topbar">
@@ -31,18 +31,30 @@
 
   <main class="game-shell" aria-label="New World strategy interface">
     <nav class="nav-rail" aria-label="World navigation">
-      <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>WORLD</span></button>
-      <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_farmhouse_barn" aria-hidden="true"></canvas><span>LAND</span></button>
-      <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="houses/1x1_house1" aria-hidden="true"></canvas><span>BUILD</span></button>
-      <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_2_store" aria-hidden="true"></canvas><span>ECONOMY</span></button>
-      <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>GOVERNMENT</span></button>
-      <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><img class="nav-icon nav-icon-image" src="./assets/kenney-medieval-rts/medievalUnit_01.png" alt="" aria-hidden="true"><span>MILITARY</span></button>
-      <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_13_bookstore" aria-hidden="true"></canvas><span>RESEARCH</span></button>
-      <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_market_stall" aria-hidden="true"></canvas><span>DIPLOMACY</span></button>
-      <button class="tab" data-view="civic" aria-controls="civic-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="stores/1x1_commercial_57_clinic" aria-hidden="true"></canvas><span>SOCIETY / STATE</span></button>
-      <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_round_cottage" aria-hidden="true"></canvas><span>PLAYERS</span></button>
-      <div class="nav-rail-foot">NA</div>
-    </nav>
+  <div class="nav-group">
+    <span class="nav-section-label">OVERVIEW</span>
+    <button class="tab active" data-view="world" aria-controls="world-view" aria-selected="true"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>WORLD</span></button>
+    <button class="tab" data-view="territory" aria-controls="territory-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_farmhouse_barn" aria-hidden="true"></canvas><span>LAND</span></button>
+    <button class="tab" data-view="city" aria-controls="city-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="houses/1x1_house1" aria-hidden="true"></canvas><span>CITY</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">GOVERNMENT</span>
+    <button class="tab" data-view="ledger" aria-controls="ledger-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_2_store" aria-hidden="true"></canvas><span>ECONOMY</span></button>
+    <button class="tab" data-view="government" aria-controls="government-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_village_hall" aria-hidden="true"></canvas><span>GOVERNMENT</span></button>
+    <button class="tab" data-view="military" aria-controls="military-view" aria-selected="false"><img class="nav-icon nav-icon-image" src="./assets/kenney-medieval-rts/military-unit.png" alt="" aria-hidden="true"><span>MILITARY</span></button>
+    <button class="tab" data-view="technology" aria-controls="technology-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="restaurants/1x1_commercial_13_bookstore" aria-hidden="true"></canvas><span>RESEARCH</span></button>
+    <button class="tab" data-view="diplomacy" aria-controls="diplomacy-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_market_stall" aria-hidden="true"></canvas><span>DIPLOMACY</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">PUBLIC SYSTEMS</span>
+    <button class="tab" data-view="civic" aria-controls="civic-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="stores/1x1_commercial_57_clinic" aria-hidden="true"></canvas><span>SOCIETY / STATE</span></button>
+  </div>
+  <div class="nav-group">
+    <span class="nav-section-label">WORLD SYSTEMS</span>
+    <button class="tab" data-view="multiplayer" aria-controls="multiplayer-view" aria-selected="false"><canvas class="nav-icon" width="72" height="72" data-sprite-key="village/1x1_round_cottage" aria-hidden="true"></canvas><span>PLAYERS</span></button>
+  </div>
+  <div class="nav-rail-foot"><strong>NA</strong><span>NORTH ASSEMBLY</span><small>NEW WORLD / 001</small></div>
+</nav>
 
     <div class="play-area">
       <section class="map-frame" aria-label="Beleland strategic map">
