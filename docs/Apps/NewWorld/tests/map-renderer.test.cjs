@@ -39,6 +39,43 @@ function createRenderer() {
   return new Renderer({ canvas, viewport });
 }
 
+test('starter city streets, zones and utilities are placed on buildable land',()=>{
+  const renderer=createRenderer();
+  renderer.setRegion(0,'Founders Reach');
+  const center=144+520*1024+490;
+  const city=require('../city-builder.js').createStarterCity(center);
+  const plots=[
+    ...Object.keys(city.roads).map(Number),
+    ...Object.keys(city.zones).map(Number),
+    ...Object.keys(city.facilities).map(Number)
+  ];
+  for(const plot of plots) {
+    const cell=renderer.getPlotCell(plot);
+    assert.ok(cell,'plot '+plot+' must resolve to a map cell');
+    const terrain=renderer.terrainAt(cell.row,cell.col);
+    assert.ok(terrain && !['water','shore','wetland','mountain'].includes(terrain.type),
+      'starter plot '+plot+' must have buildable land; found '+terrain?.type);
+  }
+});
+
+test('city renderer retains detailed mode at city scale and accepts a zoning overlay',()=>{
+  const renderer=createRenderer();
+  renderer.failed=true;
+  renderer.setCityData({
+    zones:{'144': 'residential'},
+    roads:{'145':true},
+    powerLines:{'145':true},
+    waterPipes:{'145':true},
+    facilities:{}
+  });
+  assert.equal(renderer.active,true);
+  assert.equal(renderer.cityData.zones[144],'residential');
+  renderer.setCamera(.85);
+  assert.equal(renderer.active,true);
+  renderer.setCityData(null);
+  assert.equal(renderer.active,false);
+});
+
 test('open territory contains 1,048,576 procedurally generated land cells', () => {
   const renderer = createRenderer();
   assert.equal(renderer.worldSize, 1024);

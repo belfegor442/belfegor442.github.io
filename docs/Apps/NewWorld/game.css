@@ -808,3 +808,50 @@ a{color:inherit}
 #play-solo{justify-content:center;min-height:42px;margin-top:7px}
 #network-service{margin-top:17px;padding-top:11px;border-top:1px solid var(--line-soft)}
 #network-service[hidden]{display:none!important}
+
+
+/* TheoTown-style city simulation: zoning, streets and utility networks. */
+.city-builder-panel{margin:0 0 14px;padding:12px;border:1px solid var(--line);background:linear-gradient(180deg,#232f2e,#1c2828);box-shadow:inset 0 1px rgba(255,255,255,.035)}
+.city-builder-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;color:var(--gold);font:800 8px var(--mono);letter-spacing:.65px}
+.city-builder-heading small{color:var(--muted);font-size:6px;letter-spacing:.4px}
+.city-tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.city-tool-grid button{min-width:0;min-height:47px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 3px;border:1px solid #465650;background:#263634;color:#c6d0c1;cursor:pointer}
+.city-tool-grid button b{font:800 14px/1 var(--mono);color:#e1cf9e}
+.city-tool-grid button span{font:700 6px/1.2 var(--mono);letter-spacing:.2px;text-align:center}
+.city-tool-grid button:hover{border-color:#a99769;background:#33433c}
+.city-tool-grid button.active,.city-tool-grid button[aria-pressed="true"]{border-color:#d8c18d;background:#3c4c3c;box-shadow:inset 0 0 0 1px rgba(216,193,141,.18)}
+.city-builder-status{min-height:28px;margin:8px 0 10px;padding:7px 8px;border-left:2px solid var(--gold);background:#192524;color:#c3cbbd;font:7px/1.5 var(--mono)}
+.city-demand-panel,.city-tax-panel{padding:9px 0;border-top:1px solid var(--line-soft)}
+.city-subheading{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;color:var(--gold);font:800 7px var(--mono);letter-spacing:.6px}
+.city-subheading small{color:var(--muted);font-size:6px}
+.city-demand-row{display:grid;grid-template-columns:92px 30px minmax(0,1fr);align-items:center;gap:6px;margin:7px 0;color:var(--muted);font:700 6px var(--mono)}
+.city-demand-row strong{color:var(--ink);text-align:right;font:700 7px var(--mono)}
+.city-demand-track{height:5px;overflow:hidden;background:#111b1a;border:1px solid #3a4a43}
+.city-demand-track i{display:block;width:0;height:100%;background:#93ae75;transition:width .2s ease}
+.city-utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:9px 0;border-top:1px solid var(--line-soft)}
+.city-utility-grid>div{display:flex;flex-direction:column;gap:3px;min-width:0;padding:7px;background:#192524;border:1px solid #384740}
+.city-utility-grid small{color:var(--muted);font:700 6px var(--mono)}
+.city-utility-grid strong{color:var(--ink);font:800 10px var(--mono)}
+.city-utility-grid span{color:#9ba99a;font:6px/1.4 var(--mono)}
+.city-tax-panel label{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 8px;margin:8px 0;color:var(--muted);font:700 6px var(--mono)}
+.city-tax-panel output{color:var(--ink);font:700 7px var(--mono)}
+.city-tax-panel input{grid-column:1/-1;width:100%;accent-color:#a6bd7c}
+.city-time-panel{display:flex;justify-content:space-between;gap:8px;padding-top:9px;border-top:1px solid var(--line-soft)}
+.city-time-panel button,.city-time-panel [data-city-speed]{min-width:38px;padding:7px 9px;border:1px solid #54665a;background:#293a35;color:#dce1d0;font:700 7px var(--mono);cursor:pointer}
+.city-time-panel button[aria-pressed="true"]{border-color:#d8c18d;background:#45543e;color:#fff1c7}
+.city-time-panel>div{display:flex;gap:4px}
+.city-catalog-button{width:100%;margin-top:9px}
+.city-builder-panel[hidden]{display:none!important}
+.solo-city-mode .map-modes{display:none!important}
+.solo-city-mode .map-heading .map-title b{letter-spacing:1.4px}
+.solo-city-mode .map-foot-hint{display:none}
+.solo-city-mode .map-zoom-level{color:#cbb98c}
+.solo-city-mode .nav-group[hidden],.solo-city-mode .nav-rail .tab[hidden]{display:none!important}
+@media(max-width:740px){
+ .city-builder-panel{padding:9px}
+ .city-tool-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .city-tool-grid button{min-height:43px}
+ .city-tool-grid button span{font-size:5px}
+ .city-demand-row{grid-template-columns:82px 27px minmax(0,1fr)}
+ .city-utility-grid strong{font-size:9px}
+}

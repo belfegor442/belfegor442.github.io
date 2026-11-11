@@ -4,7 +4,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const simulation = require('../simulation.js');
 const strategy = require('../strategy.js');
-global.window = {NewWorldSimulation:simulation,NewWorldStrategy:strategy};
+const cityBuilder = require('../city-builder.js');
+global.window = {
+  NewWorldSimulation:simulation,NewWorldStrategy:strategy,
+  NewWorldCityBuilder:cityBuilder
+};
 
 const multiplayer = require('../multiplayer.js');
 
@@ -77,11 +81,38 @@ test('solo runtime saves and restores locally without MQTT or a relay', async ()
     assert.equal(created.session.isHost,true);
     assert.match(created.session.inviteCode,/^SOLO-/);
     assert.equal(created.game.status,'running');
+    assert.equal(created.game.territories[0].treasury,25000);
+    assert.equal(created.game.territories[0].city.centerPlot,144+520*1024+490);
+    assert.equal(Object.keys(created.game.territories[0].city.zones).length,8);
+    assert.equal(Object.keys(created.game.territories[0].city.roads).length,29);
     assert.equal(window.NewWorldMultiplayer.isHost(),true);
     assert.equal(window.NewWorldMultiplayer.isConnected(),true);
     assert.ok(snapshots.some(game=>game.status==='running'));
     assert.ok(statuses.includes('ready'));
     assert.ok(sessions.some(session=>session.mode==='solo'));
+
+    const cityPlot=cityBuilder.plotForCell(520,512);
+    const roadResult=window.NewWorldMultiplayer.cityAction({
+      type:'paint',tool:'road',plotIndex:cityPlot
+    });
+    assert.equal(roadResult.ok,true,roadResult.error);
+    assert.equal(roadResult.game.territories[0].city.roads[cityPlot],true);
+    assert.equal(roadResult.game.territories[0].treasury,24968);
+    const rejectedLand=window.NewWorldMultiplayer.cityAction({
+      type:'paint',tool:'industrial',plotIndex:cityBuilder.plotForCell(519,490)
+    },{isLand:()=>false});
+    assert.equal(rejectedLand.ok,false);
+    assert.match(rejectedLand.error,/dry land/i);
+    const speedResult=window.NewWorldMultiplayer.cityAction({type:'speed',value:4});
+    assert.equal(speedResult.ok,true,speedResult.error);
+    assert.equal(speedResult.game.territories[0].treasury,24968);
+    assert.equal(speedResult.game.territories[0].city.speed,4);
+    const pauseResult=window.NewWorldMultiplayer.cityAction({type:'pause'});
+    assert.equal(pauseResult.ok,true,pauseResult.error);
+    assert.equal(pauseResult.game.status,'paused');
+    const resumeResult=window.NewWorldMultiplayer.cityAction({type:'pause'});
+    assert.equal(resumeResult.ok,true,resumeResult.error);
+    assert.equal(resumeResult.game.status,'running');
 
     const storageKey='new-world-host-state-v2:'+created.session.inviteCode;
     const saved=JSON.parse(storage.get(storageKey));

@@ -13,6 +13,7 @@
   const NS = 'north-assembly/new-world/v1/';
   const HOST_SAVE = 'new-world-host-state-v2:';
   const DAY_LENGTH_MS = 5 * 60 * 1000;
+  const SOLO_DAY_LENGTH_MS = 60 * 1000;
   const DAYS_PER_FINANCIAL_PERIOD = 30;
   const MAX_TREASURY = 2147483647;
   const MAX_PLAYERS = 100;
@@ -445,7 +446,7 @@
       stateId:territory.stateId,index:territory.index,name:territory.name,treasury:territory.treasury,
       ...finance(game,territory),population:territory.population,prosperity:territory.prosperity,
       infrastructure:territory.infrastructure,ownerPlayerId:territory.ownerPlayerId,
-      currencyId:territory.currencyId
+      currencyId:territory.currencyId,city:clone(territory.city || null)
     }));
     const out = {
       id:game.id,started:game.started,day:game.day,hostPlayerId:game.hostPlayerId,paused:game.paused,
@@ -732,6 +733,13 @@
       return true;
     }
 
+    if (runtime.mode === 'solo' && game.status === 'running') {
+      const cityResult=window.NewWorldCityBuilder?.advanceDay(game);
+      if(!cityResult?.ok) {
+        pushActivity(game,'City development was skipped: '+(cityResult?.error || 'The city simulation engine is unavailable.'));
+      }
+    }
+
     persistHost();
     publishSnapshot();
     return true;
@@ -750,13 +758,16 @@
     }
     const now = Date.now();
     const previous = Number(runtime.lastPulseAt) || now;
+    const dayLength = runtime.mode === 'solo'
+      ? SOLO_DAY_LENGTH_MS / Math.max(1,Math.min(4,Number(runtime.clockSpeed)||1))
+      : DAY_LENGTH_MS;
     runtime.clockAccumulatorMs = (runtime.clockAccumulatorMs || 0) +
-      Math.max(0,Math.min(now-previous,DAY_LENGTH_MS));
+      Math.max(0,Math.min(now-previous,dayLength*24));
     runtime.lastPulseAt = now;
     let advanced = 0;
-    while (runtime.clockAccumulatorMs >= DAY_LENGTH_MS && advanced < 24 &&
+    while (runtime.clockAccumulatorMs >= dayLength && advanced < 24 &&
            runtime.game.status === 'running') {
-      runtime.clockAccumulatorMs -= DAY_LENGTH_MS;
+      runtime.clockAccumulatorMs -= dayLength;
       if (!advanceHostDay()) break;
       advanced++;
     }
@@ -1192,6 +1203,10 @@
   function setSoloRuntime(game,session,handlers = {}) {
     migrateStrategyScenario(game);
     migrateCivicAndJudicialSystems(game);
+    if(!window.NewWorldCityBuilder?.ensureCity)
+      throw new Error('The city-builder simulation engine failed to load.');
+    const citySetup=window.NewWorldCityBuilder.ensureCity(game);
+    if(!citySetup) throw new Error('The local city could not be restored.');
     const localLink = {
       connected:true,
       publish:() => true,
@@ -1207,7 +1222,8 @@
       onPlayerJoined:handlers.onPlayerJoined || (()=>{}),
       onPlayerPresence:handlers.onPlayerPresence || (()=>{}),
       onPlayerCount:handlers.onPlayerCount || (()=>{}),
-      lastPulseAt:Date.now(),clockAccumulatorMs:0,hasConnected:true,link:localLink
+      lastPulseAt:Date.now(),clockAccumulatorMs:0,clockSpeed:citySetup.city.speed||1,
+      hasConnected:true,link:localLink
     };
     runtime.game.players.forEach(player => { player.connected = player.id === runtime.session.playerId; });
     return runtime;
@@ -1220,6 +1236,12 @@
     const previousRuntime = runtime;
     previousRuntime?.link?.close(false);
     const created = newWorld(normalized);
+    if(!window.NewWorldCityBuilder?.createStarterCity)
+      return Promise.reject(new Error('The TheoTown-style city simulation engine is unavailable.'));
+    const foundingTerritory=created.game.territories[0];
+    const centerPlot=144+520*1024+490;
+    foundingTerritory.city=window.NewWorldCityBuilder.createStarterCity(centerPlot);
+    foundingTerritory.treasury=25000;
     const soloId = 'SOLO-' + created.game.id.replace(/-/g,'').toUpperCase();
     const session = {
       ...created.session,mode:'solo',playerName:normalized,
@@ -1420,6 +1442,31 @@
     }));
   }
 
+  function cityAction(action,options={}) {
+    if(!runtime || runtime.role!=='host' || runtime.mode!=='solo')
+      return {ok:false,error:'City-builder tools are available only in a solo city campaign.'};
+    if(!window.NewWorldCityBuilder?.applyAction)
+      return {ok:false,error:'The city-builder rules engine is unavailable.'};
+    if(['paint','tax'].includes(action?.type) && runtime.game.status!=='running')
+      return {ok:false,error:'Resume the city simulation before changing the city.'};
+    const result=window.NewWorldCityBuilder.applyAction(
+      runtime.game,runtime.session.playerId,action,options);
+    if(!result?.ok) return result || {ok:false,error:'The city action was rejected.'};
+    if(action.type==='speed') runtime.clockSpeed=Number(action.value)||1;
+    if(action.type==='pause') {
+      runtime.clockAccumulatorMs=0;
+      runtime.lastPulseAt=Date.now();
+    }
+    if(action.type==='speed') {
+      runtime.clockAccumulatorMs=0;
+      runtime.lastPulseAt=Date.now();
+    }
+    runtime.game.worldVersion=(Number(runtime.game.worldVersion)||0)+1;
+    persistHost();
+    publishSnapshot();
+    return {ok:true,game:snapshot(runtime.game),city:result.city||runtime.game.territories[0].city};
+  }
+
   function sendOrder(order) {
     if (!runtime) return false;
     if (runtime.role === 'host') {
@@ -1526,7 +1573,7 @@
   hostPulseTimer.unref?.();
 
   window.NewWorldMultiplayer = {
-    createWorld,createSoloWorld,joinWorld,restoreSession,sendOrder,admin,disconnect,testRelay,
+    createWorld,createSoloWorld,joinWorld,restoreSession,sendOrder,cityAction,admin,disconnect,testRelay,
     isHost:() => runtime?.role === 'host',
     isConnected:() => !!runtime?.link?.connected,
     currentSession:() => runtime?.session || null,

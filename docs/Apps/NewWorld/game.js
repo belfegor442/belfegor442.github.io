@@ -187,6 +187,7 @@
   let hoveredState = null;
   let selectedProvinceId = null;
   let activeMapMode = 'political';
+  let activeCityTool = 'select';
 
   function toast(message) {
     const element = $('toast');
@@ -315,6 +316,7 @@
   function update() {
     if (state.selected !== null) selectState(state.selected, false, false);
     $('first-steps').hidden=Boolean(onlineGame?.started);
+    renderCityBuilder();
     renderPanelSafely('Financial overview',renderFinancialSummary,'state-currency');
     renderPanelSafely('Campaign objectives',renderObjectives,'state-description');
     renderPanelSafely('World chronicle',renderWorldEvents,'state-description');
@@ -325,11 +327,16 @@
       .map(item => '<div class="activity-item"><small>WORLD RECORD</small>' + escapeHtml(item) + '</div>').join('');
     $('world-mode').textContent = onlineGame?.status === 'completed'
       ? 'CAMPAIGN COMPLETED · VICTORY'
-      : isOnline() ? (onlineSession?.mode === 'solo' ? 'SOLO CAMPAIGN' : 'PRIVATE MULTIPLAYER') : 'NO ACTIVE CAMPAIGN';
+      : isOnline() ? (onlineSession?.mode === 'solo' ? 'SOLO CITY BUILDER' : 'PRIVATE MULTIPLAYER') : 'NO ACTIVE CAMPAIGN';
     $('legend-owned').textContent = onlineGame ? 'YOUR GOVERNMENT' : 'GOVERNMENT MEMBERSHIP';
     $('legend-other').textContent = onlineGame ? 'OTHER STATES' : 'WORLD DATA UNAVAILABLE';
     $('save-btn').hidden = true;
     $('next-month').hidden = true;
+    const localDaySpeed=Number(onlineGame?.territories?.find(item=>item.index===state.selected)?.city?.speed)||1;
+    const localDayMilliseconds=60000/localDaySpeed;
+    const localDayDuration=localDayMilliseconds<60000
+      ? Math.round(localDayMilliseconds/1000)+' SEC'
+      : (localDayMilliseconds/60000)+' MIN';
     $('world-time').hidden = !isOnline();
     $('world-time').textContent = isOnline()
       ? onlineGame?.status === 'completed'
@@ -337,7 +344,7 @@
         : onlineGame?.started
           ? onlineGame.paused
             ? (onlineSession?.mode === 'solo' ? 'PAUSED · LOCAL CLOCK' : 'PAUSED · HOST CLOCK')
-            : (onlineSession?.mode === 'solo' ? '1 DAY / 5 MIN · LOCAL CLOCK' : '1 DAY / 5 MIN · HOST CLOCK')
+            : (onlineSession?.mode === 'solo' ? '1 DAY / '+localDayDuration+' · LOCAL CLOCK' : '1 DAY / 5 MIN · HOST CLOCK')
           : 'LOBBY · CLOCK PAUSED'
       : '';
     renderPanelSafely('Settlement',renderCity,'settlement-status');
@@ -2011,6 +2018,14 @@
   }
 
   function prepareBuilderMap() {
+    if(onlineSession?.mode==='solo') {
+      zoom=.85;
+      pan={x:0,y:0};
+      $('map-stage').style.transform='translate3d(0,0,0) scale(1)';
+      mapDetailRenderer?.setCamera(zoom,true);
+      mapDetailRenderer?.centerOnPlot(selectedPlot);
+      return;
+    }
     if (!mapDetailRenderer?.active) {
       zoom = 0.05;
       pan = {x:0,y:0};
@@ -2029,7 +2044,13 @@
     renderFinancialSummary();
     renderCity();
     renderOptions();
-    buildMenu?.open();
+    if(onlineSession?.mode==='solo') {
+      selectCityTool('select');
+      buildMenu?.close();
+      renderCityBuilder();
+    } else {
+      buildMenu?.open();
+    }
   }
 
   function renderMapArmyMarkers(svgDocument) {
@@ -2238,6 +2259,18 @@
           buildMenu.placeAt(index);
           return;
         }
+        if(onlineSession?.mode==='solo' && activeCityTool!=='select') {
+          const cell=mapDetailRenderer?.getPlotCell(index);
+          const terrain=cell&&mapDetailRenderer?.terrainAt(cell.row,cell.col);
+          if(!terrain || ['water','shore','wetland','mountain'].includes(terrain.type)) {
+            $('city-builder-status').textContent='THIS TILE IS NOT BUILDABLE. CHOOSE FIRM, DRY LAND.';
+            return;
+          }
+          const label=activeCityTool.replace(/([A-Z])/g,' $1').toUpperCase();
+          performCityAction({type:'paint',tool:activeCityTool,plotIndex:index},
+            label+' PLACED ON THE MAP.');
+          return;
+        }
         selectedPlot = index;
         renderCity();
         buildMenu?.updateContext();
@@ -2283,6 +2316,8 @@
         if (!onlineGame?.started || onlineGame.status !== 'running' || !territory || !membership ||
             membership.permissionSetId === 'government-observer' ||
             !window.NewWorldMultiplayer?.isConnected() || state.buildings[index] ||
+            territory.city?.zones?.[index] || territory.city?.roads?.[index] ||
+            territory.city?.facilities?.[index] ||
             state.treasury < Number(item?.cost || 0)) return false;
         const cell = mapDetailRenderer?.getPlotCell(index);
         if (!cell) return false;
@@ -2924,6 +2959,145 @@
         : 'Growth is constrained. Expand housing, food and water capacity to attract residents.';
   }
 
+  function performCityAction(action,successMessage='CITY UPDATE SAVED.') {
+    if(onlineSession?.mode!=='solo' || !window.NewWorldMultiplayer?.cityAction) {
+      showMessage('CITY-BUILDER TOOLS ARE AVAILABLE IN SOLO MODE.',true);
+      return false;
+    }
+    const isLand=Number.isInteger(action?.plotIndex)
+      ? index=>{
+        const cell=mapDetailRenderer?.getPlotCell(index);
+        const terrain=cell&&mapDetailRenderer?.terrainAt(cell.row,cell.col);
+        return Boolean(terrain&&!['water','shore','wetland','mountain'].includes(terrain.type));
+      }
+      : undefined;
+    const result=window.NewWorldMultiplayer.cityAction(action,isLand?{isLand}:{});
+    if(!result?.ok) {
+      const reason=result?.error || 'The city action was rejected.';
+      $('city-builder-status').textContent=reason.toUpperCase();
+      showMessage(reason,true);
+      return false;
+    }
+    if(result.game) applySnapshot(result.game);
+    $('city-builder-status').textContent=successMessage;
+    return true;
+  }
+
+  function selectCityTool(tool) {
+    const allowed=new Set([
+      'select','road','residential','commercial','industrial',
+      'powerLine','waterPipe','powerPlant','waterPump','bulldoze'
+    ]);
+    if(!allowed.has(tool)) return;
+    activeCityTool=tool;
+    document.querySelectorAll('[data-city-tool]').forEach(button=>{
+      const active=button.dataset.cityTool===tool;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    const cursor=tool==='select'?'grab':tool==='bulldoze'?'not-allowed':'crosshair';
+    if(mapDetailRenderer?.canvas) mapDetailRenderer.canvas.style.cursor=cursor;
+    const descriptions={
+      select:'CLICK A TILE TO INSPECT IT. DRAG TO MOVE AROUND THE CITY.',
+      road:'CLICK DRY LAND TO BUILD A STREET · ¤32 PER TILE.',
+      residential:'PAINT RESIDENTIAL ZONES · ¤8 PER TILE. BUILDINGS GROW WHEN CONNECTED.',
+      commercial:'PAINT COMMERCIAL ZONES · ¤8 PER TILE. KEEP THEM NEAR ROADS.',
+      industrial:'PAINT INDUSTRIAL ZONES · ¤8 PER TILE. CONNECT ROADS, POWER AND WATER.',
+      powerLine:'EXTEND THE ELECTRICITY NETWORK · ¤7 PER TILE.',
+      waterPipe:'EXTEND THE WATER NETWORK · ¤7 PER TILE.',
+      powerPlant:'BUILD A POWER STATION · ¤2,600. IT MUST TOUCH A ROAD.',
+      waterPump:'BUILD WATERWORKS · ¤1,800. IT MUST TOUCH A ROAD.',
+      bulldoze:'REMOVE ZONES, ROADS, UTILITIES OR BUILDINGS FROM A TILE.'
+    };
+    $('city-builder-status').textContent=descriptions[tool];
+  }
+
+  function renderCityBuilder() {
+    const panel=$('city-builder-panel');
+    if(!panel) return;
+    const solo=onlineSession?.mode==='solo';
+    panel.hidden=!solo;
+    document.body.classList.toggle('solo-city-mode',solo);
+    const groups=[...document.querySelectorAll('.nav-group')];
+    const visibleTabs=new Set(['city','ledger','civic','multiplayer']);
+    document.querySelectorAll('.nav-rail .tab').forEach(tab=>{
+      tab.hidden=solo&&!visibleTabs.has(tab.dataset.view);
+    });
+    groups.forEach(group=>{
+      group.hidden=solo&&!group.querySelector('.tab:not([hidden])');
+    });
+    const title=document.querySelector('.map-title b');
+    const subtitle=document.querySelector('.map-title small');
+    const campaignOverline=document.querySelector('.campaign-overline');
+    const campaignTitle=document.querySelector('.campaign-identity strong');
+    const campaignSubline=document.querySelector('.campaign-subline');
+    if(title) title.textContent=solo?'YOUR CITY':'BELELAND';
+    if(subtitle) subtitle.textContent=solo?'ISOMETRIC CITY VIEW':'STRATEGIC MAP';
+    if(campaignOverline) campaignOverline.textContent=solo?'LOCAL CITY / 001':'BELELAND CAMPAIGN / 001';
+    if(campaignTitle) campaignTitle.textContent=solo?'BELELAND':'THE AGE OF STATES';
+    if(campaignSubline) campaignSubline.textContent=solo
+      ? 'A city shaped by streets, services and growth'
+      : 'A world shaped by borders, cities and decisions';
+    $('map-layer-label').textContent=solo?'CITY DEVELOPMENT':'POLITICAL';
+    $('legend-owned').textContent=solo?'YOUR CITY':'YOUR GOVERNMENT';
+    $('legend-other').textContent=solo?'ZONES / NETWORKS':'OTHER STATES';
+    if(!solo) return;
+
+    const territory=onlineGame?.territories.find(item=>item.index===state.selected);
+    const city=territory?.city;
+    if(!city) {
+      $('city-builder-status').textContent='CITY DATA IS LOADING…';
+      return;
+    }
+    const demand=city.demand||{};
+    const metrics=city.metrics||{};
+    const setDemand=(key,id,labelId)=>{
+      const value=Math.round(clamp(Number(demand[key])||0,0,100));
+      $(labelId).textContent=value+'%';
+      $(id).style.width=value+'%';
+    };
+    setDemand('residential','city-demand-res','city-demand-res-label');
+    setDemand('commercial','city-demand-com','city-demand-com-label');
+    setDemand('industrial','city-demand-ind','city-demand-ind-label');
+    const powerSupply=Number(metrics.powerSupply)||0;
+    const powerDemand=Number(metrics.powerDemand)||0;
+    const waterSupply=Number(metrics.waterSupply)||0;
+    const waterDemand=Number(metrics.waterDemand)||0;
+    const zoneCount=Object.keys(city.zones||{}).length;
+    const powerConnected=Number(metrics.poweredZones)||0;
+    const waterConnected=Number(metrics.wateredZones)||0;
+    $('city-power-status').textContent=powerSupply<powerDemand?'SHORTAGE':powerConnected<zoneCount?'NETWORK INCOMPLETE':'SUPPLIED';
+    $('city-power-detail').textContent=powerSupply.toLocaleString('en-US')+' / '+powerDemand.toLocaleString('en-US')+' kW · '+powerConnected+'/'+zoneCount+' zones';
+    $('city-water-status').textContent=waterSupply<waterDemand?'SHORTAGE':waterConnected<zoneCount?'NETWORK INCOMPLETE':'SUPPLIED';
+    $('city-water-detail').textContent=waterSupply.toLocaleString('en-US')+' / '+waterDemand.toLocaleString('en-US')+' units · '+waterConnected+'/'+zoneCount+' zones';
+    $('city-road-status').textContent=(metrics.roadConnectedZones||0)+' / '+zoneCount;
+    $('city-road-detail').textContent='ZONED TILES WITH STREET ACCESS';
+    $('city-developed-count').textContent=Number(city.createdBuildings||0).toLocaleString('en-US');
+    $('city-zoned-count').textContent=Object.keys(city.zones||{}).length+' ZONED TILES';
+    const dailyNet=Number(metrics.netLastDay)||0;
+    $('city-daily-net').textContent=(dailyNet>=0?'+':'−')+money(Math.abs(dailyNet));
+    $('city-daily-tax').textContent='TAX '+money(metrics.taxRevenueLastDay||0)+' · UPKEEP '+money(metrics.maintenanceLastDay||0);
+    const taxFields=[
+      ['residential','city-tax-res','city-tax-res-label'],
+      ['commercial','city-tax-com','city-tax-com-label'],
+      ['industrial','city-tax-ind','city-tax-ind-label']
+    ];
+    for(const [sector,inputId,outputId] of taxFields) {
+      const input=$(inputId);
+      const value=Number(city.taxRates?.[sector]??input.value);
+      if(document.activeElement!==input) input.value=String(value);
+      $(outputId).textContent=Number(value).toFixed(1).replace('.0','')+'%';
+    }
+    $('city-pause').textContent=onlineGame.status==='paused'?'RESUME SIMULATION':'PAUSE SIMULATION';
+    document.querySelectorAll('[data-city-speed]').forEach(button=>{
+      button.setAttribute('aria-pressed',String(Number(button.dataset.citySpeed)===Number(city.speed||1)));
+    });
+    if(!panel.dataset.toolInitialized) {
+      panel.dataset.toolInitialized='true';
+      selectCityTool('select');
+    }
+  }
+
   function renderCity() {
     const territory = onlineGame?.territories.find(item => item.index === state.selected);
     $('city-title').textContent = territory?.name || state.states[state.selected]?.name || 'Territory settlement';
@@ -2933,9 +3107,11 @@
       : 'NO PLOT SELECTED';
     $('build-budget-side').textContent = onlineGame ? money(state.treasury) : '—';
     renderSettlement();
+    mapDetailRenderer?.setCityData(territory?.city || null);
     mapDetailRenderer?.setBuildings(state.buildings);
     mapDetailRenderer?.setSelectedPlot(selectedPlot);
     buildMenu?.updateContext();
+    renderCityBuilder();
   }
 
   function renderOptions() {
@@ -3071,7 +3247,8 @@
       const result=await window.NewWorldMultiplayer.createSoloWorld(name,multiplayerHandlers());
       storeSession({...result.session,playerName:name,mode:'solo'});
       applySnapshot(result.game);
-      $('server-status').textContent='SOLO MODE · SAVED IN THIS BROWSER';
+      enterCityMap(0);
+      $('server-status').textContent='SOLO CITY · SAVED IN THIS BROWSER';
       $('server-status').classList.remove('error');
       showMessage('Your solo campaign has started. Progress is saved automatically in this browser.');
       toast('SOLO CAMPAIGN STARTED');
@@ -3166,8 +3343,9 @@
       if (result.session) storeSession({...result.session,
         playerName:$('player-name').value.trim() || result.session.playerName});
       if (result.game) applySnapshot(result.game);
+      if(onlineSession.mode==='solo') enterCityMap(0);
       showMessage(onlineSession.mode === 'solo'
-        ? 'Your local campaign has been restored.'
+        ? 'Your local city has been restored.'
         : 'Reconnected. Your current world state has been restored.');
     } catch (error) {
       $('server-status').textContent = 'Reconnect required.';
@@ -3229,6 +3407,8 @@
       : (governmentIndex ?? player.countryIndex ?? 0);
     const selectedFinance = game.territories.find(territory => territory.index === selectedIndex) ||
       governmentFinance;
+    if(onlineSession?.mode==='solo' && Number.isInteger(selectedFinance?.city?.centerPlot))
+      selectedPlot=selectedFinance.city.centerPlot;
     state = {
       ...state,
       treasury: selectedFinance?.treasury ?? player.treasury,
@@ -3248,6 +3428,7 @@
       activity: [...game.activity]
     };
     mapDetailRenderer?.setRegion(state.selected, state.states[state.selected]?.name);
+    mapDetailRenderer?.setCityData(selectedFinance?.city || null);
     mapDetailRenderer?.setBuildings(state.buildings);
     update();
   }
@@ -3871,6 +4052,34 @@
       button.textContent='TEST';
     }
   });
+  document.querySelectorAll('[data-city-tool]').forEach(button=>{
+    button.addEventListener('click',()=>selectCityTool(button.dataset.cityTool));
+  });
+  $('city-pause').addEventListener('click',()=>{
+    if(onlineSession?.mode!=='solo') return;
+    performCityAction({type:'pause'});
+  });
+  document.querySelectorAll('[data-city-speed]').forEach(button=>{
+    button.addEventListener('click',()=>performCityAction({
+      type:'speed',value:Number(button.dataset.citySpeed)
+    }));
+  });
+  $('city-open-catalog').addEventListener('click',()=>{
+    if(onlineSession?.mode==='solo') buildMenu?.open();
+  });
+  const cityTaxControls=[
+    ['residential','city-tax-res','city-tax-res-label'],
+    ['commercial','city-tax-com','city-tax-com-label'],
+    ['industrial','city-tax-ind','city-tax-ind-label']
+  ];
+  for(const [sector,inputId,outputId] of cityTaxControls) {
+    $(inputId).addEventListener('input',()=>{
+      $(outputId).textContent=Number($(inputId).value).toFixed(1).replace('.0','')+'%';
+    });
+    $(inputId).addEventListener('change',()=>{
+      performCityAction({type:'tax',sector,value:Number($(inputId).value)});
+    });
+  }
   $('play-solo').addEventListener('click', createSoloWorld);
   $('create-world').addEventListener('click', createWorld);
   $('join-world').addEventListener('click', joinWorld);

@@ -7,7 +7,7 @@
   <meta name="description" content="New World — a territorial strategy simulation by North Assembly.">
   <title>NEW WORLD — North Assembly</title>
   <link rel="icon" href="/na-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./game.css?v=20261111-solo-campaign-v1">
+  <link rel="stylesheet" href="./game.css?v=20261111-theotown-citybuilder-v2">
 </head>
 <body>
   <header class="topbar">
@@ -204,7 +204,51 @@
         <section id="city-view" class="view">
           <p class="panel-kicker">SETTLEMENT / DEVELOPMENT</p>
           <h2 id="city-title">Founding settlement</h2>
-          <p class="muted">Select a plot on the terrain, choose an asset from the Build catalogue, then place it directly into the world. Buildings are constructed over world days and affect the settlement economy.</p>
+          <p id="city-description" class="muted">Plan roads, lay residential, commercial and industrial zones, connect utilities and grow a functioning city.</p>
+          <div id="city-builder-panel" class="city-builder-panel" hidden>
+            <div class="city-builder-heading"><span>CITY CONSTRUCTION</span><small>LAND USE / NETWORKS / SERVICES</small></div>
+            <div class="city-tool-grid" role="group" aria-label="City construction tools">
+              <button type="button" data-city-tool="select" aria-pressed="true"><b>↖</b><span>SELECT</span></button>
+              <button type="button" data-city-tool="road" aria-pressed="false"><b>═</b><span>ROADS</span></button>
+              <button type="button" data-city-tool="residential" aria-pressed="false"><b>R</b><span>RESIDENTIAL</span></button>
+              <button type="button" data-city-tool="commercial" aria-pressed="false"><b>C</b><span>COMMERCIAL</span></button>
+              <button type="button" data-city-tool="industrial" aria-pressed="false"><b>I</b><span>INDUSTRIAL</span></button>
+              <button type="button" data-city-tool="powerLine" aria-pressed="false"><b>ϟ</b><span>POWER LINES</span></button>
+              <button type="button" data-city-tool="waterPipe" aria-pressed="false"><b>≋</b><span>WATER PIPES</span></button>
+              <button type="button" data-city-tool="powerPlant" aria-pressed="false"><b>⚡</b><span>POWER PLANT</span></button>
+              <button type="button" data-city-tool="waterPump" aria-pressed="false"><b>W</b><span>WATERWORKS</span></button>
+              <button type="button" data-city-tool="bulldoze" aria-pressed="false"><b>×</b><span>BULLDOZE</span></button>
+            </div>
+            <p id="city-builder-status" class="city-builder-status" role="status">Select a tool, then click a dry tile on the map.</p>
+            <div class="city-demand-panel">
+              <div class="city-subheading">ZONE DEMAND <small>LIVE</small></div>
+              <div class="city-demand-row"><span>RESIDENTIAL</span><strong id="city-demand-res-label">—</strong><div class="city-demand-track"><i id="city-demand-res"></i></div></div>
+              <div class="city-demand-row"><span>COMMERCIAL</span><strong id="city-demand-com-label">—</strong><div class="city-demand-track"><i id="city-demand-com"></i></div></div>
+              <div class="city-demand-row"><span>INDUSTRIAL</span><strong id="city-demand-ind-label">—</strong><div class="city-demand-track"><i id="city-demand-ind"></i></div></div>
+            </div>
+            <div class="city-utility-grid">
+              <div><small>ELECTRICITY</small><strong id="city-power-status">—</strong><span id="city-power-detail">—</span></div>
+              <div><small>WATER</small><strong id="city-water-status">—</strong><span id="city-water-detail">—</span></div>
+              <div><small>ROAD ACCESS</small><strong id="city-road-status">—</strong><span id="city-road-detail">—</span></div>
+              <div><small>DEVELOPED ZONES</small><strong id="city-developed-count">—</strong><span id="city-zoned-count">—</span></div>
+              <div><small>DAILY CITY BALANCE</small><strong id="city-daily-net">—</strong><span id="city-daily-tax">—</span></div>
+            </div>
+            <div class="city-tax-panel">
+              <div class="city-subheading">CITY TAX RATES</div>
+              <label>RESIDENTIAL <output id="city-tax-res-label">9%</output><input id="city-tax-res" type="range" min="4" max="20" step="0.5" value="9"></label>
+              <label>COMMERCIAL <output id="city-tax-com-label">10%</output><input id="city-tax-com" type="range" min="4" max="20" step="0.5" value="10"></label>
+              <label>INDUSTRIAL <output id="city-tax-ind-label">8%</output><input id="city-tax-ind" type="range" min="4" max="20" step="0.5" value="8"></label>
+            </div>
+            <div class="city-time-panel">
+              <button id="city-pause" type="button">PAUSE</button>
+              <div role="group" aria-label="Simulation speed">
+                <button type="button" data-city-speed="1" aria-pressed="true">1×</button>
+                <button type="button" data-city-speed="2" aria-pressed="false">2×</button>
+                <button type="button" data-city-speed="4" aria-pressed="false">4×</button>
+              </div>
+            </div>
+            <button id="city-open-catalog" class="secondary-button city-catalog-button" type="button">OPEN BUILDING CATALOGUE</button>
+          </div>
           <div class="build-side-summary">
             <div><small>SELECTED PLOT</small><strong id="selected-plot-label">CENTRAL PLOT</strong></div>
             <div><small>AVAILABLE TREASURY</small><strong id="build-budget-side">—</strong></div>
@@ -543,10 +587,11 @@
   <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" crossorigin="anonymous"></script>
   <script src="./civic-systems.js?v=20261109-public-budget-phase5"></script>
   <script src="./simulation.js?v=20261109-public-budget-phase5"></script>
+  <script src="./city-builder.js?v=20261111-theotown-citybuilder-v2"></script>
   <script src="./strategy.js?v=20261109-public-budget-phase5"></script>
-  <script src="./multiplayer.js?v=20261111-solo-campaign-v1"></script>
-  <script src="./map-renderer.js?v=20261108-theotown-builder-v2"></script>
+  <script src="./multiplayer.js?v=20261111-theotown-citybuilder-v2"></script>
+  <script src="./map-renderer.js?v=20261111-theotown-citybuilder-v2"></script>
   <script src="./build-menu.js?v=20261109-colored-sprite-ui-v1"></script>
-  <script src="./game.js?v=20261111-solo-campaign-v1"></script>
+  <script src="./game.js?v=20261111-theotown-citybuilder-v2"></script>
 </body>
 </html>

@@ -30,8 +30,29 @@ test('responsive navigation remains horizontal on smaller screens and respects r
   assert.ok(css.includes('@media(max-width:980px)'));
   assert.ok(css.includes('@media(max-width:740px)'));
   assert.ok(css.includes('prefers-reduced-motion:reduce'));
-  assert.ok(html.includes('game.css?v=20261111-solo-campaign-v1'));
+  assert.ok(html.includes('game.css?v=20261111-theotown-citybuilder-v2'));
 });
+test('solo campaign is an isometric city-builder with roads, RCI zones and utilities',()=>{
+  const cityHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const cityCss=fs.readFileSync(path.join(root,'game.css'),'utf8');
+  const cityGame=fs.readFileSync(path.join(root,'game.js'),'utf8');
+  const cityEngine=fs.readFileSync(path.join(root,'city-builder.js'),'utf8');
+  for(const tool of ['select','road','residential','commercial','industrial','powerLine','waterPipe','powerPlant','waterPump','bulldoze'])
+    assert.ok(cityHtml.includes('data-city-tool="'+tool+'"'));
+  assert.ok(cityHtml.includes('id="city-builder-panel"'));
+  assert.ok(cityHtml.includes('city-demand-res'));
+  assert.ok(cityHtml.includes('city-tax-res'));
+  assert.ok(cityHtml.includes('city-pause'));
+  assert.ok(cityGame.includes('function renderCityBuilder()'));
+  assert.ok(cityGame.includes("type:'paint',tool:activeCityTool,plotIndex:index"));
+  assert.ok(cityGame.includes("['water','shore','wetland','mountain'].includes(terrain.type)"));
+  assert.ok(cityGame.includes("selectCityTool('select')"));
+  assert.ok(cityEngine.includes('function connectedCells('));
+  assert.ok(cityEngine.includes('function growZones('));
+  assert.ok(cityEngine.includes('function advanceDay('));
+  assert.ok(cityCss.includes('.solo-city-mode .map-modes'));
+});
+
 test('campaign screen offers a real local solo start alongside multiplayer',()=>{
   const game=fs.readFileSync(path.join(root,'game.js'),'utf8');
   const multiplayer=fs.readFileSync(path.join(root,'multiplayer.js'),'utf8');
@@ -42,7 +63,22 @@ test('campaign screen offers a real local solo start alongside multiplayer',()=>
   assert.ok(multiplayer.includes('function createSoloWorld('));
   assert.ok(multiplayer.includes('function setSoloRuntime('));
   assert.ok(css.includes('#network-service[hidden]'));
-  assert.ok(html.includes('solo-campaign-v1'));
+  assert.ok(html.includes('theotown-citybuilder-v2'));
+});
+
+test('solo city mode exposes road, zoning, utilities, demand and tax tools',()=>{
+  const cityHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const cityCss=fs.readFileSync(path.join(root,'game.css'),'utf8');
+  const cityScript=fs.readFileSync(path.join(root,'city-builder.js'),'utf8');
+  assert.ok(cityHtml.includes('id="city-builder-panel"'));
+  for(const tool of ['road','residential','commercial','industrial','powerLine','waterPipe','powerPlant','waterPump','bulldoze'])
+    assert.ok(cityHtml.includes('data-city-tool="'+tool+'"'));
+  assert.ok(cityHtml.includes('city-demand-res'));
+  assert.ok(cityHtml.includes('city-tax-res'));
+  assert.ok(cityHtml.includes('city-pause'));
+  assert.ok(cityScript.includes('function growZones('));
+  assert.ok(cityScript.includes('function connectedCells('));
+  assert.ok(cityCss.includes('.solo-city-mode .map-modes'));
 });
 
 test('mobile metrics fit two columns and military navigation uses an existing asset',()=>{

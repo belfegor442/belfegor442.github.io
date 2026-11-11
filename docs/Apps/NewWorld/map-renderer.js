@@ -31,6 +31,7 @@
       this.pools = { residential: [], commercial: [], utility: [], village: [] };
       this.buildingData = new Map();
       this.buildingSprites = new Map();
+      this.cityData = null;
       this.selectedPlot = null;
       this.hoverPlot = null;
       this.pointer = null;
@@ -317,6 +318,13 @@
       this.render();
     }
 
+    setCityData(city) {
+      this.cityData = city && typeof city === 'object' ? city : null;
+      this.active = this.cityData !== null || this.zoom >= 1.65;
+      this.viewport?.classList.toggle('is-city-detail',this.active);
+      this.render();
+    }
+
     setBuildings(buildings) {
       this.buildingData.clear();
       for (const [key, value] of Object.entries(buildings || {})) {
@@ -466,7 +474,9 @@
 
     setCamera(zoom, detailMode = null) {
       this.zoom = clamp(Number(zoom) || 1, 0.04, 6);
-      this.active = detailMode === null ? this.zoom >= 1.65 : Boolean(detailMode);
+      this.active = detailMode === null
+        ? Boolean(this.cityData) || this.zoom >= 1.65
+        : Boolean(detailMode);
       this.viewport?.classList.toggle('is-city-detail', this.active);
       if (this.active && !this.ready && !this.loading && !this.failed) this.loadAtlas();
 
@@ -581,6 +591,121 @@
       }
     }
 
+    drawCityRoad(cx,cy,halfW,halfH,tileW,tileH,scale) {
+      const ctx=this.ctx;
+      this.polygon(cx,cy,halfW*.94,halfH*.94);
+      ctx.fillStyle='#555d5a';
+      ctx.fill();
+      ctx.strokeStyle='rgba(227,221,202,.5)';
+      ctx.lineWidth=Math.max(.7,scale*.9);
+      ctx.stroke();
+      ctx.strokeStyle='rgba(245,232,197,.78)';
+      ctx.lineWidth=Math.max(.65,scale*.7);
+      ctx.setLineDash([Math.max(1,tileW*.12),Math.max(1,tileW*.1)]);
+      ctx.beginPath();
+      ctx.moveTo(cx-tileW*.25,cy);
+      ctx.lineTo(cx+tileW*.25,cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    drawCityFacility(facility,plotIndex,cx,cy,tileW,tileH,scale) {
+      if(!facility) return;
+      const ctx=this.ctx;
+      if(facility.type==='waterPump') {
+        const sprite=this.getSprite('watertower/1x1_standpipe',0);
+        if(sprite) {
+          this.drawBuilding(sprite,cx,cy,tileW,tileH,{});
+          return;
+        }
+      }
+      if(facility.type==='townHall') {
+        const sprite=this.getSprite('village/1x1_village_hall',0);
+        if(sprite) {
+          this.drawBuilding(sprite,cx,cy,tileW,tileH,{});
+          return;
+        }
+      }
+      if(facility.type==='powerPlant') {
+        ctx.save();
+        ctx.fillStyle='rgba(25,32,29,.26)';
+        ctx.beginPath();
+        ctx.ellipse(cx+tileW*.06,cy+tileH*.27,tileW*.35,tileH*.15,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle='#7b7567';
+        ctx.fillRect(cx-tileW*.25,cy-tileH*.08,tileW*.5,tileH*.36);
+        ctx.fillStyle='#a34e3f';
+        ctx.fillRect(cx-tileW*.18,cy-tileH*.39,tileW*.12,tileH*.45);
+        ctx.fillRect(cx+tileW*.05,cy-tileH*.49,tileW*.12,tileH*.55);
+        ctx.fillStyle='#d6b17b';
+        ctx.fillRect(cx-tileW*.15,cy+tileH*.02,tileW*.08,tileH*.12);
+        ctx.fillRect(cx+tileW*.02,cy+tileH*.02,tileW*.08,tileH*.12);
+        ctx.fillStyle='rgba(218,224,211,.56)';
+        ctx.beginPath();
+        ctx.arc(cx-tileW*.12,cy-tileH*.48,tileW*.07,0,Math.PI*2);
+        ctx.arc(cx+tileW*.14,cy-tileH*.58,tileW*.06,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    drawCityOverlay(plotIndex,cx,cy,halfW,halfH,tileW,tileH,scale) {
+      const city=this.cityData;
+      if(!city || plotIndex===null) return;
+      const ctx=this.ctx;
+      const zone=city.zones?.[plotIndex];
+      if(zone) {
+        const palette={
+          residential:{fill:'rgba(75,157,92,.38)',stroke:'#c4e0a7',letter:'R'},
+          commercial:{fill:'rgba(64,132,185,.42)',stroke:'#b4d8ef',letter:'C'},
+          industrial:{fill:'rgba(190,143,59,.42)',stroke:'#f0d29a',letter:'I'}
+        };
+        const style=palette[zone];
+        if(style) {
+          this.polygon(cx,cy,halfW*.77,halfH*.77);
+          ctx.fillStyle=style.fill;
+          ctx.fill();
+          ctx.strokeStyle=style.stroke;
+          ctx.lineWidth=Math.max(.8,scale*1.05);
+          ctx.setLineDash([Math.max(1,tileW*.055),Math.max(1,tileW*.04)]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if(tileW>=21) {
+            ctx.fillStyle='rgba(20,29,26,.9)';
+            ctx.font='700 '+Math.max(8,tileW*.19)+'px Consolas,monospace';
+            ctx.textAlign='center';
+            ctx.textBaseline='middle';
+            ctx.fillText(style.letter,cx,cy+tileH*.02);
+          }
+        }
+      }
+      if(city.roads?.[plotIndex]) this.drawCityRoad(cx,cy,halfW,halfH,tileW,tileH,scale);
+      if(city.powerLines?.[plotIndex]) {
+        ctx.save();
+        ctx.strokeStyle='#e4c66f';
+        ctx.lineWidth=Math.max(1,scale*1.3);
+        ctx.beginPath();
+        ctx.moveTo(cx-halfW*.38,cy+halfH*.04);
+        ctx.lineTo(cx+halfW*.38,cy-halfH*.04);
+        ctx.stroke();
+        ctx.fillStyle='#e4c66f';
+        ctx.fillRect(cx-tileW*.04,cy-tileH*.14,Math.max(1,scale*2),Math.max(1,scale*2));
+        ctx.restore();
+      }
+      if(city.waterPipes?.[plotIndex]) {
+        ctx.save();
+        ctx.strokeStyle='#75c8df';
+        ctx.lineWidth=Math.max(1,scale*1.35);
+        ctx.beginPath();
+        ctx.moveTo(cx-halfW*.32,cy-halfH*.1);
+        ctx.lineTo(cx+halfW*.32,cy+halfH*.1);
+        ctx.stroke();
+        ctx.restore();
+      }
+      const facility=city.facilities?.[plotIndex];
+      if(facility) this.drawCityFacility(facility,plotIndex,cx,cy,tileW,tileH,scale);
+    }
+
     drawTerrain(cell, row, col, cx, cy, tileW, tileH, scale) {
       const ctx = this.ctx;
       const halfW = tileW / 2;
@@ -650,8 +775,9 @@
           }
         }
       }
+      if(blockStep===1) this.drawCityOverlay(plotIndex,cx,cy,halfW,halfH,tileW,tileH,scale);
       const building = plotIndex === null ? null : this.buildingSprites.get(plotIndex);
-      if (buildingData?.id === 'road') {
+      if (!this.cityData?.roads?.[plotIndex] && buildingData?.id === 'road') {
         ctx.save();
         if (Number(buildingData.daysRemaining) > 0) ctx.globalAlpha = 0.48;
         this.polygon(cx, cy, halfW * 0.92, halfH * 0.92);
