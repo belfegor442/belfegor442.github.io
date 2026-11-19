@@ -36,7 +36,6 @@ Fuente de verdad de la organización. Última actualización: 2026-10-06.
 | Software | CryptCast | Aplicación | En desarrollo | — | Proyecto de NA |
 | Software | DraftPad | Aplicación | En desarrollo | — | Aplicación de edición/notas |
 | Software | TeleNet | Aplicación | En desarrollo | — | Proyecto de red/comunicación |
-| Software | Meat | Aplicación | En desarrollo | — | Proyecto de NA |
 | Software | Brew | Aplicación | En desarrollo | — | Proyecto de NA |
 | **Herramientas internas** | NA Command | Sistema interno | En desarrollo | — | Gestión de proyectos/organización |
 | Herramientas internas | Commit-like records | Sistema | Implementado | — | Registros tipo `Added x in main.cpp` |
