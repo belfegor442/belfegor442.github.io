@@ -93,7 +93,7 @@ test("neutralises spreadsheet formula prefixes without changing numeric values",
     record("a", "=HYPERLINK(\"https://example.invalid\",\"open\")", { category: "+cmd", temperature: -12, status: "Open" })
   ], templates);
   assert.match(csv, /'=HYPERLINK/);
-  assert.match(csv, /'\\+cmd/);
+  assert.ok(csv.includes("'+cmd"));
   assert.match(csv, /,-12,/);
 });
 
