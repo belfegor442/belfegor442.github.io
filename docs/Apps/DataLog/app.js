@@ -595,6 +595,25 @@
           $("#templateFormError").textContent = "Cannot change the data type of a field that already contains saved values.";
           return;
         }
+        if (replacement && replacement.type === "select" && oldField.type === "select") {
+          const removedOptions = (oldField.options || []).filter(option => !(replacement.options || []).includes(option));
+          const removesSavedOption = linkedRecords.some(record => removedOptions.includes(record.values && record.values[oldField.key]));
+          if (removesSavedOption) {
+            $("#templateFormError").textContent = "Cannot remove a select option that is used by a saved record.";
+            return;
+          }
+        }
+      }
+      for (const field of fields) {
+        if (!field.required) continue;
+        const missingRequiredValue = linkedRecords.some(record => {
+          const value = record.values ? record.values[field.key] : undefined;
+          return value === undefined || value === null || value === "" || (typeof value === "string" && !value.trim());
+        });
+        if (missingRequiredValue) {
+          $("#templateFormError").textContent = "A field with existing records cannot become required until every linked record has a value for it.";
+          return;
+        }
       }
     }
 
