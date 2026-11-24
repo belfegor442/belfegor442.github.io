@@ -411,6 +411,9 @@
       input = '<textarea id="' + escapeHTML(id) + '" name="field_' + escapeHTML(field.key) + '"' + required + ' maxlength="10000" rows="3">' + safeValue + '</textarea>';
     } else if (field.type === "checkbox") {
       input = '<span class="checkbox-field"><input id="' + escapeHTML(id) + '" type="checkbox" name="field_' + escapeHTML(field.key) + '"' + (value ? " checked" : "") + '> Checked</span>';
+    } else if (field.type === "select") {
+      const options = (field.options || []).map(option => '<option value="' + escapeHTML(option) + '"' + (String(option) === String(value == null ? "" : value) ? " selected" : "") + '>' + escapeHTML(option) + '</option>').join("");
+      input = '<select id="' + escapeHTML(id) + '" name="field_' + escapeHTML(field.key) + '"' + required + '><option value="">Choose an option</option>' + options + '</select>';
     } else {
       const type = field.type === "number" ? "number" : field.type === "date" ? "date" : "text";
       const extra = field.type === "number" ? ' step="any"' : "";
@@ -766,6 +769,11 @@
     $("#templateForm").addEventListener("submit", saveTemplate);
     $("#recordTemplate").addEventListener("change", event => renderRecordFields(event.target.value, {}));
     $("#addTemplateField").addEventListener("click", () => addTemplateField());
+    $("#templateFieldRows").addEventListener("change", event => {
+      if (event.target.name !== "fieldType") return;
+      const options = event.target.closest("[data-field-row]").querySelector(".field-options");
+      options.classList.toggle("is-hidden", event.target.value !== "select");
+    });
     document.addEventListener("click", event => {
       const close = event.target.closest("[data-close-dialog]");
       if (close) {
