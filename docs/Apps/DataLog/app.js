@@ -267,7 +267,7 @@
     const maxCount = Math.max(1, ...summary.byTemplate.map(item => item.count));
     const templateBars = summary.byTemplate.length
       ? '<div class="template-count-list">' + summary.byTemplate.map(item =>
-        '<div class="template-count-row"><div class="template-count-meta"><span>' + escapeHTML(item.name) + '</span><span>' + item.count + '</span></div><div class="progress-track"><div class="progress-fill" style="width:' + (item.count / maxCount * 100).toFixed(1) + '%"></div></div></div>'
+        '<div class="template-count-row"><div class="template-count-meta"><span>' + escapeHTML(item.name) + '</span><span>' + item.count + '</span></div><progress class="progress-bar" max="100" value="' + (item.count / maxCount * 100).toFixed(1) + '">' + item.count + '</progress></div>'
       ).join("") + '</div>'
       : '<p class="muted-cell">Create a template to organise your records.</p>';
 
