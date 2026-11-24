@@ -26,3 +26,5 @@
 .progress-bar::-webkit-progress-bar{border-radius:10px;background:#252538}
 .progress-bar::-webkit-progress-value{border-radius:10px;background:linear-gradient(90deg,#7050f2,#9b85ff)}
 .progress-bar::-moz-progress-bar{border-radius:10px;background:linear-gradient(90deg,#7050f2,#9b85ff)}
+
+.record-subtitle{max-width:360px;margin-top:3px;overflow:hidden;color:var(--dim);font-size:9px;font-weight:400;text-overflow:ellipsis;white-space:nowrap}
