@@ -13,7 +13,7 @@ Run each case in the current stable releases of Chrome, Edge, Firefox and Safari
 5. Search by title and field value. Filter by template and date range. Reset filters.
 6. Create a custom template with multiple fields; create records against it. Rename the template.
 7. Attempt to delete a template that has linked records. The app must block the operation.
-8. Attempt to remove a populated field or change its data type. The app must block the operation.
+8. Attempt to remove a populated field, change its data type, make an unfilled field required or remove a select option used by an existing record. The app must block each operation.
 9. Export CSV. Open it in a spreadsheet application and verify commas, quotation marks, non-ASCII characters and line breaks.
 10. Export JSON, clear the workspace, then restore the backup. Verify every record, template, value and date.
 11. Try to restore malformed JSON, an unsupported backup version, duplicate identifiers and a record referencing a missing template. Each import must be rejected without changing current data.
