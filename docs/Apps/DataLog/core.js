@@ -159,8 +159,8 @@
 
   function csvEscape(value) {
     const raw = value === null || value === undefined ? "" : String(value);
-    const text = typeof value === "number" ? raw : (/^[\\t\\r\\n ]*[=+\\-@]/.test(raw) ? "'" + raw : raw);
-    return /[",\\r\\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    const text = typeof value === "number" ? raw : (/^[\t\r\n ]*[=+\-@]/.test(raw) ? "'" + raw : raw);
+    return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
   }
 
   function recordsToCSV(records, templates) {
