@@ -94,7 +94,7 @@ test("neutralises spreadsheet formula prefixes without changing numeric values",
   ], templates);
   assert.match(csv, /'=HYPERLINK/);
   assert.ok(csv.includes("'+cmd"));
-  assert.match(csv, /,-12\r?\n/);
+  assert.ok(csv.endsWith(",-12"));
 });
 
 test("validates a full backup and rejects broken references and duplicate ids", () => {
