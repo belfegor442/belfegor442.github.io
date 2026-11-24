@@ -8,7 +8,7 @@ Run each case in the current stable releases of Chrome, Edge, Firefox and Safari
 
 1. Open \`/docs/Apps/DataLog/\`; confirm the app loads and the storage status reads Ready.
 2. Refresh the page; confirm the three starter templates remain available and no sample records have been fabricated.
-3. Create a record for each starter template. Verify required-field errors, number validation, dates, checkboxes and long text.
+3. Create a record for each starter template. Verify required-field errors, number validation, dates, checkboxes, select options and long text.
 4. Edit a record; verify its creation date remains unchanged and the update date changes.
 5. Search by title and field value. Filter by template and date range. Reset filters.
 6. Create a custom template with multiple fields; create records against it. Rename the template.
