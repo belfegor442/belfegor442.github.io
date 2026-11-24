@@ -33,7 +33,7 @@ A local static server is also suitable for development. Opening the HTML file di
 
 The IndexedDB database is named \`north-assembly-datalog\` and currently has version 1.
 
-**Templates** define named fields. Each field has a stable key, label, type and required flag. Supported UI field types are short text, long text, number, date and checkbox.
+**Templates** define named fields. Each field has a stable key, label, type and required flag. Supported UI field types are short text, long text, number, date, select and checkbox. Select fields use comma-separated options.
 
 **Records** contain an identifier, title, template identifier, event date, field values, creation timestamp and update timestamp.
 
