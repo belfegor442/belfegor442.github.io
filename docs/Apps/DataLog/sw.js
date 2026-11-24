@@ -1,13 +1,14 @@
 "use strict";
 
-const CACHE_NAME = "north-assembly-datalog-v1";
+const CACHE_NAME = "north-assembly-datalog-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./core.js",
   "./app.js",
-  "./manifest.webmanifest"
+  "./manifest.webmanifest",
+  "./icon.svg"
 ];
 
 self.addEventListener("install", event => {
