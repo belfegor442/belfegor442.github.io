@@ -23,8 +23,10 @@
     const errors = [];
     if (!isObject(input)) return { valid: false, errors: ["Template must be an object."] };
 
-    const name = cleanText(input.name, 80);
+    const rawName = String(input.name == null ? "" : input.name).trim();
+    const name = cleanText(rawName, 80);
     if (!name) errors.push("Template name is required.");
+    if (rawName.length > 80) errors.push("Template name is too long.");
     const fields = Array.isArray(input.fields) ? input.fields : [];
     if (fields.length < 1 || fields.length > 20) errors.push("A template must contain between 1 and 20 fields.");
 
@@ -41,6 +43,8 @@
       if (seen.has(key)) errors.push("Field keys must be unique: " + key + ".");
       seen.add(key);
       if (!label) errors.push("Field " + (index + 1) + " needs a label.");
+      if (String(field.label == null ? "" : field.label).trim().length > 60) errors.push("Field " + (index + 1) + " label is too long.");
+      if (typeof field.required !== "boolean") errors.push("Field " + (index + 1) + " must define required as true or false.");
       if (!FIELD_TYPES.has(type)) errors.push("Field " + (index + 1) + " has an unsupported type.");
       if (type === "select") {
         const options = Array.isArray(field.options) ? field.options.map(v => cleanText(v, 80)).filter(Boolean) : [];
@@ -55,9 +59,10 @@
     const errors = [];
     if (!isObject(input)) return { valid: false, errors: ["Record must be an object."] };
 
-    const title = cleanText(input.title, 160);
+    const rawTitle = String(input.title == null ? "" : input.title).trim();
+    const title = cleanText(rawTitle, 160);
     if (!title) errors.push("A record title is required.");
-    if (title.length > 160) errors.push("Record title is too long.");
+    if (rawTitle.length > 160) errors.push("Record title is too long.");
 
     const template = (templates || []).find(item => item.id === input.templateId);
     if (!template) errors.push("The selected template does not exist.");
@@ -88,8 +93,10 @@
       });
     }
 
+    const occurredAt = Date.parse(input.occurredAt);
     const createdAt = Date.parse(input.createdAt);
     const updatedAt = Date.parse(input.updatedAt);
+    if (!Number.isFinite(occurredAt)) errors.push("Record date is invalid.");
     if (!Number.isFinite(createdAt)) errors.push("Record creation date is invalid.");
     if (!Number.isFinite(updatedAt)) errors.push("Record modification date is invalid.");
 
