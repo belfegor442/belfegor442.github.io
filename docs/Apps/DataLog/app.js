@@ -501,12 +501,14 @@
     const rowId = "field-row-" + (++state.templateRowCounter);
     const current = field || { key: "", label: "", type: "text", required: false };
     const types = [
-      ["text", "Short text"], ["textarea", "Long text"], ["number", "Number"], ["date", "Date"], ["checkbox", "Checkbox"]
+      ["text", "Short text"], ["textarea", "Long text"], ["number", "Number"], ["date", "Date"], ["select", "Select"], ["checkbox", "Checkbox"]
     ];
-    const options = types.map(([value, label]) => '<option value="' + value + '"' + (current.type === value ? " selected" : "") + '>' + label + '</option>').join("");
+    const typeOptions = types.map(([value, label]) => '<option value="' + value + '"' + (current.type === value ? " selected" : "") + '>' + label + '</option>').join("");
+    const optionValues = Array.isArray(current.options) ? current.options.join(", ") : "";
     return '<div class="field-row" id="' + rowId + '" data-field-row>' +
       '<label>Field label<input name="fieldLabel" maxlength="60" required value="' + escapeHTML(current.label) + '" placeholder="e.g. Temperature"></label>' +
-      '<label>Data type<select name="fieldType">' + options + '</select></label>' +
+      '<label>Data type<select name="fieldType">' + typeOptions + '</select></label>' +
+      '<label class="field-options' + (current.type === "select" ? "" : " is-hidden") + '">Options, separated by commas<input name="fieldOptions" maxlength="500" value="' + escapeHTML(optionValues) + '" placeholder="Open, In progress, Closed"></label>' +
       '<input type="hidden" name="fieldKey" value="' + escapeHTML(current.key || "") + '">' +
       '<label class="field-required">Required<input name="fieldRequired" type="checkbox"' + (current.required ? " checked" : "") + '></label>' +
       '<button class="icon-button danger field-row-remove" type="button" data-action="remove-field-row" aria-label="Remove field" title="Remove field">×</button>' +
@@ -555,12 +557,10 @@
       const label = row.querySelector('[name="fieldLabel"]').value.trim();
       const previousKey = row.querySelector('[name="fieldKey"]').value.trim();
       const key = previousKey && !used.has(previousKey) ? (used.add(previousKey), previousKey) : createFieldKey(label, used);
-      return {
-        key,
-        label,
-        type: row.querySelector('[name="fieldType"]').value,
-        required: row.querySelector('[name="fieldRequired"]').checked
-      };
+      const type = row.querySelector('[name="fieldType"]').value;
+      const field = { key, label, type, required: row.querySelector('[name="fieldRequired"]').checked };
+      if (type === "select") field.options = row.querySelector('[name="fieldOptions"]').value.split(",").map(value => value.trim()).filter(Boolean);
+      return field;
     });
     const existing = state.editingTemplateId ? findTemplate(state.editingTemplateId) : null;
     const template = {
