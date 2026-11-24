@@ -728,6 +728,8 @@
       );
       if (!confirmed) return;
       await replaceDatabase(parsed.templates, parsed.records);
+      state.filters = { query: "", templateId: "", from: "", to: "" };
+      state.analysis = { templateId: "", fieldKey: "" };
       await reloadData();
       render();
       showToast("Backup restored. " + state.records.length + " record(s) loaded.");
