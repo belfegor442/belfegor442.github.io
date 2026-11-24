@@ -252,10 +252,12 @@
     const templateMap = new Map(state.templates.map(template => [template.id, template.name]));
     const rows = records.map(record => {
       const title = escapeHTML(record.title);
+      const template = findTemplate(record.templateId);
       const templateName = escapeHTML(templateMap.get(record.templateId) || "Unknown template");
       const date = escapeHTML(formatDate(record.occurredAt || record.createdAt));
       const id = escapeHTML(record.id);
-      return '<tr><td class="record-title">' + title + '</td><td><span class="badge">' + templateName + '</span></td><td class="muted-cell">' + date + '</td><td class="muted-cell">' + escapeHTML(formatDate(record.updatedAt)) + '</td><td><div class="row-actions"><button class="icon-button" type="button" data-action="edit-record" data-id="' + id + '" aria-label="Edit ' + title + '" title="Edit">↗</button><button class="icon-button danger" type="button" data-action="delete-record" data-id="' + id + '" aria-label="Delete ' + title + '" title="Delete">×</button></div></td></tr>';
+      const preview = template ? template.fields.filter(field => record.values && record.values[field.key] !== "" && record.values[field.key] !== undefined && record.values[field.key] !== null).slice(0, 2).map(field => field.label + ": " + (typeof record.values[field.key] === "boolean" ? (record.values[field.key] ? "Yes" : "No") : String(record.values[field.key]))).join(" · ") : "";
+      return '<tr><td class="record-title"><div>' + title + '</div>' + (preview ? '<div class="record-subtitle">' + escapeHTML(preview) + '</div>' : '') + '</td><td><span class="badge">' + templateName + '</span></td><td class="muted-cell">' + date + '</td><td class="muted-cell">' + escapeHTML(formatDate(record.updatedAt)) + '</td><td><div class="row-actions"><button class="icon-button" type="button" data-action="edit-record" data-id="' + id + '" aria-label="Edit ' + title + '" title="Edit">↗</button><button class="icon-button danger" type="button" data-action="delete-record" data-id="' + id + '" aria-label="Delete ' + title + '" title="Delete">×</button></div></td></tr>';
     }).join("");
     return '<div class="table-wrap"><table class="data-table"><thead><tr><th>Record</th><th>Template</th><th>Record date</th><th>Last updated</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       (compact ? "" : '<div class="table-footer"><span>Showing ' + records.length + ' record' + (records.length === 1 ? "" : "s") + '</span><span>Sorted by most recently updated</span></div>');
