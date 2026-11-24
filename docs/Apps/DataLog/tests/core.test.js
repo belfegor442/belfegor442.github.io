@@ -88,6 +88,15 @@ test("exports CSV with correct escaping for commas, quotes and line breaks", () 
   assert.ok(csv.startsWith("\uFEFF"));
 });
 
+test("neutralises spreadsheet formula prefixes without changing numeric values", () => {
+  const csv = core.recordsToCSV([
+    record("a", "=HYPERLINK(\"https://example.invalid\",\"open\")", { category: "+cmd", temperature: -12, status: "Open" })
+  ], templates);
+  assert.match(csv, /'=HYPERLINK/);
+  assert.match(csv, /'\\+cmd/);
+  assert.match(csv, /,-12,/);
+});
+
 test("validates a full backup and rejects broken references and duplicate ids", () => {
   const good = core.createBackup([
     record("a", "Reading", { category: "Lab", temperature: 22, status: "Open" })
