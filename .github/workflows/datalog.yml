@@ -1,0 +1,32 @@
+name: DataLog validation
+
+on:
+  push:
+    paths:
+      - "docs/Apps/DataLog/**"
+      - ".github/workflows/datalog.yml"
+  pull_request:
+    paths:
+      - "docs/Apps/DataLog/**"
+      - ".github/workflows/datalog.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check docs/Apps/DataLog/core.js
+          node --check docs/Apps/DataLog/app.js
+          node --check docs/Apps/DataLog/sw.js
+      - name: Run core regression tests
+        run: node --test docs/Apps/DataLog/tests/*.test.js
