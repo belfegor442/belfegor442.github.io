@@ -438,6 +438,7 @@
     const select = $("#recordTemplate");
     select.innerHTML = state.templates.map(template => '<option value="' + escapeHTML(template.id) + '">' + escapeHTML(template.name) + '</option>').join("");
     select.value = record ? record.templateId : state.templates[0].id;
+    select.disabled = Boolean(record);
     form.elements.title.value = record ? record.title : "";
     renderRecordFields(select.value, record ? record.values : {});
     $("#recordDialog").showModal();
